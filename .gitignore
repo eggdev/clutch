@@ -1,0 +1,34 @@
+# Build output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+test-output
+
+# Dependencies
+node_modules
+
+# Editors
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# System files
+.DS_Store
+
+# Nx
+.nx/cache
+.nx/workspace-data
+.nx/migrate-runs
+.nx/polygraph
+
+# Agents
+.claude/worktrees
+.claude/settings.local.json
+
+# Local secrets and test artifacts
+.env.local
+.env.*.local
+playwright-report/
+test-results/

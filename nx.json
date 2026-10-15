@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "analytics": false,
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "production": ["default", "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)"],
+    "sharedGlobals": []
+  },
+  "plugins": [
+    {
+      "plugin": "@nx/js/typescript",
+      "options": {
+        "typecheck": { "targetName": "typecheck" },
+        "build": {
+          "targetName": "build",
+          "configName": "tsconfig.lib.json",
+          "buildDepsName": "build-deps",
+          "watchDepsName": "watch-deps"
+        },
+        "compiler": "tsgo"
+      }
+    },
+    {
+      "plugin": "@nx/oxlint",
+      "options": { "targetName": "lint" }
+    }
+  ],
+  "sync": { "applyChanges": true },
+  "targetDefaults": {
+    "lint": {
+      "inputs": [
+        "default",
+        "{workspaceRoot}/.oxlintrc.json",
+        "{workspaceRoot}/tools/lint/**/*",
+        "{workspaceRoot}/packages/**/*",
+        { "externalDependencies": ["oxlint"] }
+      ]
+    }
+  }
+}

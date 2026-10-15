@@ -1,0 +1,39 @@
+import { resolve } from 'node:path';
+
+/** Oxlint handles source files; this companion check covers JSON manifests. */
+export async function checkManifests(root: string): Promise<string[]> {
+  const workspace = await Bun.file(resolve(root, 'package.json')).json();
+  const patterns: string[] = workspace.workspaces || [];
+  const exclusions = patterns
+    .filter((pattern) => pattern.startsWith('!'))
+    .map((pattern) => new Bun.Glob(`${pattern.slice(1)}/package.json`));
+  const files = new Set(['package.json']);
+  for (const pattern of patterns.filter((pattern) => !pattern.startsWith('!'))) {
+    for await (const file of new Bun.Glob(`${pattern}/package.json`).scan({ cwd: root })) {
+      if (!exclusions.some((glob) => glob.match(file))) files.add(file);
+    }
+  }
+  const errors: string[] = [];
+  for (const file of files) {
+    const manifest = await Bun.file(resolve(root, file)).json();
+    if (Object.hasOwn(manifest, 'exports'))
+      errors.push(
+        `${file}: package exports are forbidden; use TypeScript path aliases to source files.`,
+      );
+    const kinds = (manifest.nx?.tags ?? []).filter(
+      (tag: string) => tag === 'type:service' || tag === 'type:domain',
+    );
+    if (file.startsWith('packages/') && kinds.length !== 1)
+      errors.push(
+        `${file}: a package needs exactly one Nx tag, type:service or type:domain. See docs/contributing/import-boundaries.md.`,
+      );
+  }
+  return errors;
+}
+
+if (import.meta.main) {
+  const errors = await checkManifests(resolve(import.meta.dir, '../..'));
+  for (const error of errors) console.error(error);
+  if (errors.length) process.exitCode = 1;
+  else console.log('Workspace manifests have no exports maps, and each package has one type tag.');
+}

@@ -1,0 +1,109 @@
+{
+  "name": "project-template",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "validate": "nx run-many -t typecheck test lint format-check lint-policy-test check-docs-file-refs check-docs-temporal check-decisions check-file-size check-kickoff-slots",
+    "check": "nx run-many -t typecheck lint format-check",
+    "format": "nx run project-template:format"
+  },
+  "devDependencies": {
+    "@nx/js": "23.2.1",
+    "@nx/oxlint": "23.2.1",
+    "@nx/workspace": "23.2.1",
+    "@types/bun": "^1.4.2",
+    "@types/node": "^22.0.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "nx": "23.2.1",
+    "oxfmt": "^0.60.0",
+    "oxlint": "^1.75.0",
+    "tslib": "^2.3.0",
+    "typescript": "~6.0.3"
+  },
+  "packageManager": "bun@1.4.2",
+  "nx": {
+    "targets": {
+      "lint": {
+        "executor": "nx:run-commands",
+        "options": {
+          "commands": [
+            "oxlint tools",
+            "bun tools/lint/check-manifests.ts"
+          ],
+          "parallel": false
+        }
+      },
+      "format": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "oxfmt --write ."
+        },
+        "cache": false
+      },
+      "format-check": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "oxfmt --check ."
+        }
+      },
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "tsgo -p tools/tsconfig.json"
+        }
+      },
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun test tools --path-ignore-patterns 'tools/lint/**'"
+        }
+      },
+      "lint-policy-test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun test tools/lint"
+        }
+      },
+      "check-docs-file-refs": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-docs-file-refs.ts"
+        },
+        "cache": false
+      },
+      "check-docs-temporal": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-docs-temporal.ts"
+        },
+        "cache": false
+      },
+      "check-decisions": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-decisions.ts"
+        },
+        "cache": false
+      },
+      "check-file-size": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-file-size.ts"
+        },
+        "cache": false
+      },
+      "check-kickoff-slots": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-kickoff-slots.ts"
+        },
+        "cache": false
+      }
+    }
+  }
+}
