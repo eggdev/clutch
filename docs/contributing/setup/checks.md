@@ -90,7 +90,7 @@ reads the reason. The check rejects:
 - A file over the limit with no entry
 - A file over its budget
 - An entry with no reason
-- An entry for a file that is back within the limit, or that no longer exists
+- An entry for a file that is within the limit, or for a file that does not exist
 
 When a file outgrows its design, split it. A split keeps every test: the test
 count is the same before and after.
