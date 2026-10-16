@@ -28,7 +28,7 @@ The comments in `oxlint.config.ts` are the record. In short:
 | Style         | Function declarations, `Array<T>`, `type` over `interface`, named exports                                                                                                       |
 | Off           | `sort-keys`, `no-await-in-loop`, `promise/avoid-new`, `default-case`, `prefer-named-capture-group`, `no-plusplus`, `no-bitwise`, and two rules that another rule already covers |
 | Configured    | `prefer-destructuring` for objects only                                                                                                                                         |
-| Default files | Config files that a tool loads by default export may use one                                                                                                                    |
+| Default files | Config files and Worker entries (`apps/*/src/worker.ts`) that a tool loads by default export may use one                                                                        |
 
 `typescript/no-explicit-any` and `no-warning-comments` come from the preset. A
 marker comment such as FIXME or HACK fails lint. Record the work in an issue.

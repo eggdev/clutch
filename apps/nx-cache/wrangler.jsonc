@@ -1,0 +1,15 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Kickoff renames the worker and the bucket with the root project.
+  "name": "project-template-nx-cache",
+  "main": "./src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  // Contributor infrastructure. The workers.dev URL is enough, so the worker
+  // needs no custom domain.
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "r2_buckets": [{ "binding": "CACHE_BUCKET", "bucket_name": "project-template-nx-cache" }],
+  // The deploy workflow sets the commit with --var. The secrets are
+  // CACHE_WRITE_TOKEN and CACHE_READ_TOKEN. See docs/contributing/setup/nx.md.
+  "vars": { "BUILD_COMMIT": "local" },
+}

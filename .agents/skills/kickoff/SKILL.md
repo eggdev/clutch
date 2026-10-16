@@ -111,6 +111,8 @@ secret inventory, the operator accounts and the rollback commands.
 
 1. Fill the slots in `AGENTS.md` and `docs/contributing/index.md`. Rewrite
    `README.md` for the product. Rename the root project in `package.json`.
+   Rename the Nx cache worker and its R2 bucket to `<project>-nx-cache` in
+   `apps/nx-cache/wrangler.jsonc` and `docs/contributing/setup/nx.md`.
 2. Delete `KICKOFF.md` and its line in `AGENTS.md`.
 3. Run `mise exec -- bun run validate`. The slot check is strict now. Each
    slot left belongs to a phase: ask its question, or delete the slot when the

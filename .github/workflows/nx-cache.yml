@@ -1,0 +1,54 @@
+name: Nx cache worker
+
+# Deploys apps/nx-cache, the Nx remote cache. See
+# docs/contributing/setup/nx.md#remote-cache for the one-time setup.
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/nx-cache/**
+      - .github/workflows/nx-cache.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nx-cache-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # A manual run deploys only from main.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v2
+      - run: bun install --frozen-lockfile
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: bun x wrangler deploy --config apps/nx-cache/wrangler.jsonc --var "BUILD_COMMIT:$GITHUB_SHA"
+      - name: Check health
+        env:
+          NX_CACHE_URL: ${{ vars.NX_CACHE_URL }}
+        run: |
+          if [ -z "$NX_CACHE_URL" ]; then
+            echo "::warning title=Nx cache::Set the NX_CACHE_URL variable to the worker URL. The health check is skipped."
+            exit 0
+          fi
+          for attempt in $(seq 1 20); do
+            commit="$(curl --silent --fail --max-time 10 "${NX_CACHE_URL%/}/health" | jq -r .commit || true)"
+            if [ "$commit" = "$GITHUB_SHA" ]; then
+              echo "The Nx cache worker serves $GITHUB_SHA."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error title=Nx cache::${NX_CACHE_URL%/}/health does not report commit $GITHUB_SHA."
+          exit 1

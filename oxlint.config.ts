@@ -65,5 +65,10 @@ export default defineConfig({
       files: ['*.config.{ts,mts,js,mjs}', 'tools/hooks/paths.mjs', 'tools/lint/import-policy.mjs'],
       rules: { 'import/no-default-export': 'off' },
     },
+    {
+      // The Workers runtime loads a worker entry through its default export.
+      files: ['apps/*/src/worker.ts'],
+      rules: { 'import/no-default-export': 'off' },
+    },
   ],
 });
