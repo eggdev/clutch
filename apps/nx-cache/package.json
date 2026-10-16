@@ -7,7 +7,7 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "bun test apps/nx-cache"
+          "command": "bun tools/test-budget.ts 60 -- bun test apps/nx-cache"
         }
       }
     }

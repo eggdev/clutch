@@ -68,13 +68,13 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "bun test tools --path-ignore-patterns 'tools/lint/**'"
+          "command": "bun tools/test-budget.ts 60 -- bun test tools --path-ignore-patterns 'tools/lint/**'"
         }
       },
       "lint-policy-test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "bun test tools/lint"
+          "command": "bun tools/test-budget.ts 60 -- bun test tools/lint"
         }
       },
       "check-docs-file-refs": {
@@ -159,13 +159,21 @@
           "check-dependency-overrides",
           "check-user-docs",
           "knip",
-          "check-migrations"
+          "check-migrations",
+          "check-lockfile"
         ]
       },
       "check-migrations": {
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/check-migrations.ts"
+        },
+        "cache": false
+      },
+      "check-lockfile": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun install --frozen-lockfile"
         },
         "cache": false
       }

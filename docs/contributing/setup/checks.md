@@ -57,6 +57,7 @@ tests the workflow and dependency checks.
 | `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target`   |
 | `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)               |
 | `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md) |
+| `check-lockfile`             | A `bun.lock` that does not match the manifests                                                     |
 | `check-dependency-overrides` | An override without a documented reason, a stale reason, or a repeated JSON key                    |
 | `audit-prod`                 | A moderate or worse advisory in a production dependency                                            |
 
@@ -109,6 +110,19 @@ deleted, not listed. See
 When a tool calls a file in a way that knip cannot see, run it through a
 `package.json` script. The Git hooks do this: they call `hooks:pre-commit` and
 `hooks:pre-push`.
+
+## Test time budget
+
+Each test target runs through
+[`tools/test-budget.ts`](../../../tools/test-budget.ts). A suite that takes more
+than 60 seconds fails, even when every test passes. A slow suite slows every
+push, and it is often the first sign of a test that reaches the network or
+builds too much setup.
+
+When the budget fails, make the slowest tests faster. `bun test` prints the time
+of each one. Never delete or skip a test to fit the budget. Raise a budget only
+in a reviewed change that says why. The budget is the first argument of the
+target's command in `package.json`.
 
 ## Test output
 
