@@ -7,9 +7,9 @@ describe how the system works.
 
 ## Keep a record short
 
-Agents load these records often. Aim for half a page: context, decision,
-consequences. A record that needs more is usually two decisions, or an
-architecture page.
+Agents load these records often. A record has three parts: context, decision,
+consequences. It has at most 500 words. A record that needs more is usually two
+decisions, or an architecture page.
 
 ## When to add a record
 
@@ -22,13 +22,29 @@ otherwise propose again. Also write one before you go through a
 2. Add the record to the steering list below with a one-line summary of the no.
 
 Do not write a record for each PR, for a layout or UI change, or for a library
-pick that the code already shows. The `check-decisions` target rejects a
-duplicate number or a record that this index does not list once.
+pick that the code already shows.
+
+The `check-decisions` target rejects:
+
+- A duplicate number, or a file name that is not `NNNN-kebab-slug.md`
+- A status other than the three above, or a status link to a record that does
+  not exist or is not later
+- A record with no `**Revisit if:**` line
+- A record over 500 words
+- A record that this index does not list once, or lists in the wrong section
 
 ## Changing a decision
 
-Do not edit or delete an accepted record. Write a new record, mark the old one
-`superseded by NNNN`, and move it to the historical list.
+Do not edit or delete an accepted record. Write a new record, then change only
+the status line of the old one:
+
+| The new record               | Old status                             | Old record in the index |
+| ---------------------------- | -------------------------------------- | ----------------------- |
+| Replaces the whole decision  | `superseded by [NNNN](./NNNN-slug.md)` | Historical              |
+| Changes part of the decision | `amended by [NNNN](./NNNN-slug.md)`    | Steering list           |
+
+A record amended more than once lists each amending record:
+`amended by [0007](./0007-a.md), [0012](./0012-b.md)`.
 
 ## Steering list
 

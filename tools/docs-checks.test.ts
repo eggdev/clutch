@@ -7,6 +7,10 @@ import { checkKickoffSlots } from '@tools/check-kickoff-slots';
 import { checkUserDocs } from '@tools/check-user-docs';
 import { inRepo } from '@tools/testing/in-repo';
 
+/** A short decision record with the given status line. */
+const decision = (status: string) =>
+  `# A decision\n\n- **Status:** ${status}\n- **Date:** 2026-10-16\n\n## Consequences\n\n**Revisit if:** usage doubles.\n`;
+
 test('file refs reject a link or a root code path to a missing file, and skip fenced examples', async () => {
   expect(
     await inRepo(
@@ -33,10 +37,10 @@ test('decisions reject a duplicate number and a record the index does not list o
   const errors = await inRepo(
     {
       'docs/contributing/decisions/index.md':
-        '- [0001](./0001-push-not-poll.md)\n- [0001](./0001-push-not-poll.md)\n- [0000](./0000-template.md)\n',
+        '## Steering list\n\n- [0001](./0001-push-not-poll.md)\n- [0001](./0001-push-not-poll.md)\n- [0000](./0000-template.md)\n\n## Historical\n',
       'docs/contributing/decisions/0000-template.md': '',
-      'docs/contributing/decisions/0001-push-not-poll.md': '',
-      'docs/contributing/decisions/0001-no-barrels.md': '',
+      'docs/contributing/decisions/0001-push-not-poll.md': decision('accepted'),
+      'docs/contributing/decisions/0001-no-barrels.md': decision('accepted'),
     },
     checkDecisions,
   );
@@ -44,6 +48,41 @@ test('decisions reject a duplicate number and a record the index does not list o
     'docs/contributing/decisions/0001-push-not-poll.md: 0001 is also used by 0001-no-barrels.md. Renumber the later record.',
     'docs/contributing/decisions/index.md: lists 0001-no-barrels.md 0 times. List each record once.',
     'docs/contributing/decisions/index.md: lists 0001-push-not-poll.md 2 times. List each record once.',
+  ]);
+});
+
+test('decisions need a known status that names a later record, a revisit-if, the word limit, and the right index section', async () => {
+  const errors = await inRepo(
+    {
+      'docs/contributing/decisions/index.md': [
+        '## Steering list',
+        '- [0001](./0001-poll.md)',
+        '- [0003](./0003-push.md)',
+        '- [0004](./0004-long.md)',
+        '- [0005](./0005-unknown.md)',
+        '## Historical',
+        '- [0002](./0002-cache.md)',
+      ].join('\n'),
+      'docs/contributing/decisions/0001-poll.md': decision('superseded by [0003](./0003-push.md)'),
+      'docs/contributing/decisions/0002-cache.md': decision(
+        'amended by [0003](./0003-push.md), [0001](./0001-poll.md)',
+      ),
+      'docs/contributing/decisions/0003-push.md': decision('accepted').replace(
+        /\*\*Revisit if:\*\*.*/,
+        '',
+      ),
+      'docs/contributing/decisions/0004-long.md': decision('accepted') + ' word'.repeat(500),
+      'docs/contributing/decisions/0005-unknown.md': decision('amended in place'),
+    },
+    checkDecisions,
+  );
+  expect(errors).toEqual([
+    'docs/contributing/decisions/0002-cache.md: the status links 0001-poll.md. It must name a later record.',
+    'docs/contributing/decisions/0003-push.md: add a "**Revisit if:**" line with the condition that reopens the decision.',
+    'docs/contributing/decisions/0004-long.md: 515 words, limit 500. Split it into two decisions, or move the design to an architecture page.',
+    'docs/contributing/decisions/0005-unknown.md: the status must be "accepted", "superseded by [NNNN](./NNNN-slug.md)" or "amended by [NNNN](./NNNN-slug.md)".',
+    'docs/contributing/decisions/index.md: 0001-poll.md is superseded. List it under "Historical".',
+    'docs/contributing/decisions/index.md: 0002-cache.md is in force. List it under "Steering list".',
   ]);
 });
 
