@@ -21,17 +21,26 @@ Never mock an internal module. The `repo-imports/no-internal-mocks` lint rule
 rejects `mock.module`, `jest.mock`, `vi.mock` and `spyOn` on `@repo/*` and `@/`
 imports.
 
-For an upstream vendor, use the highest rung that exists:
+Our own code always runs for real in a test. Only an upstream vendor gets a
+stand-in, and only at the edge where our code calls the vendor. For a vendor,
+use the highest rung that exists:
 
 1. **The real service, run locally.** For example workerd and Miniflare for
    Cloudflare, a Postgres container, or `stripe-mock`.
-2. **A fake, only when no local runtime exists.** The fake lives in the owner
-   module's `src/testing/`. It is typed against the SDK interface. A shared
-   contract suite runs against the fake on each run and against the real service
-   on a schedule. A test that fails on the real service and passes on the fake
-   shows that the fake drifted.
+2. **A mock API server, when the vendor speaks HTTP and has no local
+   runtime.** It answers the vendor's API on a local port, and our code calls
+   it the way it calls the vendor, through its normal client and
+   configuration. It lives in `tools/mocks/<vendor>/`, so production code
+   cannot import it, and it shows what it received at a `/__mocks` route. Local development, previews and end-to-end tests share it.
+   For example, an email mock keeps each sent message, and a journey reads the
+   sign-in code from it. The journey never reads the code from the database.
+3. **A typed fake, for a unit test.** The fake lives in the owner module's
+   `src/testing/`. It is typed against the SDK interface, and it connects
+   through the module's port. Never patch an import.
 
-Connect a fake through the module's port. Never patch an import.
+A shared contract suite runs against each mock and fake on every run, and
+against the real service on a schedule. A test that fails on the real service
+and passes on the stand-in shows that the stand-in drifted.
 
 ## Structure
 

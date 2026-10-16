@@ -72,6 +72,8 @@ decision. Show a draft answer with each question.
   suite cover?
 - Which security rules must every later change keep? Which risks do you accept
   on purpose, and when would you revisit each one?
+- Does the product encrypt stored data with a key that it holds, beyond the
+  storage vendor's encryption? The default is no. Name the threat that needs it.
 - Which secrets exist, what does each one protect, and what breaks when it
   rotates?
 - Which vendor accounts hold the product, and how do you recover each one?

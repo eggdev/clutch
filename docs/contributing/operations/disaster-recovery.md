@@ -50,6 +50,10 @@ runtimes cannot delete from it. See [operator accounts](./operator-accounts.md).
 
 ## Encryption keys
 
+This section applies only when the project encrypts stored data with a key that
+it holds. Kickoff decides that from a stated threat. Most projects rely on the
+encryption of their storage vendor and skip it.
+
 A key that encrypts stored data has an escrow copy outside the vendor that uses
 it. A drill opens the escrow copy and decrypts sample data with it. A copy that
 nobody has opened is not proven. See [secret rotation](./secret-rotation.md).
