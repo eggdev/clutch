@@ -78,6 +78,8 @@ decision. Show a draft answer with each question.
 - Which production numbers does an agent need to read? Which analytics source
   gives them without customer content?
 - What is the first action for each failure: roll back, or fix forward?
+- How much data can each store lose, and how long may a restore take? Which
+  stores are backed up, rebuilt or accepted as lost?
 - Which performance numbers get a budget?
 
 ## What past owners pushed back on

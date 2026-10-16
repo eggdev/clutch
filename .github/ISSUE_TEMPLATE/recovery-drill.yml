@@ -1,0 +1,44 @@
+name: Recovery drill
+description: The record of one restore drill. See docs/contributing/operations/disaster-recovery.md.
+title: 'Drill: <store> from <backup>'
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A recovery path counts only after a drill restores real data from it.
+        Restore into a separate environment, never over production.
+  - type: input
+    id: store
+    attributes:
+      label: Store
+      description: The store from the recovery target table.
+    validations:
+      required: true
+  - type: input
+    id: backup
+    attributes:
+      label: Backup used
+      description: The backup or escrow copy, and its time.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: Each command you ran, and the result that showed the step worked.
+    validations:
+      required: true
+  - type: input
+    id: duration
+    attributes:
+      label: Time to restore
+      description: Compare it with the recovery time target.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Result
+      description: What came back, what did not, and each step that failed. Link a fix issue for each failure.
+    validations:
+      required: true

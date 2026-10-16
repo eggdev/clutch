@@ -8,6 +8,7 @@ How to operate production. Open only the page you need.
 | [Secret rotation](./secret-rotation.md)     | A key leaked, expires or is due for rotation         |
 | [Operator accounts](./operator-accounts.md) | You need a vendor account, a token or access back    |
 | [Production access](./production-access.md) | You or an agent needs to read production data        |
+| [Disaster recovery](./disaster-recovery.md) | Data is lost, or a store needs a restore drill       |
 | [Security](../security.md)                  | You change auth, headers, logs or deploy permissions |
 
 <!-- kickoff: One row for each project runbook, such as a data migration or a disaster recovery page. Delete this slot when there is none. -->
