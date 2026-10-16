@@ -17,6 +17,13 @@ with no declaration. See
 [one door for each decision](../docs/principles/one-door-for-each-decision.md).
 When a check enforces the declaration, delete this rule.
 
+## Destructive automation
+
+Flag a script or workflow that deletes a cloud resource with no name guard in
+the same function. See
+[previews](../docs/contributing/setup/previews.md#destructive-automation-checks-the-name-first).
+When a check enforces the guard, delete this rule.
+
 ## Docs move with behavior
 
 When a change alters how a module or flow works, the page that owns it must
