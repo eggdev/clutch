@@ -226,11 +226,15 @@ export function parseRegistry(data) {
 
 const registries = new Map();
 /** The parsed registry at the repository root, read once per lint run. */
+/** The registry under `root` as written, or null when the file is missing. */
+export function readRegistry(root) {
+  const file = path.join(root, registryFile);
+  return existsSync(file) ? (parse(readFileSync(file, 'utf-8')) ?? {}) : null;
+}
+
 export function registryOf(root) {
   if (!registries.has(root)) {
-    const file = path.join(root, registryFile);
-    const data = existsSync(file) ? parse(readFileSync(file, 'utf-8')) : null;
-    registries.set(root, parseRegistry(data ?? {}));
+    registries.set(root, parseRegistry(readRegistry(root) ?? {}));
   }
   return registries.get(root);
 }

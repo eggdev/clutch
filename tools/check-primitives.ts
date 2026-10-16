@@ -1,8 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
-import { parseRegistry, registryFile } from '@tools/lint/import-policy.mjs';
-import { parse } from 'yaml';
+import { parseRegistry, readRegistry, registryFile } from '@tools/lint/import-policy.mjs';
 
 /**
  * Checks the primitives registry: unique ids, known groups and kinds, real
@@ -139,12 +138,11 @@ function registryProblems(root: string, registry: Registry): Array<string> {
   return problems.map(([entry, problem]) => `${registryFile}: ${entry} ${problem}`);
 }
 
-export async function checkPrimitives(root: string): Promise<Array<string>> {
-  const file = path.join(root, registryFile);
-  if (!existsSync(file)) {
+export function checkPrimitives(root: string): Array<string> {
+  const registry: Registry | null = readRegistry(root);
+  if (!registry) {
     return [`${registryFile}: the file is missing. Restore it from the project template.`];
   }
-  const registry: Registry = parse(await Bun.file(file).text()) ?? {};
   const errors: Array<string> = [];
   try {
     parseRegistry(registry);
@@ -155,7 +153,7 @@ export async function checkPrimitives(root: string): Promise<Array<string>> {
 }
 
 if (import.meta.main) {
-  const errors = await checkPrimitives(process.cwd());
+  const errors = checkPrimitives(process.cwd());
   if (errors.length) {
     console.error(
       [

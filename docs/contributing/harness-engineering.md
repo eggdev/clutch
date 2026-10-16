@@ -60,6 +60,8 @@ A message that names only the problem costs a round trip to find the fix. See
 - Put the verification commands you ran in the PR description.
 - Update docs in the same change when a workflow or constraint shifts.
 - Document when to use a new pattern in the change that adds it.
+- On request, the [`visual-recap`](../../.agents/skills/visual-recap/SKILL.md)
+  skill writes a PR recap block: the primitives touched, the risk and a diagram.
 
 ## Keep docs from drifting
 

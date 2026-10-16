@@ -2,6 +2,10 @@
 
 <!-- What this change does and why, in two or three sentences. Link the issue. -->
 
+## Risk
+
+<!-- The level: `composes` (low), `extends` (medium) or `adds` (high), and the primitive ids that the change touches. See the risk levels in docs/contributing/architecture/primitives.yaml. An `adds` change updates that registry in this PR. On request, the visual-recap skill can fill a recap block in this description. -->
+
 ## Verification
 
 <!-- The commands you ran, such as `mise exec -- bun run validate`, and their result. -->

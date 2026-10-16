@@ -5,7 +5,7 @@ import path from 'node:path';
 /** Writes the files into a new directory, runs `check` there, and deletes the directory. */
 export async function inRepo<T>(
   files: Record<string, string>,
-  check: (root: string) => Promise<T>,
+  check: (root: string) => T | Promise<T>,
 ): Promise<T> {
   const root = await mkdtemp(path.join(tmpdir(), 'repo-check-'));
   try {

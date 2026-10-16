@@ -21,6 +21,13 @@
 #               docs/contributing/import-boundaries.md#exceptions.
 #
 # Kickoff adds the product primitives, and fills `layers` and `invariants`.
+#
+# Risk levels. A PR names the highest level that applies. See
+# .agents/skills/visual-recap/SKILL.md.
+#   composes (low):   wires existing primitives together. Their behavior stays.
+#   extends (medium): changes the behavior or the interface of a primitive.
+#   adds (high):      adds, removes or reshapes a primitive. Update this file
+#                     in the same PR.
 
 version: 1
 
