@@ -100,6 +100,28 @@ decision. Show a draft answer with each question.
 - Which performance numbers get a budget? Does the live site get a weekly check
   against a budget file, with one tracking issue that opens and closes itself?
 
+## 5. Product edges
+
+Ask each one. When the owner does not know yet, add it to "Later, not now" in
+project intent and move on. Each answer has a default to propose.
+
+- Does the product need uptime monitoring? Default: a probe that runs outside
+  the product's infrastructure and checks public endpoints only. It sends one
+  alert for each outage, one reminder each day and one all-clear.
+- Do operators get alerts about product events? Default: the product emits a
+  domain event, and the alert subscribes to it. The product sends email
+  directly only to the account owner, such as a password reset.
+- Does the product issue API tokens? Default: a prefix that secret scanners
+  find, only a hash stored, an idle expiry and an absolute expiry, and rotate
+  and revoke for the user.
+- Does the product accept inbound webhooks? Default: a wrong secret, a disabled
+  endpoint and an unknown endpoint all return the same 404. Compare secrets in
+  constant time. Cap the payload size, reject replays outside a time window,
+  and let an old and a new secret overlap while a secret rotates.
+- Is the repository public, and does it accept outside contributions? Default:
+  private. A public repository that accepts contributions needs a license and
+  a contributor license agreement.
+
 ## What past owners pushed back on
 
 - Exceptions that "agents will misuse". Propose the rule with no exception.

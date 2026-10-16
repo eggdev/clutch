@@ -113,6 +113,10 @@ languages, test runners, and which CI steps the journeys need. Then walk the
 security and operations pages: the security rules, the accepted risks, the
 secret inventory, the operator accounts and the rollback commands.
 
+Then ask the product edge questions in section 5 of the question bank:
+uptime, operator alerts, API tokens, inbound webhooks and repository access.
+Write each answer to the page that owns it.
+
 Set up the project's own Nx remote cache. Each project has its own worker and
 R2 bucket, so one repository never reads another's cache:
 
