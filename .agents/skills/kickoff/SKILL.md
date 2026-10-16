@@ -82,7 +82,7 @@ capabilities the product needs. Collect them for phase 3.
 ### 3. Services
 
 Output: the slots in `docs/contributing/architecture/` (the index, request
-context, authorization and data storage), one page for each other service with
+context, authorization, data storage and feature flags), one page for each other service with
 real rules, `tools/lint/boundaries.json`, and a decision record for each no.
 
 For each capability from phase 2 (sign-in, data storage, sync, files, email,

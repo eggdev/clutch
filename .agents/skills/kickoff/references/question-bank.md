@@ -44,6 +44,8 @@ decision. Show a draft answer with each question.
 - Do two people edit the same record at the same time? If so, how do edits
   merge, and who wins on a conflict?
 - Does the client get updates by push or by poll?
+- Which service holds feature flag state? PostHog is the default. Who owns the
+  flag registry module?
 - What may operators see? Is support access granted by the customer, for a
   set time?
 - How does the customer pay, and for what unit: seats, projects, usage?

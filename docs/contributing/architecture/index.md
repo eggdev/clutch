@@ -55,6 +55,8 @@ packages/<name>/src/
   each surface declares
 - [Data storage](./data-storage.md): tenant isolation, the data inventory and
   frozen storage contracts
+- [Feature flags](./feature-flags.md): the registry in code, the flag service,
+  and when a flag goes away
 
 <!-- kickoff: One link for each other system page, with when to open it. Each user journey from kickoff gets a page, and so does each service with real rules (authentication, sync, jobs). -->
 
