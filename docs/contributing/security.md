@@ -54,8 +54,11 @@ queries, logging or deploy configuration.
 15. **Background jobs do not grant access.** Role, membership, billing and
     secret grants need a signed-in person. A job, webhook or third-party code
     cannot grant itself access.
+16. **Agents hold no production credential that writes data or reads customer
+    content.** Production data questions run as reviewed query workflows. See
+    [production access](./operations/production-access.md).
 
-<!-- kickoff: Project rules. A numbered list that continues from 16. Each rule is one bold sentence, then the file or check that enforces it. Include the CSRF design, the tenant key name and the auth surfaces. -->
+<!-- kickoff: Project rules. A numbered list that continues from 17. Each rule is one bold sentence, then the file or check that enforces it. Include the CSRF design, the tenant key name and the auth surfaces. -->
 
 When a rule can be a check, add the check. See
 [harness engineering](./harness-engineering.md) and [checks](./setup/checks.md).

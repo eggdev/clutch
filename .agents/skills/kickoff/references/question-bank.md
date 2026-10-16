@@ -72,6 +72,8 @@ decision. Show a draft answer with each question.
 - Which secrets exist, what does each one protect, and what breaks when it
   rotates?
 - Which vendor accounts hold the product, and how do you recover each one?
+- Which production numbers does an agent need to read? Which analytics source
+  gives them without customer content?
 - What is the first action for each failure: roll back, or fix forward?
 - Which performance numbers get a budget?
 
