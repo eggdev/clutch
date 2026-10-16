@@ -59,6 +59,7 @@ packages/<name>/src/
   and when a flag goes away
 - [API errors](./api-errors.md): one error shape, and the code for each status
 - [Soft delete](./soft-delete.md): the restore window, live reads and the purge
+- [MCP server](./mcp.md): the tools that agents call, and how to add one
 
 <!-- kickoff: One link for each other system page, with when to open it. Each user journey from kickoff gets a page, and so does each service with real rules (authentication, sync, jobs). -->
 

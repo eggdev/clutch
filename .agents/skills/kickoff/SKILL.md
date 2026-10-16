@@ -87,8 +87,8 @@ inventory and the vendors are known.
 ### 3. Services
 
 Output: the slots in `docs/contributing/architecture/` (the index, request
-context, authorization, data storage, feature flags, API errors and soft
-delete), one page for each other service with
+context, authorization, data storage, feature flags, API errors, soft
+delete and MCP server), one page for each other service with
 real rules, `tools/lint/boundaries.json`, and a decision record for each no.
 
 For each capability from phase 2 (sign-in, data storage, sync, files, email,

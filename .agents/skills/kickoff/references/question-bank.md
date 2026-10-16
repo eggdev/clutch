@@ -63,6 +63,8 @@ decision. Show a draft answer with each question.
   table in `docs/contributing/architecture/api-errors.md`.
 - Which work runs in the background? What retries, and what tells the user?
 - What can a user export, in what format, and for how long is it kept?
+- Which capabilities does the MCP server expose to agents? The default is to
+  ship an MCP server. Which of its tools change data?
 - Which ways can a request arrive: a browser, a token, a job, a webhook, an
   inbound message? Which of them have no person behind them?
 - Which actions must a live person take, never automation: members, roles,
