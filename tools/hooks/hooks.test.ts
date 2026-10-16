@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { isDocsOnly, stagedCommands } from '@tools/hooks/paths.mjs';
-import { parsePushedRefs } from '@tools/hooks/pre-push';
+import { parsePushedRefs, pushTargets } from '@tools/hooks/pre-push';
 
 test('docs-only covers Markdown, the docs folder and license texts, and nothing else', () => {
   expect(
@@ -36,4 +36,11 @@ test('pre-push reads one ref per line and ignores blank lines', () => {
     { localSha: '1111', remoteSha: '0000' },
     { localSha: '0000', remoteSha: '2222' },
   ]);
+});
+
+test('pre-push runs the fast checks on each push that changes a path, and the tests only when code changed', () => {
+  expect(pushTargets(['docs/a.md', 'README.md'])).toEqual(['checks']);
+  expect(pushTargets(['docs/a.md', 'tools/a.ts'])).toEqual(['test', 'lint-policy-test', 'checks']);
+  expect(pushTargets(null)).toEqual(['test', 'lint-policy-test', 'checks']);
+  expect(pushTargets([])).toEqual([]);
 });

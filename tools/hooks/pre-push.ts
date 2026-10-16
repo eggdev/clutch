@@ -37,24 +37,29 @@ export function changedPaths(refs: PushedRef[]): string[] | null {
   return paths;
 }
 
+/**
+ * The Nx targets for a push. A docs-only push can still break a docs check. A
+ * push that changes no path, such as a branch deletion, runs nothing. When Git
+ * cannot list the paths (null), everything runs.
+ */
+export function pushTargets(paths: string[] | null): string[] {
+  if (paths?.length === 0) return [];
+  return paths?.every(isDocsOnly) ? ['checks'] : ['test', 'lint-policy-test', 'checks'];
+}
+
 if (import.meta.main) {
-  const paths = changedPaths(parsePushedRefs(await Bun.stdin.text()));
-  if (paths && paths.every(isDocsOnly)) {
-    console.log('pre-push: docs-only push. The tests are skipped.');
-  } else {
-    const run = Bun.spawnSync(
-      [process.execPath, 'x', 'nx', 'run-many', '-t', 'test', 'lint-policy-test'],
-      {
-        env: { ...process.env, CI: '1' },
-        stdout: 'inherit',
-        stderr: 'inherit',
-      },
+  const targets = pushTargets(changedPaths(parsePushedRefs(await Bun.stdin.text())));
+  if (!targets.length) process.exit(0);
+  console.log(`pre-push: nx run-many -t ${targets.join(' ')}`);
+  const run = Bun.spawnSync([process.execPath, 'x', 'nx', 'run-many', '-t', ...targets], {
+    env: { ...process.env, CI: '1' },
+    stdout: 'inherit',
+    stderr: 'inherit',
+  });
+  if (run.exitCode !== 0) {
+    console.error(
+      'pre-push: a check failed. Fix it, then push again. Never push with --no-verify.',
     );
-    if (run.exitCode !== 0) {
-      console.error(
-        'pre-push: the tests failed. Fix them, then push again. Never push with --no-verify.',
-      );
-      process.exit(1);
-    }
+    process.exit(1);
   }
 }

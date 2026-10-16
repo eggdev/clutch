@@ -11,7 +11,7 @@
     "prepare": "bun tools/hooks/install.ts",
     "hooks:pre-commit": "lint-staged --concurrent false --config tools/hooks/paths.mjs",
     "hooks:pre-push": "bun tools/hooks/pre-push.ts",
-    "validate": "CI=1 nx run-many -t typecheck test lint format-check lint-policy-test check-docs-file-refs check-docs-temporal check-decisions check-file-size check-kickoff-slots check-workflows check-dependency-overrides check-user-docs knip audit-prod",
+    "validate": "CI=1 nx run-many -t typecheck test lint format-check lint-policy-test audit-prod checks",
     "check": "nx run-many -t typecheck lint format-check",
     "format": "nx run project-template:format"
   },
@@ -142,6 +142,20 @@
           "command": "bun audit --prod --audit-level=moderate"
         },
         "cache": false
+      },
+      "checks": {
+        "executor": "nx:noop",
+        "dependsOn": [
+          "check-docs-file-refs",
+          "check-docs-temporal",
+          "check-decisions",
+          "check-file-size",
+          "check-kickoff-slots",
+          "check-workflows",
+          "check-dependency-overrides",
+          "check-user-docs",
+          "knip"
+        ]
       }
     }
   }

@@ -19,10 +19,10 @@ names its target.
 the hooks in `.githooks/`. Each hook runs through `mise`, so it uses the pinned
 Bun and Node.
 
-| Hook         | Runs                                                                                                                     | Skips when                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| `pre-commit` | On staged files: `oxlint --fix`, then `oxfmt`. Then `bun install --frozen-lockfile` and the typecheck of the staged tree | The install check and typecheck skip a docs-only commit     |
-| `pre-push`   | `test` and `lint-policy-test` with `CI=1`, so the Nx cache matches `validate`                                            | Each pushed path is docs-only, or the push deletes a branch |
+| Hook         | Runs                                                                                                                     | Skips when                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `pre-commit` | On staged files: `oxlint --fix`, then `oxfmt`. Then `bun install --frozen-lockfile` and the typecheck of the staged tree | The install check and typecheck skip a docs-only commit                                          |
+| `pre-push`   | `test`, `lint-policy-test` and `checks` (every fast check and `knip`), with `CI=1` so the Nx cache matches `validate`    | `test` and `lint-policy-test` skip a docs-only push. Nothing runs when the push deletes a branch |
 
 [`tools/hooks/paths.mjs`](../../../tools/hooks/paths.mjs) defines docs-only:
 Markdown anywhere, any file under `docs/`, or a license text. A pushed branch is
@@ -61,8 +61,9 @@ tests the workflow and dependency checks.
 
 Add a check as `tools/check-<name>.ts`. Export a `check<Name>(root)` function
 that returns the problems, so a test can call it on a temporary repository. Add
-a test, a root target in `package.json`, the target in the `validate` script,
-and a row here.
+a test, a root target in `package.json`, the target in the `dependsOn` list of
+the root `checks` target, and a row here. `validate` and the pre-push hook both
+run `checks`, so the new check runs in both.
 
 A failure message names the file, the problem and the fix. Print the fix hint
 and a link to the page that owns the rule above the list of problems. See
