@@ -1,5 +1,0 @@
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "extends": ["./tools/lint/oxlint-rules.json"],
-  "ignorePatterns": [".agents/**", ".claude/**", ".codex/**", ".cursor/**"]
-}

@@ -7,6 +7,7 @@
     "apps/*",
     "packages/*"
   ],
+  "type": "module",
   "scripts": {
     "prepare": "bun tools/hooks/install.ts",
     "hooks:pre-commit": "lint-staged --concurrent false --config tools/hooks/paths.mjs",
@@ -27,7 +28,8 @@
     "oxfmt": "^0.60.0",
     "oxlint": "^1.75.0",
     "tslib": "^2.3.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "ultracite": "7.12.2"
   },
   "packageManager": "bun@1.4.2",
   "nx": {
@@ -36,7 +38,7 @@
         "executor": "nx:run-commands",
         "options": {
           "commands": [
-            "oxlint tools",
+            "oxlint tools oxlint.config.ts",
             "bun tools/lint/check-manifests.ts"
           ],
           "parallel": false

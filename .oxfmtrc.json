@@ -1,6 +1,14 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "singleQuote": true,
-  "sortPackageJson": false,
+  "printWidth": 100,
+  "trailingComma": "all",
+  "proseWrap": "preserve",
+  "sortImports": {
+    "ignoreCase": true,
+    "newlinesBetween": true,
+    "order": "asc"
+  },
+  "sortPackageJson": true,
   "ignorePatterns": ["bun.lock", ".agents/**", ".claude/**", ".codex/**", ".cursor/**"]
 }

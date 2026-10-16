@@ -6,7 +6,7 @@ policy with `mise exec -- bun nx run-many -t lint-policy-test`.
 
 The policy is [`tools/lint/import-policy.mjs`](../../tools/lint/import-policy.mjs).
 Its project data is [`tools/lint/boundaries.json`](../../tools/lint/boundaries.json).
-[`tools/lint/oxlint-rules.json`](../../tools/lint/oxlint-rules.json) turns on
+[`oxlint.config.ts`](../../oxlint.config.ts) turns on
 each rule. The policy also exports its matchers and its `boundaries.json`
 parser, so a test can check them without a lint run.
 

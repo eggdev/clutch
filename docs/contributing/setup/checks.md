@@ -155,13 +155,8 @@ samples.
 - Typechecks use TSGo (`@typescript/native-preview`). Keep `typescript` only for
   tools that need its JavaScript compiler API.
 - Lint uses Oxlint. Formatting uses Oxfmt.
-- `.oxlintrc.json` extends
-  [`tools/lint/oxlint-rules.json`](../../../tools/lint/oxlint-rules.json) and
-  holds only the ignore patterns. Oxlint does not inherit `ignorePatterns`
-  through `extends`. Add plugins and rules to the rules file.
-- The rules file turns on `typescript/no-explicit-any` and
-  `no-warning-comments`. A marker comment such as FIXME or HACK fails lint.
-  Record the work in an issue.
+- The lint rules and how each one is chosen are on
+  [lint rules](./lint-rules.md).
 
 ```sh
 mise exec -- bun run format   # write formatting

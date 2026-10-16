@@ -1,7 +1,7 @@
-import { join } from 'node:path';
+import path from 'node:path';
 
 /** Contributor docs, as docs/contributing/documentation.md lists them. Paths are repo-relative. */
-export async function listDocs(root: string): Promise<string[]> {
+export async function listDocs(root: string): Promise<Array<string>> {
   const files = new Set<string>();
   for (const pattern of [
     'AGENTS.md',
@@ -11,13 +11,17 @@ export async function listDocs(root: string): Promise<string[]> {
     'packages/*/README.md',
     'docs/**/*.md',
     '.agents/skills/**/*.md',
-  ])
-    for await (const file of new Bun.Glob(pattern).scan({ cwd: root, dot: true }))
-      if (!file.split('/').includes('node_modules')) files.add(file);
-  return [...files].sort();
+  ]) {
+    for await (const file of new Bun.Glob(pattern).scan({ cwd: root, dot: true })) {
+      if (!file.split('/').includes('node_modules')) {
+        files.add(file);
+      }
+    }
+  }
+  return [...files].toSorted();
 }
 
-export const readDoc = (root: string, file: string) => Bun.file(join(root, file)).text();
+export const readDoc = (root: string, file: string) => Bun.file(path.join(root, file)).text();
 
 /**
  * Blanks fenced code blocks and keeps line numbers. A closing fence uses the
@@ -28,15 +32,16 @@ export function blankFences(content: string): string {
   return content
     .split('\n')
     .map((line) => {
-      const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+      const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
       if (open) {
         if (
           fence &&
           fence[1][0] === open.character &&
           fence[1].length >= open.length &&
           !fence[2].trim()
-        )
+        ) {
           open = null;
+        }
         return '';
       }
       if (fence && !(fence[1][0] === '`' && fence[2].includes('`'))) {
@@ -50,4 +55,4 @@ export function blankFences(content: string): string {
 
 /** Replaces each inline code span with spaces, so columns stay the same. */
 export const maskInlineCode = (line: string) =>
-  line.replace(/(`+)(?:(?!\1)[\s\S])*?\1/g, (span) => ' '.repeat(span.length));
+  line.replaceAll(/(`+)(?:(?!\1)[\s\S])*?\1/gu, (span) => ' '.repeat(span.length));

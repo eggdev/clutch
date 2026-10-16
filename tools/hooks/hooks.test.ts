@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+
 import { isDocsOnly, stagedCommands } from '@tools/hooks/paths.mjs';
 import { parsePushedRefs, pushTargets } from '@tools/hooks/pre-push';
 

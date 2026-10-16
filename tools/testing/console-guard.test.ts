@@ -1,16 +1,17 @@
 import { expect, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import path from 'node:path';
+
 import { allowConsole, consoleMessage } from '@tools/testing/console-guard';
 
-const guard = resolve(import.meta.dir, 'console-guard.ts');
+const guard = path.resolve(import.meta.dir, 'console-guard.ts');
 
 /** Runs the test file source under the guard preload, and lists `pass name` or `fail name` per test. */
-async function runGuarded(source: string): Promise<string[]> {
-  const directory = await mkdtemp(join(tmpdir(), 'console-guard-'));
+async function runGuarded(source: string): Promise<Array<string>> {
+  const directory = await mkdtemp(path.join(tmpdir(), 'console-guard-'));
   try {
-    await writeFile(join(directory, 'fixture.test.ts'), source);
+    await writeFile(path.join(directory, 'fixture.test.ts'), source);
     Bun.spawnSync(
       [
         process.execPath,
@@ -23,10 +24,11 @@ async function runGuarded(source: string): Promise<string[]> {
       ],
       { cwd: directory },
     );
-    const report = await Bun.file(join(directory, 'report.xml')).text();
-    return [...report.matchAll(/<testcase name="([^"]+)"[^>]*?(\/>|>\s*<failure)/g)]
-      .map((match) => `${match[2] === '/>' ? 'pass' : 'fail'} ${match[1]}`)
-      .sort();
+    const report = await Bun.file(path.join(directory, 'report.xml')).text();
+    const outcomes = [...report.matchAll(/<testcase name="([^"]+)"[^>]*?(\/>|>\s*<failure)/gu)].map(
+      (match) => `${match[2] === '/>' ? 'pass' : 'fail'} ${match[1]}`,
+    );
+    return outcomes.toSorted();
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

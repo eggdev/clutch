@@ -11,8 +11,8 @@ export type ConsoleLevel = 'error' | 'warn';
 
 type Allowed = { level: ConsoleLevel; message: string; seen: boolean };
 
-const allowed: Allowed[] = [];
-const unexpected: string[] = [];
+const allowed: Array<Allowed> = [];
+const unexpected: Array<string> = [];
 
 /**
  * Allows one exact message for the rest of the current test. The message is
@@ -24,12 +24,12 @@ export function allowConsole(level: ConsoleLevel, message: string): void {
 }
 
 /** The text that `allowConsole` compares. Errors drop their stack, so the text is stable. */
-export const consoleMessage = (args: unknown[]) =>
+export const consoleMessage = (args: Array<unknown>) =>
   format(...args.map((arg) => (arg instanceof Error ? `${arg.name}: ${arg.message}` : arg)));
 
 for (const level of ['error', 'warn'] as const) {
   const original = console[level].bind(console);
-  console[level] = (...args: unknown[]) => {
+  console[level] = (...args: Array<unknown>) => {
     const message = consoleMessage(args);
     const entry = allowed.find((item) => item.level === level && item.message === message);
     if (entry) {
@@ -53,7 +53,7 @@ afterEach(() => {
   ];
   unexpected.length = 0;
   allowed.length = 0;
-  if (problems.length)
+  if (problems.length) {
     throw new Error(
       [
         'Console guard failed.',
@@ -64,4 +64,5 @@ afterEach(() => {
         ...problems,
       ].join('\n'),
     );
+  }
 });

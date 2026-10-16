@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+
 import { checkDecisions } from '@tools/check-decisions';
 import { checkDocsFileRefs } from '@tools/check-docs-file-refs';
 import { findPhrases } from '@tools/check-docs-temporal';
@@ -10,6 +11,13 @@ import { inRepo } from '@tools/testing/in-repo';
 /** A short decision record with the given status line. */
 const decision = (status: string) =>
   `# A decision\n\n- **Status:** ${status}\n- **Date:** 2026-10-16\n\n## Consequences\n\n**Revisit if:** usage doubles.\n`;
+
+/** A file of `count` short lines. */
+const sourceLines = (count: number) => 'x\n'.repeat(count);
+
+/** A user doc with the given id and any extra frontmatter. */
+const userDoc = (id: string, extra = '') =>
+  `---\nid: ${id}\ntitle: Connect\nsummary: Load this when a user connects.\ntype: integration\n${extra}---\n\n# Connect\n`;
 
 test('file refs reject a link or a root code path to a missing file, and skip fenced examples', async () => {
   expect(
@@ -68,7 +76,7 @@ test('decisions need a known status that names a later record, a revisit-if, the
         'amended by [0003](./0003-push.md), [0001](./0001-poll.md)',
       ),
       'docs/contributing/decisions/0003-push.md': decision('accepted').replace(
-        /\*\*Revisit if:\*\*.*/,
+        /\*\*Revisit if:\*\*.*/u,
         '',
       ),
       'docs/contributing/decisions/0004-long.md': decision('accepted') + ' word'.repeat(500),
@@ -87,7 +95,6 @@ test('decisions need a known status that names a later record, a revisit-if, the
 });
 
 test('file size holds AGENTS.md to 20 lines and each source file to the limit or its reasoned budget', async () => {
-  const lines = (count: number) => 'x\n'.repeat(count);
   const budgets = {
     limit: 10,
     files: {
@@ -101,14 +108,14 @@ test('file size holds AGENTS.md to 20 lines and each source file to the limit or
   expect(
     await inRepo(
       {
-        'AGENTS.md': lines(21),
+        'AGENTS.md': sourceLines(21),
         'tools/file-size-budgets.json': JSON.stringify(budgets),
-        'tools/deep.ts': lines(15),
-        'tools/grown.ts': lines(13),
-        'tools/small.ts': lines(10),
-        'tools/silent.ts': lines(11),
-        'tools/large.ts': lines(11),
-        'packages/x/node_modules/dep.js': lines(50),
+        'tools/deep.ts': sourceLines(15),
+        'tools/grown.ts': sourceLines(13),
+        'tools/small.ts': sourceLines(10),
+        'tools/silent.ts': sourceLines(11),
+        'tools/large.ts': sourceLines(11),
+        'packages/x/node_modules/dep.js': sourceLines(50),
       },
       checkFileSize,
     ),
@@ -131,20 +138,19 @@ test('kickoff slots are pending while KICKOFF.md exists, and inline code that na
     pending: true,
     slots: [{ file: 'docs/contributing/project-intent.md', line: 3, text: 'who are the users' }],
   });
-  expect((await inRepo(docs, checkKickoffSlots)).pending).toBe(false);
+  const done = await inRepo(docs, checkKickoffSlots);
+  expect(done.pending).toBe(false);
 });
 
 test('user docs reject missing frontmatter, bad fields, a wrong id and a duplicate id, and skip README.md', async () => {
-  const page = (id: string, extra = '') =>
-    `---\nid: ${id}\ntitle: Connect\nsummary: Load this when a user connects.\ntype: integration\n${extra}---\n\n# Connect\n`;
   expect(
     await inRepo(
       {
         'docs/users/README.md': '# User docs\n',
-        'docs/users/connect-calendar.md': page('connect_calendar'),
-        'docs/users/copy.md': page('connect_calendar'),
+        'docs/users/connect-calendar.md': userDoc('connect_calendar'),
+        'docs/users/copy.md': userDoc('connect_calendar'),
         'docs/users/bare.md': '# Bare\n',
-        'docs/users/odd.md': page('odd', 'audience: people\nowner: me\n').replace(
+        'docs/users/odd.md': userDoc('odd', 'audience: people\nowner: me\n').replace(
           'integration',
           'guide',
         ),

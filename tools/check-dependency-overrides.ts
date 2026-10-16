@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
+
 import { blankFences } from '@tools/docs-files';
 
 /**
@@ -13,19 +14,23 @@ export const page = 'docs/contributing/setup/dependencies.md';
 const section = '## Overrides';
 
 /** The path of each key that repeats in its object. The source must be valid JSON. */
-export function duplicateKeys(source: string): string[] {
+export function duplicateKeys(source: string): Array<string> {
   JSON.parse(source);
-  const duplicates: string[] = [];
+  const duplicates: Array<string> = [];
   let index = 0;
   const space = () => {
-    while (/\s/.test(source[index] ?? '')) index++;
+    while (/\s/u.test(source[index] ?? '')) {
+      index++;
+    }
   };
   const string = () => {
     const start = index++;
-    while (source[index] !== '"') index += source[index] === '\\' ? 2 : 1;
+    while (source[index] !== '"') {
+      index += source[index] === '\\' ? 2 : 1;
+    }
     return JSON.parse(source.slice(start, ++index)) as string;
   };
-  const value = (path: string): void => {
+  const value = (location: string): void => {
     space();
     const open = source[index];
     if (open === '{' || open === '[') {
@@ -34,23 +39,33 @@ export function duplicateKeys(source: string): string[] {
       const seen = new Set<string>();
       for (let item = 0; source[index] !== (open === '{' ? '}' : ']'); item++) {
         space();
-        if (open === '[') value(`${path}[${item}]`);
-        else {
+        if (open === '[') {
+          value(`${location}[${item}]`);
+        } else {
           const key = string();
-          const keyPath = path ? `${path}.${key}` : key;
-          if (seen.has(key)) duplicates.push(keyPath);
+          const keyPath = location ? `${location}.${key}` : key;
+          if (seen.has(key)) {
+            duplicates.push(keyPath);
+          }
           seen.add(key);
           space();
           index++;
           value(keyPath);
         }
         space();
-        if (source[index] === ',') index++;
+        if (source[index] === ',') {
+          index++;
+        }
         space();
       }
       index++;
-    } else if (open === '"') string();
-    else while (index < source.length && !/[\s,}\]]/.test(source[index])) index++;
+    } else if (open === '"') {
+      string();
+    } else {
+      while (index < source.length && !/[\s,}\]]/u.test(source[index])) {
+        index++;
+      }
+    }
   };
   value('');
   return duplicates;
@@ -59,51 +74,65 @@ export function duplicateKeys(source: string): string[] {
 export type Entry = { name: string; line: number; reason: boolean };
 
 /** The `###` headings in the overrides section, with whether text follows each one. */
-export function documentedOverrides(content: string): Entry[] {
-  const entries: Entry[] = [];
+export function documentedOverrides(content: string): Array<Entry> {
+  const entries: Array<Entry> = [];
   let inside = false;
   let current: Entry | null = null;
   for (const [index, line] of blankFences(content).split('\n').entries()) {
-    if (/^#{1,3}\s/.test(line)) {
-      if (/^#{1,2}\s/.test(line)) inside = line.trim() === section;
-      const name = inside && /^###\s/.test(line) ? /`([^`]+)`/.exec(line)?.[1] : undefined;
+    if (/^#{1,3}\s/u.test(line)) {
+      if (/^#{1,2}\s/u.test(line)) {
+        inside = line.trim() === section;
+      }
+      const name = inside && /^###\s/u.test(line) ? /`([^`]+)`/u.exec(line)?.[1] : undefined;
       current = name ? { name, line: index + 1, reason: false } : null;
-      if (current) entries.push(current);
-    } else if (current && line.trim()) current.reason = true;
+      if (current) {
+        entries.push(current);
+      }
+    } else if (current && line.trim()) {
+      current.reason = true;
+    }
   }
   return entries;
 }
 
-export async function checkDependencyOverrides(root: string): Promise<string[]> {
-  const source = await Bun.file(join(root, 'package.json')).text();
+export async function checkDependencyOverrides(root: string): Promise<Array<string>> {
+  const source = await Bun.file(path.join(root, 'package.json')).text();
   const errors = duplicateKeys(source).map(
-    (path) => `package.json: \`${path}\` repeats. JSON keeps only the last value. Delete one.`,
+    (keyPath) =>
+      `package.json: \`${keyPath}\` repeats. JSON keeps only the last value. Delete one.`,
   );
   const manifest = JSON.parse(source);
   const overrides = new Map<string, string>();
-  for (const field of ['overrides', 'resolutions'])
-    for (const name of Object.keys(manifest[field] ?? {})) overrides.set(name, field);
-  const entries = existsSync(join(root, page))
-    ? documentedOverrides(await Bun.file(join(root, page)).text())
+  for (const field of ['overrides', 'resolutions']) {
+    for (const name of Object.keys(manifest[field] ?? {})) {
+      overrides.set(name, field);
+    }
+  }
+  const entries = existsSync(path.join(root, page))
+    ? documentedOverrides(await Bun.file(path.join(root, page)).text())
     : [];
-  for (const [name, field] of overrides)
-    if (!entries.some((entry) => entry.name === name))
+  for (const [name, field] of overrides) {
+    if (!entries.some((entry) => entry.name === name)) {
       errors.push(
         `package.json: \`${field}.${name}\` has no heading in ${page}. Add "### \`${name}\`" under "${section}" with the reason.`,
       );
+    }
+  }
   const seen = new Set<string>();
   for (const entry of entries) {
-    if (seen.has(entry.name))
+    if (seen.has(entry.name)) {
       errors.push(`${page}:${entry.line}: \`${entry.name}\` has a second heading. Merge them.`);
+    }
     seen.add(entry.name);
-    if (!overrides.has(entry.name))
+    if (!overrides.has(entry.name)) {
       errors.push(
         `${page}:${entry.line}: \`${entry.name}\` is not in package.json overrides. Delete the stale section.`,
       );
-    else if (!entry.reason)
+    } else if (!entry.reason) {
       errors.push(
         `${page}:${entry.line}: \`${entry.name}\` has no reason. Say why the override exists and what removes it.`,
       );
+    }
   }
   return errors;
 }
@@ -120,5 +149,7 @@ if (import.meta.main) {
       ].join('\n'),
     );
     process.exitCode = 1;
-  } else console.log('Each dependency override has a documented reason.');
+  } else {
+    console.log('Each dependency override has a documented reason.');
+  }
 }

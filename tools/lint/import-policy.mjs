@@ -1,29 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-
-/** Module specifiers use aliases; filesystem paths in configs are unaffected. */
-function specifiers(check) {
-  return {
-    ImportDeclaration: (node) => check(node.source),
-    ExportNamedDeclaration: (node) => check(node.source),
-    ExportAllDeclaration: (node) => check(node.source),
-    ImportExpression: (node) => check(node.source),
-    TSImportType: (node) => check(node.source ?? node.argument?.literal ?? node.argument),
-    TSExternalModuleReference: (node) => check(node.expression),
-    CallExpression(node) {
-      const callee = node.callee;
-      if (
-        (callee.type === 'Identifier' && callee.name === 'require') ||
-        (callee.type === 'MemberExpression' &&
-          !callee.computed &&
-          ((callee.object.name === 'require' && callee.property.name === 'resolve') ||
-            (callee.object.name === 'module' && callee.property.name === 'require'))) ||
-        mockCall(callee)
-      )
-        check(node.arguments[0]);
-    },
-  };
-}
+import path from 'node:path';
 
 /**
  * A test runner call whose first argument is a module specifier: `vi.mock`,
@@ -31,7 +7,9 @@ function specifiers(check) {
  * specifiers like imports, so a test cannot route around a boundary.
  */
 export function mockCall(callee) {
-  if (callee?.type !== 'MemberExpression' || callee.computed) return false;
+  if (callee?.type !== 'MemberExpression' || callee.computed) {
+    return false;
+  }
   const owner = callee.object.type === 'Identifier' ? callee.object.name : null;
   const method = callee.property.name;
   return (
@@ -49,61 +27,98 @@ export function mockCall(callee) {
       ].includes(method))
   );
 }
+
+/** Module specifiers use aliases; filesystem paths in configs are unaffected. */
+function specifiers(check) {
+  return {
+    ImportDeclaration: (node) => check(node.source),
+    ExportNamedDeclaration: (node) => check(node.source),
+    ExportAllDeclaration: (node) => check(node.source),
+    ImportExpression: (node) => check(node.source),
+    TSImportType: (node) => check(node.source ?? node.argument?.literal ?? node.argument),
+    TSExternalModuleReference: (node) => check(node.expression),
+    CallExpression(node) {
+      const { callee } = node;
+      if (
+        (callee.type === 'Identifier' && callee.name === 'require') ||
+        (callee.type === 'MemberExpression' &&
+          !callee.computed &&
+          ((callee.object.name === 'require' && callee.property.name === 'resolve') ||
+            (callee.object.name === 'module' && callee.property.name === 'require'))) ||
+        mockCall(callee)
+      ) {
+        check(node.arguments[0]);
+      }
+    },
+  };
+}
+
 const valueOf = (source) =>
   source?.type === 'TemplateLiteral' ? source.quasis[0]?.value.cooked : source?.value;
 const filenameOf = (context) => (context.filename ?? context.getFilename()).replaceAll('\\', '/');
 
 /** The repository root and package of a linted file. */
 function locate(filename) {
-  const match = filename.match(/^(.*?)\/(?:packages\/([^/]+)\/(.*)|apps\/|tools\/)/);
+  const match = filename.match(/^(.*?)\/(?:packages\/([^/]+)\/(.*)|apps\/|tools\/)/u);
   return match ? { root: match[1], name: match[2], path: match[3] } : null;
 }
-const repoTarget = (value) => value.match(/^@repo\/([^/]+)\//)?.[1];
+const repoTarget = (value) => value.match(/^@repo\/([^/]+)\//u)?.[1];
 export const isTestFile = (filename) =>
-  /(?:^|\/)test\//.test(filename) || /\.(?:test|spec|pw)\.[cm]?[jt]sx?$/.test(filename);
+  /(?:^|\/)test\//u.test(filename) || /\.(?:test|spec|pw)\.[cm]?[jt]sx?$/u.test(filename);
 /** A specifier for one of our own modules. */
-export const internal = (value) => /^(?:@repo\/|@apps\/|@tools\/|@\/|\.{1,2}(?:\/|$))/.test(value);
+export const internal = (value) => /^(?:@repo\/|@apps\/|@tools\/|@\/|\.{1,2}(?:\/|$))/u.test(value);
 /** A specifier that `aliases-only` rejects. */
-export const notAnAlias = (value) => /^(?:\.{1,2}(?:\/|$)|\/|file:|@repo\/[^/]+$|~\/)/.test(value);
+export const notAnAlias = (value) => /^(?:\.{1,2}(?:\/|$)|\/|file:|@repo\/[^/]+$|~\/)/u.test(value);
 
 const kinds = new Map();
 /** Reads `type:service` or `type:domain` from the package manifest. */
 function kindOf(root, name) {
-  const file = join(root, 'packages', name, 'package.json');
+  const file = path.join(root, 'packages', name, 'package.json');
   if (!kinds.has(file)) {
-    const tags = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')).nx?.tags ?? []) : [];
+    const tags = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf-8')).nx?.tags ?? []) : [];
     const kind = tags.filter((tag) => tag === 'type:service' || tag === 'type:domain');
     kinds.set(file, kind.length === 1 ? kind[0].slice(5) : null);
   }
   return kinds.get(file);
 }
 
+/** Adds each `@repo/<name>` import under `directory` to `edges`. */
+function collectEdges(directory, edges) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) {
+      continue;
+    }
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      collectEdges(entryPath, edges);
+    } else if (/\.[cm]?[jt]sx?$/u.test(entry.name)) {
+      for (const match of readFileSync(entryPath, 'utf-8').matchAll(
+        /(?:\bfrom|\bimport|\brequire\s*\(|\bimport\s*\()\s*['"`]@repo\/([^/'"`]+)\//gu,
+      )) {
+        edges.add(match[1]);
+      }
+    }
+  }
+}
+
 const graphs = new Map();
 /** Package-to-package edges from every source and test file under `packages/`. */
 function graphOf(root) {
-  if (graphs.has(root)) return graphs.get(root);
+  if (graphs.has(root)) {
+    return graphs.get(root);
+  }
   const graph = new Map();
-  const packages = join(root, 'packages');
-  const walk = (directory, edges) => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) walk(path, edges);
-      else if (/\.[cm]?[jt]sx?$/.test(entry.name))
-        for (const match of readFileSync(path, 'utf8').matchAll(
-          /(?:\bfrom|\bimport|\brequire\s*\(|\bimport\s*\()\s*['"`]@repo\/([^/'"`]+)\//g,
-        ))
-          edges.add(match[1]);
-    }
-  };
-  if (existsSync(packages))
-    for (const entry of readdirSync(packages, { withFileTypes: true }))
+  const packages = path.join(root, 'packages');
+  if (existsSync(packages)) {
+    for (const entry of readdirSync(packages, { withFileTypes: true })) {
       if (entry.isDirectory()) {
         const edges = new Set();
-        walk(join(packages, entry.name), edges);
+        collectEdges(path.join(packages, entry.name), edges);
         edges.delete(entry.name);
         graph.set(entry.name, edges);
       }
+    }
+  }
   graphs.set(root, graph);
   return graph;
 }
@@ -112,16 +127,27 @@ function pathBetween(graph, from, to) {
   const queue = [[from]];
   const seen = new Set([from]);
   while (queue.length) {
-    const path = queue.shift();
-    for (const next of graph.get(path.at(-1)) ?? []) {
-      if (next === to) return [...path, next];
+    const route = queue.shift();
+    for (const next of graph.get(route.at(-1)) ?? []) {
+      if (next === to) {
+        return [...route, next];
+      }
       if (!seen.has(next)) {
         seen.add(next);
-        queue.push([...path, next]);
+        queue.push([...route, next]);
       }
     }
   }
   return null;
+}
+
+/** The identifier at the root of a member chain: `vi` for `vi.mock.calls`. */
+function rootName(node) {
+  let current = node;
+  while (current?.type === 'MemberExpression') {
+    current = current.object;
+  }
+  return current?.type === 'Identifier' ? current.name : null;
 }
 
 export const ruleNames = [
@@ -135,6 +161,15 @@ export const ruleNames = [
   'no-internal-mocks',
 ];
 
+/** Whether a layer rule applies to the file, by package name, package path or file pattern. */
+function within(rule, file, filename) {
+  return (
+    (rule.packages ?? []).includes(file?.name) ||
+    (!!file?.name && (rule.packagePaths ?? []).some((prefix) => file.path.startsWith(prefix))) ||
+    (rule.files ?? []).some((pattern) => new RegExp(pattern, 'u').test(filename))
+  );
+}
+
 /**
  * Vendor owners, layers and exceptions from the data in
  * `tools/lint/boundaries.json`. An exception lets one file pattern import one
@@ -143,19 +178,15 @@ export const ruleNames = [
  * and docs/contributing/import-boundaries.md.
  */
 export function parseBoundaries(data) {
-  const within = (rule, file, filename) =>
-    (rule.packages ?? []).includes(file?.name) ||
-    (!!file?.name && (rule.packagePaths ?? []).some((path) => file.path.startsWith(path))) ||
-    (rule.files ?? []).some((pattern) => new RegExp(pattern).test(filename));
   return {
     vendors: (data.vendors ?? []).map((rule) => ({
       vendor: rule.vendor,
-      pattern: new RegExp(rule.imports),
+      pattern: new RegExp(rule.imports, 'u'),
       owner: `packages/${rule.owner}`,
       allowed: (file) => file?.name === rule.owner,
     })),
     layers: (data.layers ?? []).map((rule) => ({
-      pattern: new RegExp(rule.imports),
+      pattern: new RegExp(rule.imports, 'u'),
       where: rule.where,
       allowed: (file, filename) => within(rule, file, filename),
     })),
@@ -167,14 +198,15 @@ export function parseBoundaries(data) {
         !(typeof exception.reason === 'string' && exception.reason.trim()) &&
           '`reason` must say why the import cannot move behind a boundary',
       ].filter(Boolean);
-      if (problems.length)
+      if (problems.length) {
         throw new Error(
           `tools/lint/boundaries.json exceptions[${index}]: ${problems.join('; ')}. See docs/contributing/import-boundaries.md#exceptions.`,
         );
+      }
       return {
         rule: exception.rule,
-        file: new RegExp(exception.file),
-        imports: new RegExp(exception.imports),
+        file: new RegExp(exception.file, 'u'),
+        imports: new RegExp(exception.imports, 'u'),
         reason: exception.reason,
       };
     }),
@@ -185,10 +217,10 @@ const boundaries = new Map();
 /** The parsed `tools/lint/boundaries.json` at the repository root, read once per lint run. */
 export function boundariesOf(root) {
   if (!boundaries.has(root)) {
-    const file = join(root, 'tools/lint/boundaries.json');
+    const file = path.join(root, 'tools/lint/boundaries.json');
     boundaries.set(
       root,
-      parseBoundaries(existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}),
+      parseBoundaries(existsSync(file) ? JSON.parse(readFileSync(file, 'utf-8')) : {}),
     );
   }
   return boundaries.get(root);
@@ -206,7 +238,9 @@ function report(context, rule, descriptor, value = valueOf(descriptor.node)) {
         exception.file.test(filename) &&
         exception.imports.test(typeof value === 'string' ? value : ''),
     );
-  if (!exempt) context.report(descriptor);
+  if (!exempt) {
+    context.report(descriptor);
+  }
 }
 
 export default {
@@ -224,8 +258,9 @@ export default {
       create(context) {
         return specifiers((source) => {
           const value = valueOf(source);
-          if (typeof value === 'string' && notAnAlias(value))
+          if (typeof value === 'string' && notAnAlias(value)) {
             report(context, 'aliases-only', { node: source, messageId: 'alias' });
+          }
         });
       },
     },
@@ -242,34 +277,39 @@ export default {
       },
       create(context) {
         const filename = filenameOf(context);
-        const pkg = filename.match(/(?:^|\/)packages\/([^/]+)\/src\/(.+)$/);
-        const browser = /(?:^|\/)apps\/app\/(?:lib|app)\//.test(filename);
-        const portable = pkg && /^(?:client|http)(?:\/|\.)/.test(pkg[2]) && pkg[1] !== 'access';
+        const pkg = filename.match(/(?:^|\/)packages\/([^/]+)\/src\/(.+)$/u);
+        const browser = /(?:^|\/)apps\/app\/(?:lib|app)\//u.test(filename);
+        const portable = pkg && /^(?:client|http)(?:\/|\.)/u.test(pkg[2]) && pkg[1] !== 'access';
         const domain =
           pkg &&
           ((pkg[1] === 'projects' &&
-            /^(?:contracts|model|events|intake|change-orders|errors)\.ts$/.test(pkg[2])) ||
-            (pkg[1] === 'access' && /^(?:index\.ts|lib\/)/.test(pkg[2])) ||
+            /^(?:contracts|model|events|intake|change-orders|errors)\.ts$/u.test(pkg[2])) ||
+            (pkg[1] === 'access' && /^(?:index\.ts|lib\/)/u.test(pkg[2])) ||
             (pkg[1] === 'sync' && pkg[2] === 'contracts.ts'));
         return specifiers((source) => {
           const value = valueOf(source);
-          if (typeof value !== 'string') return;
-          if (pkg && /^@(?:apps|tools)?\//.test(value)) {
+          if (typeof value !== 'string') {
+            return;
+          }
+          if (pkg && /^@(?:apps|tools)?\//u.test(value)) {
             report(context, 'module-dependencies', { node: source, messageId: 'application' });
             return;
           }
           if (
             (browser || portable || domain) &&
-            ((browser && /^@(?:apps|tools)\//.test(value)) ||
-              /^@repo\/[^/]+\/src\/server(?:\/|\.|$)/.test(value) ||
-              /^@repo\/access\/src\/(?:sqlite|http)(?:\/|\.|$)/.test(value) ||
-              /^(?:@automerge\/|@better-auth\/|better-auth(?:\/|$)|better-call(?:\/|$)|@cloudflare\/|wrangler(?:\/|$))/.test(
+            ((browser && /^@(?:apps|tools)\//u.test(value)) ||
+              /^@repo\/[^/]+\/src\/server(?:\/|\.|$)/u.test(value) ||
+              /^@repo\/access\/src\/(?:sqlite|http)(?:\/|\.|$)/u.test(value) ||
+              /^(?:@automerge\/|@better-auth\/|better-auth(?:\/|$)|better-call(?:\/|$)|@cloudflare\/|wrangler(?:\/|$))/u.test(
                 value,
               ) ||
               ((portable || domain) &&
-                /^(?:node:|bun:|react(?:-native)?(?:\/|$)|expo(?:-|\/|$)|one(?:\/|$))/.test(value)))
-          )
+                /^(?:node:|bun:|react(?:-native)?(?:\/|$)|expo(?:-|\/|$)|one(?:\/|$))/u.test(
+                  value,
+                )))
+          ) {
             report(context, 'module-dependencies', { node: source, messageId: 'portable' });
+          }
         });
       },
     },
@@ -288,12 +328,16 @@ export default {
       },
       create(context) {
         const file = locate(filenameOf(context));
-        if (!file?.name) return {};
+        if (!file?.name) {
+          return {};
+        }
         return specifiers((source) => {
           const value = valueOf(source);
           const target = typeof value === 'string' && repoTarget(value);
-          if (!target || target === file.name) return;
-          for (const name of [file.name, target])
+          if (!target || target === file.name) {
+            return;
+          }
+          for (const name of [file.name, target]) {
             if (!kindOf(file.root, name)) {
               report(context, 'module-direction', {
                 node: source,
@@ -302,7 +346,10 @@ export default {
               });
               return;
             }
-          if (kindOf(file.root, target) !== 'domain') return;
+          }
+          if (kindOf(file.root, target) !== 'domain') {
+            return;
+          }
           report(context, 'module-direction', {
             node: source,
             messageId: kindOf(file.root, file.name),
@@ -321,18 +368,23 @@ export default {
       },
       create(context) {
         const file = locate(filenameOf(context));
-        if (!file?.name) return {};
+        if (!file?.name) {
+          return {};
+        }
         return specifiers((source) => {
           const value = valueOf(source);
           const target = typeof value === 'string' && repoTarget(value);
-          if (!target || target === file.name) return;
-          const path = pathBetween(graphOf(file.root), target, file.name);
-          if (path)
+          if (!target || target === file.name) {
+            return;
+          }
+          const cycle = pathBetween(graphOf(file.root), target, file.name);
+          if (cycle) {
             report(context, 'no-cycles', {
               node: source,
               messageId: 'cycle',
-              data: { path: [file.name, ...path].join(' -> ') },
+              data: { path: [file.name, ...cycle].join(' -> ') },
             });
+          }
         });
       },
     },
@@ -347,18 +399,23 @@ export default {
       },
       create(context) {
         const file = locate(filenameOf(context));
-        if (!file) return {};
+        if (!file) {
+          return {};
+        }
         const { vendors } = boundariesOf(file.root);
         return specifiers((source) => {
           const value = valueOf(source);
-          if (typeof value !== 'string') return;
+          if (typeof value !== 'string') {
+            return;
+          }
           const rule = vendors.find((vendor) => vendor.pattern.test(value));
-          if (rule && !rule.allowed(file ?? {}))
+          if (rule && !rule.allowed(file ?? {})) {
             report(context, 'vendor-owner', {
               node: source,
               messageId: 'owner',
               data: { vendor: rule.vendor, owner: rule.owner },
             });
+          }
         });
       },
     },
@@ -374,18 +431,23 @@ export default {
       create(context) {
         const filename = filenameOf(context);
         const file = locate(filename);
-        if (!file) return {};
+        if (!file) {
+          return {};
+        }
         const { layers } = boundariesOf(file.root);
         return specifiers((source) => {
           const value = valueOf(source);
-          if (typeof value !== 'string') return;
+          if (typeof value !== 'string') {
+            return;
+          }
           const rule = layers.find((layer) => layer.pattern.test(value));
-          if (rule && !rule.allowed(file, filename))
+          if (rule && !rule.allowed(file, filename)) {
             report(context, 'layers', {
               node: source,
               messageId: 'layer',
               data: { value, where: rule.where },
             });
+          }
         });
       },
     },
@@ -400,11 +462,14 @@ export default {
       },
       create(context) {
         const filename = filenameOf(context);
-        if (isTestFile(filename) || /\/src\/testing\//.test(filename)) return {};
+        if (isTestFile(filename) || /\/src\/testing\//u.test(filename)) {
+          return {};
+        }
         return specifiers((source) => {
           const value = valueOf(source);
-          if (typeof value === 'string' && /^@repo\/[^/]+\/src\/testing\//.test(value))
+          if (typeof value === 'string' && /^@repo\/[^/]+\/src\/testing\//u.test(value)) {
             report(context, 'testing-imports', { node: source, messageId: 'testing' });
+          }
         });
       },
     },
@@ -418,23 +483,22 @@ export default {
       },
       create(context) {
         const imported = new Set();
-        const rootName = (node) => {
-          while (node?.type === 'MemberExpression') node = node.object;
-          return node?.type === 'Identifier' ? node.name : null;
-        };
         return {
           ImportDeclaration(node) {
-            if (internal(node.source.value))
-              for (const specifier of node.specifiers) imported.add(specifier.local.name);
+            if (internal(node.source.value)) {
+              for (const specifier of node.specifiers) {
+                imported.add(specifier.local.name);
+              }
+            }
           },
           CallExpression(node) {
-            const callee = node.callee;
-            const method =
-              callee.type === 'Identifier'
-                ? callee.name
-                : callee.type === 'MemberExpression' && !callee.computed
-                  ? callee.property.name
-                  : null;
+            const { callee } = node;
+            let method = null;
+            if (callee.type === 'Identifier') {
+              method = callee.name;
+            } else if (callee.type === 'MemberExpression' && !callee.computed) {
+              method = callee.property.name;
+            }
             const owner = callee.type === 'MemberExpression' ? rootName(callee.object) : null;
             const [first] = node.arguments;
             const target = valueOf(first);
@@ -443,10 +507,11 @@ export default {
                 (['jest', 'vi'].includes(owner) && ['mock', 'doMock'].includes(method))) &&
               typeof target === 'string' &&
               internal(target)
-            )
+            ) {
               report(context, 'no-internal-mocks', { node, messageId: 'mock' }, target);
-            else if (method === 'spyOn' && imported.has(rootName(first)))
+            } else if (method === 'spyOn' && imported.has(rootName(first))) {
               report(context, 'no-internal-mocks', { node, messageId: 'mock' }, '');
+            }
           },
         };
       },

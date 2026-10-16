@@ -7,6 +7,8 @@ How to run, check and ship the project. Open only the page you need.
   add a variable
 - [Nx](./nx.md): how to run tasks, project names
 - [Checks](./checks.md): `validate`, each check, CI
+- [Lint and format rules](./lint-rules.md): the Ultracite baseline, each choice
+  we made, and the formatter settings
 - [Dependencies](./dependencies.md): the production audit, overrides
 - [Documentation maintenance](./documentation-maintenance.md)
 

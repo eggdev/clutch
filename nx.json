@@ -30,7 +30,7 @@
     "lint": {
       "inputs": [
         "default",
-        "{workspaceRoot}/.oxlintrc.json",
+        "{workspaceRoot}/oxlint.config.ts",
         "{workspaceRoot}/tools/lint/**/*",
         "{workspaceRoot}/packages/**/*",
         { "externalDependencies": ["oxlint"] }

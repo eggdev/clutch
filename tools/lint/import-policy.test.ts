@@ -1,35 +1,37 @@
 import { expect, test } from 'bun:test';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { resolve, join, relative } from 'node:path';
+import path from 'node:path';
+
 import { checkManifests } from '@tools/lint/check-manifests';
 import { boundariesOf, mockCall, notAnAlias, parseBoundaries } from '@tools/lint/import-policy.mjs';
 
-const root = resolve(import.meta.dir, '../..');
+const root = path.resolve(import.meta.dir, '../..');
 
 /** Writes the files into a new directory, lints it, and lists `path rule` for each diagnostic. */
-async function lint(files: Record<string, string>): Promise<string[]> {
-  const directory = await mkdtemp(join(tmpdir(), 'import-rule-'));
+async function lint(files: Record<string, string>): Promise<Array<string>> {
+  const directory = await mkdtemp(path.join(tmpdir(), 'import-rule-'));
   try {
     for (const [name, source] of Object.entries(files)) {
-      await mkdir(resolve(directory, name, '..'), { recursive: true });
-      await writeFile(join(directory, name), source);
+      await mkdir(path.resolve(directory, name, '..'), { recursive: true });
+      await writeFile(path.join(directory, name), source);
     }
     const run = Bun.spawnSync([
-      resolve(root, 'node_modules/.bin/oxlint'),
+      path.resolve(root, 'node_modules/.bin/oxlint'),
       '-c',
-      resolve(root, '.oxlintrc.json'),
+      path.resolve(root, 'oxlint.config.ts'),
       '--format',
       'json',
       directory,
     ]);
     const result = JSON.parse(run.stdout.toString());
-    return result.diagnostics
+    const lines: Array<string> = result.diagnostics
+      .filter((item: { code: string }) => item.code.startsWith('repo-imports('))
       .map(
         (item: { code: string; filename: string }) =>
-          `${relative(directory, item.filename)} ${item.code.replace(/^repo-imports\((.+)\)$/, '$1')}`,
-      )
-      .sort();
+          `${path.relative(directory, item.filename)} ${item.code.replace(/^repo-imports\((.+)\)$/u, '$1')}`,
+      );
+    return lines.toSorted();
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -85,7 +87,7 @@ test('Oxlint rejects relative static, type, re-export, dynamic and CommonJS impo
         'import "@repo/projects";',
       ].join('\n'),
     }),
-  ).toEqual(Array(10).fill('bad.ts aliases-only'));
+  ).toEqual(Array.from({ length: 10 }, () => 'bad.ts aliases-only'));
   expect(
     await lint({
       'clean.ts':
@@ -95,28 +97,31 @@ test('Oxlint rejects relative static, type, re-export, dynamic and CommonJS impo
 });
 
 test('manifest policy rejects export maps and missing type tags in workspaces, without inspecting dependencies or excluded apps', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'neighborhood-manifest-rule-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'neighborhood-manifest-rule-'));
   try {
     await writeFile(
-      join(directory, 'package.json'),
+      path.join(directory, 'package.json'),
       JSON.stringify({ workspaces: ['packages/*', 'apps/*', '!apps/archived'] }),
     );
     for (const folder of ['packages/new-package', 'apps/archived', 'node_modules/external']) {
-      await mkdir(join(directory, folder), { recursive: true });
-      await writeFile(join(directory, folder, 'package.json'), JSON.stringify({ exports: {} }));
+      await mkdir(path.join(directory, folder), { recursive: true });
+      await writeFile(
+        path.join(directory, folder, 'package.json'),
+        JSON.stringify({ exports: {} }),
+      );
     }
     expect(await checkManifests(directory)).toEqual([
       'packages/new-package/package.json: package exports are forbidden; use TypeScript path aliases to source files.',
       'packages/new-package/package.json: a package needs exactly one Nx tag, type:service or type:domain. See docs/contributing/import-boundaries.md.',
     ]);
     await writeFile(
-      join(directory, 'packages/new-package/package.json'),
+      path.join(directory, 'packages/new-package/package.json'),
       JSON.stringify({ nx: { tags: ['type:service', 'type:domain'] } }),
     );
     expect(await checkManifests(directory)).toEqual([
       'packages/new-package/package.json: a package needs exactly one Nx tag, type:service or type:domain. See docs/contributing/import-boundaries.md.',
     ]);
-    await writeFile(join(directory, 'packages/new-package/package.json'), tagged('service'));
+    await writeFile(path.join(directory, 'packages/new-package/package.json'), tagged('service'));
     expect(await checkManifests(directory)).toEqual([]);
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -387,6 +392,7 @@ test('an exception lets one file import one specifier past one rule, and needs a
 });
 
 test('each exception in this repository states its reason', () => {
-  for (const exception of boundariesOf(root).exceptions)
+  for (const exception of boundariesOf(root).exceptions) {
     expect(exception.reason.trim()).not.toBe('');
+  }
 });
