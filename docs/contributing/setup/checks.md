@@ -12,6 +12,30 @@ Run it before you say a change is done. CI runs the same command on each PR.
 Nx caches results, so a second run with no changes takes seconds. A failure
 names its target.
 
+## Git hooks
+
+`bun install` runs the root `prepare` script,
+[`tools/hooks/install.ts`](../../../tools/hooks/install.ts). It points Git at
+the hooks in `.githooks/`. Each hook runs through `mise`, so it uses the pinned
+Bun and Node.
+
+| Hook         | Runs                                                                                                                     | Skips when                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| `pre-commit` | On staged files: `oxlint --fix`, then `oxfmt`. Then `bun install --frozen-lockfile` and the typecheck of the staged tree | The install check and typecheck skip a docs-only commit     |
+| `pre-push`   | `test` and `lint-policy-test` with `CI=1`, so the Nx cache matches `validate`                                            | Each pushed path is docs-only, or the push deletes a branch |
+
+[`tools/hooks/paths.mjs`](../../../tools/hooks/paths.mjs) defines docs-only:
+Markdown anywhere, any file under `docs/`, or a license text. A pushed branch is
+compared with the remote tip. A new branch is compared with its merge base on
+`origin/HEAD`.
+
+Lint-staged hides unstaged changes while the pre-commit commands run. The
+typecheck reads the staged tree, and the formatter changes only staged content.
+Lint fixes run before formatting, because a lint fix can leave code unformatted.
+
+Never skip a hook with `--no-verify`. When a hook fails, fix what it found. When
+a hook is wrong, fix the hook in its own change.
+
 ## Checks
 
 Each repository check is a standalone script in `tools/check-*.ts`, with a

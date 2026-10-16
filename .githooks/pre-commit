@@ -1,0 +1,8 @@
+#!/bin/sh
+# Lint fixes, formatting and a typecheck of the staged tree.
+# See docs/contributing/setup/checks.md#git-hooks.
+command -v mise >/dev/null 2>&1 || {
+  echo "pre-commit: mise is not on PATH. Install it from https://mise.jdx.dev, then commit again." >&2
+  exit 1
+}
+exec mise exec -- bun x lint-staged --concurrent false --config tools/hooks/paths.mjs

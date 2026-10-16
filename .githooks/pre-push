@@ -1,0 +1,8 @@
+#!/bin/sh
+# Unit tests for each push that changes more than docs.
+# See docs/contributing/setup/checks.md#git-hooks.
+command -v mise >/dev/null 2>&1 || {
+  echo "pre-push: mise is not on PATH. Install it from https://mise.jdx.dev, then push again." >&2
+  exit 1
+}
+exec mise exec -- bun tools/hooks/pre-push.ts "$@"
