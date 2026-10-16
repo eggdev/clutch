@@ -58,3 +58,8 @@ test('fetches from a disposable server', async () => {
 
 Put setup builders in `packages/<name>/src/testing/`, and call them inside each
 test. Do not hide setup in `beforeEach`.
+
+## Split a test file
+
+When a test file passes its size limit, split it by workflow. Compare the test
+count from `bun test` before and after the split. The counts are the same.

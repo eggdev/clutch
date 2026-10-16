@@ -86,10 +86,39 @@ test('decisions need a known status that names a later record, a revisit-if, the
   ]);
 });
 
-test('file size rejects an AGENTS.md over 20 lines', async () => {
-  expect(await inRepo({ 'AGENTS.md': 'line\n'.repeat(20) }, checkFileSize)).toEqual([]);
-  expect(await inRepo({ 'AGENTS.md': 'line\n'.repeat(21) }, checkFileSize)).toEqual([
+test('file size holds AGENTS.md to 20 lines and each source file to the limit or its reasoned budget', async () => {
+  const lines = (count: number) => 'x\n'.repeat(count);
+  const budgets = {
+    limit: 10,
+    files: {
+      'tools/deep.ts': { lines: 15, reason: 'One parser with shared state.' },
+      'tools/grown.ts': { lines: 12, reason: 'One plugin.' },
+      'tools/small.ts': { lines: 20, reason: 'Was large.' },
+      'tools/silent.ts': { lines: 20, reason: ' ' },
+      'tools/gone.ts': { lines: 20, reason: 'Deleted.' },
+    },
+  };
+  expect(
+    await inRepo(
+      {
+        'AGENTS.md': lines(21),
+        'tools/file-size-budgets.json': JSON.stringify(budgets),
+        'tools/deep.ts': lines(15),
+        'tools/grown.ts': lines(13),
+        'tools/small.ts': lines(10),
+        'tools/silent.ts': lines(11),
+        'tools/large.ts': lines(11),
+        'packages/x/node_modules/dep.js': lines(50),
+      },
+      checkFileSize,
+    ),
+  ).toEqual([
     'AGENTS.md: 21 lines, budget 20. Move detail to the page that owns it.',
+    'tools/file-size-budgets.json: tools/gone.ts does not exist. Delete its entry.',
+    'tools/grown.ts: 13 lines, budget 12. Split the file, or raise the budget and update its reason in the same change.',
+    'tools/large.ts: 11 lines, limit 10. Split the file, or add an entry with a reason to tools/file-size-budgets.json.',
+    'tools/silent.ts: the budget entry has no reason. Say why the file stays deep.',
+    'tools/small.ts: 10 lines is within the limit of 10. Delete its budget entry.',
   ]);
 });
 

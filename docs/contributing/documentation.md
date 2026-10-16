@@ -51,7 +51,7 @@ word for one idea. No em dashes.
 | Docs file references   | A link or inline path to a repository file that does not exist |
 | Docs temporal language | Changelog phrases in durable docs                              |
 | Decision numbers       | Duplicate record numbers, or an index that does not match      |
-| File size              | `AGENTS.md` over 20 lines                                      |
+| File size              | `AGENTS.md` over 20 lines, or a source file over its limit     |
 | Kickoff slots          | A kickoff slot left in a doc after kickoff ends                |
 
 ## Related

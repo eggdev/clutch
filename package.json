@@ -9,17 +9,19 @@
   ],
   "scripts": {
     "prepare": "bun tools/hooks/install.ts",
-    "validate": "CI=1 nx run-many -t typecheck test lint format-check lint-policy-test check-docs-file-refs check-docs-temporal check-decisions check-file-size check-kickoff-slots check-workflows check-dependency-overrides check-user-docs audit-prod",
+    "hooks:pre-commit": "lint-staged --concurrent false --config tools/hooks/paths.mjs",
+    "hooks:pre-push": "bun tools/hooks/pre-push.ts",
+    "validate": "CI=1 nx run-many -t typecheck test lint format-check lint-policy-test check-docs-file-refs check-docs-temporal check-decisions check-file-size check-kickoff-slots check-workflows check-dependency-overrides check-user-docs knip audit-prod",
     "check": "nx run-many -t typecheck lint format-check",
     "format": "nx run project-template:format"
   },
   "devDependencies": {
     "@nx/js": "23.2.1",
     "@nx/oxlint": "23.2.1",
-    "@nx/workspace": "23.2.1",
     "@types/bun": "^1.4.2",
     "@types/node": "^22.0.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "knip": "6.39.0",
     "lint-staged": "17.6.0",
     "nx": "23.2.1",
     "oxfmt": "^0.60.0",
@@ -103,6 +105,13 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/check-kickoff-slots.ts"
+        },
+        "cache": false
+      },
+      "knip": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "knip"
         },
         "cache": false
       },

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@6.39.0/schema.json",
+  // Each entry needs a reason. Knip finds most entries itself, from package.json
+  // scripts and Nx targets.
+  "entry": [
+    // Bun test runs every test file.
+    "{apps,packages,tools}/**/*.test.{ts,tsx}",
+    // Lint-staged loads this config through --config in the hooks:pre-commit script.
+    "tools/hooks/paths.mjs",
+  ],
+  "project": ["{apps,packages,tools}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+}

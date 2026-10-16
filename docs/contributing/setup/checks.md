@@ -51,7 +51,8 @@ tests the workflow and dependency checks.
 | `check-docs-file-refs`       | A doc link or path to a file that does not exist                                                 |
 | `check-docs-temporal`        | Changelog phrases in durable docs                                                                |
 | `check-decisions`            | Duplicate decision numbers, or an index that does not match                                      |
-| `check-file-size`            | `AGENTS.md` over 20 lines                                                                        |
+| `check-file-size`            | `AGENTS.md` over 20 lines, or a source file over its limit. See [file size](#file-size)          |
+| `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                |
 | `check-kickoff-slots`        | A kickoff slot left in a doc after `KICKOFF.md` is deleted                                       |
 | `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target` |
 | `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)             |
@@ -73,6 +74,39 @@ string, and the run continues. See [CI](#ci) for the other two rules.
 
 [Dependencies](./dependencies.md) explains `check-dependency-overrides` and
 `audit-prod`. `audit-prod` needs network access.
+
+## File size
+
+A source or test file has at most 400 lines.
+[`tools/file-size-budgets.json`](../../../tools/file-size-budgets.json) sets the
+limit and lists the files that may pass it.
+
+A deep module can be the right design: a small interface over a lot of logic,
+where a split would only pass state between files. Such a file gets an entry
+with a line budget and the reason it stays deep. Raise the budget in the same
+change that grows the file, and update the reason when it changes. A review
+reads the reason. The check rejects:
+
+- A file over the limit with no entry
+- A file over its budget
+- An entry with no reason
+- An entry for a file that is back within the limit, or that no longer exists
+
+When a file outgrows its design, split it. A split keeps every test: the test
+count is the same before and after.
+
+## Dead code
+
+`knip` reports unused files, exports and dependencies. It finds entry points
+from the `package.json` scripts and the Nx targets.
+[`knip.jsonc`](../../../knip.jsonc) adds the entries that it cannot find, such
+as test files. Each added entry has a comment with its reason. A leftover is
+deleted, not listed. See
+[delete what is off the common path](../../principles/delete-off-the-common-path.md).
+
+When a tool calls a file in a way that knip cannot see, run it through a
+`package.json` script. The Git hooks do this: they call `hooks:pre-commit` and
+`hooks:pre-push`.
 
 ## Test output
 

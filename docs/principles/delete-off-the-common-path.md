@@ -6,9 +6,10 @@ not take. A leftover trains the next change to preserve it.
 
 A finished migration is one case. The migration is not done until the old way is
 gone. Do not run two lanes, unless a sender we cannot update still uses the
-old one (see below). Hunt for leftovers: compat shims, aliases, codemods
-with nothing left to migrate, checks that still police an old name, and doc
-sentences that only say the old name is gone.
+old one (see below). The `knip` check reports unused files, exports and
+dependencies. Hunt for the leftovers that it cannot see: compat shims, aliases,
+codemods with nothing left to migrate, checks that still police an old name,
+and doc sentences that only say the old name is gone.
 
 Speculative code is another case. Add no empty tables, no flags for features
 that do not exist, and no placeholder branches. The
