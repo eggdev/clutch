@@ -22,8 +22,7 @@ until it is built. Then it becomes an architecture page.
 
 **Exceptions.** Decision records are point-in-time by design.
 [Project intent](./project-intent.md) keeps "Later, not now" so that nobody
-designs those features out. `TODO.md` is the build plan while a build runs, and
-it is deleted when the build ends. Ordered steps across deploys, such as a
+designs those features out. Ordered steps across deploys, such as a
 migration procedure, may describe phases. Quoted error messages match what the
 product returns.
 

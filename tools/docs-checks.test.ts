@@ -38,14 +38,13 @@ test('file refs reject a link or a root code path to a missing file, and skip fe
   ).toEqual(['AGENTS.md:1: `docs/gone.md` does not exist.']);
 });
 
-test('temporal language flags changelog phrases, and skips decision records, inline code and TODO.md', () => {
+test('temporal language flags changelog phrases, and skips decision records and inline code', () => {
   expect(
     findPhrases('docs/a.md', 'The Worker now uses D1.\nThe `no longer` phrase.\n').map(
       (m) => m.label,
     ),
   ).toEqual(['now plus a verb']);
   expect(findPhrases('docs/contributing/decisions/0001-x.md', 'We no longer poll.')).toEqual([]);
-  expect(findPhrases('TODO.md', 'Sign-in no longer uses passwords.')).toEqual([]);
 });
 
 test('decisions reject a duplicate number and a record the index does not list once', async () => {

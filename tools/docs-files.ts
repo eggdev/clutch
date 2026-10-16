@@ -6,7 +6,6 @@ export async function listDocs(root: string): Promise<string[]> {
   for (const pattern of [
     'AGENTS.md',
     'KICKOFF.md',
-    'TODO.md',
     'README.md',
     'apps/*/README.md',
     'packages/*/README.md',

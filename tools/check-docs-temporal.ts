@@ -3,13 +3,10 @@ import { blankFences, listDocs, maskInlineCode, readDoc } from '@tools/docs-file
 /**
  * Changelog phrases in durable docs. Keep the list narrow, and in line with
  * docs/contributing/documentation.md. Decision records are point-in-time, so
- * they are skipped. The documentation page quotes the phrases, and TODO.md is a
- * plan, so both are skipped.
+ * they are skipped. The documentation page quotes the phrases, so it is skipped.
  */
 const skipped = (file: string) =>
-  file.startsWith('docs/contributing/decisions/') ||
-  file === 'docs/contributing/documentation.md' ||
-  file === 'TODO.md';
+  file.startsWith('docs/contributing/decisions/') || file === 'docs/contributing/documentation.md';
 
 export const phrases: Array<[label: string, pattern: RegExp]> = [
   ['now we', /\bnow we\b/i],

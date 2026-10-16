@@ -1,13 +1,13 @@
 ---
 name: kickoff
-description: Define a new project from the template in one grilling session with the owner. Interviews one question at a time about intent, users, journeys, services and the harness, then writes project intent, architecture pages, decision records, tools/lint/boundaries.json and a TODO.md build plan. Use when KICKOFF.md exists, or when the user says kickoff, define the project, or start a new project.
+description: Define a new project from the template in one grilling session with the owner. Interviews one question at a time about intent, users, journeys, services and the harness, then writes project intent, architecture pages, decision records and tools/lint/boundaries.json. Use when KICKOFF.md exists, or when the user says kickoff, define the project, or start a new project.
 ---
 
 # Kickoff
 
 You turn the owner's idea into the docs that steer every later agent. The
-owner talks about the product once. After kickoff, the `build` skill works
-from the docs without the owner.
+owner talks about the product once. After kickoff, every agent works from the
+docs and asks the owner only what the docs do not decide.
 
 The docs are the state. Each `<!-- kickoff: … -->` slot is a question that is
 still open. This command lists them, so a new session can resume:
@@ -104,23 +104,11 @@ Ask about the app framework and deploy target, environments (the default is
 a preview for each PR and production on merge), seed data, user-facing
 languages, and which CI steps the journeys need.
 
-### 5. Plan
-
-Output: `TODO.md`, in the format in
-[references/todo-template.md](./references/todo-template.md).
-
-Order the plan as a walking skeleton. Scaffold the apps and modules first.
-Then build one journey end to end, with its test, before the next journey.
-Each item is one commit and names the check that proves it. Show the plan to
-the owner and ask what is out of order.
-
-### 6. Close
+### 5. Close
 
 1. Fill the slots in `AGENTS.md` and `docs/contributing/index.md`. Rewrite
    `README.md` for the product. Rename the root project in `package.json`.
 2. Delete `KICKOFF.md` and its line in `AGENTS.md`.
 3. Run `mise exec -- bun run validate`. The slot check is strict now. Fix each
    failure.
-4. Commit: `Define <project>: intent, architecture and build plan`.
-5. Tell the owner how to start the build: `/build` in Claude Code, or `$build`
-   in Codex.
+4. Commit: `Define <project>: intent and architecture`.

@@ -18,19 +18,16 @@ mise install && mise exec -- bun install
 claude "/kickoff"     # or: codex "\$kickoff"
 ```
 
-After kickoff, run `/build` (Claude Code) or `$build` (Codex). The build works
-through `TODO.md` and asks only what the docs do not decide.
-
 ## What is universal and what is per project
 
-| Universal: change it here first                    | Per project: kickoff writes it                 |
-| -------------------------------------------------- | ---------------------------------------------- |
-| `docs/principles/`                                 | `docs/contributing/project-intent.md`          |
-| `docs/contributing/documentation.md`               | `docs/contributing/architecture/`              |
-| `docs/contributing/harness-engineering.md`         | `docs/contributing/decisions/0001-*` and later |
-| `docs/contributing/import-boundaries.md`           | `docs/contributing/setup/local-development.md` |
-| `tools/`, except `tools/lint/boundaries.json`      | `tools/lint/boundaries.json`                   |
-| `.agents/skills/kickoff/`, `.agents/skills/build/` | `AGENTS.md`, `README.md`, `TODO.md`            |
+| Universal: change it here first               | Per project: kickoff writes it                 |
+| --------------------------------------------- | ---------------------------------------------- |
+| `docs/principles/`                            | `docs/contributing/project-intent.md`          |
+| `docs/contributing/documentation.md`          | `docs/contributing/architecture/`              |
+| `docs/contributing/harness-engineering.md`    | `docs/contributing/decisions/0001-*` and later |
+| `docs/contributing/import-boundaries.md`      | `docs/contributing/setup/local-development.md` |
+| `tools/`, except `tools/lint/boundaries.json` | `tools/lint/boundaries.json`                   |
+| `.agents/skills/kickoff/`                     | `AGENTS.md`, `README.md`                       |
 
 A universal page never states a fact about one product. It links to the
 project page that owns the fact: the owner, the issue tracker, the journeys,
