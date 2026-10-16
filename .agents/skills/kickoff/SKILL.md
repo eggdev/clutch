@@ -79,6 +79,11 @@ they arrive, what they see, what they do, what each empty, error and offline
 state shows, and what message or email each step sends. The walk shows which
 capabilities the product needs. Collect them for phase 3.
 
+Then fill two user pages from the walk: `docs/users/intro.md`, which says
+what the product is and is not, and `docs/users/getting-started.md`, which
+takes a new user to one first win, a useful result they can see. Fill `docs/users/privacy.md` after phase 3, when the data
+inventory and the vendors are known.
+
 ### 3. Services
 
 Output: the slots in `docs/contributing/architecture/` (the index, request

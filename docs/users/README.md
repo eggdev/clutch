@@ -89,6 +89,10 @@ What the product is, who it is for, and the first page to open.
 
 - <A task a user can do, in their words.>
 
+## What it is not
+
+- <A product that users confuse it with, and how it differs.>
+
 ## How it works
 
 <A short description of the parts the user sees, and how they connect.>
