@@ -71,8 +71,8 @@ not for, later not now, room to keep, hard invariants, what not to assume.
 
 ### 2. Journeys
 
-Output: one page in `docs/contributing/architecture/` for each journey, and
-the "End-to-end journeys" list in project intent.
+Output: one page in `docs/contributing/architecture/` for each journey, the
+"End-to-end journeys" list in project intent, and the slots in `docs/users/`.
 
 Walk each user from the first touch to their goal, one screen at a time: how
 they arrive, what they see, what they do, what each empty, error and offline
@@ -81,9 +81,9 @@ capabilities the product needs. Collect them for phase 3.
 
 ### 3. Services
 
-Output: the runtime map and module table in
-`docs/contributing/architecture/index.md`, one page for each service with real
-rules, `tools/lint/boundaries.json`, and a decision record for each no.
+Output: the slots in `docs/contributing/architecture/` (the index, request
+context, authorization and data storage), one page for each other service with
+real rules, `tools/lint/boundaries.json`, and a decision record for each no.
 
 For each capability from phase 2 (sign-in, data storage, sync, files, email,
 payments, AI, jobs, search, analytics), research two or three vendors first.
@@ -95,20 +95,24 @@ When the owner rejects an option that the next agent would propose again,
 write a decision record from `docs/contributing/decisions/0000-template.md` and
 add it to the steering list.
 
-### 4. Harness
+### 4. Harness and operations
 
-Output: `docs/contributing/setup/local-development.md`, the CI slot in
-`docs/contributing/setup/checks.md`, and `.github/workflows/ci.yml`.
+Output: the slots in `docs/contributing/setup/`, `docs/contributing/testing.md`,
+`docs/contributing/end-to-end-testing.md`, `docs/contributing/security.md` and
+`docs/contributing/operations/`, and `.github/workflows/ci.yml`.
 
 Ask about the app framework and deploy target, environments (the default is
 a preview for each PR and production on merge), seed data, user-facing
-languages, and which CI steps the journeys need.
+languages, test runners, and which CI steps the journeys need. Then walk the
+security and operations pages: the security rules, the accepted risks, the
+secret inventory, the operator accounts and the rollback commands.
 
 ### 5. Close
 
 1. Fill the slots in `AGENTS.md` and `docs/contributing/index.md`. Rewrite
    `README.md` for the product. Rename the root project in `package.json`.
 2. Delete `KICKOFF.md` and its line in `AGENTS.md`.
-3. Run `mise exec -- bun run validate`. The slot check is strict now. Fix each
-   failure.
+3. Run `mise exec -- bun run validate`. The slot check is strict now. Each
+   slot left belongs to a phase: ask its question, or delete the slot when the
+   project has no such content.
 4. Commit: `Define <project>: intent and architecture`.

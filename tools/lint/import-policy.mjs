@@ -17,11 +17,37 @@ function specifiers(check) {
         (callee.type === 'MemberExpression' &&
           !callee.computed &&
           ((callee.object.name === 'require' && callee.property.name === 'resolve') ||
-            (callee.object.name === 'module' && callee.property.name === 'require')))
+            (callee.object.name === 'module' && callee.property.name === 'require'))) ||
+        mockCall(callee)
       )
         check(node.arguments[0]);
     },
   };
+}
+
+/**
+ * A test runner call whose first argument is a module specifier: `vi.mock`,
+ * `jest.mock`, `mock.module` and their relatives. The policy reads these
+ * specifiers like imports, so a test cannot route around a boundary.
+ */
+export function mockCall(callee) {
+  if (callee?.type !== 'MemberExpression' || callee.computed) return false;
+  const owner = callee.object.type === 'Identifier' ? callee.object.name : null;
+  const method = callee.property.name;
+  return (
+    (owner === 'mock' && method === 'module') ||
+    (['vi', 'jest'].includes(owner) &&
+      [
+        'mock',
+        'doMock',
+        'unmock',
+        'doUnmock',
+        'importActual',
+        'importMock',
+        'requireActual',
+        'requireMock',
+      ].includes(method))
+  );
 }
 const valueOf = (source) =>
   source?.type === 'TemplateLiteral' ? source.quasis[0]?.value.cooked : source?.value;
@@ -33,9 +59,12 @@ function locate(filename) {
   return match ? { root: match[1], name: match[2], path: match[3] } : null;
 }
 const repoTarget = (value) => value.match(/^@repo\/([^/]+)\//)?.[1];
-const isTestFile = (filename) =>
+export const isTestFile = (filename) =>
   /(?:^|\/)test\//.test(filename) || /\.(?:test|spec|pw)\.[cm]?[jt]sx?$/.test(filename);
-const internal = (value) => /^(?:@repo\/|@apps\/|@tools\/|@\/|\.{1,2}(?:\/|$))/.test(value);
+/** A specifier for one of our own modules. */
+export const internal = (value) => /^(?:@repo\/|@apps\/|@tools\/|@\/|\.{1,2}(?:\/|$))/.test(value);
+/** A specifier that `aliases-only` rejects. */
+export const notAnAlias = (value) => /^(?:\.{1,2}(?:\/|$)|\/|file:|@repo\/[^/]+$|~\/)/.test(value);
 
 const kinds = new Map();
 /** Reads `type:service` or `type:domain` from the package manifest. */
@@ -95,35 +124,89 @@ function pathBetween(graph, from, to) {
   return null;
 }
 
-const boundaries = new Map();
+export const ruleNames = [
+  'aliases-only',
+  'module-dependencies',
+  'module-direction',
+  'no-cycles',
+  'vendor-owner',
+  'layers',
+  'testing-imports',
+  'no-internal-mocks',
+];
+
 /**
- * Vendor owners and layers from `tools/lint/boundaries.json` at the repository
- * root. See docs/principles/generic-platform.md and
- * docs/contributing/import-boundaries.md.
+ * Vendor owners, layers and exceptions from the data in
+ * `tools/lint/boundaries.json`. An exception lets one file pattern import one
+ * specifier pattern past one rule. Each exception needs a `reason`, so an
+ * exception without one stops the lint. See docs/principles/generic-platform.md
+ * and docs/contributing/import-boundaries.md.
  */
-function boundariesOf(root) {
+export function parseBoundaries(data) {
+  const within = (rule, file, filename) =>
+    (rule.packages ?? []).includes(file?.name) ||
+    (!!file?.name && (rule.packagePaths ?? []).some((path) => file.path.startsWith(path))) ||
+    (rule.files ?? []).some((pattern) => new RegExp(pattern).test(filename));
+  return {
+    vendors: (data.vendors ?? []).map((rule) => ({
+      vendor: rule.vendor,
+      pattern: new RegExp(rule.imports),
+      owner: `packages/${rule.owner}`,
+      allowed: (file) => file?.name === rule.owner,
+    })),
+    layers: (data.layers ?? []).map((rule) => ({
+      pattern: new RegExp(rule.imports),
+      where: rule.where,
+      allowed: (file, filename) => within(rule, file, filename),
+    })),
+    exceptions: (data.exceptions ?? []).map((exception, index) => {
+      const problems = [
+        !ruleNames.includes(exception.rule) && `\`rule\` must be one of ${ruleNames.join(', ')}`,
+        typeof exception.file !== 'string' && '`file` must be a regular expression string',
+        typeof exception.imports !== 'string' && '`imports` must be a regular expression string',
+        !(typeof exception.reason === 'string' && exception.reason.trim()) &&
+          '`reason` must say why the import cannot move behind a boundary',
+      ].filter(Boolean);
+      if (problems.length)
+        throw new Error(
+          `tools/lint/boundaries.json exceptions[${index}]: ${problems.join('; ')}. See docs/contributing/import-boundaries.md#exceptions.`,
+        );
+      return {
+        rule: exception.rule,
+        file: new RegExp(exception.file),
+        imports: new RegExp(exception.imports),
+        reason: exception.reason,
+      };
+    }),
+  };
+}
+
+const boundaries = new Map();
+/** The parsed `tools/lint/boundaries.json` at the repository root, read once per lint run. */
+export function boundariesOf(root) {
   if (!boundaries.has(root)) {
     const file = join(root, 'tools/lint/boundaries.json');
-    const data = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
-    const within = (rule, file, filename) =>
-      (rule.packages ?? []).includes(file?.name) ||
-      (!!file?.name && (rule.packagePaths ?? []).some((path) => file.path.startsWith(path))) ||
-      (rule.files ?? []).some((pattern) => new RegExp(pattern).test(filename));
-    boundaries.set(root, {
-      vendors: (data.vendors ?? []).map((rule) => ({
-        vendor: rule.vendor,
-        pattern: new RegExp(rule.imports),
-        owner: `packages/${rule.owner}`,
-        allowed: (file) => file?.name === rule.owner,
-      })),
-      layers: (data.layers ?? []).map((rule) => ({
-        pattern: new RegExp(rule.imports),
-        where: rule.where,
-        allowed: (file, filename) => within(rule, file, filename),
-      })),
-    });
+    boundaries.set(
+      root,
+      parseBoundaries(existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}),
+    );
   }
   return boundaries.get(root);
+}
+
+/** Reports the problem, unless an exception in boundaries.json covers this file, rule and specifier. */
+function report(context, rule, descriptor, value = valueOf(descriptor.node)) {
+  const filename = filenameOf(context);
+  const file = locate(filename);
+  const exempt =
+    file &&
+    boundariesOf(file.root).exceptions.some(
+      (exception) =>
+        exception.rule === rule &&
+        exception.file.test(filename) &&
+        exception.imports.test(typeof value === 'string' ? value : ''),
+    );
+  if (!exempt) context.report(descriptor);
 }
 
 export default {
@@ -141,11 +224,8 @@ export default {
       create(context) {
         return specifiers((source) => {
           const value = valueOf(source);
-          if (
-            typeof value === 'string' &&
-            /^(?:\.{1,2}(?:\/|$)|\/|file:|@repo\/[^/]+$|~\/)/.test(value)
-          )
-            context.report({ node: source, messageId: 'alias' });
+          if (typeof value === 'string' && notAnAlias(value))
+            report(context, 'aliases-only', { node: source, messageId: 'alias' });
         });
       },
     },
@@ -175,7 +255,7 @@ export default {
           const value = valueOf(source);
           if (typeof value !== 'string') return;
           if (pkg && /^@(?:apps|tools)?\//.test(value)) {
-            context.report({ node: source, messageId: 'application' });
+            report(context, 'module-dependencies', { node: source, messageId: 'application' });
             return;
           }
           if (
@@ -189,7 +269,7 @@ export default {
               ((portable || domain) &&
                 /^(?:node:|bun:|react(?:-native)?(?:\/|$)|expo(?:-|\/|$)|one(?:\/|$))/.test(value)))
           )
-            context.report({ node: source, messageId: 'portable' });
+            report(context, 'module-dependencies', { node: source, messageId: 'portable' });
         });
       },
     },
@@ -215,11 +295,18 @@ export default {
           if (!target || target === file.name) return;
           for (const name of [file.name, target])
             if (!kindOf(file.root, name)) {
-              context.report({ node: source, messageId: 'untagged', data: { name } });
+              report(context, 'module-direction', {
+                node: source,
+                messageId: 'untagged',
+                data: { name },
+              });
               return;
             }
           if (kindOf(file.root, target) !== 'domain') return;
-          context.report({ node: source, messageId: kindOf(file.root, file.name) });
+          report(context, 'module-direction', {
+            node: source,
+            messageId: kindOf(file.root, file.name),
+          });
         });
       },
     },
@@ -241,7 +328,7 @@ export default {
           if (!target || target === file.name) return;
           const path = pathBetween(graphOf(file.root), target, file.name);
           if (path)
-            context.report({
+            report(context, 'no-cycles', {
               node: source,
               messageId: 'cycle',
               data: { path: [file.name, ...path].join(' -> ') },
@@ -267,7 +354,7 @@ export default {
           if (typeof value !== 'string') return;
           const rule = vendors.find((vendor) => vendor.pattern.test(value));
           if (rule && !rule.allowed(file ?? {}))
-            context.report({
+            report(context, 'vendor-owner', {
               node: source,
               messageId: 'owner',
               data: { vendor: rule.vendor, owner: rule.owner },
@@ -294,7 +381,7 @@ export default {
           if (typeof value !== 'string') return;
           const rule = layers.find((layer) => layer.pattern.test(value));
           if (rule && !rule.allowed(file, filename))
-            context.report({
+            report(context, 'layers', {
               node: source,
               messageId: 'layer',
               data: { value, where: rule.where },
@@ -317,7 +404,7 @@ export default {
         return specifiers((source) => {
           const value = valueOf(source);
           if (typeof value === 'string' && /^@repo\/[^/]+\/src\/testing\//.test(value))
-            context.report({ node: source, messageId: 'testing' });
+            report(context, 'testing-imports', { node: source, messageId: 'testing' });
         });
       },
     },
@@ -357,9 +444,9 @@ export default {
               typeof target === 'string' &&
               internal(target)
             )
-              context.report({ node, messageId: 'mock' });
+              report(context, 'no-internal-mocks', { node, messageId: 'mock' }, target);
             else if (method === 'spyOn' && imported.has(rootName(first)))
-              context.report({ node, messageId: 'mock' });
+              report(context, 'no-internal-mocks', { node, messageId: 'mock' }, '');
           },
         };
       },

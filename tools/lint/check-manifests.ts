@@ -33,7 +33,16 @@ export async function checkManifests(root: string): Promise<string[]> {
 
 if (import.meta.main) {
   const errors = await checkManifests(resolve(import.meta.dir, '../..'));
-  for (const error of errors) console.error(error);
-  if (errors.length) process.exitCode = 1;
-  else console.log('Workspace manifests have no exports maps, and each package has one type tag.');
+  if (errors.length) {
+    console.error(
+      [
+        `Manifest check failed (${errors.length}).`,
+        'Fix each package.json below. See docs/contributing/import-boundaries.md.',
+        '',
+        ...errors,
+      ].join('\n'),
+    );
+    process.exitCode = 1;
+  } else
+    console.log('Workspace manifests have no exports maps, and each package has one type tag.');
 }

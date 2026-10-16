@@ -42,6 +42,18 @@ failure mode.
 
 If reviewers repeat the same comment twice, encode it.
 
+## Make failures teach the fix
+
+A failure message is the first doc an agent reads. Each check, lint rule and
+test helper prints:
+
+- The file and line, or the name of the thing that is wrong.
+- The fix, as an action: "Add `id: build` to the step", not "invalid reference".
+- A link to the page that owns the rule, for the why.
+
+A message that names only the problem costs a round trip to find the fix. See
+[checks](./setup/checks.md#checks).
+
 ## Working agreements
 
 - Keep changes scoped. Split large work into smaller steps.
@@ -53,7 +65,8 @@ If reviewers repeat the same comment twice, encode it.
 
 The checks in `tools/` catch most drift on each change: missing file
 references, changelog language, decision record numbering, the `AGENTS.md`
-budget and leftover kickoff slots.
+budget, leftover kickoff slots, workflow references and undocumented dependency
+overrides.
 
 Cursor Bugbot reviews each PR against `.cursor/BUGBOT.md`. That file holds only
 the rules that a check cannot catch yet. When a check covers a rule, delete the
@@ -61,7 +74,28 @@ rule from `BUGBOT.md`.
 
 Record follow-up work as an issue. Leftovers from a migration follow
 [delete what is off the common path](../principles/delete-off-the-common-path.md):
-remove them in the same change when safe, otherwise open an issue.
+remove them in the same change when safe, otherwise open an issue with the
+[cleanup form](../../.github/ISSUE_TEMPLATE/cleanup.yml). Its "Ready when"
+field is a criterion that a person can prove true or false. A code comment is
+never the only record of a leftover. Report a bug with the
+[bug form](../../.github/ISSUE_TEMPLATE/bug.yml), one bug in each issue.
+
+## Weekly gardening
+
+Once a week, an agent or a person does one short pass:
+
+1. Read the review comments of the week's merged PRs. Find a comment that
+   repeats.
+2. Propose one new guardrail for it, as an issue or a PR. Use the strongest
+   cheap kind from [promote learning into enforcement](#promote-learning-into-enforcement).
+3. Delete stale guidance from `docs/contributing/`, and tighten unclear steps.
+4. Delete each rule from `.cursor/BUGBOT.md` that a check covers.
+5. Close each cleanup issue whose "Ready when" criterion is true, in the PR
+   that removes the leftover.
+
+Many small cleanups cost less than one large rewrite.
+
+<!-- kickoff: Who runs the weekly gardening pass, and on which day. -->
 
 ## References
 

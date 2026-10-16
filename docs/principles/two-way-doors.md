@@ -31,6 +31,19 @@ Before a one-way change merges:
 - Record the no in [decision records](../contributing/decisions/index.md) when
   the next agent would otherwise propose it again.
 
+## Move data between stores
+
+Moving a fact from one store to another is one-way. Do it in this order:
+
+1. Stop writes to the source for a short window.
+2. Copy the data.
+3. Compare row counts and a sample of records, including the owner of each
+   record.
+4. Switch reads and writes together, in one deploy. Never read from one store
+   and write to the other.
+5. Keep the source as the rollback until the comparison passes. A later
+   migration deletes it.
+
 ## Example
 
 A saved document carries `schemaVersion: 1`. The reader returns `null` for any

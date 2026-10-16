@@ -1,0 +1,46 @@
+name: Cleanup
+description: A leftover that waits for a gate, such as a shim, flag, table or old path.
+title: 'Cleanup: <what to remove> after <gate>'
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Delete a leftover in the same change when that is safe. Open this issue only when the removal must wait.
+        Search open `Cleanup:` issues first, and comment on a match.
+        A code comment is never the only record of a leftover. This issue is the record.
+        Link this issue from the PR that adds the leftover with `Related to #N`. Never write "does not close #N": GitHub reads "close #N" as a closing keyword.
+  - type: textarea
+    id: leftover
+    attributes:
+      label: Leftover
+      description: What to delete or stop serving. Name the paths, tables, flags, shims or classes.
+    validations:
+      required: true
+  - type: textarea
+    id: gate
+    attributes:
+      label: Why it waits
+      description: The gate, such as a soak metric, a later migration, a deploy order or a cutover.
+    validations:
+      required: true
+  - type: textarea
+    id: ready
+    attributes:
+      label: Ready when
+      description: A criterion that a person can prove true or false. A calendar date alone is not a criterion.
+    validations:
+      required: true
+  - type: textarea
+    id: verify
+    attributes:
+      label: How to verify
+      description: The commands, queries or deploy evidence that prove the removal is safe.
+    validations:
+      required: true
+  - type: input
+    id: introduced
+    attributes:
+      label: Introduced by
+      description: The PR that adds the leftover.
+    validations:
+      required: true

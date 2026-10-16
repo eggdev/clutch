@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "validate": "nx run-many -t typecheck test lint format-check lint-policy-test check-docs-file-refs check-docs-temporal check-decisions check-file-size check-kickoff-slots",
+    "validate": "CI=1 nx run-many -t typecheck test lint format-check lint-policy-test check-docs-file-refs check-docs-temporal check-decisions check-file-size check-kickoff-slots check-workflows check-dependency-overrides check-user-docs audit-prod",
     "check": "nx run-many -t typecheck lint format-check",
     "format": "nx run project-template:format"
   },
@@ -101,6 +101,34 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/check-kickoff-slots.ts"
+        },
+        "cache": false
+      },
+      "check-user-docs": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-user-docs.ts"
+        },
+        "cache": false
+      },
+      "check-workflows": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-workflows.ts"
+        },
+        "cache": false
+      },
+      "check-dependency-overrides": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-dependency-overrides.ts"
+        },
+        "cache": false
+      },
+      "audit-prod": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun audit --prod --audit-level=moderate"
         },
         "cache": false
       }

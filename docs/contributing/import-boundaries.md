@@ -6,6 +6,14 @@ policy with `mise exec -- bun nx run-many -t lint-policy-test`.
 
 The policy is [`tools/lint/import-policy.mjs`](../../tools/lint/import-policy.mjs).
 Its project data is [`tools/lint/boundaries.json`](../../tools/lint/boundaries.json).
+[`tools/lint/oxlint-rules.json`](../../tools/lint/oxlint-rules.json) turns on
+each rule. The policy also exports its matchers and its `boundaries.json`
+parser, so a test can check them without a lint run.
+
+Every rule reads each module specifier in a file: static imports, re-exports,
+dynamic `import()`, type imports, `require`, and the first argument of
+`vi.mock`, `jest.mock`, `mock.module` and their relatives, such as
+`vi.importActual`. A test cannot route around a boundary with a mock.
 
 ## Services and domains
 
@@ -50,7 +58,7 @@ import { createIdentity } from '@repo/identity/src/server';
 `repo-imports/aliases-only` rejects:
 
 - Relative module specifiers, including in re-exports, dynamic imports,
-  CommonJS and type imports
+  CommonJS, type imports and test runner mocks
 - The bare `@repo/<name>` package entrypoint
 - `exports` maps in workspace package manifests
 
@@ -94,6 +102,34 @@ for app folders.
 | Tests never mock `@repo/*` or `@/` imports                         | `repo-imports/no-internal-mocks` |
 
 See [test the workflow](../principles/test-the-workflow.md).
+
+## Exceptions
+
+Move the shared code into a module that both sides can import. When that
+cannot happen in this change, add an exception to `boundaries.json`. An
+exception lets the files that match `file` import the specifiers that match
+`imports`, past one `rule`:
+
+```json
+{
+  "exceptions": [
+    {
+      "rule": "vendor-owner",
+      "file": "/packages/projects/src/server/legacy-billing\\.ts$",
+      "imports": "^stripe$",
+      "reason": "The legacy webhook checks its signature before billing has a port for it."
+    }
+  ]
+}
+```
+
+`rule` is a rule name without the `repo-imports/` prefix. `file` and `imports`
+are regular expressions. `reason` says why the import cannot move yet. An
+exception without a reason, or with an unknown rule, stops the lint with the
+index of the entry. `tools/lint/import-policy.test.ts` checks that each
+exception in the repository states its reason. Open a
+[cleanup issue](../../.github/ISSUE_TEMPLATE/cleanup.yml) to remove the
+exception.
 
 ## Runtime resolution
 

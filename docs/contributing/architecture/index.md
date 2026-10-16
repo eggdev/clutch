@@ -7,7 +7,7 @@ surface or storage home.
 
 ## Runtime map
 
-<!-- kickoff: A table: Unit, Public surface, Owns. One row for each deployed thing (app, API, worker, queue) and each store (database, object storage, cache). -->
+<!-- kickoff: A table: Unit, Public surface, Owns, Binds. One row for each deployed thing (app, API, worker, queue) and each store (database, object storage, cache). Binds names the other units and stores that this unit calls. -->
 
 ## Modules
 
@@ -43,6 +43,30 @@ packages/<name>/src/
 - Test through caller-facing interfaces. See
   [test the workflow](../../principles/test-the-workflow.md).
 
+## Source of truth in code
+
+<!-- kickoff: One line for each entry point, router and composition root: the file and what it starts. -->
+
 ## Pages
 
-<!-- kickoff: One link for each system page, with when to open it. Each user journey from kickoff gets a page, and so does each service with real rules (authentication, authorization, data storage, sync, jobs). -->
+- [Request context](./request-context.md): how a request becomes a tenant and
+  an actor
+- [Authorization](./authorization.md): the access check, and the permission
+  each surface declares
+- [Data storage](./data-storage.md): tenant isolation, the data inventory and
+  frozen storage contracts
+
+<!-- kickoff: One link for each other system page, with when to open it. Each user journey from kickoff gets a page, and so does each service with real rules (authentication, sync, jobs). -->
+
+## Page shape
+
+Each page here follows one shape, so readers know where a fact lives:
+
+1. A table that answers the page's core questions.
+2. The rules, each one a sentence that a test or a check can prove.
+3. A recipe for the common extension, such as a new entry point or a new
+   store, when one exists.
+4. "What to read when changing it": the files and pages to open first.
+
+A runbook for a one-time operation lives in
+[operations](../operations/index.md).

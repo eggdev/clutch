@@ -23,7 +23,14 @@ export async function checkFileSize(root: string): Promise<string[]> {
 if (import.meta.main) {
   const errors = await checkFileSize(process.cwd());
   if (errors.length) {
-    console.error([`File size check failed (${errors.length}).`, '', ...errors].join('\n'));
+    console.error(
+      [
+        `File size check failed (${errors.length}).`,
+        'Move detail to the page that owns it. See docs/principles/lean-agent-context.md.',
+        '',
+        ...errors,
+      ].join('\n'),
+    );
     process.exitCode = 1;
   } else console.log('Files are within their line budgets.');
 }

@@ -15,6 +15,9 @@ Indexes, projections, KV maps and counters are caches of the owner record.
 - The write that changes the owner record also updates or deletes the copy, in
   the same transaction or before the response returns.
 - A TTL alone is never the invalidation.
+- Each cache states how stale it can be, on the page that owns the cache.
+- Each cache key starts with the tenant ID, so one tenant never reads another
+  tenant's entry.
 - A rebuild from a partial read writes nothing and fails. See
   [fail loudly](./fail-loudly.md).
 

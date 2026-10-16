@@ -39,6 +39,9 @@ Connect a fake through the module's port. Never patch an import.
   mutable state.
 - Do not pin exported constants, copy production helpers or repeat checks that
   the type system makes.
+- An absence assertion runs on a live path that could still show the thing:
+  an admin view next to a user view, a full list next to an empty one.
+- Tests run with no network. A vendor is a local runtime or a fake.
 - Put setup builders in `packages/<name>/src/testing/`. Tests in any package can
   import them. Production code cannot.
 
@@ -54,4 +57,7 @@ matcher is the constant.
 
 ## Related
 
+- [Testing](../contributing/testing.md): test types, console output and
+  `await using`
+- [End-to-end testing](../contributing/end-to-end-testing.md)
 - [No invasive test-only code in production](./no-invasive-test-only-code.md)

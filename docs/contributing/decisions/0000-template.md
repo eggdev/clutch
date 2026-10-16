@@ -16,8 +16,10 @@ What was decided, in one or two sentences. The usual record is a product-shaped
 
 ## Consequences
 
-What stays simple, what gets harder, and the **revisit-if** - the concrete
-condition that would reopen this. Half a page is enough.
+What stays simple, what gets harder, and the **revisit-if**: a condition that
+someone can measure, such as a user count or a cost. When the record defers a
+change, it also states the shape to build when the condition is met, so the
+next agent does not design it again. Half a page is enough.
 
 Do not use this template for a layout or UI tweak, a library pick the code
 already encodes, or because a PR shipped.

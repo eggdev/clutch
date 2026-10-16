@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join, relative } from 'node:path';
 import { checkManifests } from '@tools/lint/check-manifests';
+import { boundariesOf, mockCall, notAnAlias, parseBoundaries } from '@tools/lint/import-policy.mjs';
 
 const root = resolve(import.meta.dir, '../..');
 
@@ -313,4 +314,79 @@ test('src/testing is imported only by test files and other src/testing files', a
       'apps/api/browser/onboarding.pw.ts': 'import "@repo/projects/src/testing/project";',
     }),
   ).toEqual([]);
+});
+
+test('every rule reads vi.mock, jest.mock and mock.module specifiers like imports', async () => {
+  expect(
+    await lint({
+      'tools/lint/boundaries.json': boundaries,
+      'packages/projects/package.json': tagged('domain'),
+      'packages/sync/package.json': tagged('service'),
+      'packages/projects/test/sync.test.ts': [
+        'vi.mock("./relative");',
+        'vi.mock("stripe");',
+        'jest.requireActual("../parent");',
+        'mock.module("drizzle-orm", () => ({}));',
+        'vi.mock("@repo/sync/src/server");',
+        'vi.importActual("@repo/sync/src/server");',
+      ].join('\n'),
+    }),
+  ).toEqual([
+    'packages/projects/test/sync.test.ts aliases-only',
+    'packages/projects/test/sync.test.ts aliases-only',
+    'packages/projects/test/sync.test.ts layers',
+    'packages/projects/test/sync.test.ts no-internal-mocks',
+    'packages/projects/test/sync.test.ts no-internal-mocks',
+    'packages/projects/test/sync.test.ts vendor-owner',
+  ]);
+  expect(
+    mockCall({
+      type: 'MemberExpression',
+      computed: false,
+      object: { type: 'Identifier', name: 'vi' },
+      property: { name: 'unmock' },
+    }),
+  ).toBe(true);
+  expect(
+    mockCall({
+      type: 'MemberExpression',
+      computed: false,
+      object: { type: 'Identifier', name: 'vi' },
+      property: { name: 'fn' },
+    }),
+  ).toBe(false);
+  expect(
+    ['./x', '../x', '@repo/sync', '/abs', '@repo/sync/src/server', 'stripe'].filter(notAnAlias),
+  ).toEqual(['./x', '../x', '@repo/sync', '/abs']);
+});
+
+test('an exception lets one file import one specifier past one rule, and needs a reason', async () => {
+  const exception = {
+    rule: 'vendor-owner',
+    file: '/packages/projects/src/server/legacy-billing\\.ts$',
+    imports: '^stripe$',
+    reason: 'The legacy webhook verifies its signature before billing exposes a port for it.',
+  };
+  const withException = JSON.stringify({ ...JSON.parse(boundaries), exceptions: [exception] });
+  expect(
+    await lint({
+      'tools/lint/boundaries.json': withException,
+      'packages/projects/src/server/legacy-billing.ts': 'import "stripe"; import "drizzle-orm";',
+      'packages/projects/src/server/invoices.ts': 'import "stripe";',
+    }),
+  ).toEqual([
+    'packages/projects/src/server/invoices.ts vendor-owner',
+    'packages/projects/src/server/legacy-billing.ts layers',
+  ]);
+  expect(() => parseBoundaries({ exceptions: [{ ...exception, reason: ' ' }] })).toThrow(
+    'tools/lint/boundaries.json exceptions[0]: `reason` must say why the import cannot move behind a boundary.',
+  );
+  expect(() => parseBoundaries({ exceptions: [{ ...exception, rule: 'vendor' }] })).toThrow(
+    '`rule` must be one of aliases-only',
+  );
+});
+
+test('each exception in this repository states its reason', () => {
+  for (const exception of boundariesOf(root).exceptions)
+    expect(exception.reason.trim()).not.toBe('');
 });

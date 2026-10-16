@@ -17,6 +17,12 @@ the page that owns your task. Do not read this folder from top to bottom.
 - [Setup](./setup/index.md): local services, configuration, checks
 - [Harness engineering](./harness-engineering.md): the agent-first loop, how to
   turn a repeated lesson into a check, and PR review
+- [Testing](./testing.md) and [end-to-end testing](./end-to-end-testing.md):
+  which test type to write, console output, journeys
+- [Security](./security.md): the rules each change keeps, and the risks
+  accepted on purpose
+- [Operations](./operations/index.md): rollback, secret rotation, operator
+  accounts and the runbook shape
 
 ## Architecture
 
@@ -35,6 +41,8 @@ the page that owns your task. Do not read this folder from top to bottom.
 
 ## Writing docs
 
+- [User docs](../users/README.md): page types and frontmatter for docs that
+  users and their agents read
 - [Documentation principles](./documentation.md): present tense, no status,
   one home for each fact, checks over should-lists
 - [Documentation maintenance](./setup/documentation-maintenance.md)

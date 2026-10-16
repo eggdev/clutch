@@ -35,6 +35,22 @@
         "{workspaceRoot}/packages/**/*",
         { "externalDependencies": ["oxlint"] }
       ]
+    },
+    "test": {
+      "inputs": [
+        "default",
+        "{workspaceRoot}/bunfig.toml",
+        "{workspaceRoot}/tools/testing/**/*",
+        { "env": "CI" }
+      ]
+    },
+    "lint-policy-test": {
+      "inputs": [
+        "default",
+        "{workspaceRoot}/bunfig.toml",
+        "{workspaceRoot}/tools/testing/**/*",
+        { "env": "CI" }
+      ]
     }
   }
 }

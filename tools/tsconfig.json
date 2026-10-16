@@ -5,6 +5,7 @@
     "noEmit": true,
     "emitDeclarationOnly": false,
     "declarationMap": false,
+    "allowJs": true,
     "types": ["bun"]
   },
   "include": ["**/*.ts"]

@@ -5,11 +5,21 @@ on:
   push:
     branches: [main]
 
+# Least privilege. A job that needs more grants it in its own permissions block.
+permissions:
+  contents: read
+
+env:
+  # Agents run validate with CI=1 too, so Nx test hashes match.
+  CI: 1
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: jdx/mise-action@v2
       - run: bun install --frozen-lockfile
       - run: bun run validate

@@ -1,29 +1,11 @@
 import { expect, test } from 'bun:test';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
 import { checkDecisions } from '@tools/check-decisions';
 import { checkDocsFileRefs } from '@tools/check-docs-file-refs';
 import { findPhrases } from '@tools/check-docs-temporal';
 import { checkFileSize } from '@tools/check-file-size';
 import { checkKickoffSlots } from '@tools/check-kickoff-slots';
-
-/** Writes the files into a new directory, runs `check` there, and deletes the directory. */
-async function inRepo<T>(
-  files: Record<string, string>,
-  check: (root: string) => Promise<T>,
-): Promise<T> {
-  const root = await mkdtemp(join(tmpdir(), 'docs-check-'));
-  try {
-    for (const [name, content] of Object.entries(files)) {
-      await mkdir(join(root, dirname(name)), { recursive: true });
-      await writeFile(join(root, name), content);
-    }
-    return await check(root);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-}
+import { checkUserDocs } from '@tools/check-user-docs';
+import { inRepo } from '@tools/testing/in-repo';
 
 test('file refs reject a link or a root code path to a missing file, and skip fenced examples', async () => {
   expect(
@@ -82,4 +64,31 @@ test('kickoff slots are pending while KICKOFF.md exists, and inline code that na
     slots: [{ file: 'docs/contributing/project-intent.md', line: 3, text: 'who are the users' }],
   });
   expect((await inRepo(docs, checkKickoffSlots)).pending).toBe(false);
+});
+
+test('user docs reject missing frontmatter, bad fields, a wrong id and a duplicate id, and skip README.md', async () => {
+  const page = (id: string, extra = '') =>
+    `---\nid: ${id}\ntitle: Connect\nsummary: Load this when a user connects.\ntype: integration\n${extra}---\n\n# Connect\n`;
+  expect(
+    await inRepo(
+      {
+        'docs/users/README.md': '# User docs\n',
+        'docs/users/connect-calendar.md': page('connect_calendar'),
+        'docs/users/copy.md': page('connect_calendar'),
+        'docs/users/bare.md': '# Bare\n',
+        'docs/users/odd.md': page('odd', 'audience: people\nowner: me\n').replace(
+          'integration',
+          'guide',
+        ),
+      },
+      checkUserDocs,
+    ),
+  ).toEqual([
+    'docs/users/bare.md: the page has no frontmatter.',
+    'docs/users/copy.md: `id` is `connect_calendar`. The file name gives `copy`.',
+    'docs/users/copy.md: `id: connect_calendar` is also used by docs/users/connect-calendar.md.',
+    'docs/users/odd.md: `owner` is not a frontmatter field.',
+    'docs/users/odd.md: `type: guide` is not one of intro, getting-started, concept, playbook, integration, reference.',
+    'docs/users/odd.md: `audience` can only be `agents`.',
+  ]);
 });

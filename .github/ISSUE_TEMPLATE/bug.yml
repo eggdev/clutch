@@ -1,0 +1,73 @@
+name: Bug
+description: One bug, with the steps that show it.
+title: '<area>: <symptom>'
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report one bug in each issue. Open a new issue for each other problem.
+        Name the area and the symptom in the title, so triage works from the list.
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What you tried to do.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of steps that shows the bug. Include the commands, inputs and environment.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Exact error text
+      description: Copy the error as text, not as a screenshot. Quote the relevant lines only. Remove secrets.
+      render: text
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options:
+        - Always
+        - Sometimes
+        - Once
+    validations:
+      required: true
+  - type: textarea
+    id: conditions
+    attributes:
+      label: Conditions
+      description: When it happens, if not always.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Blocked or degraded. Name the workaround, and what it costs.
+    validations:
+      required: true
+  - type: textarea
+    id: cause
+    attributes:
+      label: Suspected cause
+      description: Optional. Keep it apart from the observed facts above.

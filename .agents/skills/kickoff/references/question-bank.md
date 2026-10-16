@@ -49,6 +49,14 @@ decision. Show a draft answer with each question.
 - How does the customer pay, and for what unit: seats, projects, usage?
 - Which work runs in the background? What retries, and what tells the user?
 - What can a user export, in what format, and for how long is it kept?
+- Which ways can a request arrive: a browser, a token, a job, a webhook, an
+  inbound message? Which of them have no person behind them?
+- Which actions must a live person take, never automation: members, roles,
+  billing?
+- How long does each store keep data that grows? What leaves with a deleted
+  tenant?
+- Which key formats, object names and stored JSON shapes will outlive the first
+  deploy?
 
 ## 4. Harness
 
@@ -57,6 +65,15 @@ decision. Show a draft answer with each question.
   staging step?
 - What does the seed data contain, and which accounts does it create?
 - Which CI steps does each PR need beyond `validate`?
+- Which test runner for each test type, and which journeys does the end-to-end
+  suite cover?
+- Which security rules must every later change keep? Which risks do you accept
+  on purpose, and when would you revisit each one?
+- Which secrets exist, what does each one protect, and what breaks when it
+  rotates?
+- Which vendor accounts hold the product, and how do you recover each one?
+- What is the first action for each failure: roll back, or fix forward?
+- Which performance numbers get a budget?
 
 ## What past owners pushed back on
 
