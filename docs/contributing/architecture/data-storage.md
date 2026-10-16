@@ -9,6 +9,17 @@ Where each fact lives, and the rules that keep tenants apart.
 | What leaves with a tenant?      | Everything in the data inventory below          |
 | What can never change in place? | The frozen storage contracts below              |
 
+## Every resource belongs to a tenant
+
+A resource is owned by a tenant, never by a person. Signup creates a personal
+tenant for each person, with that person as its only member. A product for one
+person at a time still works this way.
+
+The product does not have to show tenants. Organizations, teams and invites are
+product features that kickoff decides on. The ownership model leaves room for
+them: a second member joins an existing tenant, and no stored key or owner
+column moves.
+
 ## Tenant isolation
 
 Every tenant-owned record is scoped by the tenant ID: a column, a key prefix or

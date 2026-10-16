@@ -36,7 +36,8 @@ decision. Show a draft answer with each question.
 
 ## 3. Services
 
-- Is one account one person, or an organization with roles? What may each
+- Every resource belongs to a tenant, and signup creates a personal tenant.
+  Does the product show organizations or teams now, or later? What may each
   role do?
 - Where does each fact live? One database for all tenants, or one for each
   tenant? Bring the cost of each at the expected scale.
