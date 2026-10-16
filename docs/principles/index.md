@@ -15,6 +15,7 @@ owns the fact.
 | [Delete what is off the common path](./delete-off-the-common-path.md)       | A migration left an old lane, or a branch, field, flag or doc serves a path the product skips |
 | [Fail loudly at the right layer](./fail-loudly.md)                          | An error could be swallowed so a partial result continues                                     |
 | [Fix the root bottleneck](./fix-the-root-bottleneck.md)                     | Masking slowness with timeouts, fallbacks or caches                                           |
+| [One door for each decision](./one-door-for-each-decision.md)               | Adding a route, job or tool that touches access, money or visibility, or a new kind of guard  |
 | [Two-way and one-way doors](./two-way-doors.md)                             | Changing a stored shape, a hard invariant, or anything a copy outlives                        |
 | [Examples over prose](./examples-over-prose.md)                             | Writing docs, skills or a procedure with more than one step                                   |
 | [Keep agent context lean](./lean-agent-context.md)                          | Editing `AGENTS.md` or skills, or deciding where guidance goes                                |

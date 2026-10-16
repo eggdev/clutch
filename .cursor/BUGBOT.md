@@ -9,6 +9,14 @@ Read [project intent](../docs/contributing/project-intent.md#hard-invariants).
 Flag any change that touches a hard invariant and has no `one-way-door` label.
 See [two-way and one-way doors](../docs/principles/two-way-doors.md).
 
+## One door for each decision
+
+Flag a change that checks access, a plan limit, a flag or the acting user
+outside the one function that owns that decision, and a new route, job or tool
+with no declaration. See
+[one door for each decision](../docs/principles/one-door-for-each-decision.md).
+When a check enforces the declaration, delete this rule.
+
 ## Docs move with behavior
 
 When a change alters how a module or flow works, the page that owns it must

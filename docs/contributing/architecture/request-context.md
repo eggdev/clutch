@@ -16,6 +16,8 @@ answers these questions in one shape:
 
 ## Rules
 
+This page applies [one door for each decision](../../principles/one-door-for-each-decision.md).
+
 - **Nothing builds a context by hand.** Each entry point names its source, and
   one function derives the context from that source. The source is a required
   parameter, so a new entry point does not compile until it names itself.

@@ -28,6 +28,7 @@ for what to do when the check gets slow.
 
 ## Every surface declares its permission
 
+This page applies [one door for each decision](../../principles/one-door-for-each-decision.md).
 Each route, API operation and tool declares the permission it needs. The
 declaration is a required field, so a surface without one does not compile.
 `'none'` is an explicit value: the surface touches no tenant data. A test walks
