@@ -49,7 +49,18 @@ decision. Show a draft answer with each question.
   flag registry module?
 - What may operators see? Is support access granted by the customer, for a
   set time?
-- How does the customer pay, and for what unit: seats, projects, usage?
+- How does the customer pay: a subscription, usage-based billing, or not at
+  all? For a subscription, what happens at a plan limit: stop, charge overage,
+  or degrade? The default is stop with a clear message. Write a plan limits
+  page only when the product bills.
+- Does billing or a dashboard need usage events? Write a usage metering page
+  only when it does.
+- Does background work need a history that users can see, such as agent or job
+  runs? Write a run history page only when it does.
+- How long can a user restore deleted data? The default is 30 days. Which data
+  is exempt from soft delete, and why?
+- Does the product expose an API to third parties? Its error codes extend the
+  table in `docs/contributing/architecture/api-errors.md`.
 - Which work runs in the background? What retries, and what tells the user?
 - What can a user export, in what format, and for how long is it kept?
 - Which ways can a request arrive: a browser, a token, a job, a webhook, an

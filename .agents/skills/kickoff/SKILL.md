@@ -82,7 +82,8 @@ capabilities the product needs. Collect them for phase 3.
 ### 3. Services
 
 Output: the slots in `docs/contributing/architecture/` (the index, request
-context, authorization, data storage and feature flags), one page for each other service with
+context, authorization, data storage, feature flags, API errors and soft
+delete), one page for each other service with
 real rules, `tools/lint/boundaries.json`, and a decision record for each no.
 
 For each capability from phase 2 (sign-in, data storage, sync, files, email,
@@ -107,12 +108,21 @@ languages, test runners, and which CI steps the journeys need. Then walk the
 security and operations pages: the security rules, the accepted risks, the
 secret inventory, the operator accounts and the rollback commands.
 
+Set up the project's own Nx remote cache. Each project has its own worker and
+R2 bucket, so one repository never reads another's cache:
+
+1. Ask which Cloudflare account hosts it.
+2. Rename the worker and its bucket to `<project>-nx-cache` in
+   `apps/nx-cache/wrangler.jsonc` and `docs/contributing/setup/nx.md`.
+3. Walk the owner through "Set up the cache" in `docs/contributing/setup/nx.md`.
+   The owner runs the steps that need their account.
+4. Confirm that a CI run reports remote cache hits. Until it does, the cache is
+   not set up.
+
 ### 5. Close
 
 1. Fill the slots in `AGENTS.md` and `docs/contributing/index.md`. Rewrite
    `README.md` for the product. Rename the root project in `package.json`.
-   Rename the Nx cache worker and its R2 bucket to `<project>-nx-cache` in
-   `apps/nx-cache/wrangler.jsonc` and `docs/contributing/setup/nx.md`.
 2. Delete `KICKOFF.md` and its line in `AGENTS.md`.
 3. Run `mise exec -- bun run validate`. The slot check is strict now. Each
    slot left belongs to a phase: ask its question, or delete the slot when the

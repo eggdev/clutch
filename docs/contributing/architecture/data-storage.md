@@ -54,3 +54,4 @@ unless a migration rewrites every stored copy. See
 <!-- kickoff: The files that own storage drivers, migrations and the inventory. -->
 
 - [Normalized source of truth](../../principles/normalized-source-of-truth.md)
+- [Soft delete](./soft-delete.md): what delete does, and when data goes for good

@@ -18,6 +18,12 @@ mise install && mise exec -- bun install
 claude "/kickoff"     # or: codex "\$kickoff"
 ```
 
+## The template's own infrastructure
+
+The template runs its own Nx remote cache (`project-template-nx-cache`). It
+proves that a fresh setup of `apps/nx-cache` works. Each project sets up its own
+cache in kickoff, with its own worker, bucket and tokens.
+
 ## What is universal and what is per project
 
 | Universal: change it here first               | Per project: kickoff writes it                 |
