@@ -9,6 +9,8 @@ How to run, check and ship the project. Open only the page you need.
 - [Checks](./checks.md): `validate`, each check, CI
 - [Previews](./previews.md): a preview for each PR, flow checks, and the name
   guard on destructive automation
+- [Migrations](./migrations.md): where migrations live, and why a merged one
+  never changes
 - [Seed data](./seeding.md): the seed world and one account for each role
 - [Lint and format rules](./lint-rules.md): the Ultracite baseline, each choice
   we made, and the formatter settings

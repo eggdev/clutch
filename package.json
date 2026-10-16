@@ -156,8 +156,16 @@
           "check-workflows",
           "check-dependency-overrides",
           "check-user-docs",
-          "knip"
+          "knip",
+          "check-migrations"
         ]
+      },
+      "check-migrations": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-migrations.ts"
+        },
+        "cache": false
       }
     }
   }
