@@ -5,6 +5,8 @@ How to run, check and ship the project. Open only the page you need.
 - [Local development](./local-development.md): tools, services, configuration
 - [Environment variables](./environment-variables.md): the schema, and how to
   add a variable
+- [TypeScript](./typescript.md): one config for each environment, and committed
+  generated types
 - [Nx](./nx.md): how to run tasks, project names
 - [Checks](./checks.md): `validate`, each check, CI
 - [Previews](./previews.md): a preview for each PR, flow checks, and the name

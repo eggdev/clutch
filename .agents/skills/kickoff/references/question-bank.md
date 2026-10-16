@@ -68,6 +68,8 @@ decision. Show a draft answer with each question.
   staging step?
 - What does the seed data contain, and which accounts does it create?
 - Which CI steps does each PR need beyond `validate`?
+- Which runtimes does the code target: browser, server, worker? Which tools
+  generate types?
 - Which test runner for each test type, and which journeys does the end-to-end
   suite cover?
 - Which security rules must every later change keep? Which risks do you accept
@@ -82,7 +84,8 @@ decision. Show a draft answer with each question.
 - What is the first action for each failure: roll back, or fix forward?
 - How much data can each store lose, and how long may a restore take? Which
   stores are backed up, rebuilt or accepted as lost?
-- Which performance numbers get a budget?
+- Which performance numbers get a budget? Does the live site get a weekly check
+  against a budget file, with one tracking issue that opens and closes itself?
 
 ## What past owners pushed back on
 
