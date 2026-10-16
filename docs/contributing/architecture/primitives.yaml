@@ -1,0 +1,58 @@
+# The primitives registry: one list of the parts of this system.
+#
+# Each primitive names the folders it owns (`code`), the pages that explain it
+# (`docs`) and, for a service, the vendors that only it imports (`vendors`).
+# The import policy (tools/lint/import-policy.mjs) reads the vendor owners,
+# the layers and the exceptions from this file. tools/check-primitives.ts
+# checks the file. See docs/contributing/architecture/index.md#modules.
+#
+# This file never records dependencies between primitives. Nx derives them
+# from the imports. Run `mise exec -- bun nx graph` to see them.
+#
+# Fields:
+#   groups:     id, name
+#   primitives: id, group, name, kind (service | domain | app | tool),
+#               summary (one line, at most 120 characters),
+#               code (folder roots; the longest matching root owns a file),
+#               docs (paths), vendors (a service only: vendor, imports)
+#   layers:     shared languages: imports, where, primitives, packagePaths, files
+#   invariants: id, summary, docs
+#   exceptions: rule, file, imports, reason. See
+#               docs/contributing/import-boundaries.md#exceptions.
+#
+# Kickoff adds the product primitives, and fills `layers` and `invariants`.
+
+version: 1
+
+groups:
+  - id: repository
+    name: Repository
+
+primitives:
+  - id: repository-tools
+    group: repository
+    name: Repository tools
+    kind: tool
+    summary: The checks, Git hooks, import policy and test helpers that every project shares.
+    code:
+      - tools/
+    docs:
+      - docs/contributing/setup/checks.md
+      - docs/contributing/import-boundaries.md
+
+  - id: nx-cache
+    group: repository
+    name: Nx remote cache
+    kind: app
+    summary: A Cloudflare Worker that stores Nx task results in R2 for local and CI runs.
+    code:
+      - apps/nx-cache/
+    docs:
+      - apps/nx-cache/README.md
+      - docs/contributing/setup/nx.md
+
+layers: []
+
+invariants: []
+
+exceptions: []

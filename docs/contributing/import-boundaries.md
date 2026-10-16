@@ -5,10 +5,11 @@ rule that enforces it. Run the lint with `mise exec -- bun run check`. Test the
 policy with `mise exec -- bun nx run-many -t lint-policy-test`.
 
 The policy is [`tools/lint/import-policy.mjs`](../../tools/lint/import-policy.mjs).
-Its project data is [`tools/lint/boundaries.json`](../../tools/lint/boundaries.json).
-[`oxlint.config.ts`](../../oxlint.config.ts) turns on
-each rule. The policy also exports its matchers and its `boundaries.json`
-parser, so a test can check them without a lint run.
+Its project data is the
+[primitives registry](./architecture/primitives.yaml): the vendor owners, the
+layers and the exceptions. [`oxlint.config.ts`](../../oxlint.config.ts) turns on
+each rule. The policy also exports its matchers and its registry parser, so a
+test can check them without a lint run.
 
 Every rule reads each module specifier in a file: static imports, re-exports,
 dynamic `import()`, type imports, `require`, and the first argument of
@@ -73,26 +74,37 @@ does not cover them.
 | A shared language, such as a query builder or a UI framework, is imported only in the folders of its layer | `repo-imports/layers`              |
 | Client and contract files never import server code, vendors or framework runtimes                          | `repo-imports/module-dependencies` |
 
-Add a vendor or a layer to `boundaries.json` in the same change that adds the
-dependency:
+Add a vendor or a layer to the registry in the same change that adds the
+dependency. A vendor goes in the `vendors` list of its owner, which is a
+service:
 
-```json
-{
-  "vendors": [{ "vendor": "Stripe", "imports": "^stripe(?:/|$)", "owner": "billing" }],
-  "layers": [
-    {
-      "imports": "^drizzle-orm(?:/|$)",
-      "where": "`src/server/db/**` and `@repo/storage`",
-      "packages": ["storage"],
-      "packagePaths": ["src/server/db/"]
-    }
-  ]
-}
+```yaml
+primitives:
+  - id: billing
+    group: platform
+    name: Billing
+    kind: service
+    summary: Charges a team for its plan.
+    code:
+      - packages/billing/
+    docs:
+      - docs/contributing/architecture/billing.md
+    vendors:
+      - vendor: Stripe
+        imports: ^stripe(?:/|$)
+layers:
+  - imports: ^drizzle-orm(?:/|$)
+    where: '`src/server/db/**` and `@repo/storage`'
+    primitives:
+      - storage
+    packagePaths:
+      - src/server/db/
 ```
 
-`owner` and `packages` are folder names under `packages/`. `packagePaths` are
-paths inside any package. `files` are regular expressions on the full file path,
-for app folders.
+The owner of a vendor is the `packages/<name>/` folder in the `code` roots of
+its primitive. A layer applies to the package folders of its `primitives`.
+`packagePaths` are paths inside any package. `files` are regular expressions on
+the full file path, for app folders.
 
 ## Tests
 
@@ -106,28 +118,23 @@ See [test the workflow](../principles/test-the-workflow.md).
 ## Exceptions
 
 Move the shared code into a module that both sides can import. When that
-cannot happen in this change, add an exception to `boundaries.json`. An
-exception lets the files that match `file` import the specifiers that match
-`imports`, past one `rule`:
+cannot happen in this change, add an exception to the `exceptions` list of the
+registry. An exception lets the files that match `file` import the specifiers
+that match `imports`, past one `rule`:
 
-```json
-{
-  "exceptions": [
-    {
-      "rule": "vendor-owner",
-      "file": "/packages/projects/src/server/legacy-billing\\.ts$",
-      "imports": "^stripe$",
-      "reason": "The legacy webhook checks its signature before billing has a port for it."
-    }
-  ]
-}
+```yaml
+exceptions:
+  - rule: vendor-owner
+    file: /packages/projects/src/server/legacy-billing\.ts$
+    imports: ^stripe$
+    reason: The legacy webhook checks its signature before billing has a port for it.
 ```
 
 `rule` is a rule name without the `repo-imports/` prefix. `file` and `imports`
 are regular expressions. `reason` says why the import cannot move yet. An
 exception without a reason, or with an unknown rule, stops the lint with the
-index of the entry. `tools/lint/import-policy.test.ts` checks that each
-exception in the repository states its reason. Open a
+index of the entry. `check-primitives` and `tools/lint/import-policy.test.ts`
+check that each exception in the repository states its reason. Open a
 [cleanup issue](../../.github/ISSUE_TEMPLATE/cleanup.yml) to remove the
 exception.
 

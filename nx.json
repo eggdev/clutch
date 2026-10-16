@@ -33,6 +33,7 @@
         "default",
         "{workspaceRoot}/oxlint.config.ts",
         "{workspaceRoot}/tools/lint/**/*",
+        "{workspaceRoot}/docs/contributing/architecture/primitives.yaml",
         "{workspaceRoot}/packages/**/*",
         { "externalDependencies": ["oxlint"] }
       ]

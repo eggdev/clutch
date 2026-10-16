@@ -35,7 +35,7 @@ removed for good. Some data has its own retention period:
 
 ## Service providers
 
-<!-- kickoff: Each vendor that processes your data, what it processes and where. Build the list from the vendor owners in tools/lint/boundaries.json. -->
+<!-- kickoff: Each vendor that processes your data, what it processes and where. Build the list from the vendors in docs/contributing/architecture/primitives.yaml. -->
 
 ## Your choices and rights
 

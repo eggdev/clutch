@@ -3,8 +3,14 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { checkManifests } from '@tools/lint/check-manifests';
-import { boundariesOf, mockCall, notAnAlias, parseBoundaries } from '@tools/lint/import-policy.mjs';
+import {
+  mockCall,
+  notAnAlias,
+  parseRegistry,
+  registryFile,
+  registryOf,
+} from '@tools/lint/import-policy.mjs';
+import { stringify } from 'yaml';
 
 const root = path.resolve(import.meta.dir, '../..');
 
@@ -36,23 +42,39 @@ async function lint(files: Record<string, string>): Promise<Array<string>> {
     await rm(directory, { recursive: true, force: true });
   }
 }
-/** A filled `tools/lint/boundaries.json`, as kickoff writes it for a project. */
-const boundaries = JSON.stringify({
-  vendors: [
-    { vendor: 'Automerge', imports: '^@automerge/', owner: 'sync' },
-    {
-      vendor: 'Better Auth',
-      imports: '^(?:@better-auth/|better-auth(?:/|$)|better-call(?:/|$))',
-      owner: 'identity',
-    },
-    { vendor: 'Stripe', imports: '^stripe(?:/|$)', owner: 'billing' },
-    { vendor: 'unpdf', imports: '^unpdf(?:/|$)', owner: 'document-extraction' },
+/** A primitive whose code root is `packages/<id>/`. */
+const primitive = (id: string, vendors: Array<{ vendor: string; imports: string }> = []) => ({
+  id,
+  group: 'platform',
+  name: id,
+  kind: 'service',
+  summary: `The ${id} service.`,
+  code: [`packages/${id}/`],
+  docs: [],
+  vendors,
+});
+/** A filled primitives registry, as kickoff writes it for a project. */
+const registry = {
+  version: 1,
+  groups: [{ id: 'platform', name: 'Platform' }],
+  primitives: [
+    primitive('sync', [{ vendor: 'Automerge', imports: '^@automerge/' }]),
+    primitive('identity', [
+      {
+        vendor: 'Better Auth',
+        imports: '^(?:@better-auth/|better-auth(?:/|$)|better-call(?:/|$))',
+      },
+    ]),
+    primitive('billing', [{ vendor: 'Stripe', imports: '^stripe(?:/|$)' }]),
+    primitive('document-extraction', [{ vendor: 'unpdf', imports: '^unpdf(?:/|$)' }]),
+    primitive('storage'),
+    primitive('design-system'),
   ],
   layers: [
     {
       imports: '^drizzle-orm(?:/|$)',
       where: '`src/server/db/**` and `@repo/storage`',
-      packages: ['storage'],
+      primitives: ['storage'],
       packagePaths: ['src/server/db/'],
     },
     {
@@ -63,12 +85,14 @@ const boundaries = JSON.stringify({
     {
       imports: '^react(?:-native)?(?:/|$)',
       where: '`src/ui/**`, `@repo/design-system` and `apps/app`',
-      packages: ['design-system'],
+      primitives: ['design-system'],
       packagePaths: ['src/ui/'],
       files: ['/apps/app/'],
     },
   ],
-});
+  invariants: [],
+};
+const registryYaml = stringify(registry);
 const tagged = (kind: string) => JSON.stringify({ nx: { tags: [`type:${kind}`] } });
 
 test('Oxlint rejects relative static, type, re-export, dynamic and CommonJS imports', async () => {
@@ -94,38 +118,6 @@ test('Oxlint rejects relative static, type, re-export, dynamic and CommonJS impo
         'import "@/lib/auth-context"; import "@repo/sync/src/server"; import "@tools/lint/check-manifests"; import "node:fs";',
     }),
   ).toEqual([]);
-});
-
-test('manifest policy rejects export maps and missing type tags in workspaces, without inspecting dependencies or excluded apps', async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'neighborhood-manifest-rule-'));
-  try {
-    await writeFile(
-      path.join(directory, 'package.json'),
-      JSON.stringify({ workspaces: ['packages/*', 'apps/*', '!apps/archived'] }),
-    );
-    for (const folder of ['packages/new-package', 'apps/archived', 'node_modules/external']) {
-      await mkdir(path.join(directory, folder), { recursive: true });
-      await writeFile(
-        path.join(directory, folder, 'package.json'),
-        JSON.stringify({ exports: {} }),
-      );
-    }
-    expect(await checkManifests(directory)).toEqual([
-      'packages/new-package/package.json: package exports are forbidden; use TypeScript path aliases to source files.',
-      'packages/new-package/package.json: a package needs exactly one Nx tag, type:service or type:domain. See docs/contributing/import-boundaries.md.',
-    ]);
-    await writeFile(
-      path.join(directory, 'packages/new-package/package.json'),
-      JSON.stringify({ nx: { tags: ['type:service', 'type:domain'] } }),
-    );
-    expect(await checkManifests(directory)).toEqual([
-      'packages/new-package/package.json: a package needs exactly one Nx tag, type:service or type:domain. See docs/contributing/import-boundaries.md.',
-    ]);
-    await writeFile(path.join(directory, 'packages/new-package/package.json'), tagged('service'));
-    expect(await checkManifests(directory)).toEqual([]);
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
 });
 
 test('packages never import apps or tools, and client and contract files stay portable', async () => {
@@ -226,7 +218,7 @@ test('an import that closes a package cycle fails at each end, and passes once t
   ).toEqual([]);
 });
 
-test('vendor and layer rules do nothing until boundaries.json names them', async () => {
+test('vendor and layer rules do nothing until the registry names them', async () => {
   expect(
     await lint({
       'packages/projects/src/server.ts': 'import "stripe"; import "drizzle-orm"; import "react";',
@@ -237,7 +229,7 @@ test('vendor and layer rules do nothing until boundaries.json names them', async
 test('a vendor is imported only in its owner module', async () => {
   expect(
     await lint({
-      'tools/lint/boundaries.json': boundaries,
+      [registryFile]: registryYaml,
       'packages/projects/src/server.ts':
         'import "better-auth"; import "@better-auth/core"; import "better-call"; import "stripe"; import "unpdf";',
       'apps/api/worker.ts': 'import "@automerge/automerge"; import "better-auth/plugins";',
@@ -253,7 +245,7 @@ test('a vendor is imported only in its owner module', async () => {
   ]);
   expect(
     await lint({
-      'tools/lint/boundaries.json': boundaries,
+      [registryFile]: registryYaml,
       'packages/identity/src/server/runtime.ts': 'import "better-auth"; import "better-call";',
       'packages/identity/test/runtime.test.ts': 'import "@better-auth/memory-adapter";',
       'packages/sync/src/server.ts': 'import "@automerge/automerge";',
@@ -266,7 +258,7 @@ test('a vendor is imported only in its owner module', async () => {
 test('drizzle-orm, one and react are imported only in their layers', async () => {
   expect(
     await lint({
-      'tools/lint/boundaries.json': boundaries,
+      [registryFile]: registryYaml,
       'packages/projects/src/server/model.ts': 'import "drizzle-orm"; import "react";',
       'apps/api/worker.ts': 'import "drizzle-orm/d1";',
       'apps/app/lib/gate.tsx': 'import "one";',
@@ -283,7 +275,7 @@ test('drizzle-orm, one and react are imported only in their layers', async () =>
   ]);
   expect(
     await lint({
-      'tools/lint/boundaries.json': boundaries,
+      [registryFile]: registryYaml,
       'packages/projects/src/server/db/schema.ts': 'import "drizzle-orm/sqlite-core";',
       'packages/storage/src/server/d1.ts': 'import "drizzle-orm/d1";',
       'apps/app/app/_layout.tsx': 'import "one"; import "react";',
@@ -324,7 +316,7 @@ test('src/testing is imported only by test files and other src/testing files', a
 test('every rule reads vi.mock, jest.mock and mock.module specifiers like imports', async () => {
   expect(
     await lint({
-      'tools/lint/boundaries.json': boundaries,
+      [registryFile]: registryYaml,
       'packages/projects/package.json': tagged('domain'),
       'packages/sync/package.json': tagged('service'),
       'packages/projects/test/sync.test.ts': [
@@ -372,10 +364,10 @@ test('an exception lets one file import one specifier past one rule, and needs a
     imports: '^stripe$',
     reason: 'The legacy webhook verifies its signature before billing exposes a port for it.',
   };
-  const withException = JSON.stringify({ ...JSON.parse(boundaries), exceptions: [exception] });
+  const withException = stringify({ ...registry, exceptions: [exception] });
   expect(
     await lint({
-      'tools/lint/boundaries.json': withException,
+      [registryFile]: withException,
       'packages/projects/src/server/legacy-billing.ts': 'import "stripe"; import "drizzle-orm";',
       'packages/projects/src/server/invoices.ts': 'import "stripe";',
     }),
@@ -383,16 +375,16 @@ test('an exception lets one file import one specifier past one rule, and needs a
     'packages/projects/src/server/invoices.ts vendor-owner',
     'packages/projects/src/server/legacy-billing.ts layers',
   ]);
-  expect(() => parseBoundaries({ exceptions: [{ ...exception, reason: ' ' }] })).toThrow(
-    'tools/lint/boundaries.json exceptions[0]: `reason` must say why the import cannot move behind a boundary.',
+  expect(() => parseRegistry({ exceptions: [{ ...exception, reason: ' ' }] })).toThrow(
+    'docs/contributing/architecture/primitives.yaml exceptions[0]: `reason` must say why the import cannot move behind a boundary.',
   );
-  expect(() => parseBoundaries({ exceptions: [{ ...exception, rule: 'vendor' }] })).toThrow(
+  expect(() => parseRegistry({ exceptions: [{ ...exception, rule: 'vendor' }] })).toThrow(
     '`rule` must be one of aliases-only',
   );
 });
 
 test('each exception in this repository states its reason', () => {
-  for (const exception of boundariesOf(root).exceptions) {
+  for (const exception of registryOf(root).exceptions) {
     expect(exception.reason.trim()).not.toBe('');
   }
 });

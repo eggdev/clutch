@@ -11,7 +11,16 @@ surface or storage home.
 
 ## Modules
 
-<!-- kickoff: A table: Module, Kind (service, domain or UI), Owns. Name the vendor each service wraps. Each vendor here has an entry in tools/lint/boundaries.json. -->
+The [primitives registry](./primitives.yaml) is the list of primitives. Each
+entry names its group, its kind (service, domain, app or tool), the folders it
+owns, its docs and, for a service, its vendors. `check-primitives` rejects a
+registry entry that names a missing path, and an Nx project that no primitive
+owns. The import policy reads the vendor owners and the layers from it.
+
+The registry never records dependencies between primitives. Nx derives them
+from the imports. Run `mise exec -- bun nx graph` to see them.
+
+<!-- kickoff: Two or three sentences: the primitives of the product and how they fit together. The registry holds the full list. -->
 
 Services are molecules: focused and the same everywhere. Domains are organisms:
 they combine services into a feature. The import rules are in

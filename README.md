@@ -26,14 +26,14 @@ cache in kickoff, with its own worker, bucket and tokens.
 
 ## What is universal and what is per project
 
-| Universal: change it here first               | Per project: kickoff writes it                 |
-| --------------------------------------------- | ---------------------------------------------- |
-| `docs/principles/`                            | `docs/contributing/project-intent.md`          |
-| `docs/contributing/documentation.md`          | `docs/contributing/architecture/`              |
-| `docs/contributing/harness-engineering.md`    | `docs/contributing/decisions/0001-*` and later |
-| `docs/contributing/import-boundaries.md`      | `docs/contributing/setup/local-development.md` |
-| `tools/`, except `tools/lint/boundaries.json` | `tools/lint/boundaries.json`                   |
-| `.agents/skills/kickoff/`                     | `AGENTS.md`, `README.md`                       |
+| Universal: change it here first            | Per project: kickoff writes it                                        |
+| ------------------------------------------ | --------------------------------------------------------------------- |
+| `docs/principles/`                         | `docs/contributing/project-intent.md`                                 |
+| `docs/contributing/documentation.md`       | `docs/contributing/architecture/`                                     |
+| `docs/contributing/harness-engineering.md` | `docs/contributing/architecture/primitives.yaml`: the product entries |
+| `docs/contributing/import-boundaries.md`   | `docs/contributing/decisions/0001-*` and later                        |
+| `tools/`                                   | `docs/contributing/setup/local-development.md`                        |
+| `.agents/skills/kickoff/`                  | `AGENTS.md`, `README.md`                                              |
 
 A universal page never states a fact about one product. It links to the
 project page that owns the fact: the owner, the issue tracker, the journeys,

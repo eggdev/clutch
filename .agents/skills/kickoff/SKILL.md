@@ -1,6 +1,6 @@
 ---
 name: kickoff
-description: Define a new project from the template in one grilling session with the owner. Interviews one question at a time about intent, users, journeys, services and the harness, then writes project intent, architecture pages, decision records and tools/lint/boundaries.json. Use when KICKOFF.md exists, or when the user says kickoff, define the project, or start a new project.
+description: Define a new project from the template in one grilling session with the owner. Interviews one question at a time about intent, users, journeys, services and the harness, then writes project intent, architecture pages, decision records and the primitives registry. Use when KICKOFF.md exists, or when the user says kickoff, define the project, or start a new project.
 ---
 
 # Kickoff
@@ -89,13 +89,29 @@ inventory and the vendors are known.
 Output: the slots in `docs/contributing/architecture/` (the index, request
 context, authorization, data storage, feature flags, API errors, soft
 delete and MCP server), one page for each other service with
-real rules, `tools/lint/boundaries.json`, and a decision record for each no.
+real rules, the product entries in
+`docs/contributing/architecture/primitives.yaml`, and a decision record for
+each no.
 
 For each capability from phase 2 (sign-in, data storage, sync, files, email,
 payments, AI, jobs, search, analytics), research two or three vendors first.
 Then propose one with its owner module, its kind (service or domain), its
 price at the owner's expected scale, and its local test runtime. Ask about the
 tenancy and storage topology before the rest, because they are one-way doors.
+
+Write the registry entries as the owner agrees to each part:
+
+1. A `primitives` entry for each service, domain and app. Give it a group, a
+   kind, a one-line summary, its `code` roots and its `docs` pages.
+2. A `vendors` entry on the service that owns each vendor. Only a service owns
+   a vendor.
+3. A `layers` entry for each shared language, such as a query builder or a UI
+   framework, with the folders that may import it.
+4. An `invariants` entry for each hard invariant from phase 1. Its `docs` list
+   links `docs/contributing/project-intent.md#hard-invariants`.
+
+Run `mise exec -- bun tools/check-primitives.ts` after each change to the
+registry.
 
 When the owner rejects an option that the next agent would propose again,
 write a decision record from `docs/contributing/decisions/0000-template.md` and

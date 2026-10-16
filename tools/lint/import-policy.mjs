@@ -1,6 +1,20 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { parse } from 'yaml';
+
+/** The `vi` and `jest` methods whose first argument is a module specifier. */
+const mockMethods = new Set([
+  'mock',
+  'doMock',
+  'unmock',
+  'doUnmock',
+  'importActual',
+  'importMock',
+  'requireActual',
+  'requireMock',
+]);
+
 /**
  * A test runner call whose first argument is a module specifier: `vi.mock`,
  * `jest.mock`, `mock.module` and their relatives. The policy reads these
@@ -14,17 +28,7 @@ export function mockCall(callee) {
   const method = callee.property.name;
   return (
     (owner === 'mock' && method === 'module') ||
-    (['vi', 'jest'].includes(owner) &&
-      [
-        'mock',
-        'doMock',
-        'unmock',
-        'doUnmock',
-        'importActual',
-        'importMock',
-        'requireActual',
-        'requireMock',
-      ].includes(method))
+    (['vi', 'jest'].includes(owner) && mockMethods.has(method))
   );
 }
 
@@ -161,34 +165,41 @@ export const ruleNames = [
   'no-internal-mocks',
 ];
 
-/** Whether a layer rule applies to the file, by package name, package path or file pattern. */
-function within(rule, file, filename) {
-  return (
-    (rule.packages ?? []).includes(file?.name) ||
-    (!!file?.name && (rule.packagePaths ?? []).some((prefix) => file.path.startsWith(prefix))) ||
-    (rule.files ?? []).some((pattern) => new RegExp(pattern, 'u').test(filename))
-  );
-}
+/** Whether a layer applies to a file, by package name, package path or file pattern. */
+const within = (rule, packages) => (file, filename) =>
+  packages.includes(file?.name) ||
+  (!!file?.name && (rule.packagePaths ?? []).some((prefix) => file.path.startsWith(prefix))) ||
+  (rule.files ?? []).some((pattern) => new RegExp(pattern, 'u').test(filename));
+
+export const registryFile = 'docs/contributing/architecture/primitives.yaml';
 
 /**
- * Vendor owners, layers and exceptions from the data in
- * `tools/lint/boundaries.json`. An exception lets one file pattern import one
- * specifier pattern past one rule. Each exception needs a `reason`, so an
- * exception without one stops the lint. See docs/principles/generic-platform.md
- * and docs/contributing/import-boundaries.md.
+ * Vendor owners, layers and exceptions from the primitives registry. A vendor
+ * owner is a `packages/<name>/` folder in its primitive's code roots. See
+ * docs/contributing/import-boundaries.md.
  */
-export function parseBoundaries(data) {
+export function parseRegistry(data) {
+  const packagesOf = (ids) =>
+    (data.primitives ?? [])
+      .filter((primitive) => ids.includes(primitive.id))
+      .flatMap((primitive) =>
+        (primitive.code ?? []).map((root) => root.match(/^packages\/([^/]+)/u)?.[1]),
+      )
+      .filter(Boolean);
   return {
-    vendors: (data.vendors ?? []).map((rule) => ({
-      vendor: rule.vendor,
-      pattern: new RegExp(rule.imports, 'u'),
-      owner: `packages/${rule.owner}`,
-      allowed: (file) => file?.name === rule.owner,
-    })),
+    vendors: (data.primitives ?? []).flatMap((primitive) => {
+      const owners = packagesOf([primitive.id]);
+      return (primitive.vendors ?? []).map((rule) => ({
+        vendor: rule.vendor,
+        pattern: new RegExp(rule.imports, 'u'),
+        owner: owners.map((name) => `packages/${name}`).join('`, `'),
+        allowed: (file) => owners.includes(file?.name),
+      }));
+    }),
     layers: (data.layers ?? []).map((rule) => ({
       pattern: new RegExp(rule.imports, 'u'),
       where: rule.where,
-      allowed: (file, filename) => within(rule, file, filename),
+      allowed: within(rule, packagesOf(rule.primitives ?? [])),
     })),
     exceptions: (data.exceptions ?? []).map((exception, index) => {
       const problems = [
@@ -200,7 +211,7 @@ export function parseBoundaries(data) {
       ].filter(Boolean);
       if (problems.length) {
         throw new Error(
-          `tools/lint/boundaries.json exceptions[${index}]: ${problems.join('; ')}. See docs/contributing/import-boundaries.md#exceptions.`,
+          `${registryFile} exceptions[${index}]: ${problems.join('; ')}. See docs/contributing/import-boundaries.md#exceptions.`,
         );
       }
       return {
@@ -213,26 +224,24 @@ export function parseBoundaries(data) {
   };
 }
 
-const boundaries = new Map();
-/** The parsed `tools/lint/boundaries.json` at the repository root, read once per lint run. */
-export function boundariesOf(root) {
-  if (!boundaries.has(root)) {
-    const file = path.join(root, 'tools/lint/boundaries.json');
-    boundaries.set(
-      root,
-      parseBoundaries(existsSync(file) ? JSON.parse(readFileSync(file, 'utf-8')) : {}),
-    );
+const registries = new Map();
+/** The parsed registry at the repository root, read once per lint run. */
+export function registryOf(root) {
+  if (!registries.has(root)) {
+    const file = path.join(root, registryFile);
+    const data = existsSync(file) ? parse(readFileSync(file, 'utf-8')) : null;
+    registries.set(root, parseRegistry(data ?? {}));
   }
-  return boundaries.get(root);
+  return registries.get(root);
 }
 
-/** Reports the problem, unless an exception in boundaries.json covers this file, rule and specifier. */
+/** Reports the problem, unless an exception in the registry covers this file, rule and specifier. */
 function report(context, rule, descriptor, value = valueOf(descriptor.node)) {
   const filename = filenameOf(context);
   const file = locate(filename);
   const exempt =
     file &&
-    boundariesOf(file.root).exceptions.some(
+    registryOf(file.root).exceptions.some(
       (exception) =>
         exception.rule === rule &&
         exception.file.test(filename) &&
@@ -402,7 +411,7 @@ export default {
         if (!file) {
           return {};
         }
-        const { vendors } = boundariesOf(file.root);
+        const { vendors } = registryOf(file.root);
         return specifiers((source) => {
           const value = valueOf(source);
           if (typeof value !== 'string') {
@@ -434,7 +443,7 @@ export default {
         if (!file) {
           return {};
         }
-        const { layers } = boundariesOf(file.root);
+        const { layers } = registryOf(file.root);
         return specifiers((source) => {
           const value = valueOf(source);
           if (typeof value !== 'string') {

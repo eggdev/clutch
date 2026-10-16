@@ -11,7 +11,7 @@ codex "\$kickoff"
 ```
 
 Kickoff is one interview, one question at a time. It writes project intent,
-the architecture pages, decision records and `tools/lint/boundaries.json`. Each open question is a `<!-- kickoff: … -->` slot in a
+the architecture pages, decision records and the primitives registry. Each open question is a `<!-- kickoff: … -->` slot in a
 doc. `mise exec -- bun tools/check-kickoff-slots.ts` lists the slots that are
 left.
 

@@ -31,7 +31,8 @@
     "tslib": "^2.3.0",
     "typescript": "~6.0.3",
     "ultracite": "7.12.2",
-    "wrangler": "4.146.0"
+    "wrangler": "4.146.0",
+    "yaml": "2.9.1"
   },
   "packageManager": "bun@1.4.2",
   "nx": {
@@ -105,6 +106,13 @@
         },
         "cache": false
       },
+      "check-primitives": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-primitives.ts"
+        },
+        "cache": false
+      },
       "check-kickoff-slots": {
         "executor": "nx:run-commands",
         "options": {
@@ -155,6 +163,7 @@
           "check-decisions",
           "check-file-size",
           "check-kickoff-slots",
+          "check-primitives",
           "check-workflows",
           "check-dependency-overrides",
           "check-user-docs",

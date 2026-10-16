@@ -2,8 +2,8 @@
   "limit": 400,
   "files": {
     "tools/lint/import-policy.mjs": {
-      "lines": 520,
-      "reason": "One oxlint plugin. Its rules share the module graph, the package kinds and the boundaries loader, so a split would pass them between files."
+      "lines": 530,
+      "reason": "One oxlint plugin. Its rules share the module graph, the package kinds and the registry loader, so a split would pass them between files."
     }
   }
 }

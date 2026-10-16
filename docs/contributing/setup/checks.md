@@ -54,6 +54,7 @@ tests the workflow and dependency checks.
 | `check-file-size`            | `AGENTS.md` over 20 lines, or a source file over its limit. See [file size](#file-size)            |
 | `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                  |
 | `check-kickoff-slots`        | A kickoff slot left in a doc after `KICKOFF.md` is deleted                                         |
+| `check-primitives`           | A broken [registry](../architecture/primitives.yaml) entry, or an Nx project with no primitive     |
 | `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target`   |
 | `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)               |
 | `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md) |
@@ -94,6 +95,10 @@ reads the reason. The check rejects:
 - A file over its budget
 - An entry with no reason
 - An entry for a file that is within the limit, or for a file that does not exist
+
+Never make code denser to fit a budget: no lists folded into a regex, no
+helpers squeezed onto one line. Readable code with a raised budget is better
+than dense code under the old one.
 
 When a file outgrows its design, split it. A split keeps every test: the test
 count is the same before and after.
