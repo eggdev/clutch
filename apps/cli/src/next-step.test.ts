@@ -56,3 +56,10 @@ test('when the worktree was removed, the run adds it back from the install branc
   expect(await nextStep(setup.project.root)).toEqual({ step: 'survey', worktree: setup.worktree });
   expect(await git(setup.worktree, 'branch', '--show-current')).toBe('template/install');
 });
+
+test('when the migration deleted the install folder, kickoff is done', async () => {
+  await using setup = await installed();
+  await git(setup.worktree, 'rm', '--quiet', '-r', '.template-install');
+  await git(setup.worktree, 'commit', '--quiet', '--message', 'Migrate: remove the install folder');
+  expect(await nextStep(setup.project.root)).toEqual({ step: 'done', worktree: setup.worktree });
+});

@@ -83,3 +83,19 @@ test("a failed stage returns the agent's exit code", async () => {
     }),
   ).toBe(3);
 });
+
+test('the Claude migration may delete files and fix them in place, and the survey may not', async () => {
+  await using bin = await fakeBin(['claude']);
+  await using worktree = await gitRepo({});
+  for (const stage of ['survey', 'migrate'] as const) {
+    await runStage({ provider: claude, stage, worktree: worktree.root, env: { PATH: bin.dir } });
+  }
+  const [survey, migrate] = await bin.calls();
+  expect(migrate.args.slice(0, 2)).toEqual(['-p', '/kickoff migrate']);
+  for (const tool of ['Bash(git rm:*)', 'Bash(mise exec -- bun run format:*)']) {
+    expect(survey.args).not.toContain(tool);
+    expect(migrate.args).toContain(tool);
+  }
+  expect(migrate.args).not.toContain('Bash');
+  expect(migrate.args.join(' ')).not.toContain('dangerously');
+});

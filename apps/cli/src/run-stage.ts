@@ -12,7 +12,7 @@ type RunnableStage = Exclude<Stage, 'done'>;
  * worktree, and each shell command is named, so the agent cannot push, deploy
  * or change state outside the repository.
  */
-const claudeTools = [
+const surveyTools = [
   'Read',
   'Glob',
   'Grep',
@@ -29,8 +29,22 @@ const claudeTools = [
   'Bash(git commit:*)',
   'Bash(mise exec -- bun install:*)',
   'Bash(mise exec -- bun run validate:*)',
-  'Bash(mise exec -- bun tools/check-kickoff-slots.ts:*)',
-  'Bash(mise exec -- bun tools/check-primitives.ts:*)',
+  'Bash(mise exec -- bun tools/check-:*)',
+];
+
+/** The migration also deletes and moves files, formats, applies lint fixes and runs single checks. */
+const migrateTools = [
+  ...surveyTools,
+  'Bash(git rm:*)',
+  'Bash(git mv:*)',
+  'Bash(mise exec -- bun run format:*)',
+  'Bash(mise exec -- bun x oxlint --fix:*)',
+  'Bash(mise exec -- bun test:*)',
+  'Bash(mise exec -- bun nx run-many -t typecheck:*)',
+  'Bash(mise exec -- bun nx run-many -t lint:*)',
+  'Bash(mise exec -- bun nx run-many -t test:*)',
+  'Bash(mise exec -- bun nx run-many -t format-check:*)',
+  'Bash(mise exec -- bun nx run-many -t checks:*)',
 ];
 
 /** The arguments for each provider and stage. The interview is interactive. The other stages run unattended. */
@@ -45,7 +59,7 @@ function commandFor(provider: Provider, stage: RunnableStage) {
           '--permission-mode',
           'dontAsk',
           '--allowedTools',
-          ...claudeTools,
+          ...(stage === 'migrate' ? migrateTools : surveyTools),
           '--output-format',
           'stream-json',
           '--verbose',

@@ -143,7 +143,11 @@ export async function installTemplate(options: {
     conflicts.push(...merged.conflicts.map((conflict) => ({ file: name, ...conflict })));
   }
 
-  const manifest = { template: { commit }, stage: 'survey', files, conflicts };
+  const base = {
+    branch: project.defaultBranch,
+    commit: await gitOrThrow(project.root, 'rev-parse', project.defaultBranch),
+  };
+  const manifest = { template: { commit }, base, stage: 'survey', files, conflicts };
   await mkdir(path.join(worktree, path.dirname(manifestPath)), { recursive: true });
   await writeFile(path.join(worktree, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
   await gitOrThrow(worktree, 'add', '--all');

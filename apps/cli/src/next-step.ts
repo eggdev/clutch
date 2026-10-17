@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -20,7 +21,8 @@ async function findWorktree(root: string) {
 /**
  * Decides what a run of the CLI does next. Without the install branch, it
  * installs. With it, the `stage` in the manifest names the next stage. When
- * the worktree was removed, it adds the worktree back from the branch.
+ * the worktree was removed, it adds the worktree back from the branch. The
+ * migration deletes the manifest when it ends, so no manifest means done.
  */
 export async function nextStep(root: string): Promise<Step> {
   const exists = await git(root, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`);
@@ -32,6 +34,10 @@ export async function nextStep(root: string): Promise<Step> {
     worktree = worktreePath(root);
     await gitOrThrow(root, 'worktree', 'add', '--quiet', worktree, branch);
   }
-  const manifest = JSON.parse(await readFile(path.join(worktree, manifestPath), 'utf-8'));
+  const file = path.join(worktree, manifestPath);
+  if (!existsSync(file)) {
+    return { step: 'done', worktree };
+  }
+  const manifest = JSON.parse(await readFile(file, 'utf-8'));
   return { step: manifest.stage, worktree };
 }

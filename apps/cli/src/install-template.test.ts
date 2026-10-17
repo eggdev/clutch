@@ -57,6 +57,7 @@ test('the install copies the files into a worktree on a new branch from the defa
     JSON.parse(await readFile(path.join(worktree, '.template-install/manifest.json'), 'utf-8')),
   ).toEqual({
     template: { commit: await git(template.root, 'rev-parse', 'HEAD') },
+    base: { branch: 'main', commit: await git(project.root, 'rev-parse', 'main') },
     stage: 'survey',
     files: [
       { path: 'AGENTS.md', action: 'replaced' },

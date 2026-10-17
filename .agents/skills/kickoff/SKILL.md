@@ -46,6 +46,20 @@ The question bank for each phase is in
 [references/question-bank.md](./references/question-bank.md). The opening
 question of each phase is a prompt for a draft. It is not a script.
 
+## Entry points
+
+| Command            | Stage                                     | Read first                                                                    |
+| ------------------ | ----------------------------------------- | ----------------------------------------------------------------------------- |
+| `/kickoff`         | The interview, with the owner             | This page                                                                     |
+| `/kickoff survey`  | Unattended: drafts before the interview   | [existing-project-survey.md](./references/existing-project-survey.md)         |
+| `/kickoff migrate` | Unattended: makes `validate` pass after it | [existing-project-migrate.md](./references/existing-project-migrate.md)       |
+
+The install CLI in `apps/cli/` runs each stage when it installs the template
+into an existing project. When `.template-install/manifest.json` exists, the
+project existed before the template. Read
+[existing-project.md](./references/existing-project.md) before phase 0. It
+changes phase 0, adds a Reconcile phase and changes phase 5.
+
 ## Phases
 
 Do the phases in order. Intent comes first: every later answer depends on who
