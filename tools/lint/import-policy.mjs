@@ -66,6 +66,9 @@ function locate(filename) {
   const match = filename.match(/^(.*?)\/(?:packages\/([^/]+)\/(.*)|apps\/|tools\/)/u);
   return match ? { root: match[1], name: match[2], path: match[3] } : null;
 }
+/** Framework and platform runtimes. Client and contract files stay plain TypeScript. */
+const runtimes =
+  /^(?:node:|bun:|cloudflare:|@cloudflare\/|wrangler(?:\/|$)|react(?:-dom|-native)?(?:\/|$)|next(?:\/|$)|expo(?:-|\/|$)|one(?:\/|$))/u;
 const repoTarget = (value) => value.match(/^@repo\/([^/]+)\//u)?.[1];
 export const isTestFile = (filename) =>
   /(?:^|\/)test\//u.test(filename) || /\.(?:test|spec|pw)\.[cm]?[jt]sx?$/u.test(filename);
@@ -285,20 +288,16 @@ export default {
           application:
             'Packages cannot depend on applications or repository tooling. Inject an adapter at the module interface.',
           portable:
-            'Client and domain modules cannot import server implementations or infrastructure. Use a plain contract or inject an adapter.',
+            'Client and contract files cannot import server code, vendors or framework runtimes. Use a plain contract or inject an adapter.',
         },
       },
       create(context) {
         const filename = filenameOf(context);
+        const file = locate(filename);
         const pkg = filename.match(/(?:^|\/)packages\/([^/]+)\/src\/(.+)$/u);
-        const browser = /(?:^|\/)apps\/app\/(?:lib|app)\//u.test(filename);
-        const portable = pkg && /^(?:client|http)(?:\/|\.)/u.test(pkg[2]) && pkg[1] !== 'access';
-        const domain =
-          pkg &&
-          ((pkg[1] === 'projects' &&
-            /^(?:contracts|model|events|intake|change-orders|errors)\.ts$/u.test(pkg[2])) ||
-            (pkg[1] === 'access' && /^(?:index\.ts|lib\/)/u.test(pkg[2])) ||
-            (pkg[1] === 'sync' && pkg[2] === 'contracts.ts'));
+        // `src/client.ts` and `src/contracts.ts`, or a folder of the same name.
+        const portable = pkg && /^(?:client|contracts)(?:\/|\.)/u.test(pkg[2]);
+        const vendors = portable && file ? registryOf(file.root).vendors : [];
         return specifiers((source) => {
           const value = valueOf(source);
           if (typeof value !== 'string') {
@@ -309,17 +308,10 @@ export default {
             return;
           }
           if (
-            (browser || portable || domain) &&
-            ((browser && /^@(?:apps|tools)\//u.test(value)) ||
-              /^@repo\/[^/]+\/src\/server(?:\/|\.|$)/u.test(value) ||
-              /^@repo\/access\/src\/(?:sqlite|http)(?:\/|\.|$)/u.test(value) ||
-              /^(?:@automerge\/|@better-auth\/|better-auth(?:\/|$)|better-call(?:\/|$)|@cloudflare\/|wrangler(?:\/|$))/u.test(
-                value,
-              ) ||
-              ((portable || domain) &&
-                /^(?:node:|bun:|react(?:-native)?(?:\/|$)|expo(?:-|\/|$)|one(?:\/|$))/u.test(
-                  value,
-                )))
+            portable &&
+            (/^@repo\/[^/]+\/src\/server(?:\/|\.|$)/u.test(value) ||
+              runtimes.test(value) ||
+              vendors.some((vendor) => vendor.pattern.test(value)))
           ) {
             report(context, 'module-dependencies', { node: source, messageId: 'portable' });
           }

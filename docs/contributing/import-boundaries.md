@@ -72,7 +72,7 @@ does not cover them.
 | ---------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | A vendor is imported only in its owner module. See [generic platform](../principles/generic-platform.md)   | `repo-imports/vendor-owner`        |
 | A shared language, such as a query builder or a UI framework, is imported only in the folders of its layer | `repo-imports/layers`              |
-| Client and contract files never import server code, vendors or framework runtimes                          | `repo-imports/module-dependencies` |
+| `src/client` and `src/contracts` files never import server code, registry vendors or framework runtimes    | `repo-imports/module-dependencies` |
 
 Add a vendor or a layer to the registry in the same change that adds the
 dependency. A vendor goes in the `vendors` list of its owner, which is a

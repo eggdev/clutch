@@ -122,7 +122,9 @@ test('Oxlint rejects relative static, type, re-export, dynamic and CommonJS impo
 
 test('packages never import apps or tools, and client and contract files stay portable', async () => {
   const packages = {
+    [registryFile]: registryYaml,
     'packages/access/package.json': tagged('service'),
+    'packages/billing/package.json': tagged('service'),
     'packages/sync/package.json': tagged('service'),
     'packages/projects/package.json': tagged('domain'),
   };
@@ -132,14 +134,12 @@ test('packages never import apps or tools, and client and contract files stay po
       'packages/projects/src/server.ts':
         'import "@apps/api/worker"; import "@tools/lint/check-manifests"; import "@/lib/auth-platform";',
       'packages/projects/src/client.ts':
-        'import "@repo/projects/src/server"; import "@repo/access/src/sqlite"; import "node:fs";',
+        'import "@repo/projects/src/server"; import "node:fs"; import "next";',
+      'packages/billing/src/client/plans.ts': 'import "stripe";',
       'packages/sync/src/contracts.ts': 'import "@repo/sync/src/server";',
-      'apps/app/lib/project.ts':
-        'export * from "@repo/projects/src/server.ts"; import "@apps/api/worker";',
     }),
   ).toEqual([
-    'apps/app/lib/project.ts module-dependencies',
-    'apps/app/lib/project.ts module-dependencies',
+    'packages/billing/src/client/plans.ts module-dependencies',
     'packages/projects/src/client.ts module-dependencies',
     'packages/projects/src/client.ts module-dependencies',
     'packages/projects/src/client.ts module-dependencies',
@@ -153,8 +153,10 @@ test('packages never import apps or tools, and client and contract files stay po
       ...packages,
       'packages/projects/src/server.ts': 'import "@repo/access/src/sqlite"; import "node:fs";',
       'packages/projects/src/client.ts': 'import "@repo/projects/src/contracts";',
+      'packages/billing/src/server.ts': 'import "stripe";',
       'packages/sync/src/contracts.ts': 'export type Scalar = string | number | boolean | null;',
-      'apps/app/lib/project.ts': 'import "@repo/projects/src/client";',
+      'apps/api/worker.ts':
+        'import "@repo/projects/src/server"; import "@repo/projects/src/client";',
     }),
   ).toEqual([]);
 });
