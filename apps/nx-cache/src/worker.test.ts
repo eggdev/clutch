@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, setDefaultTimeout, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -14,6 +14,10 @@ const wrangler = path.join(app, '../../node_modules/.bin/wrangler');
 const write = 'test-write-token';
 const read = 'test-read-token';
 const hash = '0123456789abcdef0123456789abcdef';
+// A cold workerd start on a new CI runner takes longer than Bun's default
+// 5 s test timeout. Each test gets the start limit plus time for its requests.
+const startLimit = 30_000;
+setDefaultTimeout(startLimit + 10_000);
 
 function freePort() {
   const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: () => new Response() });
@@ -52,7 +56,8 @@ async function start(vars: Record<string, string>) {
     await worker.exited;
     await rm(state, { recursive: true, force: true });
   };
-  for (let attempt = 0; attempt < 120; attempt++) {
+  const deadline = Date.now() + startLimit;
+  while (Date.now() < deadline) {
     const ready = await fetch(`${url}/health`).then(
       (response) => response.ok,
       () => false,
