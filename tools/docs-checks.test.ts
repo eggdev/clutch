@@ -129,6 +129,25 @@ test('file size holds AGENTS.md to 20 lines and each source file to the limit or
   ]);
 });
 
+test('file size skips files that Git ignores, such as build output', async () => {
+  expect(
+    await inRepo(
+      {
+        '.gitignore': 'dist/\n',
+        'tools/file-size-budgets.json': JSON.stringify({ limit: 10, files: {} }),
+        'apps/web/dist/bundle.js': sourceLines(50),
+        'apps/web/src/large.ts': sourceLines(11),
+      },
+      (root) => {
+        Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+        return checkFileSize(root);
+      },
+    ),
+  ).toEqual([
+    'apps/web/src/large.ts: 11 lines, limit 10. Split the file, or add an entry with a reason to tools/file-size-budgets.json.',
+  ]);
+});
+
 test('kickoff slots are pending while KICKOFF.md exists, and inline code that names a slot is not a slot', async () => {
   const docs = {
     'docs/contributing/project-intent.md': '# Intent\n\n<!-- kickoff: who are the users -->\n',

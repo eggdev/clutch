@@ -17,6 +17,45 @@ async function countLines(file: string) {
   return text.trimEnd().split('\n').length;
 }
 
+/** The files that Git ignores, such as build output. None when `root` is not a repository. */
+function ignoredByGit(root: string, files: Array<string>): Set<string> {
+  const run = Bun.spawnSync(['git', 'check-ignore', '--stdin'], {
+    cwd: root,
+    stdin: new TextEncoder().encode(files.join('\n')),
+  });
+  return new Set(run.stdout.toString().split('\n').filter(Boolean));
+}
+
+/** The problems with one source file, given its line count and its budget entry. */
+function sizeProblems(
+  file: string,
+  lines: number,
+  limit: number,
+  entry: { lines: number; reason: string } | undefined,
+): Array<string> {
+  if (!entry) {
+    return lines > limit
+      ? [
+          `${file}: ${lines} lines, limit ${limit}. Split the file, or add an entry with a reason to tools/file-size-budgets.json.`,
+        ]
+      : [];
+  }
+  const problems: Array<string> = [];
+  if (!entry.reason?.trim()) {
+    problems.push(`${file}: the budget entry has no reason. Say why the file stays deep.`);
+  }
+  if (lines <= limit) {
+    problems.push(
+      `${file}: ${lines} lines is within the limit of ${limit}. Delete its budget entry.`,
+    );
+  } else if (lines > entry.lines) {
+    problems.push(
+      `${file}: ${lines} lines, budget ${entry.lines}. Split the file, or raise the budget and update its reason in the same change.`,
+    );
+  }
+  return problems;
+}
+
 export async function checkFileSize(root: string): Promise<Array<string>> {
   const errors: Array<string> = [];
   for (const [file, budget] of Object.entries(fixed)) {
@@ -36,31 +75,22 @@ export async function checkFileSize(root: string): Promise<Array<string>> {
   }
   const { limit, files }: Budgets = await Bun.file(budgetsFile).json();
   const seen = new Set<string>();
+  const scanned: Array<string> = [];
   for await (const file of new Bun.Glob(sources).scan({ cwd: root })) {
-    if (file.split('/').includes('node_modules')) {
+    if (!file.split('/').includes('node_modules')) {
+      scanned.push(file);
+    }
+  }
+  const ignored = ignoredByGit(root, scanned);
+  for (const file of scanned) {
+    if (ignored.has(file)) {
       continue;
     }
-    const lines = await countLines(path.join(root, file));
     const entry = files[file];
     if (entry) {
       seen.add(file);
     }
-    if (entry && !entry.reason?.trim()) {
-      errors.push(`${file}: the budget entry has no reason. Say why the file stays deep.`);
-    }
-    if (entry && lines <= limit) {
-      errors.push(
-        `${file}: ${lines} lines is within the limit of ${limit}. Delete its budget entry.`,
-      );
-    } else if (entry && lines > entry.lines) {
-      errors.push(
-        `${file}: ${lines} lines, budget ${entry.lines}. Split the file, or raise the budget and update its reason in the same change.`,
-      );
-    } else if (!entry && lines > limit) {
-      errors.push(
-        `${file}: ${lines} lines, limit ${limit}. Split the file, or add an entry with a reason to tools/file-size-budgets.json.`,
-      );
-    }
+    errors.push(...sizeProblems(file, await countLines(path.join(root, file)), limit, entry));
   }
   for (const file of Object.keys(files)) {
     if (!seen.has(file)) {

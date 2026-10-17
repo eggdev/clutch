@@ -83,7 +83,8 @@ string, and the run continues. See [CI](#ci) for the other two rules.
 
 A source or test file has at most 400 lines.
 [`tools/file-size-budgets.json`](../../../tools/file-size-budgets.json) sets the
-limit and lists the files that may pass it.
+limit and lists the files that may pass it. The check skips files that Git
+ignores, such as build output.
 
 A deep module can be the right design: a small interface over a lot of logic,
 where a split would only pass state between files. Such a file gets an entry
