@@ -37,6 +37,10 @@ const mergers: Record<string, (project: string, template: string) => Merged> = {
 export const branch = 'template/install';
 export const manifestPath = '.template-install/manifest.json';
 
+/** The install worktree sits next to the project, so the user's checkout never changes. */
+export const worktreePath = (root: string) =>
+  path.join(path.dirname(root), `${path.basename(root)}-template-install`);
+
 /** The files that `rev` tracks, under `prefix` when given. */
 async function listFiles(cwd: string, rev: string, prefix?: string) {
   const out = await gitOrThrow(
@@ -113,7 +117,7 @@ export async function installTemplate(options: {
     );
   }
 
-  const worktree = path.join(path.dirname(project.root), `${project.name}-template-install`);
+  const worktree = worktreePath(project.root);
   await gitOrThrow(
     project.root,
     'worktree',
