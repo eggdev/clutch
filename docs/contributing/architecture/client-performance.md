@@ -20,10 +20,14 @@ a check in CI.
 | Largest contentful paint, warm visit         | 0.5 s at p75                | Lab run against each preview                         |
 | Animated layout properties                   | 0                           | `lint`: `no-low-performance-animation-properties`    |
 | Duration literals outside the speed tokens   | 0                           | `lint`: `declaration-property-value-disallowed-list` |
+| Duration classes outside the speed tokens    | 0                           | `lint`: `repo-classes/speed-tokens-only`             |
+| `transition-all` classes                     | 0                           | `lint`: `repo-classes/no-transition-all`             |
 | Longest speed token                          | 350 ms                      | `lint`: `declaration-property-value-allowed-list`    |
 | Motion for a frequent interaction            | 150 ms                      | The quick and fade-out speed tokens                  |
 
-The [CSS lint](../setup/lint-rules.md#css) runs the three lint rules.
+The [CSS lint](../setup/lint-rules.md#css) and the
+[Tailwind class lint](../setup/lint-rules.md#tailwind-classes) run the lint
+rules.
 
 <!-- kickoff: The file or target for each check that needs the app: the end-to-end trace, the warm-store test, the build output check and the lab run. Then the tracking issue for the weekly check against the live site. -->
 

@@ -28,7 +28,7 @@ The comments in `oxlint.config.ts` are the record. In short:
 | Style         | Function declarations, `Array<T>`, `type` over `interface`, named exports                                                                                                       |
 | Off           | `sort-keys`, `no-await-in-loop`, `promise/avoid-new`, `default-case`, `prefer-named-capture-group`, `no-plusplus`, `no-bitwise`, and two rules that another rule already covers |
 | Configured    | `prefer-destructuring` for objects only                                                                                                                                         |
-| Default files | Config files and Worker entries (`apps/*/src/worker.ts`) that a tool loads by default export may use one                                                                        |
+| Default files | Config files, lint plugins and Worker entries (`apps/*/src/worker.ts`) that a tool loads by default export may use one                                                          |
 
 `typescript/no-explicit-any` and `no-warning-comments` come from the preset. A
 marker comment such as FIXME or HACK fails lint. Record the work in an issue.
@@ -48,6 +48,28 @@ CSS that fails.
 
 The plugin allows four paint properties for short hover and focus changes:
 `color`, `background-color`, `border-color` and `fill`.
+
+## Tailwind classes
+
+Stylelint does not read class names in TSX. The `repo-classes` oxlint plugin,
+[`tools/lint/class-policy.mjs`](../../../tools/lint/class-policy.mjs), reads
+the strings in `className` and `class` attributes, and the strings in calls to
+`cn`, `clsx`, `cx`, `cva`, `tv`, `twMerge` and `twJoin`. It enforces
+[tokens for every visual value](../../principles/design-tokens.md) and
+[compositor-only motion](../../principles/compositor-only-motion.md).
+`tools/lint/class-policy.test.ts` proves each rule with classes that pass and
+classes that fail.
+
+| Rule                  | Rejects                                                                         |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `no-arbitrary-values` | A value in brackets, such as `bg-[#fff]`, `p-[13px]` or `[mask-type:luminance]` |
+| `speed-tokens-only`   | A duration or delay that is not a speed token, such as `duration-300`           |
+| `no-transition-all`   | `transition-all`                                                                |
+| `no-dark-variant`     | The `dark:` variant                                                             |
+
+Brackets in a variant select an element and stay allowed, such as
+`data-[state=open]:` and `[&>svg]:`. A duration reads its token through the
+variable shorthand: `duration-(--speed-quick)`.
 
 ## Formatting
 

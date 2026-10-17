@@ -15,7 +15,10 @@ export default defineConfig({
     '.codex/**',
     '.cursor/**',
   ],
-  jsPlugins: [{ name: 'repo-imports', specifier: './tools/lint/import-policy.mjs' }],
+  jsPlugins: [
+    { name: 'repo-imports', specifier: './tools/lint/import-policy.mjs' },
+    { name: 'repo-classes', specifier: './tools/lint/class-policy.mjs' },
+  ],
   rules: {
     // Function declarations read as the module's API and hoist. Arrow
     // functions stay fine for callbacks and short helpers.
@@ -58,11 +61,21 @@ export default defineConfig({
     'repo-imports/layers': 'error',
     'repo-imports/testing-imports': 'error',
     'repo-imports/no-internal-mocks': 'error',
+
+    'repo-classes/no-arbitrary-values': 'error',
+    'repo-classes/speed-tokens-only': 'error',
+    'repo-classes/no-transition-all': 'error',
+    'repo-classes/no-dark-variant': 'error',
   },
   overrides: [
     {
       // Tools load these files through their default export.
-      files: ['*.config.{ts,mts,js,mjs}', 'tools/hooks/paths.mjs', 'tools/lint/import-policy.mjs'],
+      files: [
+        '*.config.{ts,mts,js,mjs}',
+        'tools/hooks/paths.mjs',
+        'tools/lint/import-policy.mjs',
+        'tools/lint/class-policy.mjs',
+      ],
       rules: { 'import/no-default-export': 'off' },
     },
     {

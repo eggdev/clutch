@@ -72,14 +72,20 @@ each role under `:root` and again under `.dark`.
 
 ## Checks
 
-| Rule                                      | Check                                                           |
-| ----------------------------------------- | --------------------------------------------------------------- |
-| No layout property animates               | `lint`: `no-low-performance-animation-properties`               |
-| No duration literal in CSS                | `lint`: `declaration-property-value-disallowed-list`            |
-| No speed token longer than 350 ms         | `lint`: `declaration-property-value-allowed-list`               |
-| No default Tailwind color, font or radius | The theme starts with `--*: initial`, so the class has no style |
+| Rule                                                | Check                                                           |
+| --------------------------------------------------- | --------------------------------------------------------------- |
+| No layout property animates                         | `lint`: `no-low-performance-animation-properties`               |
+| No duration literal in CSS                          | `lint`: `declaration-property-value-disallowed-list`            |
+| No speed token longer than 350 ms                   | `lint`: `declaration-property-value-allowed-list`               |
+| No default Tailwind color, font or radius           | The theme starts with `--*: initial`, so the class has no style |
+| No arbitrary value in a class                       | `lint`: `repo-classes/no-arbitrary-values`                      |
+| No duration or delay class outside the speed tokens | `lint`: `repo-classes/speed-tokens-only`                        |
+| No `transition-all`                                 | `lint`: `repo-classes/no-transition-all`                        |
+| No `dark:` variant                                  | `lint`: `repo-classes/no-dark-variant`                          |
 
-The [CSS lint](../setup/lint-rules.md#css) runs the three lint rules.
+The [CSS lint](../setup/lint-rules.md#css) and the
+[Tailwind class lint](../setup/lint-rules.md#tailwind-classes) run the lint
+rules.
 
 ## Add a role
 
