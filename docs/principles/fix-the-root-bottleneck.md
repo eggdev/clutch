@@ -15,3 +15,5 @@ to shard the access store, so each check reads a small shard.
 ## Related
 
 - [Fail loudly at the right layer](./fail-loudly.md)
+- [Local first](./local-first.md): the network is the client's root
+  bottleneck. Remove the request from the user's path.

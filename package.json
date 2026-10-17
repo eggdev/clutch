@@ -30,6 +30,8 @@
     "nx": "23.2.1",
     "oxfmt": "^0.60.0",
     "oxlint": "^1.75.0",
+    "stylelint": "17.16.0",
+    "stylelint-high-performance-animation": "2.0.0",
     "tslib": "^2.3.0",
     "typescript": "~6.0.3",
     "ultracite": "7.12.2",
@@ -43,7 +45,8 @@
         "executor": "nx:run-commands",
         "options": {
           "commands": [
-            "oxlint tools oxlint.config.ts",
+            "oxlint tools oxlint.config.ts stylelint.config.ts",
+            "stylelint \"**/*.css\" --allow-empty-input --ignore-path .gitignore",
             "bun tools/lint/check-manifests.ts"
           ],
           "parallel": false

@@ -19,9 +19,12 @@ test('docs-only covers Markdown, the docs folder and license texts, and nothing 
 });
 
 test('pre-commit lints, then formats, then typechecks the staged tree when code changed', () => {
-  expect(stagedCommands(['/repo/tools/a b.ts', '/repo/README.md'], '/repo')).toEqual([
+  expect(
+    stagedCommands(['/repo/tools/a b.ts', '/repo/apps/web/app.css', '/repo/README.md'], '/repo'),
+  ).toEqual([
     'oxlint --fix "/repo/tools/a b.ts"',
-    'oxfmt --no-error-on-unmatched-pattern "/repo/tools/a b.ts" "/repo/README.md"',
+    'stylelint --fix "/repo/apps/web/app.css"',
+    'oxfmt --no-error-on-unmatched-pattern "/repo/tools/a b.ts" "/repo/apps/web/app.css" "/repo/README.md"',
     'bun install --frozen-lockfile',
     'nx run-many -t typecheck',
   ]);

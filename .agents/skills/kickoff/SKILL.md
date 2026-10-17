@@ -88,7 +88,8 @@ inventory and the vendors are known.
 
 Output: the slots in `docs/contributing/architecture/` (the index, request
 context, authorization, data storage, feature flags, API errors, soft
-delete and MCP server), one page for each other service with
+delete, MCP server, local-first sync and client performance), one page for
+each other service with
 real rules, the product entries in
 `docs/contributing/architecture/primitives.yaml`, and a decision record for
 each no.

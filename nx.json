@@ -34,11 +34,20 @@
       "inputs": [
         "default",
         "{workspaceRoot}/oxlint.config.ts",
+        "{workspaceRoot}/stylelint.config.ts",
         "{workspaceRoot}/tools/lint/**/*",
         "{workspaceRoot}/docs/contributing/architecture/primitives.yaml",
         "{workspaceRoot}/apps/*/package.json",
         "{workspaceRoot}/packages/**/*",
-        { "externalDependencies": ["oxlint", "ultracite", "yaml"] }
+        {
+          "externalDependencies": [
+            "oxlint",
+            "ultracite",
+            "yaml",
+            "stylelint",
+            "stylelint-high-performance-animation"
+          ]
+        }
       ]
     },
     "format-check": {

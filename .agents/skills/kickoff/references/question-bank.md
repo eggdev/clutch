@@ -44,7 +44,15 @@ decision. Show a draft answer with each question.
 - Which sign-in methods does each user need now, and later?
 - Do two people edit the same record at the same time? If so, how do edits
   merge, and who wins on a conflict?
-- Does the client get updates by push or by poll?
+- Does the client get updates by push or by poll? The default is push from a
+  sync engine into a local store. See `docs/principles/local-first.md`.
+- Which sync engine holds the local store? Bring two or three, with the device
+  storage, the conflict rule and the local test runtime of each.
+- Which writes must wait for the server? Start from writes that move money,
+  give consent, change access or touch a hard invariant. Every other write is
+  local first.
+- Which actions does a frequent user repeat most? Each gets a shortcut in the
+  registry. See `docs/principles/keyboard-first.md`.
 - Which service holds feature flag state? PostHog is the default. Who owns the
   flag registry module?
 - What may operators see? Is support access granted by the customer, for a
@@ -97,8 +105,11 @@ decision. Show a draft answer with each question.
 - What is the first action for each failure: roll back, or fix forward?
 - How much data can each store lose, and how long may a restore take? Which
   stores are backed up, rebuilt or accepted as lost?
-- Which performance numbers get a budget? Does the live site get a weekly check
-  against a budget file, with one tracking issue that opens and closes itself?
+- Which check measures each budget in
+  `docs/contributing/architecture/client-performance.md` that needs the app?
+  The budgets are fixed. A project can only make one stricter. Does the live
+  site get a weekly check against the budgets, with one tracking issue that
+  opens and closes itself?
 
 ## 5. Product edges
 

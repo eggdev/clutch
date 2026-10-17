@@ -8,6 +8,21 @@ These pages are the same in every project that starts from the template. A page
 here never states a fact about one product. It links to the project page that
 owns the fact.
 
+## Speed
+
+Speed drives the design of every surface that a person uses. A user action
+never waits on the network. Open these pages first for any change to what a
+user sees or does.
+
+| Principle                                             | When to open it                                                       |
+| ----------------------------------------------------- | --------------------------------------------------------------------- |
+| [Local first](./local-first.md)                       | Adding a screen, a read, a write, a search or a boot step             |
+| [Fast first load](./fast-first-load.md)               | Adding a dependency, a route, a font or a step before the first paint |
+| [Compositor-only motion](./compositor-only-motion.md) | Adding a transition, an animation or a duration                       |
+| [Keyboard first](./keyboard-first.md)                 | Adding an action, a menu item or a navigation target                  |
+
+## Everything else
+
 | Principle                                                                   | When to open it                                                                               |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | [Generic platform](./generic-platform.md)                                   | Importing a vendor, adding a module, or deciding which module owns a vendor                   |

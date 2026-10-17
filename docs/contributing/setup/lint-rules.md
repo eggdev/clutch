@@ -33,6 +33,22 @@ The comments in `oxlint.config.ts` are the record. In short:
 `typescript/no-explicit-any` and `no-warning-comments` come from the preset. A
 marker comment such as FIXME or HACK fails lint. Record the work in an issue.
 
+## CSS
+
+Stylelint lints each `.css` file. [`stylelint.config.ts`](../../../stylelint.config.ts)
+enforces [compositor-only motion](../../principles/compositor-only-motion.md).
+`tools/lint/stylelint-config.test.ts` proves each rule with CSS that passes and
+CSS that fails.
+
+| Rule                                             | Rejects                                                        |
+| ------------------------------------------------ | -------------------------------------------------------------- |
+| `plugin/no-low-performance-animation-properties` | A transition or keyframe on a layout property, or on `all`     |
+| `declaration-property-value-disallowed-list`     | A duration literal in `transition` or `animation`. Use a token |
+| `declaration-property-value-allowed-list`        | A `--speed-*` token longer than 350 ms                         |
+
+The plugin allows four paint properties for short hover and focus changes:
+`color`, `background-color`, `border-color` and `fill`.
+
 ## Formatting
 
 Oxfmt formats each file. [`.oxfmtrc.json`](../../../.oxfmtrc.json) states each
@@ -55,5 +71,5 @@ mise exec -- bun run check
 mise exec -- bun x oxlint --fix <paths>
 ```
 
-The pre-commit hook runs `oxlint --fix` on staged files. See
+The pre-commit hook runs `oxlint --fix` and `stylelint --fix` on staged files. See
 [Git hooks](./checks.md#git-hooks).

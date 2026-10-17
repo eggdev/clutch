@@ -11,6 +11,7 @@ export const isDocsOnly = (file) =>
   /(?:^|\/)(?:LICENSE|LICENCE|COPYING|NOTICE)(?:\.txt)?$/u.test(file);
 
 const lintable = /\.[cm]?[jt]sx?$/u;
+const styles = /\.css$/u;
 const formattable = /\.(?:[cm]?[jt]sx?|jsonc?|md|ya?ml|css)$/u;
 const quote = (paths) => paths.map((file) => JSON.stringify(file)).join(' ');
 
@@ -25,9 +26,13 @@ export function stagedCommands(files, root = process.cwd()) {
   const paths = files.map((file) => path.relative(root, file));
   const commands = [];
   const lint = files.filter((file) => lintable.test(file));
+  const css = files.filter((file) => styles.test(file));
   const format = files.filter((file) => formattable.test(file));
   if (lint.length) {
     commands.push(`oxlint --fix ${quote(lint)}`);
+  }
+  if (css.length) {
+    commands.push(`stylelint --fix ${quote(css)}`);
   }
   if (format.length) {
     commands.push(`oxfmt --no-error-on-unmatched-pattern ${quote(format)}`);

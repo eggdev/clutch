@@ -30,6 +30,9 @@ Device caches can be stale while offline.
 - A copy is deleted when access is lost (401 or 403).
 - A copy never decides a command, a permission or a business transition. The
   server decides.
+- The interface reads and writes the device copy first, and the server confirms
+  each write later. A rejected write rolls back. See
+  [local first](./local-first.md).
 
 ## Example
 

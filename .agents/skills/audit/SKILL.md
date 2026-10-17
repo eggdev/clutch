@@ -18,6 +18,10 @@ tracker: one issue per finding. The audit writes no report into `docs/`.
    gets an answer, confirmed or not, backed by code and tests.
 4. Search the open issues with the `audit` label, so you do not file a finding
    twice.
+5. For performance, read the speed principles in `docs/principles/index.md`
+   and the budgets in `docs/contributing/architecture/client-performance.md`.
+   A spinner on data the device has, a write that waits on the network without
+   a reason, and an animated layout property are each a finding.
 
 ## Severity
 

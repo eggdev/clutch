@@ -19,10 +19,10 @@ names its target.
 the hooks in `.githooks/`. Each hook runs through `mise`, so it uses the pinned
 Bun and Node.
 
-| Hook         | Runs                                                                                                                     | Skips when                                                                                       |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `pre-commit` | On staged files: `oxlint --fix`, then `oxfmt`. Then `bun install --frozen-lockfile` and the typecheck of the staged tree | The install check and typecheck skip a docs-only commit                                          |
-| `pre-push`   | `test`, `lint-policy-test` and `checks` (every fast check and `knip`), with `CI=1` so the Nx cache matches `validate`    | `test` and `lint-policy-test` skip a docs-only push. Nothing runs when the push deletes a branch |
+| Hook         | Runs                                                                                                                                           | Skips when                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `pre-commit` | On staged files: `oxlint --fix` and `stylelint --fix`, then `oxfmt`. Then `bun install --frozen-lockfile` and the typecheck of the staged tree | The install check and typecheck skip a docs-only commit                                          |
+| `pre-push`   | `test`, `lint-policy-test` and `checks` (every fast check and `knip`), with `CI=1` so the Nx cache matches `validate`                          | `test` and `lint-policy-test` skip a docs-only push. Nothing runs when the push deletes a branch |
 
 [`tools/hooks/paths.mjs`](../../../tools/hooks/paths.mjs) defines docs-only:
 Markdown anywhere, any file under `docs/`, or a license text. A pushed branch is
@@ -43,24 +43,24 @@ target on the root project. [`tools/docs-checks.test.ts`](../../../tools/docs-ch
 tests the docs checks. [`tools/repo-checks.test.ts`](../../../tools/repo-checks.test.ts)
 tests the workflow and dependency checks.
 
-| Target                       | Rejects                                                                                            |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `lint`                       | Oxlint rules, including the [import boundaries](../import-boundaries.md)                           |
-| `lint-policy-test`           | A change to the import policy that breaks its fixtures                                             |
-| `format-check`               | Oxfmt differences                                                                                  |
-| `check-docs-file-refs`       | A doc link or path to a file that does not exist                                                   |
-| `check-docs-temporal`        | Changelog phrases in durable docs                                                                  |
-| `check-decisions`            | Duplicate decision numbers, or an index that does not match                                        |
-| `check-file-size`            | `AGENTS.md` over 20 lines, or a source file over its limit. See [file size](#file-size)            |
-| `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                  |
-| `check-kickoff-slots`        | A kickoff slot left in a doc after `KICKOFF.md` is deleted                                         |
-| `check-primitives`           | A broken [registry](../architecture/primitives.yaml) entry, or an Nx project with no primitive     |
-| `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target`   |
-| `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)               |
-| `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md) |
-| `check-lockfile`             | A `bun.lock` that does not match the manifests                                                     |
-| `check-dependency-overrides` | An override without a documented reason, a stale reason, or a repeated JSON key                    |
-| `audit-prod`                 | A moderate or worse advisory in a production dependency                                            |
+| Target                       | Rejects                                                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `lint`                       | Oxlint rules, including the [import boundaries](../import-boundaries.md), and the [CSS lint](./lint-rules.md#css) |
+| `lint-policy-test`           | A change to the import policy that breaks its fixtures                                                            |
+| `format-check`               | Oxfmt differences                                                                                                 |
+| `check-docs-file-refs`       | A doc link or path to a file that does not exist                                                                  |
+| `check-docs-temporal`        | Changelog phrases in durable docs                                                                                 |
+| `check-decisions`            | Duplicate decision numbers, or an index that does not match                                                       |
+| `check-file-size`            | `AGENTS.md` over 20 lines, or a source file over its limit. See [file size](#file-size)                           |
+| `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                                 |
+| `check-kickoff-slots`        | A kickoff slot left in a doc after `KICKOFF.md` is deleted                                                        |
+| `check-primitives`           | A broken [registry](../architecture/primitives.yaml) entry, or an Nx project with no primitive                    |
+| `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target`                  |
+| `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)                              |
+| `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md)                |
+| `check-lockfile`             | A `bun.lock` that does not match the manifests                                                                    |
+| `check-dependency-overrides` | An override without a documented reason, a stale reason, or a repeated JSON key                                   |
+| `audit-prod`                 | A moderate or worse advisory in a production dependency                                                           |
 
 Add a check as `tools/check-<name>.ts`. Export a `check<Name>(root)` function
 that returns the problems, so a test can call it on a temporary repository. Add
@@ -174,7 +174,7 @@ samples.
 
 - Typechecks use TSGo (`@typescript/native-preview`). Keep `typescript` only for
   tools that need its JavaScript compiler API.
-- Lint uses Oxlint. Formatting uses Oxfmt.
+- Lint uses Oxlint for code and Stylelint for CSS. Formatting uses Oxfmt.
 - The lint rules and how each one is chosen are on
   [lint rules](./lint-rules.md).
 
