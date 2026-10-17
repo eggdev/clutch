@@ -47,6 +47,16 @@ primitives:
       - docs/contributing/setup/checks.md
       - docs/contributing/import-boundaries.md
 
+  - id: install-cli
+    group: repository
+    name: Install CLI
+    kind: app
+    summary: Installs the template into an existing project and starts the kickoff stages with an agent.
+    code:
+      - apps/cli/
+    docs:
+      - apps/cli/README.md
+
   - id: nx-cache
     group: repository
     name: Nx remote cache

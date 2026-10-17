@@ -1,0 +1,57 @@
+# The files that the install CLI (apps/cli) copies into an existing project.
+#
+# Rules:
+#   replace: write the template's file. The project's copy stays in git history
+#            on its default branch, and the manifest lists it for the interview.
+#   merge:   combine both copies. Supports package.json and .gitignore. For
+#            package.json, the template's value wins each clash, and the
+#            manifest lists the clash.
+#   add:     write the template's file. When the project already has the file,
+#            the install stops before it changes anything.
+#
+# Not copied: README.md, bun.lock and tsconfig.json belong to the project.
+# apps/cli is the installer itself.
+
+files:
+  - path: AGENTS.md
+    rule: replace
+  - path: KICKOFF.md
+    rule: add
+  - path: docs/
+    rule: replace
+  - path: package.json
+    rule: merge
+  - path: .gitignore
+    rule: merge
+  - path: .editorconfig
+    rule: replace
+  - path: .oxfmtrc.json
+    rule: replace
+  - path: bunfig.toml
+    rule: replace
+  - path: mise.toml
+    rule: replace
+  - path: nx.json
+    rule: replace
+  - path: oxlint.config.ts
+    rule: replace
+  - path: stylelint.config.ts
+    rule: replace
+  - path: knip.jsonc
+    rule: replace
+  - path: tsconfig.base.json
+    rule: replace
+  - path: .githooks/
+    rule: replace
+  - path: .github/
+    rule: replace
+  - path: .cursor/BUGBOT.md
+    rule: replace
+  - path: tools/
+    rule: add
+  - path: .agents/skills/
+    rule: add
+  - path: .claude/skills/
+    rule: add
+  - path: apps/nx-cache/
+    rule: add

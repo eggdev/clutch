@@ -1,0 +1,18 @@
+{
+  "name": "cli",
+  "private": true,
+  "bin": {
+    "template": "src/main.ts"
+  },
+  "type": "module",
+  "nx": {
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/test-budget.ts 60 -- bun test apps/cli"
+        }
+      }
+    }
+  }
+}

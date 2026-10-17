@@ -5,6 +5,9 @@
   "references": [
     {
       "path": "./apps/nx-cache"
+    },
+    {
+      "path": "./apps/cli"
     }
   ]
 }
