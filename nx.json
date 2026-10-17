@@ -28,17 +28,25 @@
   ],
   "sync": { "applyChanges": true },
   "targetDefaults": {
+    "typecheck": { "cache": true },
     "lint": {
+      "cache": true,
       "inputs": [
         "default",
         "{workspaceRoot}/oxlint.config.ts",
         "{workspaceRoot}/tools/lint/**/*",
         "{workspaceRoot}/docs/contributing/architecture/primitives.yaml",
+        "{workspaceRoot}/apps/*/package.json",
         "{workspaceRoot}/packages/**/*",
-        { "externalDependencies": ["oxlint"] }
+        { "externalDependencies": ["oxlint", "ultracite", "yaml"] }
       ]
     },
+    "format-check": {
+      "cache": true,
+      "inputs": ["{workspaceRoot}/**/*"]
+    },
     "test": {
+      "cache": true,
       "inputs": [
         "default",
         "{workspaceRoot}/bunfig.toml",
@@ -47,6 +55,7 @@
       ]
     },
     "lint-policy-test": {
+      "cache": true,
       "inputs": [
         "default",
         "{workspaceRoot}/bunfig.toml",

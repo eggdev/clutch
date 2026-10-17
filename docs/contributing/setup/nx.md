@@ -27,7 +27,14 @@ matches. `nx.json` sets the inputs in `targetDefaults`.
 - A plain `nx run-many -t test` without `CI=1` has its own keys. It misses the
   `validate` results and gives the same answers.
 - Typecheck and lint hashes leave out `CI`, because nothing they run reads it.
+- The lint hash includes the workspace manifests and the `ultracite` and
+  `yaml` versions. The lint config and the import policy read them.
+- The root project's `default` input leaves out the files of nested
+  projects. `format-check` reads every file, so its input is
+  `{workspaceRoot}/**/*`.
 - Checks that read the network or the whole repository set `"cache": false`.
+- A run-commands target with no `cache` setting is never cached. Give each new
+  target a `cache` value.
 
 A remote cache takes writes only from people who can push to the repository.
 Fork PR jobs get read access at most. See [CI](./checks.md#ci).
