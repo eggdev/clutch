@@ -90,8 +90,10 @@ Once a week, an agent or a person does one short pass:
 
 1. Read the review comments of the week's merged PRs. Find a comment that
    repeats. Read delivery records for repeated owner interventions and rework.
-2. Propose one new guardrail for it, as an issue or a PR. Use the strongest
-   cheap kind from [promote learning into enforcement](#promote-learning-into-enforcement).
+2. When a comment or an intervention repeats and a guardrail would stop it for
+   real, propose one, as an issue or a PR. Use the strongest cheap kind from
+   [promote learning into enforcement](#promote-learning-into-enforcement).
+   A week with no such repeat needs no guardrail.
 3. Delete stale guidance from `docs/contributing/`, and tighten unclear steps.
 4. Delete each rule from `.cursor/BUGBOT.md` that a check covers.
 5. Close each cleanup issue whose "Ready when" criterion is true, in the PR
