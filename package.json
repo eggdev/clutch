@@ -159,7 +159,7 @@
       "audit-prod": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "bun audit --prod --audit-level=moderate"
+          "command": "bun tools/audit-prod.ts"
         },
         "cache": false
       },

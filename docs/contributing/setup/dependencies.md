@@ -5,46 +5,29 @@ How the repository checks its npm dependencies. Both checks run in
 
 ## Production audit
 
-The `audit-prod` target runs:
-
-```sh
-bun audit --prod --audit-level=moderate
-```
-
-It reads the advisories for each production dependency in `bun.lock`. A
-moderate, high or critical advisory fails the target. A low advisory does not.
-Dev dependencies are out of scope, because they do not ship.
+The `audit-prod` target runs [`tools/audit-prod.ts`](../../../tools/audit-prod.ts).
+It reads the advisories for each production dependency in `bun.lock` with
+`bun audit --prod`. A moderate, high or critical advisory fails the target. A
+low advisory does not. Dev dependencies are out of scope, because they do not
+ship.
 
 The target asks the registry for advisories, so it needs network access. Nx
-does not cache it, because the advisories change when the code does not.
+does not cache it, because the advisories change when the code does not. A
+network failure fails the target with no advisory list. Check the connection
+and the registry setting, then run the target again.
 
-A failure lists each package, the dependency path to it and each advisory:
-
-```text
-smol-toml@1.6.1
-  (direct dependency)
-  high: smol-toml: Denial of Service via malformed TOML documents (<=1.7.0) - https://github.com/advisories/GHSA-7w5x-hrqm-74c2
-  moderate: smol-toml: Quadratic-time parse() from parseKey rescanning to end of document on each key line (<=1.8.0) - https://github.com/advisories/GHSA-r4xh-jqrq-34v2
-
-2 vulnerabilities (1 high, 1 moderate)
-```
-
-Fix it in this order:
+Fix a failure in this order:
 
 1. Run `mise exec -- bun audit fix`. It upgrades each package to the lowest
    safe version in its declared range.
 2. If no safe version is in range, upgrade the direct dependency that pulls the
    package in.
-3. If no upstream release has a fix, add an [override](#overrides) that pins a
-   safe version, and document it.
-
-A network failure also fails the target, with no advisory list:
-
-```text
-error: POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk - ConnectionRefused
-```
-
-Check the connection and the registry setting, then run the target again.
+3. If a release has a fix that the range excludes, add an
+   [override](#overrides) that pins a safe version, and document it.
+4. If no release has a fix, the owner decides. An accepted advisory is an
+   entry in [`tools/accepted-advisories.yaml`](../../../tools/accepted-advisories.yaml)
+   with its reason and the event that removes it. The target fails on an
+   entry whose advisory is gone from the audit, so a stale entry cannot stay.
 
 ## Overrides
 

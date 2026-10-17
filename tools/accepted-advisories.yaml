@@ -1,0 +1,18 @@
+# Advisories in production dependencies that the owner accepts, because no
+# release has a fix. tools/audit-prod.ts fails on any other moderate or worse
+# advisory, and on an entry here that the audit no longer reports.
+# See docs/contributing/setup/dependencies.md#production-audit.
+#
+# Fields: id (the GHSA ID), package, reason (why the risk is acceptable),
+#         revisit (the event that removes the entry).
+#
+# Example:
+#
+# - id: GHSA-xxxx-xxxx-xxxx
+#   package: some-package
+#   reason: >-
+#     1.2.3 is the latest release. Only a build tool on a developer machine
+#     runs the flawed code, and it never ships.
+#   revisit: A fixed some-package ships.
+
+[]
