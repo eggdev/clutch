@@ -122,9 +122,10 @@ add it to the steering list.
 
 Output: the slots in `docs/contributing/setup/`, `docs/contributing/testing.md`,
 `docs/contributing/end-to-end-testing.md`, `docs/contributing/security.md` and
-`docs/contributing/operations/`, and `.github/workflows/ci.yml`.
+`docs/contributing/operations/`, `docs/contributing/architecture/styling.md`,
+and `.github/workflows/ci.yml`.
 
-Ask about the app framework and deploy target, environments (the default is
+Ask about the platforms, the framework, the theme and the deploy target, environments (the default is
 a preview for each PR and production on merge), seed data, user-facing
 languages, test runners, and which CI steps the journeys need. Then walk the
 security and operations pages: the security rules, the accepted risks, the

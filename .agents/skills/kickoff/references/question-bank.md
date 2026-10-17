@@ -84,7 +84,17 @@ decision. Show a draft answer with each question.
 
 ## 4. Harness
 
-- Which app framework and deploy target? Web only, or native too?
+- Which platforms: web only, or native too? Default: web only, as a Vite
+  single-page app. Propose Next only when public pages need server rendering
+  for search. Propose One or Expo only when project intent lists a native app
+  as a must. Write the choice as a decision record.
+- On native, which Tailwind binding? Look up which binding supports the
+  Tailwind version of the web build, and bring its version.
+- Which deploy target for each app?
+- What should the product feel like? Draft the theme in
+  `docs/contributing/architecture/styling.md`: the value of each role in each
+  scheme, the font families, the shadow policy and the scheme for a first
+  visit. The role names are fixed.
 - Which environments: a preview for each PR and production on merge, or a
   staging step?
 - What does the seed data contain, and which accounts does it create?

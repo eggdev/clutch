@@ -45,6 +45,12 @@ works.
 }
 ```
 
+A Tailwind class reads the same token:
+
+```tsx
+<li className="transition-colors duration-(--speed-quick) hover:bg-hover">{name}</li>
+```
+
 A hover that sets `margin-left` lays out every row below it. Move the row with
 `transform: translateX(2px)` instead.
 

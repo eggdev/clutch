@@ -21,6 +21,15 @@ user sees or does.
 | [Compositor-only motion](./compositor-only-motion.md) | Adding a transition, an animation or a duration                       |
 | [Keyboard first](./keyboard-first.md)                 | Adding an action, a menu item or a navigation target                  |
 
+## Interface
+
+Each surface starts on a phone and takes every visual value from a token.
+
+| Principle                                           | When to open it                                               |
+| --------------------------------------------------- | ------------------------------------------------------------- |
+| [Mobile first](./mobile-first.md)                   | Adding a screen, a component, a breakpoint or a fixed width   |
+| [Tokens for every visual value](./design-tokens.md) | Adding a color, a size, a radius, a shadow, a font or a theme |
+
 ## Everything else
 
 | Principle                                                                   | When to open it                                                                               |

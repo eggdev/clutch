@@ -73,6 +73,8 @@ packages/<name>/src/
   queue, and the writes that wait for the server
 - [Client performance](./client-performance.md): the speed budgets and the
   check for each one
+- [Styling](./styling.md): the token roles, the theme, the platforms and the
+  styling checks
 
 <!-- kickoff: One link for each other system page, with when to open it. Each user journey from kickoff gets a page, and so does each service with real rules (authentication, sync, jobs). -->
 
