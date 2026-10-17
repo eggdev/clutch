@@ -17,7 +17,7 @@ async function write(root: string, file: string, content: string) {
   await writeFile(path.join(root, file), content);
 }
 
-test('a merged migration cannot change, move or go away, and a new one can be added', async () => {
+test('a merged migration cannot change, move or go away, and a new one or the journal can change', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'migrations-'));
   try {
     git(root, 'init', '-q', '-b', 'main');
@@ -26,6 +26,7 @@ test('a merged migration cannot change, move or go away, and a new one can be ad
     await write(root, 'packages/a/migrations/0001.sql', 'create table a;');
     await write(root, 'packages/a/migrations/0002.sql', 'create table b;');
     await write(root, 'packages/a/migrations/0003.sql', 'create table c;');
+    await write(root, 'packages/a/migrations/meta/_journal.json', '{"entries":3}');
     await write(root, 'packages/a/src/index.ts', 'export {};');
     git(root, 'add', '-A');
     git(root, 'commit', '-qm', 'base');
@@ -35,6 +36,7 @@ test('a merged migration cannot change, move or go away, and a new one can be ad
     git(root, 'rm', '-q', 'packages/a/migrations/0002.sql');
     git(root, 'mv', 'packages/a/migrations/0003.sql', 'packages/a/migrations/0003-c.sql');
     await write(root, 'packages/a/migrations/0004.sql', 'create table d;');
+    await write(root, 'packages/a/migrations/meta/_journal.json', '{"entries":4}');
     await write(root, 'packages/a/src/index.ts', 'export const a = 1;');
     git(root, 'add', '-A');
 

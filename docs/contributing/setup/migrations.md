@@ -6,9 +6,10 @@ To change the shape again, write a new migration. See
 
 ## Where migrations live
 
-Migration files live in a folder named `migrations` under `apps/` or
+Migration `.sql` files live in a folder named `migrations` under `apps/` or
 `packages/`. The migration tool writes there. The check below finds them by that
-name, so the folder needs no configuration.
+name, so the folder needs no configuration. Other files in the folder, such as
+the tool's journal or snapshots, can change.
 
 <!-- kickoff: The migration tool, the folder it writes to, and the commands that make, apply and dry-run a migration. -->
 
