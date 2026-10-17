@@ -1,17 +1,16 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
-import { blankFences } from '@tools/docs-files';
+import { parse } from 'yaml';
 
 /**
- * Each key in the root package.json `overrides` or `resolutions` has a `###`
- * heading in the overrides section of the dependencies page. The first code
- * span of the heading names the package, and text under it gives the reason.
- * A heading for a package with no override is stale. package.json repeats no
- * key, because JSON keeps only the last value.
+ * Each key in the root package.json `overrides` or `resolutions` has one entry
+ * in tools/dependency-overrides.yaml, with its reason and the event that
+ * removes it. An entry for a package with no override is stale. package.json
+ * repeats no key, because JSON keeps only the last value. See
+ * docs/contributing/setup/dependencies.md#overrides.
  */
-export const page = 'docs/contributing/setup/dependencies.md';
-const section = '## Overrides';
+export const registry = 'tools/dependency-overrides.yaml';
 
 /** The path of each key that repeats in its object. The source must be valid JSON. */
 export function duplicateKeys(source: string): Array<string> {
@@ -71,29 +70,7 @@ export function duplicateKeys(source: string): Array<string> {
   return duplicates;
 }
 
-export type Entry = { name: string; line: number; reason: boolean };
-
-/** The `###` headings in the overrides section, with whether text follows each one. */
-export function documentedOverrides(content: string): Array<Entry> {
-  const entries: Array<Entry> = [];
-  let inside = false;
-  let current: Entry | null = null;
-  for (const [index, line] of blankFences(content).split('\n').entries()) {
-    if (/^#{1,3}\s/u.test(line)) {
-      if (/^#{1,2}\s/u.test(line)) {
-        inside = line.trim() === section;
-      }
-      const name = inside && /^###\s/u.test(line) ? /`([^`]+)`/u.exec(line)?.[1] : undefined;
-      current = name ? { name, line: index + 1, reason: false } : null;
-      if (current) {
-        entries.push(current);
-      }
-    } else if (current && line.trim()) {
-      current.reason = true;
-    }
-  }
-  return entries;
-}
+export type Entry = { package?: string; reason?: string; revisit?: string };
 
 export async function checkDependencyOverrides(root: string): Promise<Array<string>> {
   const source = await Bun.file(path.join(root, 'package.json')).text();
@@ -108,30 +85,31 @@ export async function checkDependencyOverrides(root: string): Promise<Array<stri
       overrides.set(name, field);
     }
   }
-  const entries = existsSync(path.join(root, page))
-    ? documentedOverrides(await Bun.file(path.join(root, page)).text())
-    : [];
+  const file = path.join(root, registry);
+  const entries: Array<Entry> = existsSync(file) ? (parse(await Bun.file(file).text()) ?? []) : [];
   for (const [name, field] of overrides) {
-    if (!entries.some((entry) => entry.name === name)) {
+    if (!entries.some((entry) => entry.package === name)) {
       errors.push(
-        `package.json: \`${field}.${name}\` has no heading in ${page}. Add "### \`${name}\`" under "${section}" with the reason.`,
+        `package.json: \`${field}.${name}\` has no entry in ${registry}. Add one with its reason and the event that removes it.`,
       );
     }
   }
   const seen = new Set<string>();
-  for (const entry of entries) {
-    if (seen.has(entry.name)) {
-      errors.push(`${page}:${entry.line}: \`${entry.name}\` has a second heading. Merge them.`);
+  for (const [index, entry] of entries.entries()) {
+    const name = entry.package ?? `[${index}]`;
+    if (seen.has(name)) {
+      errors.push(`${registry}: \`${name}\` has a second entry. Merge them.`);
     }
-    seen.add(entry.name);
-    if (!overrides.has(entry.name)) {
+    seen.add(name);
+    if (!overrides.has(name)) {
       errors.push(
-        `${page}:${entry.line}: \`${entry.name}\` is not in package.json overrides. Delete the stale section.`,
+        `${registry}: \`${name}\` is not in package.json overrides. Delete the stale entry.`,
       );
-    } else if (!entry.reason) {
-      errors.push(
-        `${page}:${entry.line}: \`${entry.name}\` has no reason. Say why the override exists and what removes it.`,
-      );
+    }
+    for (const field of ['reason', 'revisit'] as const) {
+      if (!entry[field]?.trim()) {
+        errors.push(`${registry}: \`${name}\` has no \`${field}\`. Add it.`);
+      }
     }
   }
   return errors;
@@ -143,7 +121,7 @@ if (import.meta.main) {
     console.error(
       [
         `Dependency override check failed (${errors.length}).`,
-        `Keep package.json overrides and ${page} in step.`,
+        `Keep package.json overrides and ${registry} in step.`,
         '',
         ...errors,
       ].join('\n'),

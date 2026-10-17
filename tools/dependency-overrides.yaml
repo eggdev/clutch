@@ -1,0 +1,21 @@
+# Each key in the root package.json `overrides`. An override hides the choice
+# from the package that asked for another version, so each one says why it
+# exists and the event that removes it. tools/check-dependency-overrides.ts
+# checks this file. See docs/contributing/setup/dependencies.md#overrides.
+#
+# Fields: package, reason (the advisory or bug it closes), revisit (the event
+#         that removes the override).
+#
+# Example:
+#
+# - package: esbuild
+#   reason: >-
+#     Pins 0.28.2, above GHSA-xxxx-xxxx-xxxx. Vite pulls in an older copy.
+#   revisit: Vite depends on esbuild 0.28.2 or later.
+
+- package: undici
+  reason: >-
+    Pins 7.29.1, above GHSA-w293-vg96-wgc3, GHSA-rfgv-xxqx-mfg5 and the other
+    advisories fixed in 7.29.1. Nx pins undici to exactly 7.29.0, so
+    `bun audit fix` cannot move it.
+  revisit: Nx depends on undici 7.29.1 or later.

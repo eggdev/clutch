@@ -58,8 +58,8 @@ test('workflows need a permissions block and never use pull_request_target', asy
   expect(await inRepo({ 'README.md': '' }, checkWorkflows)).toEqual([]);
 });
 
-test('overrides need a heading with a reason, and a heading for a removed override is stale', async () => {
-  const page = 'docs/contributing/setup/dependencies.md';
+test('each override needs an entry with a reason, and an entry for a removed override is stale', async () => {
+  const registry = 'tools/dependency-overrides.yaml';
   expect(
     await inRepo(
       {
@@ -67,32 +67,26 @@ test('overrides need a heading with a reason, and a heading for a removed overri
           overrides: { esbuild: '0.28.2', undocumented: '1.0.0', bare: '2.0.0' },
           resolutions: { 'left-pad': '1.3.0' },
         }),
-        [page]: [
-          '# Dependencies',
-          '## Overrides',
-          '### `esbuild` to `0.28.2`',
-          '',
-          'Floors esbuild above GHSA-xxxx. Remove it when vite ships 0.28.',
-          '### `left-pad`',
-          'Pins one copy.',
-          '### `bare`',
-          '',
-          '### `removed`',
-          'Was here once.',
-          '```md',
-          '### `undocumented`',
-          '```',
-          '## Audit',
-          '### `undocumented`',
-          'A heading outside the overrides section does not count.',
+        [registry]: [
+          '- package: esbuild',
+          '  reason: Floors esbuild above GHSA-xxxx.',
+          '  revisit: Vite ships 0.28.',
+          '- package: left-pad',
+          '  reason: Pins one copy.',
+          '  revisit: One copy remains.',
+          '- package: bare',
+          '- package: removed',
+          '  reason: Was here once.',
+          '  revisit: Never.',
         ].join('\n'),
       },
       checkDependencyOverrides,
     ),
   ).toEqual([
-    'package.json: `overrides.undocumented` has no heading in docs/contributing/setup/dependencies.md. Add "### `undocumented`" under "## Overrides" with the reason.',
-    `${page}:8: \`bare\` has no reason. Say why the override exists and what removes it.`,
-    `${page}:10: \`removed\` is not in package.json overrides. Delete the stale section.`,
+    `package.json: \`overrides.undocumented\` has no entry in ${registry}. Add one with its reason and the event that removes it.`,
+    `${registry}: \`bare\` has no \`reason\`. Add it.`,
+    `${registry}: \`bare\` has no \`revisit\`. Add it.`,
+    `${registry}: \`removed\` is not in package.json overrides. Delete the stale entry.`,
   ]);
   expect(await inRepo({ 'package.json': '{"name":"x"}' }, checkDependencyOverrides)).toEqual([]);
 });
@@ -110,6 +104,6 @@ test('package.json rejects a repeated key at any depth', async () => {
     ),
   ).toEqual([
     'package.json: `overrides.esbuild` repeats. JSON keeps only the last value. Delete one.',
-    'package.json: `overrides.esbuild` has no heading in docs/contributing/setup/dependencies.md. Add "### `esbuild`" under "## Overrides" with the reason.',
+    'package.json: `overrides.esbuild` has no entry in tools/dependency-overrides.yaml. Add one with its reason and the event that removes it.',
   ]);
 });
