@@ -16,6 +16,7 @@ a check in CI.
 | -------------------------------------------- | --------------------------- | ---------------------------------------------------- |
 | Input to next paint, for a local write       | 50 ms at p75                | End-to-end test with a trace                         |
 | Network requests before a warm screen paints | 0                           | End-to-end test with a warm store                    |
+| Longest main-thread task                     | 50 ms                       | End-to-end test with a trace                         |
 | JavaScript for the first screen, compressed  | 150 KB                      | Build output check                                   |
 | Largest contentful paint, cold visit         | 1.5 s at p75 on a mid phone | Lab run against each preview                         |
 | Largest contentful paint, warm visit         | 0.5 s at p75                | Lab run against each preview                         |
@@ -31,7 +32,7 @@ The [CSS lint](../setup/lint-rules.md#css) and the
 [Tailwind class lint](../setup/lint-rules.md#tailwind-classes) run the lint
 rules.
 
-<!-- kickoff: The file or target for each check that needs the app: the end-to-end trace, the warm-store test, the build output check and the lab run. Then the tracking issue for the weekly check against the live site. -->
+<!-- kickoff: The file or target for each check that needs the app: the end-to-end trace, the warm-store test, the warm-navigation test on a 300 ms network, the build output check and the lab run. Then the tracking issue for the weekly check against the live site. -->
 
 ## Rules
 
