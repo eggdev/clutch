@@ -1,8 +1,10 @@
 import { expect, test } from 'bun:test';
+import { chmod } from 'node:fs/promises';
+import path from 'node:path';
 
 import { runStage } from '@apps/cli/src/run-stage';
 import { fakeBin } from '@apps/cli/src/testing/fake-bin';
-import { gitRepo } from '@apps/cli/src/testing/git-repo';
+import { git, gitRepo } from '@apps/cli/src/testing/git-repo';
 
 const claude = { id: 'claude', label: 'Claude Code', bin: 'claude' };
 const codex = { id: 'codex', label: 'Codex', bin: 'codex' };
@@ -98,4 +100,26 @@ test('the Claude migration may delete files and fix them in place, and the surve
   }
   expect(migrate.args).not.toContain('Bash');
   expect(migrate.args.join(' ')).not.toContain('dangerously');
+});
+
+test('a stage commits past the Git hooks, because the gate passes only after the migration', async () => {
+  await using worktree = await gitRepo({ 'hooks/pre-commit': '#!/bin/sh\nexit 1\n' });
+  await chmod(path.join(worktree.root, 'hooks/pre-commit'), 0o755);
+  await git(worktree.root, 'config', 'core.hooksPath', 'hooks');
+  await using bin = await fakeBin(['claude'], {
+    run: 'git commit --allow-empty --quiet -m "Survey drafts"',
+  });
+  for (const stage of ['survey', 'interview', 'migrate'] as const) {
+    expect(
+      await runStage({
+        provider: claude,
+        stage,
+        worktree: worktree.root,
+        env: { ...process.env, PATH: `${bin.dir}:${process.env.PATH}` },
+      }),
+    ).toBe(0);
+  }
+  expect(await git(worktree.root, 'log', '--format=%s')).toStartWith(
+    'Survey drafts\nSurvey drafts\nSurvey drafts\n',
+  );
 });

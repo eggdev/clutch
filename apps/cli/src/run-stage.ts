@@ -82,6 +82,22 @@ function commandFor(provider: Provider, stage: RunnableStage) {
 }
 
 /**
+ * Adds `core.hooksPath=/dev/null` to the Git config of the agent's commands.
+ * The template's hooks run the gate, and the gate passes only after the
+ * migration, so each commit before that would fail. The migration ends with a
+ * full `validate`.
+ */
+function withoutGitHooks(env: Record<string, string | undefined>) {
+  const count = Number(env.GIT_CONFIG_COUNT ?? 0);
+  return {
+    ...env,
+    GIT_CONFIG_COUNT: String(count + 1),
+    [`GIT_CONFIG_KEY_${count}`]: 'core.hooksPath',
+    [`GIT_CONFIG_VALUE_${count}`]: '/dev/null',
+  };
+}
+
+/**
  * Runs one kickoff stage with the provider's CLI in the worktree. The
  * interview gets the terminal. An unattended stage writes each event line to
  * a log in the worktree's git folder, where no commit picks it up, and passes
@@ -94,7 +110,8 @@ export async function runStage(options: {
   env: Record<string, string | undefined>;
   onEvent?: (line: string) => void;
 }) {
-  const { provider, stage, worktree, env } = options;
+  const { provider, stage, worktree } = options;
+  const env = withoutGitHooks(options.env);
   const bin = Bun.which(provider.bin, { PATH: env.PATH ?? '' });
   if (!bin) {
     throw new Error(`${provider.bin} is not on PATH`);
