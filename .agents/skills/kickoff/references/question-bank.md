@@ -1,7 +1,12 @@
 # Kickoff question bank
 
 These questions produced the most value in past kickoffs. Each one asks for a
-decision. Show a draft answer with each question.
+decision. Show a draft answer with each question. Consult the
+[setup checklist](./setup-checklist.md) first: skip answered questions and
+questions for off or later capabilities. Ask follow-ups only for missing
+product details or conflicts with the journeys. Apply supported engineering
+defaults directly and derive facts from the repository. Questions phrased here
+as setup prompts do not require an owner interview when that resolves them.
 
 ## 1. Intent
 
@@ -36,9 +41,9 @@ decision. Show a draft answer with each question.
 
 ## 3. Services
 
-- Every resource belongs to a tenant, and signup creates a personal tenant.
-  Does the product show organizations or teams now, or later? What may each
-  role do?
+- When multi-tenancy is on, what is the tenant boundary? Does signup create
+  a personal tenant, or does a user join an organization? What may each role do?
+  When it is off, which user or application owns data and controls access?
 - Where does each fact live? One database for all tenants, or one for each
   tenant? Bring the cost of each at the expected scale.
 - Which sign-in methods does each user need now, and later?
@@ -71,8 +76,7 @@ decision. Show a draft answer with each question.
   table in `docs/contributing/architecture/api-errors.md`.
 - Which work runs in the background? What retries, and what tells the user?
 - What can a user export, in what format, and for how long is it kept?
-- Which capabilities does the MCP server expose to agents? The default is to
-  ship an MCP server. Which of its tools change data?
+- Which capabilities does the MCP server expose to agents? Ask only when MCP is on. Which of its tools change data?
 - Which ways can a request arrive: a browser, a token, a job, a webhook, an
   inbound message? Which of them have no person behind them?
 - Which actions must a live person take, never automation: members, roles,
@@ -83,6 +87,9 @@ decision. Show a draft answer with each question.
   deploy?
 
 ## 4. Harness
+
+Apply routine setup using the checklist reference. Use these prompts only for
+remaining gaps; do not re-ask platform choices or facts the code supplies.
 
 - Which platforms: web only, or native too? Default: web only, as a Vite
   single-page app. Propose Next only when public pages need server rendering
@@ -123,8 +130,10 @@ decision. Show a draft answer with each question.
 
 ## 5. Product edges
 
-Ask each one. When the owner does not know yet, add it to "Later, not now" in
-project intent and move on. Each answer has a default to propose.
+Ask only applicable questions not settled by the checklist. When the owner does not know yet, add it to "Later, not now" in
+project intent and move on. Apply security defaults directly for enabled
+capabilities; discuss product events, recipients and external service choices
+only when they remain unresolved.
 
 - Does the product need uptime monitoring? Default: a probe that runs outside
   the product's infrastructure and checks public endpoints only. It sends one

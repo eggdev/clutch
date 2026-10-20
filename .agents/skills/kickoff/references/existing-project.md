@@ -6,8 +6,9 @@ manifest and wrote `.template-install/findings.md`. The rules of the interview
 in [SKILL.md](../SKILL.md) apply. This page changes phase 0, adds a Reconcile
 phase after phase 4 and changes phase 5.
 
-The template is the default. A project convention stays only when the owner
-gives a reason, and each convention that stays gets a decision record.
+Retain established project choices unless a concrete requirement conflicts.
+Use template defaults for gaps. Record evidence and resolve actual conflicts;
+do not require the owner to justify compatible providers or conventions.
 
 ## Follow-up after a migration
 
@@ -18,19 +19,24 @@ to run the install CLI again.
 
 ## Phase 0: Read
 
-This replaces step 4 of phase 0 in SKILL.md:
+This replaces steps 4 and 5 of phase 0 in SKILL.md:
 
 1. Read the manifest, the findings and each draft. A draft is a slot whose
    text starts with `draft.`.
 2. Show the owner the survey in one short table: each validate target with its
    error count, the number of manifest entries to reconcile, and the number of
    violations.
-3. Start phase 1 with the first draft.
+3. Present the evidence-based [setup checklist](./setup-checklist.md) from the
+   survey. Let the owner accept or edit it in one reply. Distinguish current
+   behavior from requested changes; an off choice does not authorize removal
+   of existing behavior. Record changes as decisions for reconciliation.
+4. Start phase 1 with the first unresolved product draft.
 
 ## Phases 1 to 4
 
-For each slot with a draft, show the draft and ask what is wrong with it.
-Replace the comment and the draft with the text that the owner agrees to.
+Fill verified facts and compatible setup defaults directly, removing their
+slot comments. For unresolved product decisions, show the draft and ask what
+is wrong with it. Replace those comments when the owner agrees.
 
 When a phase reaches a page that a manifest entry lists in `destinations`,
 bring that part of the old content into the draft for the page.
@@ -45,7 +51,9 @@ For each entry:
 
 1. Show the project's version, the template's version, the survey summary and
    the recommendation.
-2. Ask the owner. "Agreed" accepts the recommendation.
+2. Resolve compatible keep/combine choices and routine defaults directly.
+   Ask the owner only when a conflict needs a product decision, changes
+   behavior or requires a tradeoff. "Agreed" accepts that recommendation.
 3. Write `resolution` (`template`, `combine` or `keep`) and a one-line `note`
    into the entry.
 4. For `combine` and `keep`, write a decision record from

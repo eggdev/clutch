@@ -18,6 +18,12 @@ mise install && mise exec -- bun install
 claude "/kickoff"     # or: codex "\$kickoff"
 ```
 
+Kickoff starts with a setup checklist for access, auth provider, tenancy, MCP
+and other capabilities, applies routine engineering defaults automatically, then focuses the interview
+on product decisions. Choices
+are saved in project intent. Existing projects get a checklist prefilled from
+the survey, with unknowns left open.
+
 ## The template's own infrastructure
 
 The template runs its own Nx remote cache (`project-template-nx-cache`). It

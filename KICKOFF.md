@@ -10,7 +10,11 @@ claude "/kickoff"
 codex "\$kickoff"
 ```
 
-Kickoff is one interview, one question at a time. It writes project intent,
+Kickoff starts with a setup checklist: app access, authentication and provider,
+multi-tenancy, MCP and other capabilities. Accept or edit these choices
+together, then discuss the product one question at a time. Routine engineering setup
+uses template defaults automatically. Existing projects
+start with choices inferred from their code. It writes project intent,
 the architecture pages, decision records and the primitives registry. Each open question is a `<!-- kickoff: … -->` slot in a
 doc. `mise exec -- bun tools/check-kickoff-slots.ts` lists the slots that are
 left.

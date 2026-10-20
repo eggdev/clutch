@@ -5,6 +5,10 @@
 Read this file before you make a product decision. When other docs or code
 conflict with it, this file states the intent.
 
+## Setup choices
+
+<!-- kickoff: Record the reviewed setup checklist from .agents/skills/kickoff/references/setup-checklist.md: app access, auth and provider, tenancy, capabilities and platforms. Preserve any named provider or deployment constraints. Record scope decisions, not implementation status. Link to owning architecture pages or decision records for details. -->
+
 ## Owner
 
 <!-- kickoff: The owner's name, and how an agent reaches them: where to ask a question, and which label or tag asks for approval. -->

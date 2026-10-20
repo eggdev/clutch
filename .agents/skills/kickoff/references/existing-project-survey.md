@@ -18,9 +18,9 @@ the session on decisions and corrections.
    - `mise exec -- bun run validate`
    - `mise exec -- bun tools/check-<name>.ts` for each check in `tools/`
 4. **Do not fix code.** The migration stage fixes code after the interview.
-5. **The template is the default.** Recommend the template in every draft and
-   every manifest entry. A project convention stays only when the owner gives
-   a reason in the interview.
+5. **Retain established choices.** Recommend keeping compatible project
+   conventions and providers. Use template defaults for gaps. Identify a
+   concrete conflict before recommending replacement.
 6. **Name the source of each fact:** a file, a commit or a vendor page. When
    you cannot read a vendor page, write the vendor question into the draft.
 
@@ -52,6 +52,12 @@ Read the project before you write anything:
 
 ### 2. Draft the slots
 
+First draft the [setup checklist](./setup-checklist.md) in project intent
+from the inventory. Cite source paths for inferred choices. Mark unknowns
+undecided; absence of evidence is not an off choice. Keep its kickoff slot
+until the owner reviews it. Existing capabilities take precedence over
+new-project suggestions.
+
 Run `mise exec -- bun tools/check-kickoff-slots.ts` for the list. Work through
 the phases in [SKILL.md](../SKILL.md) in order, and use the
 [question bank](./question-bank.md). For each slot, write a draft from what the
@@ -65,8 +71,11 @@ Orders never change after payment. A refund is a new order that points to the
 original. Source: `src/orders/refund.ts`.
 ```
 
-The interview deletes the comment when the owner agrees. Leave a slot as it is
-when the project gives no evidence for it.
+For verified facts and routine defaults, identify the source and proposed
+automatic setup in the draft rather than inventing an owner question. The
+interview can resolve those directly. Product decisions stay open until the
+owner agrees. Leave unknowns explicit when neither evidence nor a supported
+default resolves them.
 
 Draft the registry in `docs/contributing/architecture/primitives.yaml`: one
 entry for each app and package. Run `mise exec -- bun tools/check-primitives.ts`
@@ -81,10 +90,10 @@ entry in `conflicts`:
 - `recommendation`: `template`, `combine` or `keep`
 - `reason`: why, with the source
 
-Recommend `template` unless the project's version does something that the
-template does not. Then recommend `combine`: the template's version, with the
-project's part added to it. Recommend `keep` only when the template's version
-would break the product.
+Recommend `keep` for an established choice that satisfies the required checks
+and principles, `combine` when template setup can fill a gap while preserving
+it, and `template` when there is no established choice or a concrete conflict
+requires replacement. Describe the conflict and any behavior change explicitly.
 
 For each replaced doc or agent instruction file, also add `destinations`: a
 list of the parts of the old content, each with the template page that owns

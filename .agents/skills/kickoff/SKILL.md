@@ -1,6 +1,6 @@
 ---
 name: kickoff
-description: Define a new project from the template in one grilling session with the owner. Interviews one question at a time about intent, users, journeys, services and the harness, then writes project intent, architecture pages, decision records and the primitives registry. Use when KICKOFF.md exists, or when the user says kickoff, define the project, or start a new project.
+description: Onboard new or existing projects with an upfront setup checklist, then a focused product interview. Writes project intent, architecture pages, decision records and the primitives registry. Use when KICKOFF.md exists, or when the user says kickoff, define the project, or start a new project.
 ---
 
 # Kickoff
@@ -18,11 +18,15 @@ mise exec -- bun tools/check-kickoff-slots.ts
 
 ## Rules of the interview
 
-1. **One question at a time.** Number each question. Never ask two.
-2. **No multiple choice.** Do not use a question tool with options. Ask in
-   prose. The owner answers in their own words.
-3. **Draft first.** Show your full draft of the section, then ask what is
-   wrong with it. A correction is faster than an answer from nothing.
+1. **Checklist first.** Collect capability choices together using
+   [the setup checklist](./references/setup-checklist.md). Options and toggles
+   are welcome here.
+2. **Then one product question at a time.** Number each question. Ask in prose
+   and let the owner answer in their own words. Skip settled checklist choices;
+   ask only about missing detail or a concrete conflict.
+3. **Automate routine setup.** Follow the split in the checklist reference.
+   Fill facts from evidence and apply supported defaults without confirmation.
+   For product decisions, show a draft before asking what is wrong with it.
 4. **Look up facts. Ask for decisions.** Before you ask, read the code, the
    docs and the vendor pages. Bring the price, the deploy model and the local
    test runtime with each vendor proposal. Never ask the owner for a fact you
@@ -31,8 +35,8 @@ mise exec -- bun tools/check-kickoff-slots.ts
    question that the owner can answer with "agreed".
 6. **Start each turn with what you recorded.** One line: the decision and the
    file it went into. Then the next question.
-7. **Write as you go.** Write each section into its file as soon as the owner
-   agrees. Do not hold answers until the end.
+7. **Write as you go.** Write defaults and verified facts directly. Write product
+   decisions as soon as the owner agrees. Do not hold answers until the end.
 8. **"Not yet" is an answer.** When the owner defers a topic, add it to "Later,
    not now" in project intent, and move on.
 9. **No loopholes in your drafts.** Do not propose exceptions, phases, a
@@ -62,8 +66,8 @@ changes phase 0, adds a Reconcile phase and changes phase 5.
 
 ## Phases
 
-Do the phases in order. Intent comes first: every later answer depends on who
-the users are.
+Do the phases in order. Capture setup choices before the product interview;
+use the product intent and journeys to refine only choices they put in doubt.
 
 ### 0. Read
 
@@ -72,7 +76,9 @@ the users are.
 2. Read `git config user.name`. That is the owner unless they say otherwise.
 3. If the repository has code beyond the template, survey it. Draft from the
    code, and ask only what the code cannot answer.
-4. Ask one open question: "Tell me what you want to build. Who is it for,
+4. Present and record [the setup checklist](./references/setup-checklist.md).
+   Resume from recorded answers instead of presenting a blank form.
+5. Ask one open question: "Tell me what you want to build. Who is it for,
    what do they do with it, and why now? Say as much as you like." Let the
    owner talk. Then start the grilling.
 
@@ -108,11 +114,14 @@ real rules, the product entries in
 `docs/contributing/architecture/primitives.yaml`, and a decision record for
 each no.
 
-For each capability from phase 2 (sign-in, data storage, sync, files, email,
-payments, AI, jobs, search, analytics), research two or three vendors first.
+Use the checklist to select capabilities from phase 2. Skip off and later
+capabilities. Keep a chosen provider unless a concrete requirement conflicts;
+research two or three vendors only where a provider choice is still open.
 Then propose one with its owner module, its kind (service or domain), its
-price at the owner's expected scale, and its local test runtime. Ask about the
-tenancy and storage topology before the rest, because they are one-way doors.
+price at the owner's expected scale, and its local test runtime. Resolve missing
+tenancy and storage details before the rest, because they are one-way doors.
+Apply the checklist scope to template architecture prose as well as slots;
+do not leave claims about disabled capabilities in the finished docs.
 
 Write the registry entries as the owner agrees to each part:
 
@@ -139,20 +148,22 @@ Output: the slots in `docs/contributing/setup/`, `docs/contributing/testing.md`,
 `docs/contributing/operations/`, `docs/contributing/architecture/styling.md`,
 and `.github/workflows/ci.yml`.
 
-Ask about the platforms, the framework, the theme and the deploy target, environments (the default is
-a preview for each PR and production on merge), seed data, user-facing
-languages, test runners, and which CI steps the journeys need. Then walk the
-security and operations pages: the security rules, the accepted risks, the
-secret inventory, the operator accounts and the rollback commands.
+Apply the [automatic defaults](./references/setup-checklist.md#apply-automatic-defaults)
+for the selected capabilities. Derive configuration, seed data, test coverage,
+secret inventories and rollback commands from the code and agreed journeys.
+Retain compatible existing framework, provider and deployment choices. Record
+the results in the owning pages without asking the owner to approve each one.
 
-Then ask the product edge questions in section 5 of the question bank:
-uptime, operator alerts, API tokens, inbound webhooks and repository access.
-Write each answer to the page that owns it.
+Ask only for unresolved product requirements: theme, languages, accepted
+security risks, support access, recovery needs and alert recipients. Use
+sections 4 and 5 of the question bank as prompts for gaps, not a mandatory
+interview. Known facts and applicable engineering defaults are work to do.
 
 Set up the project's own Nx remote cache. Each project has its own worker and
 R2 bucket, so one repository never reads another's cache:
 
-1. Ask which Cloudflare account hosts it.
+1. Use the configured Cloudflare account, or ask when the account is unknown
+   or ambiguous.
 2. Rename the worker and its bucket to `<project>-nx-cache` in
    `apps/nx-cache/wrangler.jsonc` and `docs/contributing/setup/nx.md`.
 3. Walk the owner through "Set up the cache" in `docs/contributing/setup/nx.md`.
@@ -166,6 +177,6 @@ R2 bucket, so one repository never reads another's cache:
    `README.md` for the product. Rename the root project in `package.json`.
 2. Delete `KICKOFF.md` and its line in `AGENTS.md`.
 3. Run `mise exec -- bun run validate`. The slot check is strict now. Each
-   slot left belongs to a phase: ask its question, or delete the slot when the
-   project has no such content.
+   slot left belongs to a phase: fill it from evidence or a supported default,
+   ask an unresolved product question, or delete it when inapplicable.
 4. Commit: `Define <project>: intent and architecture`.
