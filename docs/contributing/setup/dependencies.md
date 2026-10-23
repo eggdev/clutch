@@ -74,3 +74,10 @@ the override when Vite depends on 0.28.2 or later.
 
 Say why the override exists, the advisory or bug it closes, and the event that
 lets you remove it.
+
+### `undici` to `7.29.1`
+
+Floors undici above GHSA-w293-vg96-wgc3, GHSA-rfgv-xxqx-mfg5 and the other
+advisories fixed in 7.29.1. Nx pins undici to exactly 7.29.0, so
+`bun audit fix` cannot move it. Remove the override when Nx depends on 7.29.1
+or later.

@@ -21,23 +21,26 @@
   "devDependencies": {
     "@clack/prompts": "^1.8.1",
     "@cloudflare/workers-types": "5.20261001.1",
-    "@nx/js": "23.2.1",
-    "@nx/oxlint": "23.2.1",
+    "@nx/js": "23.3.0",
+    "@nx/oxlint": "23.3.0",
     "@types/bun": "^1.4.2",
     "@types/node": "^22.0.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "knip": "6.39.0",
     "lint-staged": "17.6.0",
-    "nx": "23.2.1",
-    "oxfmt": "^0.60.0",
+    "nx": "23.3.0",
+    "oxfmt": "^0.74.0",
     "oxlint": "^1.75.0",
     "stylelint": "17.16.0",
     "stylelint-high-performance-animation": "2.0.0",
     "tslib": "^2.3.0",
     "typescript": "~6.0.3",
     "ultracite": "7.12.2",
-    "wrangler": "4.146.0",
+    "wrangler": "4.152.0",
     "yaml": "2.9.1"
+  },
+  "overrides": {
+    "undici": "7.29.1"
   },
   "packageManager": "bun@1.4.2",
   "nx": {
