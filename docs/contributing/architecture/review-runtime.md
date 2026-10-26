@@ -45,9 +45,11 @@ The committed source list is review.files.yaml. The known legacy checksums in
 review-baseline.json allow unchanged prior template tooling to migrate without
 fetching old history. .review/tooling.json records the installed generation and
 hashes. Changed custom files stop the entire preflight; no force overwrite or
-automatic stash is provided. File writes are atomic and interrupted updates
-converge when repeated with the same source. This is not a filesystem transaction
-against a concurrent writer; installation requires an idle, clean checkout.
+automatic stash is provided. Individual file writes are atomic. An interrupted
+install can leave uncommitted files: inspect and commit or stash that partial
+state before retrying the same source. Already matching files are accepted on
+retry. This is not a filesystem transaction against a concurrent writer;
+installation requires an idle, clean checkout.
 
 The full template installer includes the shared tooling and hands off to kickoff.
 Review-only install preserves product docs, package manager, scripts and the

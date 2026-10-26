@@ -37,9 +37,17 @@ The external bundle verified both original branch refs and complete history.
 It is private local evidence; its history is not an ancestor of the public migration.
 Installer behavior tests cover fresh/repeat/update, conflict-before-write,
 legacy retirement, read-only/dirty work, symlink parents, partial convergence,
-and exclusion of the source-only executor. Final propagation and gate pending.
+and exclusion of the source-only executor. Full validate passed all 33 tasks.
+The template verify doctor and session-queue, review-tools and installer flows
+passed with retained receipts. Actual CLI propagation from e513ffe installed
+26 shared files, verified every hash, preserved project verify and target HEAD,
+repeated unchanged and rejected customization without writes.
+
+Interrupted installation requires inspecting and committing or stashing the
+partial checkout before retry; clean-tree protection remains in force.
 
 ## Resume
 
-Finish source verification/docs, run validation and committed-source propagation,
-publish the branch/PR, then remove the superseded remote within owner authorization.
+Local implementation and verification are complete. Publish the branch/PR,
+then remove the superseded remote within owner authorization. No service or
+driver integration has been activated.
