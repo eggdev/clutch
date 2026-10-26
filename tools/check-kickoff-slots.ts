@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { parseArgs } from 'node:util';
 
 import { blankFences, listDocs, maskInlineCode, readDoc } from '@tools/docs-files';
 
@@ -35,8 +36,24 @@ export async function checkKickoffSlots(
 }
 
 if (import.meta.main) {
+  const { values } = parseArgs({
+    options: { list: { type: 'boolean' }, json: { type: 'boolean' } },
+  });
   const { pending, slots } = await checkKickoffSlots(process.cwd());
-  if (pending) {
+  if (values.json) {
+    console.log(JSON.stringify({ schemaVersion: 1, pending, slots }));
+    if (!pending && slots.length) {
+      process.exitCode = 1;
+    }
+  } else if (values.list) {
+    console.log(
+      slots.map((s) => `${s.file}:${s.line}: ${s.text}`).join('\n') ||
+        'Docs have no kickoff slots.',
+    );
+    if (!pending && slots.length) {
+      process.exitCode = 1;
+    }
+  } else if (pending) {
     console.log(`Kickoff has not run. ${slots.length} slots wait for it. See KICKOFF.md.`);
   } else if (slots.length) {
     console.error(

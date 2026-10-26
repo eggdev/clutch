@@ -6,16 +6,17 @@ manifest and wrote `.template-install/findings.md`. The rules of the interview
 in [SKILL.md](../SKILL.md) apply. This page changes phase 0, adds a Reconcile
 phase after phase 4 and changes phase 5.
 
-Retain established project choices unless a concrete requirement conflicts.
-Use template defaults for gaps. Record evidence and resolve actual conflicts;
-do not require the owner to justify compatible providers or conventions.
+[Keep what works](../SKILL.md#rules-of-the-interview) matters most on this
+page. Use a template default only where the project has no choice of its own.
+Do not ask the owner to defend a provider or convention that works.
 
 ## Follow-up after a migration
 
 When the findings have a section **Migration: open**, the migration stopped on
 items that need the owner. Walk only those items. Record each decision as the
-Reconcile phase does. Then set `stage` to `migrate`, commit, and tell the owner
-to run the install CLI again.
+Reconcile phase does. Then set `stage` to `migrate` and commit. When the
+owner asked to finish kickoff, continue the migration in this session.
+Otherwise tell them to run the kickoff skill again when they are ready.
 
 ## Phase 0: Read
 
@@ -26,17 +27,18 @@ This replaces steps 4 and 5 of phase 0 in SKILL.md:
 2. Show the owner the survey in one short table: each validate target with its
    error count, the number of manifest entries to reconcile, and the number of
    violations.
-3. Present the evidence-based [setup checklist](./setup-checklist.md) from the
-   survey. Let the owner accept or edit it in one reply. Distinguish current
-   behavior from requested changes; an off choice does not authorize removal
-   of existing behavior. Record changes as decisions for reconciliation.
+3. Show the [setup checklist](./setup-checklist.md) that the survey filled
+   from evidence. The owner accepts or edits it in one reply. Keep what the
+   project does now apart from what the owner asks to change. An off choice
+   never removes existing behavior. Record each change as a decision for the
+   Reconcile phase.
 4. Start phase 1 with the first unresolved product draft.
 
 ## Phases 1 to 4
 
-Fill verified facts and compatible setup defaults directly, removing their
-slot comments. For unresolved product decisions, show the draft and ask what
-is wrong with it. Replace those comments when the owner agrees.
+Write verified facts and defaults that fit the project directly, and delete
+their slot comments. For an open product decision, show the draft and ask
+what is wrong with it. Delete that slot comment when the owner agrees.
 
 When a phase reaches a page that a manifest entry lists in `destinations`,
 bring that part of the old content into the draft for the page.
@@ -51,9 +53,9 @@ For each entry:
 
 1. Show the project's version, the template's version, the survey summary and
    the recommendation.
-2. Resolve compatible keep/combine choices and routine defaults directly.
-   Ask the owner only when a conflict needs a product decision, changes
-   behavior or requires a tradeoff. "Agreed" accepts that recommendation.
+2. Resolve `keep` and `combine` yourself when they fit the project. Ask the
+   owner only when the entry changes behavior, needs a product decision or
+   trades one cost for another. "Agreed" accepts the recommendation.
 3. Write `resolution` (`template`, `combine` or `keep`) and a one-line `note`
    into the entry.
 4. For `combine` and `keep`, write a decision record from
@@ -73,7 +75,7 @@ Rules for the common entries:
   them to the template's model.
 - **Violations.** Show the list from the findings, and ask once if you may
   file them. File each one as the audit skill does, in
-  [its format](../../audit/SKILL.md#each-finding).
+  [its format](../../audit-codebase/SKILL.md#record-each-finding).
 
 ## Close
 
@@ -86,4 +88,5 @@ This replaces phase 5 in SKILL.md:
 4. Do not run `validate`. The migration makes it pass.
 5. Set `stage` in the manifest to `migrate`. Commit:
    `Define <project>: intent and architecture`.
-6. Tell the owner to run the install CLI again to start the migration.
+6. Continue to the migration in this session. When the session ends, the
+   owner runs the kickoff skill again in the project, with any agent.

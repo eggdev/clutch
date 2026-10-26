@@ -28,8 +28,13 @@ command:
 4. Stops early with a fix hint when it finds a known misconfiguration, such as
    a missing environment variable.
 
-UI checks open that URL in a browser. They never read a rendered string in
-place of the page.
+The workflow also exposes status, logs and stop for this task's stack. A stop
+never shuts down another task. Document process ownership and restart behavior
+so a replacement session can restore the same review environment.
+
+UI checks use the real browser or native app. They never read a rendered
+string in place of the interface. Follow [verification setup](./verification.md)
+for platform access and criterion evidence.
 
 ## Configuration
 

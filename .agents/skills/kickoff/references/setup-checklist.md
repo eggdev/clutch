@@ -1,51 +1,52 @@
 # Setup checklist
 
-Use this before the product interview for both new and existing projects.
-It captures scope decisions in one pass so the interview can focus on users
-and journeys. These are onboarding choices, not runtime feature flags.
+Use this page before the product interview, for new and existing projects.
+The checklist records scope in one pass. The interview can then stay on users
+and journeys. These are scope choices. They are not runtime feature flags.
 
 ## Three kinds of setup
 
-- **Capability checklist:** choices that change the product's scope. Collect
-  these together before the interview.
-- **Automatic defaults:** apply established template engineering rules and
-  derive configuration from selected capabilities and repository evidence.
-  Report what you applied without asking the owner to approve each detail.
-- **Product conversation:** ask about behavior, business constraints and
-  tradeoffs that the code and defaults cannot decide, one question at a time.
+- **Capability checklist.** Choices that change the scope of the product.
+  Collect them together, before the interview.
+- **Automatic defaults.** Template rules and configuration that follow from
+  the chosen capabilities and the repository. Apply them, then report what you
+  applied. Do not ask the owner to approve each one.
+- **Product conversation.** Behavior, business limits and tradeoffs that the
+  code and the defaults cannot decide. Ask one question at a time.
 
-A slot is not automatically a question for the owner. Fill facts from evidence
-and routine setup from defaults. Ask only for a decision that remains open.
+A slot is not always a question for the owner. Fill a fact from evidence and
+routine setup from a default. Ask only about a decision that is still open.
 
 ## Present it
 
-Read recorded choices in project intent first. For an existing project,
-prefill from the survey and cite a source file for each inferred answer.
-Keep an inference visibly separate from an owner decision. Missing code does
-not prove a capability is unwanted. For a new project, use the suggestions
-below, labelled as proposals until the owner accepts them.
+Read the choices already in project intent first. For an existing project,
+fill the checklist from the survey and cite a source file for each inferred
+answer. Mark an inference as an inference until the owner confirms it. Code
+that is missing does not prove that the owner does not want a capability. For
+a new project, show the proposals below as proposals.
 
-Present one compact checklist with choices, not a sequence of questions.
-Use a form with toggles when the host supports it; otherwise use a Markdown
-table the owner can edit in one reply. Do not require a particular UI tool.
-Offer: “Accept these choices or list changes; undecided is fine.”
+Show one short checklist, not a series of questions. Use a form with toggles
+when the host has one. Otherwise use a Markdown table that the owner can edit
+in one reply. Close with: "Accept these choices or list changes. Undecided is
+fine."
 
 Each capability has four choices:
 
-- **On:** include it in scope and ask only for missing design details.
-- **Off:** exclude it; skip its vendor research and interview questions.
-- **Later:** exclude it from current scope and record it in “Later, not now”.
-- **Undecided:** resolve it when a journey needs it, before a dependent design.
+- **On:** in scope. Ask only for design details that are missing.
+- **Off:** out of scope. Skip its vendor research and its questions.
+- **Later:** out of scope now. Add it to "Later, not now".
+- **Undecided:** decide it when a journey needs it, before a design that
+  depends on it.
 
-An omitted answer stays undecided unless the owner accepts the proposed
-checklist as a whole. Do not treat silence as acceptance.
+A choice the owner does not answer stays undecided, unless the owner accepts
+the whole checklist. Silence is not acceptance.
 
 ## Choices
 
 | Choice | Options | New-project proposal |
 | --- | --- | --- |
 | App access | Public without sign-in / private / mixed public and private | Undecided |
-| Authentication | On / off / later / undecided; when on, name a provider or “recommend one” and known sign-in methods | Undecided |
+| Authentication | On / off / later / undecided; when on, name a provider or "recommend one" and known sign-in methods | Undecided |
 | Multi-tenancy | On / off / later / undecided; when on, personal accounts, organizations or both | Off |
 | MCP server | On / off / later / undecided | Off |
 | Third-party API and API tokens | On / off / later / undecided | Off |
@@ -61,98 +62,114 @@ checklist as a whole. Do not treat silence as acceptance.
 | Platforms | Web / native / both / other | Web |
 | Repository access | Private / public; outside contributions yes / no | Private; no outside contributions |
 
-Add a capability when the owner's brief calls for it. Do not turn engineering
-quality rules such as validation, accessibility, authorization or performance
-into optional features. Local-first interface rules still apply when shared
-realtime sync is off; do not add a sync vendor merely to satisfy a checklist.
+Add a capability when the owner's brief calls for it. Validation,
+accessibility, authorization and performance are quality rules. They are never
+optional capabilities. The local-first interface rules apply when shared
+realtime sync is off. Do not add a sync vendor to fill a checklist row.
 
 ## Apply automatic defaults
 
-Preserve named providers, frameworks, hosting and other constraints from the
-brief or repository. Do not add a required checklist field for each one. For
-new projects, use the template default where it fits; investigate and ask only
-when there is no supported default or a concrete conflict.
+Keep each provider, framework, host and constraint that the brief or the
+repository names. See [keep what works](../SKILL.md#rules-of-the-interview).
+Do not add a checklist row for each one. In a new project, use the template
+default where it fits. Research and ask only when no default fits or a
+requirement conflicts with it.
 
-Apply these during the phase that owns the work:
+Apply these in the phase that owns the work:
 
-- Keep the validation gate, linting, formatting, type checks and security and
-  performance rules. Derive extra checks and test coverage from the journeys.
-- Use the framework default in the question bank for the chosen platform.
-  Retain a compatible framework and test runners in an existing project.
-- Configure PR previews where the host supports them and production on merge
-  for new projects. Retain an existing deployment pipeline; ask about staging
-  only when a release requirement calls for it.
-- Apply the standard API error shape, request context and authorization
-  mechanisms to selected surfaces. Adapt them to the actual access model.
-- Derive seed fixtures from agreed journeys and roles, environment variable
-  schemas from integrations, and secret inventories from configuration. Never
-  put secret values in docs.
-- Draft health checks, rollback instructions and operational runbooks from the
-  selected deployment. Reuse existing error tracking; prepare integration
-  configuration when a provider is settled. Missing provider, account or alert
-  recipient choices remain explicit rather than being invented.
-- When tokens or webhooks are on, apply their security defaults in the question
-  bank without a separate interview about each safeguard.
+- Keep the validation gate, lint, format, type checks, and the security and
+  performance rules. Add checks and test coverage from the journeys.
+- Use the framework default in the question bank for the chosen platform. In
+  an existing project, keep a framework and test runners that work.
+- In a new project, set up PR previews where the host supports them, and a
+  production deploy on merge. In an existing project, keep the deploy pipeline.
+  Ask about staging only when a release requirement needs it.
+- Apply the standard API error shape, request context and authorization to the
+  chosen surfaces. Fit them to the real access model.
+- Derive seed fixtures from the journeys and roles, environment variable
+  schemas from the integrations, and the secret inventory from configuration.
+  Never put a secret value in a doc.
+- Derive delivery verification from the selected platforms: complete-stack
+  commands, test accounts, platform launch and old-data fixtures. Fill
+  [verification setup](../../../../docs/contributing/setup/verification.md)
+  with commands or links to their owning pages and verify the available paths.
+- Draft health checks, rollback steps and runbooks from the chosen deploy.
+  Keep existing error tracking. Write the integration configuration when the
+  provider is settled. When a provider, account or alert recipient is not
+  chosen, write it as an open question. Do not invent one.
+- When API tokens or webhooks are on, apply their security defaults from the
+  question bank. Do not interview the owner about each safeguard.
 
-Automatic setup does not select paid services, create external accounts or
-publish deployments without authorization. Complete local configuration and
-identify any specific prerequisite that prevents activation. Do not describe
-an integration as working until it has been verified.
+Automatic setup never chooses a paid service, creates an external account or
+publishes a deploy without the owner's approval. Finish the local
+configuration, and name the prerequisite that blocks activation. Do not call
+an integration working until you have verified it.
 
-## Keep product questions conversational
+## Product questions
 
-Use journeys to discuss roles and invitations, tenant boundaries, sensitive
-data, retention and restore windows, customer exports, support access,
-recovery needs, languages and currencies. Ask only about applicable topics
-whose answers are not already recorded. Engineering defaults implement these
-decisions; they do not decide customer promises or accepted risks.
+Use the journeys to ask about roles and invitations, tenant boundaries,
+sensitive data, retention and restore windows, customer exports, support
+access, recovery, languages and currencies. Skip a topic that does not apply
+or that project intent already answers. Defaults implement these decisions.
+They do not make customer promises or accept risks for the owner.
 
-For example, auth on with a named provider routes to sign-in integration and
-standard session handling automatically; who can invite members remains a
-product question. MCP off skips its transport, tools and vendor research.
-An existing deployment pipeline is retained unless a documented requirement
-conflicts; its presence does not trigger a fresh hosting interview.
+Examples:
+
+- Auth is on with a named provider. Set up its sign-in and the standard
+  session handling. Who can invite members is still a product question.
+- MCP is off. Skip its transport, its tools and its vendor research.
+- The project has a deploy pipeline. Keep it. Do not open a hosting interview
+  unless a written requirement conflicts with it.
 
 ## Record and use it
 
-Save reviewed choices under **Setup choices** in
-`docs/contributing/project-intent.md`: one row per choice with the selection
-and any provider or constraint. Link to the owning architecture page or
-decision record as details are settled. Keep provider details in that owning
-page rather than maintaining two copies. This records intent, not a list of
-what is implemented. Use normal kickoff slots for unresolved decisions so a
-later session can resume. Do not duplicate the table in the install manifest.
+Write the reviewed choices under **Setup choices** in
+`docs/contributing/project-intent.md`: one row for each choice, with the
+selection and any provider or constraint. Provider details live in the owning
+architecture page or decision record. The row links to it. The table records
+scope. It is not a list of what is built. Keep a kickoff slot for each open
+decision, so that a later session can resume. Do not copy the table into the
+install manifest.
 
-Check dependencies before drafting a design. Private access needs an access
-boundary, which may be app authentication or an existing infrastructure gate.
-Public access does not imply auth is off: a public app may have private account
-areas. Multi-tenancy needs isolation and an actor/access model. MCP does not
-automatically require a separately published REST API. Ask only about actual
-conflicts, one at a time, and never silently turn another capability on.
+Check the dependencies between choices before you draft a design:
 
-Use on choices to route services and harness questions. A chosen provider
-does not need a second selection interview; verify facts when designing its
-integration. An off choice is already the answer, not a reason to pitch it
-again. Revisit a choice only when the owner requests it or a concrete journey
-conflicts, and explain that conflict.
+- Private access needs an access boundary: app sign-in or an existing
+  infrastructure gate.
+- Public access does not mean auth is off. A public app can have private
+  account areas.
+- Multi-tenancy needs isolation and a model of who acts and what they can
+  reach.
+- MCP does not need a separate published REST API.
 
-During kickoff, adapt project architecture pages to the chosen scope,
-including prose outside kickoff slots. For example, tenancy off removes
-assumed personal tenants and membership roles from request context,
-authorization and storage; describe the actual ownership and access boundary.
-It does not remove access checks. MCP off means no MCP package, transport or
-tools. Replace an unused architecture page with a short scope statement linked
-to the choice, or delete it and update all inbound links. Apply the same rule
-to user docs, registry entries, seed data and operational instructions. Keep
-universal engineering principles unchanged; tenant isolation rules apply when
-tenant data exists and do not require inventing tenants for a public app.
+Ask about a real conflict, one at a time. Never turn another capability on
+without asking.
 
-For existing projects, keep evidence of current behavior in architecture docs.
-A requested change belongs in a decision record and the reconciliation flow;
-the checklist alone does not authorize deleting features, migrating data or
-claiming the code already matches the desired scope. Migration must still
-follow its rule against changing behavior without an owner decision.
+Use the on choices to route the services and harness questions. A chosen
+provider needs no second selection interview. Check its facts when you design
+the integration. Off is an answer. Do not propose an off capability again.
+Open a choice again only when the owner asks, or when a journey conflicts with
+it. Name the conflict.
 
-Before close, resolve undecided choices needed by current journeys. Move
-explicit deferrals to “Later, not now”; do not silently convert them to off.
-On a resumed kickoff, use saved answers and ask only what remains open.
+Fit the architecture pages to the chosen scope, including prose outside the
+slots:
+
+- Tenancy off removes personal tenants and membership roles from request
+  context, authorization and storage. Describe the real owner of the data and
+  the access boundary. Access checks stay.
+- MCP off means no MCP package, transport or tools.
+- For a page that does not apply, replace it with a short scope statement that
+  links to the choice. Or delete it and fix each link to it.
+
+Apply the same rule to the user docs, registry entries, seed data and
+operations pages. The principles do not change. Tenant isolation applies when
+tenant data exists. It does not require tenants in a public app.
+
+In an existing project, the architecture pages describe the current behavior.
+A change the owner asks for goes into a decision record and the Reconcile
+phase. The checklist alone never permits you to delete a feature, migrate
+data or claim that the code matches the new scope. The migration still does
+not change behavior without an owner decision.
+
+Before close, decide each undecided choice that a current journey needs. Move
+each deferral to "Later, not now". Do not turn a deferral into off. When
+kickoff resumes, use the saved answers and ask only what is still open.

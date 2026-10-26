@@ -22,7 +22,7 @@ async function existing(root: string) {
   return detection;
 }
 
-test('the install copies the files into a worktree on a new branch from the default branch, and leaves the checkout alone', async () => {
+test('the install switches the checkout to a new branch from the default branch, and copies the files there', async () => {
   await using template = await gitRepo({
     'template.files.yaml': copyList,
     'AGENTS.md': '# Template agents\n',
@@ -43,18 +43,16 @@ test('the install copies the files into a worktree on a new branch from the defa
     template: template.root,
   });
 
-  const worktree = path.join(project.parent, 'shop-template-install');
-  expect(result.worktree).toBe(worktree);
-  expect(await git(worktree, 'branch', '--show-current')).toBe('template/install');
-  expect(await git(worktree, 'log', '--format=%s')).toBe(
+  expect(await git(project.root, 'branch', '--show-current')).toBe('template/install');
+  expect(await git(project.root, 'log', '--format=%s')).toBe(
     'Install template: copy files\nInitial commit',
   );
-  expect(await git(worktree, 'ls-files')).toBe(
+  expect(await git(project.root, 'ls-files')).toBe(
     ['.template-install/manifest.json', 'AGENTS.md', 'package.json', 'tools/check.ts'].join('\n'),
   );
-  expect(await readFile(path.join(worktree, 'AGENTS.md'), 'utf-8')).toBe('# Template agents\n');
+  expect(await readFile(path.join(project.root, 'AGENTS.md'), 'utf-8')).toBe('# Template agents\n');
   expect(
-    JSON.parse(await readFile(path.join(worktree, '.template-install/manifest.json'), 'utf-8')),
+    JSON.parse(await readFile(path.join(project.root, '.template-install/manifest.json'), 'utf-8')),
   ).toEqual({
     template: { commit: await git(template.root, 'rev-parse', 'HEAD') },
     base: { branch: 'main', commit: await git(project.root, 'rev-parse', 'main') },
@@ -65,8 +63,9 @@ test('the install copies the files into a worktree on a new branch from the defa
     ],
     conflicts: [],
   });
-  expect(await git(project.root, 'branch', '--show-current')).toBe('feat/rebuild');
+  expect(result.manifest.stage).toBe('survey');
   expect(await git(project.root, 'status', '--porcelain')).toBe('');
+  expect(await git(project.root, 'ls-files')).not.toContain('feature.ts');
 });
 
 test('package.json merges, and the manifest lists each clash for the interview', async () => {
@@ -83,18 +82,18 @@ test('package.json merges, and the manifest lists each clash for the interview',
     { name: 'shop' },
   );
 
-  const { worktree } = await installTemplate({
+  await installTemplate({
     project: await existing(project.root),
     template: template.root,
   });
 
-  expect(JSON.parse(await readFile(path.join(worktree, 'package.json'), 'utf-8'))).toEqual({
+  expect(JSON.parse(await readFile(path.join(project.root, 'package.json'), 'utf-8'))).toEqual({
     name: 'shop',
     packageManager: 'bun@1.4.2',
     scripts: { validate: 'nx run-many -t test' },
   });
   expect(
-    JSON.parse(await readFile(path.join(worktree, '.template-install/manifest.json'), 'utf-8')),
+    JSON.parse(await readFile(path.join(project.root, '.template-install/manifest.json'), 'utf-8')),
   ).toMatchObject({
     files: [{ path: 'package.json', action: 'merged' }],
     conflicts: [
@@ -108,7 +107,7 @@ test('package.json merges, and the manifest lists each clash for the interview',
   });
 });
 
-test('a project file in an add path stops the install before any branch or worktree exists', async () => {
+test('a project file in an add path stops the install before any branch exists', async () => {
   await using template = await gitRepo({
     'template.files.yaml': copyList,
     'AGENTS.md': '# Template agents\n',
@@ -134,9 +133,7 @@ test('a project file in an add path stops the install before any branch or workt
     ].join('\n'),
   );
   expect(await git(project.root, 'branch', '--list', 'template/install')).toBe('');
-  expect(await git(project.root, 'worktree', 'list', '--porcelain')).not.toContain(
-    'shop-template-install',
-  );
+  expect(await git(project.root, 'branch', '--show-current')).toBe('main');
 });
 
 test('skill symlinks stay symlinks, so Claude finds the skills that live in .agents', async () => {
@@ -151,17 +148,41 @@ test('skill symlinks stay symlinks, so Claude finds the skills that live in .age
   await git(template.root, 'commit', '--quiet', '--message', 'Link the skill');
   await using project = await gitRepo({ 'package.json': '{}' }, { name: 'shop' });
 
-  const { worktree } = await installTemplate({
+  await installTemplate({
     project: await existing(project.root),
     template: template.root,
   });
 
-  expect(await readlink(path.join(worktree, '.claude/skills/kickoff'))).toBe(
+  expect(await readlink(path.join(project.root, '.claude/skills/kickoff'))).toBe(
     '../../.agents/skills/kickoff',
   );
-  expect(await readFile(path.join(worktree, '.claude/skills/kickoff/SKILL.md'), 'utf-8')).toBe(
+  expect(await readFile(path.join(project.root, '.claude/skills/kickoff/SKILL.md'), 'utf-8')).toBe(
     '# Kickoff\n',
   );
+});
+
+test('full template install excludes source verify and preserves an existing project executor', async () => {
+  await using template = await gitRepo({
+    'template.files.yaml':
+      'exclude:\n  - .agents/skills/verify/\nfiles:\n  - path: .agents/skills/\n    rule: add\n',
+    '.agents/skills/verify/SKILL.md': 'Template-source proof\n',
+    '.agents/skills/setup-verification/SKILL.md': 'Author project proof\n',
+  });
+  await using project = await gitRepo({
+    'package.json': '{}',
+    '.agents/skills/verify/SKILL.md': 'Project assertions\n',
+  });
+  const { manifest } = await installTemplate({
+    project: await existing(project.root),
+    template: template.root,
+  });
+  expect(await readFile(path.join(project.root, '.agents/skills/verify/SKILL.md'), 'utf-8')).toBe(
+    'Project assertions\n',
+  );
+  expect(manifest.files.some((file) => file.path === '.agents/skills/verify/SKILL.md')).toBe(false);
+  expect(
+    await readFile(path.join(project.root, '.agents/skills/setup-verification/SKILL.md'), 'utf-8'),
+  ).toBe('Author project proof\n');
 });
 
 test('a copy list entry that matches no template file stops the install', async () => {
@@ -185,12 +206,12 @@ test(".gitignore merges: the project keeps its entries and gains the template's"
     { name: 'shop' },
   );
 
-  const { worktree, manifest } = await installTemplate({
+  const { manifest } = await installTemplate({
     project: await existing(project.root),
     template: template.root,
   });
 
-  expect(await readFile(path.join(worktree, '.gitignore'), 'utf-8')).toBe(
+  expect(await readFile(path.join(project.root, '.gitignore'), 'utf-8')).toBe(
     'node_modules\n.env\n\n# From the project template\n.nx/cache\n',
   );
   expect(manifest.files).toEqual([{ path: '.gitignore', action: 'merged' }]);
@@ -208,4 +229,83 @@ test("each entry in this template's copy list names tracked files", async () => 
     }
   }
   expect(untracked).toEqual([]);
+});
+
+test('the registry keeps only the primitives whose code the install copies', async () => {
+  const registry = [
+    '# The registry.',
+    'version: 1',
+    '',
+    'primitives:',
+    '  - id: repository-tools',
+    '    kind: tool',
+    '    code:',
+    '      - tools/',
+    '',
+    '  # The installer itself.',
+    '  - id: install-cli',
+    '    kind: app',
+    '    code:',
+    '      - apps/cli/',
+    '',
+    '  - id: shop-web',
+    '    kind: app',
+    '    code:',
+    '      - apps/web/',
+    '',
+  ].join('\n');
+  await using template = await gitRepo({
+    'template.files.yaml': `${copyList}  - path: docs/\n    rule: replace\n`,
+    'AGENTS.md': '# Template agents\n',
+    'tools/check.ts': 'export {};\n',
+    'apps/cli/main.ts': 'export {};\n',
+    'docs/contributing/architecture/primitives.yaml': registry,
+  });
+  await using project = await gitRepo(
+    { 'package.json': '{}', 'apps/web/index.ts': 'export {};\n' },
+    { name: 'shop' },
+  );
+
+  await installTemplate({ project: await existing(project.root), template: template.root });
+
+  expect(
+    await readFile(
+      path.join(project.root, 'docs/contributing/architecture/primitives.yaml'),
+      'utf-8',
+    ),
+  ).toBe(
+    [
+      '# The registry.',
+      'version: 1',
+      '',
+      'primitives:',
+      '  - id: repository-tools',
+      '    kind: tool',
+      '    code:',
+      '      - tools/',
+      '',
+      '  - id: shop-web',
+      '    kind: app',
+      '    code:',
+      '      - apps/web/',
+      '',
+    ].join('\n'),
+  );
+});
+
+test('the merged package.json is in the format that the template checks', async () => {
+  await using template = await gitRepo({
+    'template.files.yaml': 'files:\n  - path: package.json\n    rule: merge\n',
+    'package.json': JSON.stringify({ name: 'project-template', workspaces: ['apps/*'] }),
+  });
+  await using project = await gitRepo(
+    { 'package.json': JSON.stringify({ type: 'module', name: 'shop' }) },
+    { name: 'shop' },
+  );
+
+  await installTemplate({ project: await existing(project.root), template: template.root });
+
+  expect(await readFile(path.join(project.root, 'package.json'), 'utf-8')).toBe(
+    '{\n  "name": "shop",\n  "workspaces": [\n    "apps/*"\n  ],\n  "type": "module"\n}\n',
+  );
 });

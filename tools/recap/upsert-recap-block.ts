@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util';
 /**
  * Puts a system recap block into a PR description. It replaces the text
  * between the markers, or appends the block when the body has no markers. It
- * never edits text outside the markers. See .agents/skills/visual-recap/SKILL.md.
+ * never edits text outside the markers. See .agents/skills/pr-recap/SKILL.md.
  *
  * Usage: bun tools/recap/upsert-recap-block.ts <pr-number> <block-file>
  */

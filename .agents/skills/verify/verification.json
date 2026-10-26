@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "setup-verification",
+  "name": "project-template",
+  "stateDir": ".state/verification",
+  "limits": {
+    "logBytes": 2097152,
+    "artifactBytes": 16777216
+  },
+  "doctor": [
+    [
+      "git",
+      "rev-parse",
+      "--show-toplevel"
+    ],
+    [
+      "python3",
+      "--version"
+    ],
+    [
+      "mise",
+      "exec",
+      "--",
+      "bun",
+      "-e",
+      "import { Database } from 'bun:sqlite'; using db = new Database(':memory:'); console.log('Bun SQLite ready');"
+    ]
+  ],
+  "flows": {
+    "session-queue": {
+      "platform": "library",
+      "role": "trusted runtime controller with disposable SQLite",
+      "ownsStack": true,
+      "commands": [
+        [
+          "mise",
+          "exec",
+          "--",
+          "bun",
+          "test",
+          "packages/runtime"
+        ]
+      ]
+    },
+    "review-tools": {
+      "platform": "cli",
+      "role": "agent using disposable verification and issue fixtures",
+      "ownsStack": true,
+      "commands": [
+        [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tools/verification",
+          "-p",
+          "test_*.py",
+          "-v"
+        ],
+        [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          ".agents/skills/deliver-linear/scripts",
+          "-p",
+          "test_*.py",
+          "-v"
+        ]
+      ]
+    },
+    "installer": {
+      "platform": "cli",
+      "role": "agent installing tooling into disposable repositories",
+      "ownsStack": true,
+      "commands": [
+        [
+          "mise",
+          "exec",
+          "--",
+          "bun",
+          "test",
+          "apps/cli"
+        ]
+      ]
+    }
+  }
+}

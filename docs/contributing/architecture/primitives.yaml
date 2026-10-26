@@ -23,7 +23,7 @@
 # Kickoff adds the product primitives, and fills `layers` and `invariants`.
 #
 # Risk levels. A PR names the highest level that applies. See
-# .agents/skills/visual-recap/SKILL.md.
+# .agents/skills/pr-recap/SKILL.md.
 #   composes (low):   wires existing primitives together. Their behavior stays.
 #   extends (medium): changes the behavior or the interface of a primitive.
 #   adds (high):      adds, removes or reshapes a primitive. Update this file
@@ -36,6 +36,17 @@ groups:
     name: Repository
 
 primitives:
+  - id: review-runtime
+    group: repository
+    name: Review runtime
+    kind: service
+    summary: Central durable review-session queue, lease fencing and cleanup quarantine.
+    code:
+      - packages/runtime/
+    docs:
+      - packages/runtime/README.md
+      - docs/contributing/architecture/review-runtime.md
+
   - id: repository-tools
     group: repository
     name: Repository tools

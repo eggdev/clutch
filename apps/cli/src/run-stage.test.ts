@@ -9,20 +9,20 @@ import { git, gitRepo } from '@apps/cli/src/testing/git-repo';
 const claude = { id: 'claude', label: 'Claude Code', bin: 'claude' };
 const codex = { id: 'codex', label: 'Codex', bin: 'codex' };
 
-test('the Claude survey runs unattended in the worktree, and may not run any shell command it likes', async () => {
+test('the Claude survey runs unattended in the project, and may not run any shell command it likes', async () => {
   await using bin = await fakeBin(['claude']);
-  await using worktree = await gitRepo({});
+  await using project = await gitRepo({});
   expect(
     await runStage({
       provider: claude,
       stage: 'survey',
-      worktree: worktree.root,
+      root: project.root,
       env: { PATH: bin.dir },
     }),
   ).toBe(0);
 
   const [call] = await bin.calls();
-  expect(call.cwd).toBe(worktree.root);
+  expect(call.cwd).toBe(project.root);
   expect(call.args.slice(0, 2)).toEqual(['-p', '/kickoff survey']);
   expect(call.args.join(' ')).toContain('--permission-mode dontAsk');
   expect(call.args).not.toContain('Bash');
@@ -32,55 +32,55 @@ test('the Claude survey runs unattended in the worktree, and may not run any she
 
 test('the Codex survey runs unattended in the workspace-write sandbox', async () => {
   await using bin = await fakeBin(['codex']);
-  await using worktree = await gitRepo({});
+  await using project = await gitRepo({});
   expect(
     await runStage({
       provider: codex,
       stage: 'survey',
-      worktree: worktree.root,
+      root: project.root,
       env: { PATH: bin.dir },
     }),
   ).toBe(0);
 
   const [call] = await bin.calls();
-  expect(call.cwd).toBe(worktree.root);
+  expect(call.cwd).toBe(project.root);
   expect(call.args[0]).toBe('exec');
   expect(call.args.join(' ')).toContain('--sandbox workspace-write');
   expect(call.args.at(-1)).toBe('$kickoff survey');
   expect(call.args.join(' ')).not.toContain('dangerously');
 });
 
-test('the interview opens the agent chat in the worktree with the kickoff entry point', async () => {
+test('the interview opens the agent chat in the project with the kickoff entry point', async () => {
   await using bin = await fakeBin(['claude', 'codex']);
-  await using worktree = await gitRepo({});
+  await using project = await gitRepo({});
   await runStage({
     provider: claude,
     stage: 'interview',
-    worktree: worktree.root,
+    root: project.root,
     env: { PATH: bin.dir },
   });
   await runStage({
     provider: codex,
     stage: 'interview',
-    worktree: worktree.root,
+    root: project.root,
     env: { PATH: bin.dir },
   });
 
   const calls = await bin.calls();
   expect(calls.map(({ name, cwd, args }) => ({ name, cwd, args }))).toEqual([
-    { name: 'claude', cwd: worktree.root, args: ['/kickoff'] },
-    { name: 'codex', cwd: worktree.root, args: ['$kickoff'] },
+    { name: 'claude', cwd: project.root, args: ['/kickoff interview'] },
+    { name: 'codex', cwd: project.root, args: ['$kickoff interview'] },
   ]);
 });
 
 test("a failed stage returns the agent's exit code", async () => {
   await using bin = await fakeBin(['claude'], { exitCode: 3 });
-  await using worktree = await gitRepo({});
+  await using project = await gitRepo({});
   expect(
     await runStage({
       provider: claude,
       stage: 'survey',
-      worktree: worktree.root,
+      root: project.root,
       env: { PATH: bin.dir },
     }),
   ).toBe(3);
@@ -88,9 +88,9 @@ test("a failed stage returns the agent's exit code", async () => {
 
 test('the Claude migration may delete files and fix them in place, and the survey may not', async () => {
   await using bin = await fakeBin(['claude']);
-  await using worktree = await gitRepo({});
+  await using project = await gitRepo({});
   for (const stage of ['survey', 'migrate'] as const) {
-    await runStage({ provider: claude, stage, worktree: worktree.root, env: { PATH: bin.dir } });
+    await runStage({ provider: claude, stage, root: project.root, env: { PATH: bin.dir } });
   }
   const [survey, migrate] = await bin.calls();
   expect(migrate.args.slice(0, 2)).toEqual(['-p', '/kickoff migrate']);
@@ -103,9 +103,9 @@ test('the Claude migration may delete files and fix them in place, and the surve
 });
 
 test('a stage commits past the Git hooks, because the gate passes only after the migration', async () => {
-  await using worktree = await gitRepo({ 'hooks/pre-commit': '#!/bin/sh\nexit 1\n' });
-  await chmod(path.join(worktree.root, 'hooks/pre-commit'), 0o755);
-  await git(worktree.root, 'config', 'core.hooksPath', 'hooks');
+  await using project = await gitRepo({ 'hooks/pre-commit': '#!/bin/sh\nexit 1\n' });
+  await chmod(path.join(project.root, 'hooks/pre-commit'), 0o755);
+  await git(project.root, 'config', 'core.hooksPath', 'hooks');
   await using bin = await fakeBin(['claude'], {
     run: 'git commit --allow-empty --quiet -m "Survey drafts"',
   });
@@ -114,12 +114,12 @@ test('a stage commits past the Git hooks, because the gate passes only after the
       await runStage({
         provider: claude,
         stage,
-        worktree: worktree.root,
+        root: project.root,
         env: { ...process.env, PATH: `${bin.dir}:${process.env.PATH}` },
       }),
     ).toBe(0);
   }
-  expect(await git(worktree.root, 'log', '--format=%s')).toStartWith(
+  expect(await git(project.root, 'log', '--format=%s')).toStartWith(
     'Survey drafts\nSurvey drafts\nSurvey drafts\n',
   );
 });

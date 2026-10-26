@@ -11,11 +11,22 @@ import type { Stage } from '@apps/cli/src/next-step';
 import { notify } from '@apps/cli/src/notify';
 import { chooseProvider, findProviders } from '@apps/cli/src/providers';
 import type { Provider } from '@apps/cli/src/providers';
+import { reviewCommand } from '@apps/cli/src/review-command';
 import { runStage } from '@apps/cli/src/run-stage';
 import * as prompts from '@clack/prompts';
 
 /** The template repo is the clone that this CLI runs from. */
 const template = path.resolve(import.meta.dir, '../../..');
+
+if (process.argv[2] === 'review') {
+  process.exit(await reviewCommand(process.argv.slice(3), process.cwd(), template));
+}
+if (process.argv.includes('--help')) {
+  console.log(
+    'template [--yes] [--agent NAME]\ntemplate review install [--check] [--json]\n\nRun from the project receiving the tooling. Review install preserves project-specific verify and custom files.',
+  );
+  process.exit(0);
+}
 
 function stop(message: string, code = 1): never {
   prompts.cancel(message);
@@ -63,7 +74,7 @@ const unattended: Record<string, { title: string; done: string }> = {
   },
 };
 
-async function runUnattended(provider: Provider, stage: 'survey' | 'migrate', worktree: string) {
+async function runUnattended(provider: Provider, stage: 'survey' | 'migrate', root: string) {
   const { title, done } = unattended[stage];
   const started = Date.now();
   const spin = prompts.spinner();
@@ -76,7 +87,7 @@ async function runUnattended(provider: Provider, stage: 'survey' | 'migrate', wo
   const code = await runStage({
     provider,
     stage,
-    worktree,
+    root,
     env: process.env,
     onEvent: (line) => {
       last = describeEvent(line) ?? last;
@@ -86,16 +97,15 @@ async function runUnattended(provider: Provider, stage: 'survey' | 'migrate', wo
   if (code !== 0) {
     spin.error(`${provider.label} stopped with exit code ${code}.`);
     await notify(`The ${stage} stopped with an error.`);
-    stop(
-      `See .git/worktrees/*/template-install-${stage}.log in the project for the agent's output.`,
-      code,
-    );
+    stop(`See .git/template-install-${stage}.log in the project for the agent's output.`, code);
   }
   spin.stop(done);
   await notify(done);
 }
 
-const { values } = parseArgs({ options: { agent: { type: 'string' } } });
+const { values } = parseArgs({
+  options: { agent: { type: 'string' }, yes: { type: 'boolean', default: false } },
+});
 
 prompts.intro('Project template');
 
@@ -106,34 +116,51 @@ if (project.kind === 'refused') {
 
 let step = await nextStep(project.root);
 if (step.step === 'install') {
-  const install = answered<boolean>(
-    await prompts.confirm({
-      message: `Install the template into the existing project ${project.name}?`,
-    }),
-  );
+  const install =
+    values.yes ||
+    answered<boolean>(
+      await prompts.confirm({
+        message: `Install the template into the existing project ${project.name}?`,
+      }),
+    );
   if (!install) {
     stop('Nothing changed.', 0);
   }
-  const { worktree, manifest } = await installTemplate({ project, template });
+  const { manifest } = await installTemplate({ project, template });
   const count = (action: string) => manifest.files.filter((file) => file.action === action).length;
   prompts.log.success(
     [
-      `Installed into ${worktree} on branch ${branch}, from ${project.defaultBranch}.`,
+      `Installed on the new branch ${branch}, from ${project.defaultBranch}. The checkout is on that branch now.`,
       `Files: ${count('added')} added, ${count('replaced')} replaced, ${count('merged')} merged. Conflicts: ${manifest.conflicts.length}.`,
       `The manifest is ${manifestPath}.`,
     ].join('\n'),
   );
-  step = { step: 'survey', worktree };
+  step = { step: 'survey' };
+}
+
+if (step.step === 'done') {
+  prompts.outro(`Kickoff is done. Review the branch ${branch}.`);
+  process.exit(0);
+}
+
+if (!values.agent) {
+  prompts.outro(
+    [
+      `Open ${project.root} in your agent and run the kickoff skill to resume the ${step.step} stage.`,
+      'Use $kickoff, /kickoff, or ask the agent to read and follow .agents/skills/kickoff/SKILL.md.',
+      'No agent CLI is required. The skill continues from .template-install/manifest.json.',
+    ].join('\n'),
+  );
+  process.exit(0);
 }
 
 const provider = await pickProvider(values.agent);
 
 while (step.step !== 'install' && step.step !== 'done') {
   const current: Stage = step.step;
-  const { worktree } = step;
   if (current === 'interview') {
-    prompts.log.step(`Opening ${provider.label} for the interview in ${worktree}.`);
-    await runStage({ provider, stage: 'interview', worktree, env: process.env });
+    prompts.log.step(`Opening ${provider.label} for the interview.`);
+    await runStage({ provider, stage: 'interview', root: project.root, env: process.env });
   } else {
     if (current === 'migrate') {
       const now = answered<boolean>(
@@ -149,7 +176,7 @@ while (step.step !== 'install' && step.step !== 'done') {
         stop('Run this again when you want to migrate.', 0);
       }
     }
-    await runUnattended(provider, current, worktree);
+    await runUnattended(provider, current, project.root);
   }
   step = await nextStep(project.root);
   if (step.step === current) {

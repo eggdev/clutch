@@ -15,7 +15,7 @@ async function writeFiles(root: string, files: Record<string, string>) {
 
 /**
  * Makes a temporary folder that holds a git repo with one commit of `files` on
- * `main`. The folder also holds siblings of the repo, such as a worktree. The
+ * `main`. The folder can also hold siblings of the repo. The
  * repo has its own identity and no commit signing, so the user's git config
  * does not change the result. Pass `git: false` for a plain folder.
  */

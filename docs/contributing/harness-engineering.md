@@ -16,13 +16,15 @@ each change into a durable improvement.
 
 Run this loop for features, fixes and refactors:
 
-1. Define intent and acceptance criteria in the issue or PR.
-2. Implement the change.
-3. Run `mise exec -- bun run validate`.
-4. Capture what was learned in docs, tests or tooling.
-5. Promote repeated guidance into mechanical enforcement.
+1. Extract the delivery brief and acceptance criteria from the request.
+2. Implement, exercise the changed behavior and review the result.
+3. Fix confirmed defects, recheck their behavior and run
+   `mise exec -- bun run validate`.
+4. Continue through the authorized destination and verify that it succeeded.
+5. Capture learning and promote repeated guidance into mechanical enforcement.
 
-See [checks](./setup/checks.md) for the suites that each kind of change needs.
+Follow [delivery](./delivery.md) for task ownership, skill selection, evidence
+and resuming work. See [checks](./setup/checks.md) for the required suites.
 
 ## Promote learning into enforcement
 
@@ -60,7 +62,7 @@ A message that names only the problem costs a round trip to find the fix. See
 - Put the verification commands you ran in the PR description.
 - Update docs in the same change when a workflow or constraint shifts.
 - Document when to use a new pattern in the change that adds it.
-- On request, the [`visual-recap`](../../.agents/skills/visual-recap/SKILL.md)
+- On request, the [`pr-recap`](../../.agents/skills/pr-recap/SKILL.md)
   skill writes a PR recap block: the primitives touched, the risk and a diagram.
 
 ## Keep docs from drifting
@@ -87,7 +89,7 @@ never the only record of a leftover. Report a bug with the
 Once a week, an agent or a person does one short pass:
 
 1. Read the review comments of the week's merged PRs. Find a comment that
-   repeats.
+   repeats. Read delivery records for repeated owner interventions and rework.
 2. Propose one new guardrail for it, as an issue or a PR. Use the strongest
    cheap kind from [promote learning into enforcement](#promote-learning-into-enforcement).
 3. Delete stale guidance from `docs/contributing/`, and tighten unclear steps.
