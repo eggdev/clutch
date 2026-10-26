@@ -1,6 +1,6 @@
 # consolidate-review-tooling: bring review tooling into project-template
 
-State: active
+State: blocked
 Owner: current migration session
 Destination: verified project-template branch, published for review
 Authorization: owner requested moving the review work into project-template,
@@ -53,6 +53,10 @@ Restored the migration checkout and tracking ref; the original checkout retained
 its unrelated edits. Push checks now clear Git-reported repository-local variables
 before running Nx, with a regression that resolves the actual fixture checkout.
 
-Local implementation and verification are complete. Publish the branch/PR,
-then remove the superseded remote within owner authorization. No service or
-driver integration has been activated.
+Implementation, full validation, normal push checks and publication are complete.
+PR: https://github.com/eggdev/project-template/pull/2 (not merged).
+The private complete-history bundle was verified again before deletion.
+GitHub refused deletion of the superseded remote with HTTP 403: the current
+credential lacks delete_repo scope. The remote and local source remain intact.
+The remaining action requires GitHub reauthentication with that scope, then retry
+the already-authorized deletion. No service or driver integration was activated.
