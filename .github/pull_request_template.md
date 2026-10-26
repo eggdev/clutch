@@ -21,3 +21,7 @@
 ## One-way doors
 
 <!-- Each copy that outlives the deploy and its recovery path, or "None". See docs/principles/two-way-doors.md. -->
+
+## Older copies
+
+<!-- For a change to a server rule, a refusal, a retry, a queue, a cache or a stored shape: the test that feeds an older build's copy through this code and shows that it recovers. Write "None" for a change that touches none of these. See docs/principles/older-copies-recover.md. -->

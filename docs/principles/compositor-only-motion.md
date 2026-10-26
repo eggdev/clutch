@@ -14,6 +14,12 @@ works.
 
 `transition: all` animates layout properties by accident. Name each property.
 
+One exception: on native, Reanimated's layout transitions (`LinearTransition`)
+may move items to their new place when a disclosure opens or a list reflows,
+such as an accordion, a collapsible or a filtered grid. Reanimated runs them on
+the UI thread from the layout it already computed, so nothing lays out again
+per frame. They never replace a transform that would do the same job.
+
 ## Timing
 
 - Use the duration tokens. Do not write a duration in a component.
