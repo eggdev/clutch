@@ -48,8 +48,9 @@ hashes. Changed custom files stop the entire preflight; no force overwrite or
 automatic stash is provided. Individual file writes are atomic. An interrupted
 install can leave uncommitted files: inspect and commit or stash that partial
 state before retrying the same source. Already matching files are accepted on
-retry. This is not a filesystem transaction against a concurrent writer;
-installation requires an idle, clean checkout.
+retry. This is not a filesystem transaction against a concurrent writer.
+Installation requires clean review-tooling paths. Other uncommitted work can
+stay in the checkout, and the installer does not touch it.
 
 The full template installer includes the shared tooling and hands off to kickoff.
 Review-only install preserves product docs, package manager, scripts and the
