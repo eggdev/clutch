@@ -48,6 +48,11 @@ partial checkout before retry; clean-tree protection remains in force.
 
 ## Resume
 
+Push verification exposed inherited Git hook variables leaking into fixtures.
+Restored the migration checkout and tracking ref; the original checkout retained
+its unrelated edits. Push checks now clear Git-reported repository-local variables
+before running Nx, with a regression that resolves the actual fixture checkout.
+
 Local implementation and verification are complete. Publish the branch/PR,
 then remove the superseded remote within owner authorization. No service or
 driver integration has been activated.

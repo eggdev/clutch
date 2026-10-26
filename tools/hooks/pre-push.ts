@@ -53,6 +53,16 @@ export function pushTargets(paths: Array<string> | null): Array<string> {
   return paths?.every(isDocsOnly) ? ['checks'] : ['test', 'lint-policy-test', 'checks'];
 }
 
+/** Nested Git fixtures must select their own repository, not the hook's. */
+export function checkEnvironment(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const localVariables = git('rev-parse', '--local-env-vars');
+  if (!localVariables) {
+    throw new Error('Cannot isolate repository environment for push checks.');
+  }
+  const local = new Set(localVariables.split('\n'));
+  return Object.fromEntries(Object.entries(environment).filter(([key]) => !local.has(key)));
+}
+
 if (import.meta.main) {
   const targets = pushTargets(changedPaths(parsePushedRefs(await Bun.stdin.text())));
   if (!targets.length) {
@@ -60,7 +70,7 @@ if (import.meta.main) {
   }
   console.log(`pre-push: nx run-many -t ${targets.join(' ')}`);
   const run = Bun.spawnSync([process.execPath, 'x', 'nx', 'run-many', '-t', ...targets], {
-    env: { ...process.env, CI: '1' },
+    env: { ...checkEnvironment(process.env), CI: '1' },
     stdout: 'inherit',
     stderr: 'inherit',
   });
