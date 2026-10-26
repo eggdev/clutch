@@ -4,8 +4,8 @@ import { readRegistry, registryFile } from '@tools/lint/import-policy.mjs';
 
 /**
  * Maps each changed path to the primitive in the registry whose `code` root is
- * the longest prefix of the path. The visual-recap skill reads the result. See
- * .agents/skills/visual-recap/SKILL.md.
+ * the longest prefix of the path. The pr-recap skill reads the result. See
+ * .agents/skills/pr-recap/SKILL.md.
  *
  * Usage: bun tools/recap/classify-primitives.ts --base <ref> [--head <ref>] [--json]
  */

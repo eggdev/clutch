@@ -5,6 +5,10 @@
     "template": "src/main.ts"
   },
   "type": "module",
+  "dependencies": {
+    "@clack/prompts": "1.8.1",
+    "yaml": "2.9.1"
+  },
   "nx": {
     "targets": {
       "test": {

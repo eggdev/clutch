@@ -1,26 +1,28 @@
 # Existing project: survey
 
-The install CLI starts this stage with `/kickoff survey`. Nobody watches it.
-The CLI made a worktree on the branch `template/install` and copied the
-template files into it. You prepare the interview, so that the owner spends
-the session on decisions and corrections.
+Kickoff routes here when the manifest stage is `survey`, or when invoked with
+`kickoff survey`. This stage needs no owner input. The installer made the
+branch `template/install` in the project, switched to it and committed the
+template files there. You prepare the interview, so that the owner spends the session on
+decisions and corrections.
 
 ## Rules
 
-1. **Ask nothing.** Nobody reads your output until the interview. Write each
+1. **Ask nothing.** Save decisions for the interview. Write each
    open question into the draft or the manifest entry that it belongs to.
-2. **Change only the worktree.** Do not push, deploy or call a remote service
-   of the project.
-3. **Use only these commands.** The run denies all others:
+2. **Change only the `template/install` branch.** Do not push, deploy or call
+   a remote service of the project.
+3. **Run only these shell commands.** Read and edit files with the host's
+   file tools. The CLI runner, when used, enforces this list:
    - `git log`, `git show`, `git diff`, `git status`, `git ls-files`,
-     `git add` and `git commit`
+     `git add` and `git commit` (including the per-command hook override in SKILL.md)
    - `mise exec -- bun install`
    - `mise exec -- bun run validate`
    - `mise exec -- bun tools/check-<name>.ts` for each check in `tools/`
 4. **Do not fix code.** The migration stage fixes code after the interview.
-5. **Retain established choices.** Recommend keeping compatible project
-   conventions and providers. Use template defaults for gaps. Identify a
-   concrete conflict before recommending replacement.
+5. **Keep what works.** Follow
+   [the rule in SKILL.md](../SKILL.md#rules-of-the-interview). Recommend
+   `template` only for a gap or a named conflict.
 6. **Name the source of each fact:** a file, a commit or a vendor page. When
    you cannot read a vendor page, write the vendor question into the draft.
 
@@ -53,10 +55,10 @@ Read the project before you write anything:
 ### 2. Draft the slots
 
 First draft the [setup checklist](./setup-checklist.md) in project intent
-from the inventory. Cite source paths for inferred choices. Mark unknowns
-undecided; absence of evidence is not an off choice. Keep its kickoff slot
-until the owner reviews it. Existing capabilities take precedence over
-new-project suggestions.
+from the inventory. Cite a source path for each inferred choice. Mark an
+unknown as undecided. No evidence is not the same as off. Keep the slot until
+the owner reviews the checklist. A capability the project has wins over a
+new-project proposal.
 
 Run `mise exec -- bun tools/check-kickoff-slots.ts` for the list. Work through
 the phases in [SKILL.md](../SKILL.md) in order, and use the
@@ -71,11 +73,11 @@ Orders never change after payment. A refund is a new order that points to the
 original. Source: `src/orders/refund.ts`.
 ```
 
-For verified facts and routine defaults, identify the source and proposed
-automatic setup in the draft rather than inventing an owner question. The
-interview can resolve those directly. Product decisions stay open until the
-owner agrees. Leave unknowns explicit when neither evidence nor a supported
-default resolves them.
+For a verified fact or a default, write the source and the setup you will
+apply into the draft. Do not turn it into a question for the owner. The
+interview writes those directly. A product decision stays open until the
+owner agrees. When neither evidence nor a default answers a slot, say so in
+the draft.
 
 Draft the registry in `docs/contributing/architecture/primitives.yaml`: one
 entry for each app and package. Run `mise exec -- bun tools/check-primitives.ts`
@@ -90,10 +92,12 @@ entry in `conflicts`:
 - `recommendation`: `template`, `combine` or `keep`
 - `reason`: why, with the source
 
-Recommend `keep` for an established choice that satisfies the required checks
-and principles, `combine` when template setup can fill a gap while preserving
-it, and `template` when there is no established choice or a concrete conflict
-requires replacement. Describe the conflict and any behavior change explicitly.
+- `keep`: the project's choice passes the checks and follows the principles.
+- `combine`: the template fills a gap and the project's choice stays.
+- `template`: the project has no choice, or a named conflict forces a
+  replacement.
+
+Name the conflict and each change in behavior.
 
 For each replaced doc or agent instruction file, also add `destinations`: a
 list of the parts of the old content, each with the template page that owns
@@ -128,7 +132,8 @@ Write `.template-install/findings.md` with these sections:
 ### 7. Hand off
 
 Set `stage` in the manifest to `interview`. Commit all files with the message
-`Install template: survey drafts`.
+`Install template: survey drafts`. Continue to the interview in the same
+session unless invoked explicitly for the survey stage only.
 
 When you must stop before the end, commit what you have and leave `stage` as
 `survey`. The next run continues: read the findings and the drafts first.

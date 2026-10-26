@@ -1,12 +1,16 @@
 ---
-name: visual-recap
+name: pr-recap
 description: Write or update the system recap block in a PR description - a GitHub-rendered summary of the primitives that a change touches, its risk and a mermaid diagram of the change. Use only when someone asks for a visual recap, a visual plan, a system recap or a PR recap. Do not run it on your own for each PR.
 ---
 
-# Visual recap
+# PR recap
 
 Run this skill only when someone asks for a recap or a plan. No check or hook
 calls it, and a PR does not need a recap block.
+
+Inputs are the requested scope, base/head and current diff; output is a factual
+recap block. Writing a recap is not a correctness review. Produce it locally or
+in chat unless updating the PR description is already authorized.
 
 The recap block is one marker-delimited block in the PR description. GitHub
 renders it. It helps a reviewer find the risk fast. The reviewer still reads
@@ -32,8 +36,8 @@ level that applies.
 | Level      | Risk   | Meaning                                                   | Also                                                      |
 | ---------- | ------ | --------------------------------------------------------- | --------------------------------------------------------- |
 | `composes` | low    | Wires existing primitives together. Their behavior stays. | Nothing more                                              |
-| `extends`  | medium | Changes the behavior or the interface of a primitive.     | Check the affected flows on the preview                   |
-| `adds`     | high   | Adds, removes or reshapes a primitive.                    | Update the registry in the same PR, and check the preview |
+| `extends`  | medium | Changes the behavior or the interface of a primitive.     | Name affected verification flows and their evidence |
+| `adds`     | high   | Adds, removes or reshapes a primitive.                    | Update the registry and verify the affected public surface |
 
 The classifier finds the primitives. You choose `composes` or `extends` from
 the diff. A change is `adds` when the registry needs a new or changed entry: a
@@ -41,10 +45,10 @@ new `id`, a changed meaning, or code roots that must move. Do not edit a
 `summary` for normal feature work. After a registry change, run
 `mise exec -- bun tools/check-primitives.ts`.
 
-For `extends` and `adds`, sign in to the preview as a seed user and walk each
-flow that the change touches. See
-[previews](../../../docs/contributing/setup/previews.md). Name the flows in the
-PR description.
+For `extends` and `adds`, read the evidence from the project's verify skill.
+Use UI interaction for UI claims and real library/CLI/service boundaries for
+nonvisual claims. Name the flows, source revision and missing proof. Do not
+launch a preview or sign-in flow for a library solely to produce a recap.
 
 At each level, name each registry invariant that the change touches. The
 classifier prints the invariants from the registry. Read each one against the

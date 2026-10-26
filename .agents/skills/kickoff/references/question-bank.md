@@ -1,12 +1,13 @@
 # Kickoff question bank
 
-These questions produced the most value in past kickoffs. Each one asks for a
-decision. Show a draft answer with each question. Consult the
-[setup checklist](./setup-checklist.md) first: skip answered questions and
-questions for off or later capabilities. Ask follow-ups only for missing
-product details or conflicts with the journeys. Apply supported engineering
-defaults directly and derive facts from the repository. Questions phrased here
-as setup prompts do not require an owner interview when that resolves them.
+These questions did the most work in past kickoffs. Each one asks for a
+decision. Show a draft answer with each question.
+
+Read the [setup checklist](./setup-checklist.md) first. Skip a question it
+answers, and each question about an off or later capability. Ask a follow-up
+only for a missing product detail or a conflict with a journey. When the
+repository or a default answers a setup question, write the answer and do not
+ask it.
 
 ## 1. Intent
 

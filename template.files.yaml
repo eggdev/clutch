@@ -12,6 +12,10 @@
 # Not copied: README.md, bun.lock and tsconfig.json belong to the project.
 # apps/cli is the installer itself.
 
+exclude:
+  - .agents/skills/verify/
+  - .claude/skills/verify
+
 files:
   - path: AGENTS.md
     rule: replace

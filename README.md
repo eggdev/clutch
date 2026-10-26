@@ -9,20 +9,43 @@ belong to one product.
 
 Kickoff rewrites this file for the product.
 
+## Deliver a change
+
+After kickoff, ask your agent to use `$deliver` with the feature, fix or task
+you want completed. The skill extracts a brief, chooses installed craft skills,
+implements, reviews, verifies and continues to the authorized destination.
+Use `$deliver` with an existing task record to resume. See
+[delivery](./docs/contributing/delivery.md) for ownership and the ready queue.
+
 ## Start a project
 
 ```sh
 gh repo create <name> --private --template eggdev/project-template --clone
 cd <name>
 mise install && mise exec -- bun install
-claude "/kickoff"     # or: codex "\$kickoff"
+# Open this folder in your agent interface and run the kickoff skill.
 ```
 
-Kickoff starts with a setup checklist for access, auth provider, tenancy, MCP
-and other capabilities, applies routine engineering defaults automatically, then focuses the interview
-on product decisions. Choices
-are saved in project intent. Existing projects get a checklist prefilled from
-the survey, with unknowns left open.
+Kickoff opens with a setup checklist: access, the sign-in provider, tenancy,
+MCP and the other capabilities. It applies the engineering defaults without
+asking, and spends the interview on product decisions. The choices go into
+project intent. In an existing project, the survey fills the checklist from
+the code and leaves unknowns open.
+
+## Add review tooling to an existing project
+
+From the receiving project's root, use a current committed template clone:
+
+```sh
+bun ~/dev/project-template/apps/cli/src/main.ts review install --check --json
+bun ~/dev/project-template/apps/cli/src/main.ts review install
+```
+
+Then ask the agent to use setup-verification to author the project's committed
+`.agents/skills/verify/SKILL.md`. Updates use the same install command; customized
+shared files require reconciliation. Review installation does not switch branches
+or replace product configuration. See [the CLI](./apps/cli/README.md) and
+[review architecture](./docs/contributing/architecture/review-runtime.md).
 
 ## The template's own infrastructure
 
@@ -40,6 +63,7 @@ cache in kickoff, with its own worker, bucket and tokens.
 | `docs/contributing/import-boundaries.md`   | `docs/contributing/decisions/0001-*` and later                        |
 | `tools/`                                   | `docs/contributing/setup/local-development.md`                        |
 | `.agents/skills/kickoff/`                  | `AGENTS.md`, `README.md`                                              |
+| `.agents/skills/deliver/`                  | Delivery records in the project's tracker or `.delivery/`             |
 
 A universal page never states a fact about one product. It links to the
 project page that owns the fact: the owner, the issue tracker, the journeys,

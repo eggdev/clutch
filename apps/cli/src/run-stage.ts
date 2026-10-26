@@ -9,7 +9,7 @@ type RunnableStage = Exclude<Stage, 'done'>;
 
 /**
  * The tools that an unattended Claude stage may use. Writes stay in the
- * worktree, and each shell command is named, so the agent cannot push, deploy
+ * project, and each shell command is named, so the agent cannot push, deploy
  * or change state outside the repository.
  */
 const surveyTools = [
@@ -52,7 +52,7 @@ function commandFor(provider: Provider, stage: RunnableStage) {
   const interactive = stage === 'interview';
   if (provider.id === 'claude') {
     return interactive
-      ? ['/kickoff']
+      ? ['/kickoff interview']
       : [
           '-p',
           `/kickoff ${stage}`,
@@ -67,7 +67,7 @@ function commandFor(provider: Provider, stage: RunnableStage) {
   }
   if (provider.id === 'codex') {
     return interactive
-      ? ['$kickoff']
+      ? ['$kickoff interview']
       : [
           'exec',
           '--sandbox',
@@ -98,19 +98,19 @@ function withoutGitHooks(env: Record<string, string | undefined>) {
 }
 
 /**
- * Runs one kickoff stage with the provider's CLI in the worktree. The
+ * Runs one kickoff stage with the provider's CLI in the project. The
  * interview gets the terminal. An unattended stage writes each event line to
- * a log in the worktree's git folder, where no commit picks it up, and passes
+ * a log in the project's git folder, where no commit picks it up, and passes
  * the line to `onEvent`. Returns the agent's exit code.
  */
 export async function runStage(options: {
   provider: Provider;
   stage: RunnableStage;
-  worktree: string;
+  root: string;
   env: Record<string, string | undefined>;
   onEvent?: (line: string) => void;
 }) {
-  const { provider, stage, worktree } = options;
+  const { provider, stage, root } = options;
   const env = withoutGitHooks(options.env);
   const bin = Bun.which(provider.bin, { PATH: env.PATH ?? '' });
   if (!bin) {
@@ -118,14 +118,14 @@ export async function runStage(options: {
   }
   const cmd = [bin, ...commandFor(provider, stage)];
   if (stage === 'interview') {
-    const proc = Bun.spawn(cmd, { cwd: worktree, env, stdio: ['inherit', 'inherit', 'inherit'] });
+    const proc = Bun.spawn(cmd, { cwd: root, env, stdio: ['inherit', 'inherit', 'inherit'] });
     return proc.exited;
   }
 
-  const gitDir = path.resolve(worktree, await gitOrThrow(worktree, 'rev-parse', '--git-dir'));
+  const gitDir = path.resolve(root, await gitOrThrow(root, 'rev-parse', '--git-dir'));
   const log = path.join(gitDir, `template-install-${stage}.log`);
   const proc = Bun.spawn(cmd, {
-    cwd: worktree,
+    cwd: root,
     env,
     stdin: 'ignore',
     stdout: 'pipe',

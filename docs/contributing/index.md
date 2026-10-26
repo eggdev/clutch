@@ -12,8 +12,15 @@ the page that owns your task. Do not read this folder from top to bottom.
   before you propose a new primitive, surface or storage home.
 - [Root README](../../README.md): set up and run the project from a fresh clone
 
+The docs decide how this project works. Follow the page that owns a topic,
+even when you know another way. To change a rule, change its page in the same
+PR. Ask the owner first when the page is project intent, a principle or a
+decision record.
+
 ## Setup and workflow
 
+- [Delivery](./delivery.md): carry a feature, fix or refactor through review,
+  verification and its authorized destination; resume from its task record
 - [Setup](./setup/index.md): local services, configuration, checks
 - [Harness engineering](./harness-engineering.md): the agent-first loop, how to
   turn a repeated lesson into a check, and PR review

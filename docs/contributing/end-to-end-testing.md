@@ -1,7 +1,9 @@
 # End-to-end testing
 
-End-to-end tests drive the real app through a browser. They are slow and
-costly to keep, so the bar to add one is high.
+End-to-end tests drive the real app through its user-facing entry point:
+browser, native app or CLI. They are slow and costly to keep, so the bar to
+add one is high. The browser locator guidance below applies to browser tests;
+use the platform runner for native and CLI journeys.
 
 ## What to test
 
@@ -43,4 +45,4 @@ costly to keep, so the bar to add one is high.
 - In CI, retry only failures that match a known infrastructure pattern, such
   as a web server that did not start. Never retry an assertion failure.
 
-<!-- kickoff: The end-to-end runner, the command to run the suite and one file, the health route, and the infrastructure failures that CI may retry. -->
+<!-- kickoff: The end-to-end runner for each selected platform, the command to run the suite and one file, the health route, and the infrastructure failures that CI may retry. -->

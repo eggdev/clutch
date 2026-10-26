@@ -23,6 +23,8 @@ jobs:
           # check-migrations compares with the base commit, so it needs history.
           fetch-depth: 0
       - uses: jdx/mise-action@v2
+      - name: Check review-helper Python prerequisite
+        run: python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11+ is required"'
       - run: bun install --frozen-lockfile
       # Nx fails the run when its remote cache is unreachable or refuses the
       # token, so this step turns the cache on only after a probe passes. A

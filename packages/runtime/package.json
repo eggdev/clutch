@@ -1,0 +1,18 @@
+{
+  "name": "@repo/runtime",
+  "private": true,
+  "type": "module",
+  "nx": {
+    "tags": [
+      "type:service"
+    ],
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/test-budget.ts 60 -- bun test packages/runtime"
+        }
+      }
+    }
+  }
+}

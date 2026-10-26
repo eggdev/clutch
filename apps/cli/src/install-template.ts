@@ -1,13 +1,14 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { Detection } from '@apps/cli/src/detect-project';
 import { gitOrThrow } from '@apps/cli/src/git';
 import { mergePackageJson } from '@apps/cli/src/merge-package-json';
 import type { Conflict } from '@apps/cli/src/merge-package-json';
+import { isMap, isSeq, parseDocument } from 'yaml';
 
 type Rule = 'replace' | 'merge' | 'add';
-type CopyList = { files: Array<{ path: string; rule: Rule }> };
+type CopyList = { files: Array<{ path: string; rule: Rule }>; exclude?: Array<string> };
 type FileAction = { path: string; action: 'added' | 'replaced' | 'merged' };
 
 type Merged = { content: string; conflicts: Array<Conflict> };
@@ -34,12 +35,49 @@ const mergers: Record<string, (project: string, template: string) => Merged> = {
   },
 };
 
+/** The clone that this CLI runs from. Its formatter writes the merged files. */
+const cliRoot = path.resolve(import.meta.dir, '../../..');
+
+/** Writes `file` in the template's format, so that the format check passes after the install. */
+async function format(root: string, file: string) {
+  const oxfmt = Bun.spawn(
+    [
+      path.join(cliRoot, 'node_modules/.bin/oxfmt'),
+      '--config',
+      path.join(cliRoot, '.oxfmtrc.json'),
+      file,
+    ],
+    { cwd: root, stdout: 'ignore', stderr: 'pipe' },
+  );
+  if ((await oxfmt.exited) !== 0) {
+    throw new Error(`Could not format ${file}: ${await new Response(oxfmt.stderr).text()}`);
+  }
+}
+
+const registryPath = 'docs/contributing/architecture/primitives.yaml';
+
+/**
+ * Removes each primitive from the copied registry when the project has no
+ * file under any of its `code` roots. The template registers parts that stay
+ * in the template, such as this installer.
+ */
+async function pruneRegistry(root: string, files: Array<string>) {
+  const file = path.join(root, registryPath);
+  const doc = parseDocument(await readFile(file, 'utf-8'));
+  const primitives = doc.get('primitives');
+  if (!isSeq(primitives)) {
+    return;
+  }
+  const present = (code: string) => files.some((name) => name.startsWith(code));
+  primitives.items = primitives.items.filter((item) => {
+    const code = isMap(item) ? item.get('code') : undefined;
+    return !isSeq(code) || code.items.some((entry) => present(String(entry)));
+  });
+  await writeFile(file, doc.toString());
+}
+
 export const branch = 'template/install';
 export const manifestPath = '.template-install/manifest.json';
-
-/** The install worktree sits next to the project, so the user's checkout never changes. */
-export const worktreePath = (root: string) =>
-  path.join(path.dirname(root), `${path.basename(root)}-template-install`);
 
 /** The files that `rev` tracks, under `prefix` when given. */
 async function listFiles(cwd: string, rev: string, prefix?: string) {
@@ -68,9 +106,9 @@ async function extract(template: string, commit: string, paths: Array<string>, d
 }
 
 /**
- * Makes a worktree next to the project on a new branch from its default
- * branch, copies the template files named in `template.files.yaml`, writes the
- * install manifest and commits. The user's checkout does not change.
+ * Switches the project's checkout to a new branch from its default branch,
+ * copies the template files named in `template.files.yaml`, writes the install
+ * manifest and commits.
  */
 export async function installTemplate(options: {
   project: Extract<Detection, { kind: 'existing' }>;
@@ -87,7 +125,13 @@ export async function installTemplate(options: {
   const merges: Array<string> = [];
   const collisions: Array<string> = [];
   for (const entry of list.files) {
-    const names = await listFiles(template, commit, entry.path);
+    const tracked = await listFiles(template, commit, entry.path);
+    const names = tracked.filter(
+      (name) =>
+        !(list.exclude ?? []).some((excluded) =>
+          excluded.endsWith('/') ? name.startsWith(excluded) : name === excluded,
+        ),
+    );
     if (!names.length) {
       throw new Error(`template.files.yaml: ${entry.path} matches no file in the template`);
     }
@@ -117,40 +161,38 @@ export async function installTemplate(options: {
     );
   }
 
-  const worktree = worktreePath(project.root);
-  await gitOrThrow(
-    project.root,
-    'worktree',
-    'add',
-    '--quiet',
-    '-b',
-    branch,
-    worktree,
-    project.defaultBranch,
-  );
+  const { root } = project;
+  await gitOrThrow(root, 'switch', '--quiet', '--create', branch, project.defaultBranch);
   const copies = files.filter((file) => file.action !== 'merged').map((file) => file.path);
   if (copies.length) {
-    await extract(template, commit, copies, worktree);
+    await extract(template, commit, copies, root);
   }
 
   const conflicts: Array<Conflict & { file: string }> = [];
   for (const name of merges) {
     const merged = mergers[path.basename(name)](
-      await gitOrThrow(project.root, 'show', `${project.defaultBranch}:${name}`),
+      await gitOrThrow(root, 'show', `${project.defaultBranch}:${name}`),
       await gitOrThrow(template, 'show', `${commit}:${name}`),
     );
-    await writeFile(path.join(worktree, name), merged.content);
+    await writeFile(path.join(root, name), merged.content);
+    if (path.basename(name) === 'package.json') {
+      await format(root, name);
+    }
     conflicts.push(...merged.conflicts.map((conflict) => ({ file: name, ...conflict })));
+  }
+
+  if (copies.includes(registryPath)) {
+    await pruneRegistry(root, [...existing, ...files.map((file) => file.path)]);
   }
 
   const base = {
     branch: project.defaultBranch,
-    commit: await gitOrThrow(project.root, 'rev-parse', project.defaultBranch),
+    commit: await gitOrThrow(root, 'rev-parse', project.defaultBranch),
   };
   const manifest = { template: { commit }, base, stage: 'survey', files, conflicts };
-  await mkdir(path.join(worktree, path.dirname(manifestPath)), { recursive: true });
-  await writeFile(path.join(worktree, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
-  await gitOrThrow(worktree, 'add', '--all');
-  await gitOrThrow(worktree, 'commit', '--quiet', '--message', 'Install template: copy files');
-  return { worktree, manifest };
+  await mkdir(path.join(root, path.dirname(manifestPath)), { recursive: true });
+  await writeFile(path.join(root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
+  await gitOrThrow(root, 'add', '--all');
+  await gitOrThrow(root, 'commit', '--quiet', '--message', 'Install template: copy files');
+  return { manifest };
 }

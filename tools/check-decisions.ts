@@ -34,7 +34,7 @@ export function parseStatus(content: string): Status {
     return null;
   }
   const targets = [...match[2].matchAll(link)].map((found) => found[2]);
-  const rest = match[2].replace(link, '').replaceAll(/[\s,]|and/gu, '');
+  const rest = match[2].replaceAll(link, '').replaceAll(/[\s,]|and/gu, '');
   if (!targets.length || rest || (match[1] === 'superseded' && targets.length > 1)) {
     return null;
   }

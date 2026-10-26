@@ -17,10 +17,9 @@ async function installed() {
   if (detection.kind !== 'existing') {
     throw new Error(detection.reason);
   }
-  const { worktree } = await installTemplate({ project: detection, template: template.root });
+  await installTemplate({ project: detection, template: template.root });
   return {
     project,
-    worktree,
     [Symbol.asyncDispose]: async () => {
       await template[Symbol.asyncDispose]();
       await project[Symbol.asyncDispose]();
@@ -33,33 +32,33 @@ test('a project without the install branch starts with the install', async () =>
   expect(await nextStep(project.root)).toEqual({ step: 'install' });
 });
 
-test('after the copy, the next step is the survey in the install worktree', async () => {
+test('after the copy, the next step is the survey', async () => {
   await using setup = await installed();
-  expect(await nextStep(setup.project.root)).toEqual({ step: 'survey', worktree: setup.worktree });
+  expect(await nextStep(setup.project.root)).toEqual({ step: 'survey' });
 });
 
 test('the stage in the manifest decides the step when a run resumes', async () => {
   await using setup = await installed();
-  const manifest = path.join(setup.worktree, '.template-install/manifest.json');
+  const { root } = setup.project;
+  const manifest = path.join(root, '.template-install/manifest.json');
   const data = JSON.parse(await readFile(manifest, 'utf-8'));
   await writeFile(manifest, JSON.stringify({ ...data, stage: 'interview' }));
-  await git(setup.worktree, 'commit', '--quiet', '--all', '--message', 'Survey done');
-  expect(await nextStep(setup.project.root)).toEqual({
-    step: 'interview',
-    worktree: setup.worktree,
-  });
+  await git(root, 'commit', '--quiet', '--all', '--message', 'Survey done');
+  expect(await nextStep(root)).toEqual({ step: 'interview' });
 });
 
-test('when the worktree was removed, the run adds it back from the install branch', async () => {
+test('when the checkout is on another branch, the run switches back to the install branch', async () => {
   await using setup = await installed();
-  await git(setup.project.root, 'worktree', 'remove', setup.worktree);
-  expect(await nextStep(setup.project.root)).toEqual({ step: 'survey', worktree: setup.worktree });
-  expect(await git(setup.worktree, 'branch', '--show-current')).toBe('template/install');
+  const { root } = setup.project;
+  await git(root, 'switch', '--quiet', 'main');
+  expect(await nextStep(root)).toEqual({ step: 'survey' });
+  expect(await git(root, 'branch', '--show-current')).toBe('template/install');
 });
 
 test('when the migration deleted the install folder, kickoff is done', async () => {
   await using setup = await installed();
-  await git(setup.worktree, 'rm', '--quiet', '-r', '.template-install');
-  await git(setup.worktree, 'commit', '--quiet', '--message', 'Migrate: remove the install folder');
-  expect(await nextStep(setup.project.root)).toEqual({ step: 'done', worktree: setup.worktree });
+  const { root } = setup.project;
+  await git(root, 'rm', '--quiet', '-r', '.template-install');
+  await git(root, 'commit', '--quiet', '--message', 'Migrate: remove the install folder');
+  expect(await nextStep(root)).toEqual({ step: 'done' });
 });

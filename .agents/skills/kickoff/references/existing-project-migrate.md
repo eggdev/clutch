@@ -1,6 +1,7 @@
 # Existing project: migrate
 
-The install CLI starts this stage with `/kickoff migrate`. Nobody watches it.
+Kickoff routes here when the manifest stage is `migrate`, or when invoked with
+`kickoff migrate`. This stage needs no owner input unless a decision blocks it.
 Your goal: `mise exec -- bun run validate` passes, and the project follows each
 decision from the interview.
 
@@ -18,7 +19,8 @@ decision from the interview.
    what the product stores, stop work on that item and record it.
 5. **One commit for each step.** Run the step's check before you commit. Use
    the message `Migrate: <step>`.
-6. **Use only these commands.** The run denies all others:
+6. **Run only these shell commands.** Read and edit files with the host's
+   file tools. The CLI runner, when used, enforces this list:
    - the survey commands in [existing-project-survey.md](./existing-project-survey.md#rules)
    - `git rm` and `git mv`
    - `mise exec -- bun run format`
@@ -52,11 +54,12 @@ Do the steps in order. Each step starts from a clean tree.
 
 - **Validate passes.** Delete the install folder with
   `git rm -r .template-install`, and commit
-  `Migrate: remove the install folder`. Kickoff is done. The CLI reads the
-  missing manifest as the end.
+  `Migrate: remove the install folder`. Kickoff is done. A missing manifest
+  marks the end of the migration.
 - **Items need the owner.** Add a section **Migration: open** to
   `.template-install/findings.md`. For each item, write the failure, what you
   tried and the decision that the owner must make. Set `stage` to `interview`,
-  and commit. The next run of the CLI opens a short interview about those items.
+  and commit. Unless the owner ran `kickoff migrate` alone, return to a short
+  interview about those items in this session.
 - **You must stop early.** Commit the finished steps, and leave `stage` as
   `migrate`. The next run continues after the last `Migrate:` commit.
