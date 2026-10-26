@@ -23,6 +23,11 @@ choose reversible implementation details yourself. Ask only an unresolved produc
 access, cost or retention decision that blocks the task. Continue independent
 work while that answer is pending. Do not ask for approval of routine next steps.
 
+For ambiguous reports, unfamiliar modules or relevant earlier work, follow
+[research and design](./references/research-and-design.md). Recover prior
+decisions, check them against current code and restate the problem before
+choosing a fix. Keep the compact findings in the task, with sources.
+
 For ambiguous mechanics or unfamiliar modules, trace the real entry point,
 recover bounded relevant prior evidence and run a discriminating experiment.
 Stop research once the next implementation step is justified; an old assistant
@@ -51,6 +56,10 @@ confirmed defects. Record unrelated findings without expanding scope. For
 persisted state or installed clients, exercise supported older state as well as
 fresh fixtures. UI work needs action/result proof on the affected platform;
 browser emulation and compilation do not establish native interaction.
+
+When a consequential design choice remains open, use the research and design
+procedure to test a usage sketch or prototype before committing to it. A
+settled direction proceeds to implementation without another planning gate.
 
 ## Verify and finalize
 

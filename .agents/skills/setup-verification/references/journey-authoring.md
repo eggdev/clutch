@@ -23,3 +23,6 @@ product contract, current feature map and source entry point first.
 A draft is complete only when drafting was the requested destination. A usable
 journey requires executed proof. Report product defects separately from map drift;
 do not change expectations to fit the current result.
+
+For a detailed drafting procedure and action/observation/proof table, use the
+[journey specification guide](./journey-specification.md).

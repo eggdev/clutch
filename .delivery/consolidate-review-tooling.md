@@ -14,7 +14,11 @@ generated verify project-owned. Protect custom files, active work and private
 research. No machine service, driver setting, schedule or cloud archive is activated.
 
 The source template checkout contains separate uncommitted workflow work.
-This task uses an isolated worktree and leaves those edits intact. Its base
+The migration initially used an isolated worktree to preserve those edits.
+At the owner's request, the feature branch now occupies the existing canonical
+project-template checkout; the temporary worktree is removed. Existing local
+workflow edits are restored and reconciled with the renamed skills, and their
+original snapshot remains in Git stash 069365fa091c17636131d2c177cf40390b0d8943. Its base
 preserves existing local installer/delivery behavior atop current remote main.
 Private task history is kept locally and is not an ancestor of the public branch.
 

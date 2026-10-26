@@ -42,7 +42,7 @@ mise exec -- bun run validate
 
 Run only the selected flows, then the gate for delivery. The flow commands
 print compact JSON naming retained command transcripts and receipts outside the
-worktree. DELIVERY_EVIDENCE_ROOT selects a durable output directory. A passed
+repository. DELIVERY_EVIDENCE_ROOT selects a durable output directory. A passed
 flow proves its named assertions; the gate is not native or deployed-app proof.
 
 ## Cleanup and limits

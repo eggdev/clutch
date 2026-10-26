@@ -19,6 +19,8 @@ decision record.
 
 ## Setup and workflow
 
+- [Agent workflow](./agent-workflow.md): lifecycle phases, exit conditions and
+  readiness for bounded, parallel and triggered work
 - [Delivery](./delivery.md): carry a feature, fix or refactor through review,
   verification and its authorized destination; resume from its task record
 - [Setup](./setup/index.md): local services, configuration, checks

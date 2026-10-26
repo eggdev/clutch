@@ -40,18 +40,19 @@ building on guessed results. An unconfigured team or project never starts work.
 
 ## Run one issue
 
-Use the configured repository's host project. In T3, delegate an isolated
-worktree task from that project using `delegate_task`, with `clientRequestId`
-derived from the stable run ID. Read live model capabilities and preserve the
-requested model options. Do not create unrelated top-level conversations.
+Use the configured repository's host project. The task runs in that
+project's main checkout, on a new task branch. Never create a Git worktree, and
+never pass `isolation: "worktree"` to `delegate_task`. In T3, delegate the task
+from that project using `delegate_task`, with `clientRequestId` derived from
+the stable run ID. Read live model capabilities and preserve the requested
+model options. Do not create unrelated top-level conversations.
 If the current host project is wrong, stop and route through its configured
 webhook/project; a shell `cd` does not change a thread's workspace binding.
-Start from the route's integration ref, not an unrelated branch open in the
-operator's checkout. If the host starts a fresh worktree at the parent's commit,
-fetch the integration ref and rebase that empty task branch onto it before any
-edits, excluding the parent's unrelated commits. Never rewrite the operator's
-checkout. Confirm the verification skill exists on that base; otherwise block
-until its tooling PR lands.
+Fetch the route's integration ref and create the task branch from it, not from
+an unrelated branch open in the checkout. Switch only from a clean checkout.
+When the checkout holds uncommitted or unpushed work, stop and ask the owner.
+Never discard, stash or rewrite the owner's work. Confirm the verification
+skill exists on that base; otherwise block until its tooling PR lands.
 
 Give the worker the live issue and comments, acceptance criteria, scope,
 repository verification skill, evidence location, destination, run ID and this
@@ -61,7 +62,7 @@ or the status write fails, keep the receipt and reconcile before retrying.
 
 The worker uses `deliver`, updates the same Linear task record and executes
 the changed flows through the committed project-local `verify` skill. Keep screenshots or recordings and
-receipts outside the disposable worktree. For visible behavior, capture the
+receipts outside the repository. For visible behavior, capture the
 interaction and result on the affected platform. Browser emulation is not a
 native check. Apply the installed Emil skills selected by `deliver`.
 
@@ -98,7 +99,7 @@ Use T3's PR watcher when available; do not implement a polling agent loop.
 - **In Review:** the PR and evidence exist; CI/Bugbot or owner review may still
   be pending. State pending gates explicitly; never label this merge-ready yet.
 - **Blocked:** an exact prerequisite, failed recovery or material decision is
-  preventing progress. Save the task/worktree and smallest unblock action.
+  preventing progress. Save the task branch and smallest unblock action.
 - **Done:** the configured completion boundary is verified. For this PR-only
   grant, keep Linear In Review until merge is observed. A future merge grant
   needs its own gates; never infer it from a ready PR.

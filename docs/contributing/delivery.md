@@ -6,6 +6,10 @@ or "follow the deliver skill" starts it. An ordinary request for end-to-end
 implementation follows the same workflow. Kickoff defines the project; delivery
 works inside those decisions.
 
+The [agent workflow](./agent-workflow.md) connects project definition, runnable
+setup, research, design and delivery. Its phases use this task's single record
+and existing states; they do not add approval turns or a second tracker.
+
 ## Ownership
 
 The owner chooses outcomes, product tradeoffs and the shipping destination.
