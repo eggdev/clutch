@@ -118,16 +118,26 @@ test('recorded checksums permit updates but protect subsequent project customiza
   );
 });
 
-test('check is read-only and real installation refuses unrelated dirty work', async () => {
+test('check is read-only and real installation refuses dirty review tooling', async () => {
   await using template = await source();
   await using project = await gitRepo({ 'package.json': '{}' });
-  await project.write({ 'unrelated.txt': 'Active work' });
+  await project.write({ 'tools/verification/verify.py': 'print("fixture runner")\n' });
   const result5 = await installReview({ root: project.root, template: template.root, check: true });
   expect(result5.status).toBe('planned');
   await expect(installReview({ root: project.root, template: template.root })).rejects.toThrow(
     'Commit or stash',
   );
   expect(await Bun.file(path.join(project.root, '.review/tooling.json')).exists()).toBe(false);
+});
+
+test('installation leaves unrelated dirty work in place', async () => {
+  await using template = await source();
+  await using project = await gitRepo({ 'package.json': '{}', 'app.ts': 'committed\n' });
+  await project.write({ 'app.ts': 'active work\n', 'notes.txt': 'untracked work\n' });
+  const result = await installReview({ root: project.root, template: template.root });
+  expect(result.status).toBe('installed');
+  expect(await readFile(path.join(project.root, 'app.ts'), 'utf-8')).toBe('active work\n');
+  expect(await readFile(path.join(project.root, 'notes.txt'), 'utf-8')).toBe('untracked work\n');
 });
 
 test('symlinked target directories cannot redirect writes outside the project', async () => {

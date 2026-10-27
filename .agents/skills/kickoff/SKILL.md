@@ -193,6 +193,12 @@ When application code is runnable, use the `setup-verification` skill to generat
 maintain its local verification harness and exercise one mapped journey.
 Without runnable code, record the prerequisite instead of generating fake proof.
 
+Use the [agent workflow](../../../docs/contributing/agent-workflow.md) for the
+handoff from project definition to delivery. In the existing task record, retain
+the baseline journey evidence or the exact prerequisite for the first runnable
+slice. Configure parallel or triggered work only when its readiness conditions
+have evidence; installing skills alone does not enable autonomous execution.
+
 Use the tracker chosen in project intent for delivery records. When it is
 unavailable, follow the local fallback in the
 [delivery task-record procedure](../deliver/references/task-records.md).

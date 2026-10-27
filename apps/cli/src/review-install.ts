@@ -187,9 +187,20 @@ export async function installReview(options: {
   if (conflicts.length || options.check || !changes.length) {
     return result;
   }
-  if (await gitOrThrow(root, 'status', '--porcelain')) {
+  // Unrelated work may stay dirty. Managed paths must be clean, so the owner can
+  // restore them alone after an interrupted install.
+  const managedPaths = [...inspected.keys()].map((filename) => `:(literal)${filename}`);
+  const dirty = await gitOrThrow(
+    root,
+    'status',
+    '--porcelain',
+    '--untracked-files=all',
+    '--',
+    ...managedPaths,
+  );
+  if (dirty) {
     throw new Error(
-      'Commit or stash project changes before installing review tooling; --check is read-only.',
+      `Commit or stash changes to review tooling before installing it; --check is read-only.\n${dirty}`,
     );
   }
   // Check the complete preflight again before the first mutation.

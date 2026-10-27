@@ -1,0 +1,91 @@
+# agent-workflow: Establish lifecycle phases for template projects
+
+State: done
+Owner: T3 thread e3315aaa-8f31-4521-a8e5-f05c2229e0bb
+Checkout: /Users/clyde/dev/project-template, fix/install-leaves-template-parts
+Requested: 2026-10-24 America/New_York
+Destination: working local template guidance and skill integration
+Authorization: Owner requested phases and project setup for reliable agent workflows. No publishing, merging, global skill update or automation activation requested.
+
+## Brief
+
+Connect the existing kickoff, delivery and verification workflows into a
+project lifecycle. Add context recovery and evidence-led design without a
+second tracker, a mandatory design contest or another orchestration system.
+Keep this repository a reusable template rather than completing its kickoff.
+
+## Acceptance
+
+- C1: Each phase has an entry procedure, an owning workflow and an observable
+  exit condition. Ordinary fixes do not acquire extra approval turns.
+- C2: Delivery recovers relevant history, reconciles it with current code and
+  uses concrete experiments for consequential design uncertainty.
+- C3: Readiness distinguishes bounded work, concurrent environments, signed
+  dispatch and separately authorized landing.
+- C4: Repository validation passes and installation carries the guide and
+  skill references into an existing project with Claude discovery intact.
+
+## References and decisions
+
+- Current code and docs: kickoff, deliver, verify-repo, linear-delivery,
+  delivery records, setup/verification and harness engineering.
+- Read relevant messages from T3 threads
+  42426dc9-ff63-4eda-b16a-fb36811fbfa9 and
+  3a9a7a77-7ab5-4075-a501-4caf54a5759e. History supplies context, not a live
+  audit of other repositories, current PR checks or webhook configuration.
+- Preserve the owner's instruction that this repository remains a template.
+- Keep Sprig's version control and environments separate from host orchestration.
+- Extend existing skill references instead of adding a competing entry skill.
+- Retain the existing task states. Lifecycle phases are not new Linear statuses.
+- Apply craft skills on demand; a settled fix does not need prototyping.
+
+## Evidence
+
+- C1-C3: agent-workflow guide, delivery research/design reference, kickoff
+  handoff instructions and contributor/README navigation.
+- This task exercised history recovery against the two relevant threads and
+  reconciled it with the current local delivery and verification records.
+- Manual procedure walkthroughs, not independent agent evaluations:
+  - Known CLI fix: inspect its owning code, extract criteria and proceed to
+    implementation; no history sweep or mandatory architecture exploration.
+  - Ambiguous regression: separate symptom and cause, recover matching prior
+    decisions, trace the runtime path and choose a discriminating experiment.
+  - Required native evidence unavailable: retain an exact prerequisite and
+    block that destination; unrelated verified web work retains its own scope.
+  - Prototype requested for review: implement and retain the working preview;
+    do not infer merge permission or invent an additional sign-off to mark the
+    preview task complete.
+- C4: `mise exec -- bun run validate` passed all 27 targets, with 8 cache hits.
+- Installation exercised the actual CLI with `--yes` against a disposable
+  committed snapshot containing the working-tree changes. A clean existing
+  project received the guide, research reference and modified skill files byte
+  for byte. Each appeared in its manifest, the Claude symlink resolved the new
+  reference, and the installed branch was clean on `template/install`.
+- Fixture: /var/folders/xx/q_kh1vtx6377y78dl980ksh80000gn/T/agent-workflow-install-f7lnwux_
+  This fixture is disposable, not a persistent artifact store.
+
+## Resume
+
+- Base revision: 8f0174a; lifecycle changes remain uncommitted in this checkout.
+- Last completed action: local guidance and disposable propagation verification.
+- Next action: trial a bounded product task using the lifecycle and record
+  intervention/rework evidence before expanding automation.
+- Environment: mise and Bun. No application runtime is added by this change.
+- Blocker: none for the local guidance destination.
+
+## Delivery and limits
+
+The lifecycle is defined and connected to repository-local skills. It does not
+establish native access, concurrent runtime isolation, live signed dispatch or
+merge authorization for any product. No global skills, external projects,
+tracker configuration or scheduled routes are changed. The template installer
+copies committed source; use a commit containing these changes for rollout.
+
+## Learning
+
+- Owner interventions during this task: none.
+- Existing verification and intake code already supply the tools. The useful
+  addition is a shared lifecycle and research procedure, not another runner.
+- Follow-up measurement: a real product task can establish whether these
+  instructions reduce repeated explanation and owner coordination. Manual
+  walkthroughs and installation checks do not establish that result.

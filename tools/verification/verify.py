@@ -67,7 +67,7 @@ def main():
     receipt_root = Path(os.environ.get('DELIVERY_EVIDENCE_ROOT',
                                       '~/.local/share/delivery/evidence')).expanduser().resolve()
     if receipt_root.is_relative_to(root):
-        raise ValueError('Evidence must survive worktree removal; choose a directory outside the repo')
+        raise ValueError('Evidence must survive a branch switch or a clean checkout; choose a directory outside the repo')
     receipt = receipt_root / name / f'{time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())}-{uuid.uuid4().hex[:8]}'
     receipt.mkdir(parents=True, mode=0o700)
     flow = config.get('flows', {}).get(args.flow, {})

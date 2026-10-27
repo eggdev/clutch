@@ -11,6 +11,9 @@ Kickoff rewrites this file for the product.
 
 ## Deliver a change
 
+Follow the [agent workflow](./docs/contributing/agent-workflow.md) for project
+setup, research, design and readiness for parallel or triggered delivery.
+
 After kickoff, ask your agent to use `$deliver` with the feature, fix or task
 you want completed. The skill extracts a brief, chooses installed craft skills,
 implements, reviews, verifies and continues to the authorized destination.

@@ -38,7 +38,7 @@ is waiting for readiness; it does not supervise a held server after start exits.
 
 ## Receipts and interruption
 
-Default evidence root is ~/.local/share/delivery/evidence, outside the worktree.
+Default evidence root is ~/.local/share/delivery/evidence, outside the repository.
 DELIVERY_EVIDENCE_ROOT selects another durable local store. Each receipt names
 action, flow, platform, role, actual commands/results, source before/after,
 cleanup result and media digests. A local path is not a remote attachment.

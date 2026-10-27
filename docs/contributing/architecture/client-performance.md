@@ -2,6 +2,7 @@
 
 The speed budgets for the client, and the checks that keep them. The rules
 behind this page are [local first](../../principles/local-first.md),
+[stay at 60 FPS](../../principles/stay-at-60-fps.md),
 [fast first load](../../principles/fast-first-load.md) and
 [compositor-only motion](../../principles/compositor-only-motion.md).
 
@@ -18,6 +19,7 @@ a check in CI.
 | JavaScript for the first screen, compressed  | 150 KB                      | Build output check                                   |
 | Largest contentful paint, cold visit         | 1.5 s at p75 on a mid phone | Lab run against each preview                         |
 | Largest contentful paint, warm visit         | 0.5 s at p75                | Lab run against each preview                         |
+| Longest main-thread task                     | 50 ms                       | End-to-end test with a trace                         |
 | Animated layout properties                   | 0                           | `lint`: `no-low-performance-animation-properties`    |
 | Duration literals outside the speed tokens   | 0                           | `lint`: `declaration-property-value-disallowed-list` |
 | Duration classes outside the speed tokens    | 0                           | `lint`: `repo-classes/speed-tokens-only`             |

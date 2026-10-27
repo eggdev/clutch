@@ -1,6 +1,6 @@
 ---
 name: audit-codebase
-description: Investigate codebase security, correctness, performance, accessibility or data risks and return evidence-backed findings. Use for a scoped code audit. Does not deliver fixes or analyze cross-project review efficiency.
+description: Investigate codebase security, correctness, performance, accessibility, data or analytics risks and return evidence-backed findings. Use for a scoped code audit. Does not deliver fixes or analyze cross-project review efficiency.
 ---
 
 # Audit a codebase
@@ -19,6 +19,7 @@ The task's configured tracker owns findings; use
 3. Trace reachable code paths. Select the smallest real test or reproduction that
    could disprove the suspicion. For performance compare equivalent measured
    conditions; for UI check actual interaction, not only rendered strings.
+   For analytics on PostHog follow [the analytics audit](references/analytics.md).
 4. Separate an observed defect from a hypothesis or missing runtime prerequisite.
    Investigate technical uncertainty; ask the owner only for a product decision.
    Do not turn an unproven suspicion into a confirmed finding.
