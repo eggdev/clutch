@@ -18,6 +18,7 @@ export default defineConfig({
   jsPlugins: [
     { name: 'repo-imports', specifier: './tools/lint/import-policy.mjs' },
     { name: 'repo-classes', specifier: './tools/lint/class-policy.mjs' },
+    { name: 'repo-gates', specifier: './tools/lint/gate-policy.mjs' },
   ],
   rules: {
     // Function declarations read as the module's API and hoist. Arrow
@@ -69,12 +70,22 @@ export default defineConfig({
   },
   overrides: [
     {
+      // One gate into each feature. In app code, a gated route opens only
+      // through its gate, which settles permissions and data before the first
+      // render. Tests may open a route directly to prove a cold deep link.
+      // Add a route here when its gate exists. See
+      // docs/principles/one-gate-per-feature.md.
+      files: ['apps/*/**/*.{ts,tsx}', 'packages/*/src/**/*.{ts,tsx}'],
+      rules: { 'repo-gates/one-gate': ['error', { gates: {} }] },
+    },
+    {
       // Tools load these files through their default export.
       files: [
         '*.config.{ts,mts,js,mjs}',
         'tools/hooks/paths.mjs',
         'tools/lint/import-policy.mjs',
         'tools/lint/class-policy.mjs',
+        'tools/lint/gate-policy.mjs',
       ],
       rules: { 'import/no-default-export': 'off' },
     },

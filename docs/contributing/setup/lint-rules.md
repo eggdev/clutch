@@ -71,6 +71,33 @@ Brackets in a variant select an element and stay allowed, such as
 `data-[state=open]:` and `[&>svg]:`. A duration reads its token through the
 variable shorthand: `duration-(--speed-quick)`.
 
+## Feature gates
+
+The `repo-gates` oxlint plugin,
+[`tools/lint/gate-policy.mjs`](../../../tools/lint/gate-policy.mjs), enforces
+[one gate into each feature](../../principles/one-gate-per-feature.md). The
+rule option in `oxlint.config.ts` is the registry. It maps each gated route to
+its gate file and its route folder. The registry starts empty; a project adds
+a route when it writes the route's gate. The rule applies to app code in
+`apps/` and `packages/*/src/`.
+
+| Rule       | Rejects                                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `one-gate` | A gated route in a navigation call (`push`, `replace`, `navigate`, `redirect`) or in an `href`, outside its gate and route folder |
+
+A string that does not navigate, such as an analytics screen name, passes.
+Tests may open a gated route directly to prove a cold deep link.
+
+To gate a new feature:
+
+1. Write its gate: one function that settles the feature's needs, then
+   navigates.
+2. Add the route to the registry, with the gate file and the route folder.
+3. Change every way in to call the gate. Run the lint.
+
+`tools/lint/gate-policy.test.ts` proves that a second way in fails and that a
+name that does not navigate passes.
+
 ## Formatting
 
 Oxfmt formats each file. [`.oxfmtrc.json`](../../../.oxfmtrc.json) states each

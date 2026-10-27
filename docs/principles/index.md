@@ -41,6 +41,7 @@ Each surface starts on a phone and takes every visual value from a token.
 | [Fail loudly at the right layer](./fail-loudly.md)                          | An error could be swallowed so a partial result continues                                     |
 | [Fix the root bottleneck](./fix-the-root-bottleneck.md)                     | Masking slowness with timeouts, fallbacks or caches                                           |
 | [One door for each decision](./one-door-for-each-decision.md)               | Adding a route, job or tool that touches access, money or visibility, or a new kind of guard  |
+| [One gate into each feature](./one-gate-per-feature.md)                     | Adding a way into a feature, or a check that a feature needs before its first screen          |
 | [Two-way and one-way doors](./two-way-doors.md)                             | Changing a stored shape, a hard invariant, or anything a copy outlives                        |
 | [Older copies always recover](./older-copies-recover.md)                    | Changing a server rule, a refusal, a retry, a queue, a cache or a stored shape                |
 | [Examples over prose](./examples-over-prose.md)                             | Writing docs, skills or a procedure with more than one step                                   |
