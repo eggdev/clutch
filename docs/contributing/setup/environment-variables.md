@@ -43,12 +43,13 @@ startup with an error that names the variable.
 
 ## Variables
 
-| Name                  | Required | Secret | Purpose                                               |
-| --------------------- | -------- | ------ | ----------------------------------------------------- |
-| `DATABASE_URL`        | No       | Yes    | A Postgres server. Without it, the API runs PGlite    |
-| `PGLITE_DIR`          | No       | No     | The PGlite data folder. The default is `.data/pglite` |
-| `PORT`                | No       | No     | The API port. The default is 4000                     |
-| `DEV_USER_ID`         | No       | No     | The development actor's user ID                       |
-| `DEV_ORGANIZATION_ID` | No       | No     | The development actor's organization ID               |
+| Name                  | Required | Secret | Purpose                                                |
+| --------------------- | -------- | ------ | ------------------------------------------------------ |
+| `DATABASE_URL`        | No       | Yes    | A Postgres server. Without it, the API runs PGlite     |
+| `PGLITE_DIR`          | No       | No     | The PGlite data folder. The default is `.data/pglite`  |
+| `PORT`                | No       | No     | The API port. The default is 4000                      |
+| `DEV_USER_ID`         | No       | No     | The development actor's user ID                        |
+| `DEV_ORGANIZATION_ID` | No       | No     | The development actor's organization ID                |
+| `SYNC_ORIGINS`        | Deployed | No     | Origins that may open the sync socket, comma-separated |
 
 <!-- kickoff: One row for each other variable that exists at kickoff. -->

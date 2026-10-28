@@ -48,8 +48,11 @@ queries, logging or deploy configuration.
     design in the project rules below. When it uses `SameSite=Lax` cookies and
     JSON bodies, no mutating endpoint accepts a form post, and no session cookie
     uses `SameSite=None`. Writes go over the sync socket, so the socket upgrade
-    must check the `Origin` header. The template's sync server has no `Origin`
-    check. A project adds it with its sign-in vendor.
+    checks the `Origin` header. The sync server answers 403 to an origin that
+    `SYNC_ORIGINS` does not list. Set `SYNC_ORIGINS` in each deployed
+    environment. When it is not set, the server accepts loopback origins only,
+    for local development. A request with no `Origin` header passes, because a
+    browser always sends one. See `packages/sync/config/origins.ts`.
 13. **Account recovery revokes old access.** A password reset ends every other
     session and token for the account, and tells the owner by email.
 14. **Signup and reset do not show which emails have accounts.** Send the same

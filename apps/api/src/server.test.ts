@@ -85,3 +85,28 @@ test('a sign-out closes each socket of the user with code 4401', async () => {
   );
   expect(result).toEqual({ ended: 1, code: 4401 });
 });
+
+test('a socket request from an origin that SYNC_ORIGINS does not list gets 403', async () => {
+  const statuses = await Effect.runPromise(
+    Effect.gen(function* () {
+      const url = yield* HttpServer.addressFormattedWith((address) =>
+        Effect.succeed(`${address}/sync`),
+      );
+      const upgrade = {
+        connection: 'Upgrade',
+        upgrade: 'websocket',
+        'sec-websocket-version': '13',
+      };
+      const key = { 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==' };
+      const status = (origin: string) =>
+        Effect.promise(() =>
+          fetch(url, { headers: { ...upgrade, ...key, origin } }).then(
+            (response) => response.status,
+          ),
+        );
+      return [yield* status('https://evil.example'), yield* status('http://localhost:5173')];
+    }).pipe(Effect.provide(server)),
+  );
+  expect(statuses[0]).toBe(403);
+  expect(statuses[1]).not.toBe(403);
+});

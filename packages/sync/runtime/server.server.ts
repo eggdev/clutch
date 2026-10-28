@@ -1,12 +1,13 @@
 import { CurrentActor } from '@repo/identity/service/current-actor';
 import type { ServerChange } from '@repo/sync/commands/define.server';
+import { originAllowed, syncOrigins } from '@repo/sync/config/origins';
 import { EventLog, EventLogLive } from '@repo/sync/service/event-log';
 import { Sessions } from '@repo/sync/service/sessions';
 import { CommandRejected } from '@repo/sync/types/command-rejected';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import type { Outcome, Transaction } from '@repo/sync/types/protocol';
 import { Effect, Layer, Stream } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { RpcServer } from 'effect/rpc';
 
 /** The path of the sync socket on the server app. */
@@ -20,7 +21,8 @@ function rejected(transaction: Transaction, reason: string): Outcome {
  * The WebSocket protocol of the RPC server, with each socket kept in
  * `Sessions` for its actor. `Sessions.end` can then close the actor's sockets
  * with code 4401. The RPC server upgrades the request itself, so this layer
- * gives it a request whose upgrade also tracks the socket.
+ * gives it a request whose upgrade also tracks the socket. A request from an
+ * origin that `SYNC_ORIGINS` does not list gets 403 before the upgrade.
  */
 const trackedWebsocket = Layer.effect(RpcServer.Protocol)(
   Effect.gen(function* () {
@@ -28,7 +30,13 @@ const trackedWebsocket = Layer.effect(RpcServer.Protocol)(
     const router = yield* HttpRouter.HttpRouter;
     const sessions = yield* Sessions;
     const actor = yield* CurrentActor;
+    const origins = yield* syncOrigins;
     yield* router.add('GET', syncPath, (request) => {
+      if (!originAllowed(request.headers.origin, origins)) {
+        return Effect.succeed(
+          HttpServerResponse.text('This origin may not open the sync socket.', { status: 403 }),
+        );
+      }
       const tracked: HttpServerRequest.HttpServerRequest = Object.create(request, {
         upgrade: {
           value: request.upgrade.pipe(Effect.tap((socket) => sessions.track(actor.userId, socket))),
