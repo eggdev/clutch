@@ -39,6 +39,35 @@ export async function loadPool(
 }
 
 /**
+ * The longest wait for the first paint, in milliseconds. A page that loads
+ * without a paint, such as a background tab, runs no frame callback until it
+ * shows. Without this limit it would not connect, and it would miss live
+ * deltas until a person opened it.
+ */
+const paintWait = 500;
+
+/**
+ * Runs `start` once, in the task after the first paint. A page that loads
+ * hidden has no paint to wait for, so `start` runs at once. A page that has
+ * not painted after `paintWait` starts anyway.
+ */
+export function afterFirstPaint(start: () => void): void {
+  let started = false;
+  const once = () => {
+    if (!started) {
+      started = true;
+      start();
+    }
+  };
+  if (document.visibilityState === 'hidden') {
+    once();
+    return;
+  }
+  requestAnimationFrame(() => setTimeout(once, 0));
+  setTimeout(once, paintWait);
+}
+
+/**
  * Starts the sync engine after the first paint. The transport and its Effect
  * code are a separate chunk that loads here, never before the screen shows.
  */
@@ -46,10 +75,8 @@ export function connectAfterPaint(
   pool: Pool,
   options: { readonly url: string; readonly onSessionEnded: () => void },
 ) {
-  requestAnimationFrame(() => {
-    setTimeout(async () => {
-      const { connect } = await import('@repo/sync/runtime/transport');
-      connect(pool, options);
-    }, 0);
+  afterFirstPaint(async () => {
+    const { connect } = await import('@repo/sync/runtime/transport');
+    connect(pool, options);
   });
 }

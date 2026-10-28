@@ -65,6 +65,37 @@ test('the sender gets the delta of its own transaction over the socket', async (
   });
 });
 
+/** A create-note transaction with the note ID in its transaction ID. */
+const create = (id: string) => ({
+  id: `t-${id}`,
+  command: 'notes/create',
+  input: { id, title: id, at: '2026-10-28T12:00:00.000Z' },
+});
+
+test('another client gets the first delta live, with no second change', async () => {
+  const received = await Effect.runPromise(
+    Effect.gen(function* () {
+      const url = yield* HttpServer.addressFormattedWith((address) =>
+        Effect.succeed(`${address.replace('http', 'ws')}/sync`),
+      );
+      const sender = Effect.gen(function* () {
+        const rpc = yield* RpcClient.make(SyncRpcs);
+        return yield* rpc.Push({ transactions: [create('n1')] });
+      }).pipe(Effect.scoped, Effect.provide(client(url)));
+      return yield* Effect.gen(function* () {
+        const rpc = yield* RpcClient.make(SyncRpcs);
+        const reading = yield* rpc
+          .Pull({ lastSyncId: 0 })
+          .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
+        yield* Effect.sleep('100 millis');
+        yield* sender;
+        return yield* Fiber.join(reading).pipe(Effect.timeout('1 second'));
+      }).pipe(Effect.scoped, Effect.provide(client(url)));
+    }).pipe(Effect.provide(server)),
+  );
+  expect(received.flat().map((delta) => delta.transactionId)).toEqual(['t-n1']);
+});
+
 test('a sign-out closes each socket of the user with code 4401', async () => {
   const result = await Effect.runPromise(
     Effect.gen(function* () {

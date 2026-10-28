@@ -82,6 +82,24 @@ test('a client gets the backlog after its sync ID, then live deltas, its own too
   ).toEqual([[[2, 't2']], [[3, 't4']]]);
 });
 
+test('a client with nothing to catch up gets the first live delta at once', async () => {
+  const received = await run(
+    Effect.gen(function* () {
+      const log = yield* EventLog;
+      yield* log.commit('org-a', 't1', () => Effect.succeed([change('a')]));
+      const reading = yield* log
+        .deltas('org-a', 1)
+        .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
+      yield* Effect.sleep('50 millis');
+      yield* log.commit('org-a', 't2', () => Effect.succeed([change('b')]));
+      return yield* Fiber.join(reading).pipe(Effect.timeout('1 second'));
+    }),
+  );
+  expect(
+    received.map((element) => element.map((delta) => [delta.syncId, delta.transactionId])),
+  ).toEqual([[[2, 't2']]]);
+});
+
 test('the head is the newest sync ID of an organization, or 0', async () => {
   const heads = await run(
     Effect.gen(function* () {

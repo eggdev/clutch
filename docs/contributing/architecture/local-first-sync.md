@@ -76,6 +76,9 @@ the same, so loading the local database needs no decode.
   [client lint rules](../setup/lint-rules.md#client-code) reject the others.
 - The transport and its Effect code load after the first paint. The first
   screen holds no Effect code, and `check-bundle` proves it.
+- A page with no paint still connects. A page that loads hidden connects at
+  once. A background tab gets no frame callback, so it connects after 500 ms.
+  Without this limit, it misses live deltas until a person opens it.
 - One `Pull` element holds at most 1,000 deltas, so one decode stays short.
 - Every client of an organization receives every event of that organization.
   The organization is the only sync group.
