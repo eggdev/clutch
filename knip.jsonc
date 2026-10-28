@@ -10,6 +10,8 @@
         "tools/**/*.test.{ts,tsx}",
         // Lint-staged loads this config through --config in the hooks:pre-commit script.
         "tools/hooks/paths.mjs",
+        // Claude Code and Codex run the agent hooks from .claude/settings.json and .codex/hooks.json.
+        ".agents/hooks/*.ts",
       ],
       "project": ["tools/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },

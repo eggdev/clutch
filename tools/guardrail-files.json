@@ -1,0 +1,26 @@
+{
+  "description": "Files that configure a check, a lint rule, a budget or an agent hook. After kickoff, an agent edit to one of them needs a person's approval, and .github/CODEOWNERS asks a person to review it. See docs/contributing/harness-engineering.md#agent-hooks.",
+  "patterns": [
+    "oxlint.config.ts",
+    "stylelint.config.ts",
+    ".oxfmtrc.json",
+    "knip.jsonc",
+    "nx.json",
+    "package.json",
+    "tsconfig.base.json",
+    "docs/contributing/architecture/primitives.yaml",
+    "tools/lint/**",
+    "tools/check-*.ts",
+    "tools/file-size-budgets.json",
+    "tools/dependency-overrides.yaml",
+    "tools/guardrail-files.json",
+    "tools/agent-hooks/**",
+    "tools/hooks/**",
+    ".agents/hooks/**",
+    ".claude/settings.json",
+    ".codex/hooks.json",
+    ".githooks/**",
+    ".github/workflows/**",
+    ".github/CODEOWNERS"
+  ]
+}

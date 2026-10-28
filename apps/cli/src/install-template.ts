@@ -14,15 +14,18 @@ type FileAction = { path: string; action: 'added' | 'replaced' | 'merged' };
 
 type Merged = { content: string; conflicts: Array<Conflict> };
 
+/** Objects merge key by key, and lists keep the items of both. The template wins a clash. */
+function mergeJson(project: string, template: string): Merged {
+  const merged = mergePackageJson(JSON.parse(project), JSON.parse(template));
+  return { content: `${JSON.stringify(merged.manifest, null, 2)}\n`, conflicts: merged.conflicts };
+}
+
 /** How the merge rule combines the project's copy of a file with the template's, by file name. */
 const mergers: Record<string, (project: string, template: string) => Merged> = {
-  'package.json': (project, template) => {
-    const merged = mergePackageJson(JSON.parse(project), JSON.parse(template));
-    return {
-      content: `${JSON.stringify(merged.manifest, null, 2)}\n`,
-      conflicts: merged.conflicts,
-    };
-  },
+  'package.json': mergeJson,
+  // Agent hook configs. A project keeps its own hooks and settings, and gains the template's hooks.
+  'settings.json': mergeJson,
+  'hooks.json': mergeJson,
   '.gitignore': (project, template) => {
     const own = new Set(project.split('\n').map((line) => line.trim()));
     const missing = template

@@ -1,0 +1,26 @@
+# A person reviews each change to a guardrail file: a file that configures a
+# check, a lint rule, a budget or an agent hook. tools/guardrail-files.json
+# lists them. The check-agent-hooks target keeps this file in step with it.
+# Kickoff replaces @eggdev with the owner of the project.
+
+/oxlint.config.ts @eggdev
+/stylelint.config.ts @eggdev
+/.oxfmtrc.json @eggdev
+/knip.jsonc @eggdev
+/nx.json @eggdev
+/package.json @eggdev
+/tsconfig.base.json @eggdev
+/docs/contributing/architecture/primitives.yaml @eggdev
+/tools/lint/ @eggdev
+/tools/check-*.ts @eggdev
+/tools/file-size-budgets.json @eggdev
+/tools/dependency-overrides.yaml @eggdev
+/tools/guardrail-files.json @eggdev
+/tools/agent-hooks/ @eggdev
+/tools/hooks/ @eggdev
+/.agents/hooks/ @eggdev
+/.claude/settings.json @eggdev
+/.codex/hooks.json @eggdev
+/.githooks/ @eggdev
+/.github/workflows/ @eggdev
+/.github/CODEOWNERS @eggdev

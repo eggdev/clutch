@@ -158,6 +158,13 @@
         },
         "cache": false
       },
+      "check-agent-hooks": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-agent-hooks.ts"
+        },
+        "cache": false
+      },
       "check-decisions": {
         "executor": "nx:run-commands",
         "options": {
@@ -228,6 +235,7 @@
           "check-docs-temporal",
           "check-suppressions",
           "check-terms",
+          "check-agent-hooks",
           "check-structure",
           "check-sentences",
           "check-commands",

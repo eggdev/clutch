@@ -56,6 +56,40 @@ test helper prints:
 A message that names only the problem costs a round trip to find the fix. See
 [checks](./setup/checks.md#checks).
 
+## Agent hooks
+
+Claude Code and Codex run the same hook scripts while an agent works. The
+scripts are in `.agents/hooks/`, and their logic is in `tools/agent-hooks/`.
+`.claude/settings.json` and `.codex/hooks.json` call them.
+
+| Hook               | Runs                         | Does                                                                     |
+| ------------------ | ---------------------------- | ------------------------------------------------------------------------ |
+| `guard-guardrails` | Before an edit               | Asks a person before an edit to a guardrail file                         |
+| `after-edit`       | After an edit                | Lints the edited files, and sends each problem back to the agent         |
+| `end-of-turn`      | When the agent ends its turn | Runs the typecheck, the lint and the repository checks on a changed tree |
+
+A guardrail file configures a check, a lint rule, a budget or an agent hook.
+[`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them.
+The guard starts when kickoff deletes `KICKOFF.md`.
+
+- In Claude Code, the guard shows the user a permission prompt.
+- Codex cannot ask from a hook. The guard refuses the edit, and the agent asks
+  the user.
+- A shell command that writes a file does not trigger the guard. CODEOWNERS is
+  the control that holds: a person reviews each guardrail file at merge.
+
+The end-of-turn hook prints nothing when the checks pass. On a failure, the
+agent continues and fixes it. A turn that the hook already continued ends,
+so the hook never loops.
+
+Codex runs a project hook only after you trust it. Open `/hooks` in Codex,
+and trust each hook once.
+
+`check-agent-hooks` fails when the two configs run different hooks. It also
+fails when `.github/CODEOWNERS` has no owner for a guardrail file.
+
+<!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS. -->
+
 ## Working agreements
 
 - Keep changes scoped. Split large work into smaller steps.

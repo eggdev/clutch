@@ -3,7 +3,8 @@
 # Rules:
 #   replace: write the template's file. The project's copy stays in git history
 #            on its default branch, and the manifest lists it for the interview.
-#   merge:   combine both copies. Supports package.json and .gitignore. For
+#   merge:   combine both copies. Supports package.json, .gitignore and the agent
+#            hook configs (.claude/settings.json, .codex/hooks.json). For
 #            package.json, the template's value wins each clash, and the
 #            manifest lists the clash.
 #   add:     write the template's file. When the project already has the file,
@@ -57,5 +58,12 @@ files:
     rule: add
   - path: .claude/skills/
     rule: add
+  # Agent hooks. The configs merge, so a project keeps its own settings and hooks.
+  - path: .agents/hooks/
+    rule: add
+  - path: .claude/settings.json
+    rule: merge
+  - path: .codex/hooks.json
+    rule: merge
   - path: apps/nx-cache/
     rule: add

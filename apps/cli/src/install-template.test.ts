@@ -218,6 +218,40 @@ test(".gitignore merges: the project keeps its entries and gains the template's"
   expect(manifest.files).toEqual([{ path: '.gitignore', action: 'merged' }]);
 });
 
+/** A hook group that runs one command. */
+const hook = (command: string) => ({ hooks: [{ type: 'command', command }] });
+
+test("a project's Claude Code settings merge: it keeps its hooks and gains the template's", async () => {
+  await using template = await gitRepo({
+    'template.files.yaml': 'files:\n  - path: .claude/settings.json\n    rule: merge\n',
+    '.claude/settings.json': JSON.stringify({ hooks: { Stop: [hook('template stop')] } }),
+  });
+  await using project = await gitRepo(
+    {
+      'package.json': '{}',
+      '.claude/settings.json': JSON.stringify({
+        model: 'opus',
+        hooks: { Stop: [hook('project stop')] },
+      }),
+    },
+    { name: 'shop' },
+  );
+
+  const { manifest } = await installTemplate({
+    project: await existing(project.root),
+    template: template.root,
+  });
+
+  const settings = JSON.parse(
+    await readFile(path.join(project.root, '.claude/settings.json'), 'utf-8'),
+  );
+  expect(settings).toEqual({
+    model: 'opus',
+    hooks: { Stop: [hook('project stop'), hook('template stop')] },
+  });
+  expect(manifest.files).toEqual([{ path: '.claude/settings.json', action: 'merged' }]);
+});
+
 test("each entry in this template's copy list names tracked files", async () => {
   const root = path.resolve(import.meta.dir, '../../..');
   const list = Bun.YAML.parse(await readFile(path.join(root, 'template.files.yaml'), 'utf-8')) as {

@@ -1,0 +1,40 @@
+{
+  "description": "Agent hooks for this repository. The scripts are shared with Claude Code. See docs/contributing/harness-engineering.md#agent-hooks.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && mise exec -- bun .agents/hooks/guard-guardrails.ts codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && mise exec -- bun .agents/hooks/after-edit.ts codex",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && mise exec -- bun .agents/hooks/end-of-turn.ts codex",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}
