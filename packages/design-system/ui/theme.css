@@ -1,0 +1,69 @@
+/*
+ * The token file. Each role from docs/contributing/architecture/styling.md has
+ * a value for each scheme. `@theme` maps the roles to Tailwind classes, and
+ * starts from `--*: initial`, so no default Tailwind color, font or radius works.
+ */
+@import 'tailwindcss';
+
+@theme {
+  --*: initial;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-hover: var(--hover);
+  --color-press: var(--press);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-on-accent: var(--on-accent);
+  --color-line: var(--line);
+  --color-focus: var(--focus);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-danger: var(--danger);
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --text-caption: 0.8125rem;
+  --text-body: 1rem;
+  --text-title: 1.25rem;
+  --text-heading: 1.75rem;
+  --radius-control: 0.5rem;
+  --radius-surface: 0.75rem;
+  --spacing: 0.25rem;
+  --breakpoint-desktop: 64rem;
+}
+
+:root {
+  --speed-instant: 0ms;
+  --speed-quick: 120ms;
+  --speed-fade-out: 150ms;
+  --speed-regular: 200ms;
+  --speed-slow: 300ms;
+  --bg: oklch(98.5% 0 0);
+  --surface: oklch(100% 0 0);
+  --surface-raised: oklch(100% 0 0);
+  --hover: oklch(96% 0 0);
+  --press: oklch(93% 0 0);
+  --fg: oklch(22% 0 0);
+  --fg-muted: oklch(48% 0 0);
+  --on-accent: oklch(99% 0 0);
+  --line: oklch(90% 0 0);
+  --focus: oklch(55% 0.18 255);
+  --accent: oklch(52% 0.19 255);
+  --accent-hover: oklch(47% 0.19 255);
+  --danger: oklch(54% 0.2 27);
+}
+
+.dark {
+  --bg: oklch(17% 0 0);
+  --surface: oklch(21% 0 0);
+  --surface-raised: oklch(25% 0 0);
+  --hover: oklch(27% 0 0);
+  --press: oklch(31% 0 0);
+  --fg: oklch(95% 0 0);
+  --fg-muted: oklch(72% 0 0);
+  --on-accent: oklch(99% 0 0);
+  --line: oklch(32% 0 0);
+  --focus: oklch(70% 0.15 255);
+  --accent: oklch(64% 0.17 255);
+  --accent-hover: oklch(69% 0.17 255);
+  --danger: oklch(68% 0.18 27);
+}

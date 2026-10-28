@@ -1,0 +1,21 @@
+{
+  "name": "@repo/identity",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "effect": "4.0.7"
+  },
+  "nx": {
+    "tags": [
+      "type:package"
+    ],
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/test-budget.ts 60 -- bun test packages/identity"
+        }
+      }
+    }
+  }
+}

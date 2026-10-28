@@ -1,0 +1,65 @@
+import { expect, test } from 'bun:test';
+
+import { BunHttpServer } from '@effect/platform-bun';
+import { CurrentActorTest } from '@repo/identity/testing/actor';
+import { DatabasePglite } from '@repo/sync/runtime/database.server';
+import { SyncRpcs } from '@repo/sync/types/protocol';
+import { Effect, Fiber, Layer, Stream } from 'effect';
+import { HttpServer } from 'effect/http';
+import { RpcClient, RpcSerialization } from 'effect/rpc';
+import { Socket } from 'effect/socket';
+
+import { api } from '@/server';
+
+const server = api(DatabasePglite()).pipe(
+  Layer.provide(CurrentActorTest()),
+  Layer.provideMerge(BunHttpServer.layerTest),
+);
+
+function client(url: string) {
+  return RpcClient.layerProtocolSocket().pipe(
+    Layer.provide(Socket.layerWebSocket(url)),
+    Layer.provide(Socket.layerWebSocketConstructorGlobal),
+    Layer.provide(RpcSerialization.layerJson),
+  );
+}
+
+test('the sender gets the delta of its own transaction over the socket', async () => {
+  const result = await Effect.runPromise(
+    Effect.gen(function* () {
+      const url = yield* HttpServer.addressFormattedWith((address) =>
+        Effect.succeed(`${address.replace('http', 'ws')}/sync`),
+      );
+      return yield* Effect.gen(function* () {
+        const rpc = yield* RpcClient.make(SyncRpcs);
+        const reading = yield* rpc
+          .Pull({ lastSyncId: 0 })
+          .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
+        yield* Effect.sleep('100 millis');
+        const outcomes = yield* rpc.Push({
+          transactions: [
+            {
+              id: 't1',
+              command: 'notes/create',
+              input: { id: 'n1', title: 'Hello', at: '2026-10-28T12:00:00.000Z' },
+            },
+            {
+              id: 't2',
+              command: 'notes/rename',
+              input: { id: 'missing', title: 'x', at: '2026-10-28T12:00:00.000Z' },
+            },
+          ],
+        });
+        const [deltas] = yield* Fiber.join(reading);
+        return { outcomes, deltas };
+      }).pipe(Effect.scoped, Effect.provide(client(url)));
+    }).pipe(Effect.provide(server)),
+  );
+  expect(result.outcomes.map((outcome) => outcome.status)).toEqual(['accepted', 'rejected']);
+  expect(result.deltas?.[0]?.transactionId).toBe('t1');
+  expect(result.deltas?.[0]?.changes[0]).toMatchObject({
+    model: 'Note',
+    id: 'n1',
+    data: { title: 'Hello' },
+  });
+});

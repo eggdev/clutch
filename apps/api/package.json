@@ -1,0 +1,33 @@
+{
+  "name": "api",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@effect/platform-bun": "4.0.7",
+    "@repo/identity": "workspace:*",
+    "@repo/notes": "workspace:*",
+    "@repo/sync": "workspace:*",
+    "effect": "4.0.7"
+  },
+  "nx": {
+    "tags": [
+      "platform:server"
+    ],
+    "targets": {
+      "dev": {
+        "executor": "nx:run-commands",
+        "continuous": true,
+        "options": {
+          "command": "bun --watch src/main.ts",
+          "cwd": "apps/api"
+        }
+      },
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/test-budget.ts 60 -- bun test apps/api"
+        }
+      }
+    }
+  }
+}

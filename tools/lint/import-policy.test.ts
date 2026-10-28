@@ -111,8 +111,10 @@ test('a feature never imports another feature, and private sections stay in thei
       'apps/api/src/main.ts': 'import "@repo/notes/runtime/handlers.server";',
       'packages/notes/runtime/handlers.server.ts': 'import "@repo/notes/commands/rename.server";',
       'packages/billing/test/charge.test.ts': 'import "@repo/notes/runtime/live.server";',
+      'packages/notes/testing/notes.ts':
+        'import "@repo/notes/service/notes"; import "@repo/sync/repo/schema";',
     }),
-  ).toEqual([]);
+  ).toEqual(['packages/notes/testing/notes.ts section-access']);
 });
 
 test('client code never imports server code, and server code may', async () => {

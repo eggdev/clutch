@@ -34,6 +34,8 @@ version: 1
 groups:
   - id: repository
     name: Repository
+  - id: product
+    name: Product
 
 primitives:
   - id: review-runtime
@@ -79,7 +81,122 @@ primitives:
       - apps/nx-cache/README.md
       - docs/contributing/setup/nx.md
 
-languages: []
+  - id: sync
+    group: product
+    name: Sync engine
+    kind: package
+    summary: The object pool, the local database, the event log and the socket that keep each client in step.
+    code:
+      - packages/sync/
+    docs:
+      - docs/contributing/architecture/local-first-sync.md
+    vendors:
+      - vendor: IndexedDB through idb
+        imports: ^idb(?:/|$)
+      - vendor: PGlite
+        imports: ^(?:@electric-sql/pglite|@effect/sql-pglite)(?:/|$)
+      - vendor: Postgres driver
+        imports: ^@effect/sql-pg(?:/|$)
+
+  - id: identity
+    group: product
+    name: Identity
+    kind: package
+    summary: The actor of each connection, and its organization.
+    code:
+      - packages/identity/
+    docs:
+      - docs/contributing/architecture/request-context.md
+
+  - id: notes
+    group: product
+    name: Notes
+    kind: package
+    summary: The example package. It shows each section, from types to a Test Layer.
+    code:
+      - packages/notes/
+    docs:
+      - docs/contributing/architecture/index.md
+
+  - id: design-system
+    group: product
+    name: Design system
+    kind: package
+    summary: The token file and the shared components.
+    code:
+      - packages/design-system/
+    docs:
+      - docs/contributing/architecture/styling.md
+
+  - id: notes-feature
+    group: product
+    name: Notes feature
+    kind: feature
+    summary: The notes screen and its gate.
+    code:
+      - features/notes/
+    docs:
+      - docs/principles/one-gate-per-feature.md
+
+  - id: web
+    group: product
+    name: Web app
+    kind: app
+    summary: The Vite app. It loads the object pool before the first paint and starts sync after it.
+    code:
+      - apps/web/
+    docs:
+      - docs/principles/fast-first-load.md
+
+  - id: api
+    group: product
+    name: API
+    kind: app
+    summary: The Bun server. It runs the sync socket and selects the database driver.
+    code:
+      - apps/api/
+    docs:
+      - docs/contributing/architecture/local-first-sync.md
+
+languages:
+  - imports: ^react(?:-dom)?(?:/|$)
+    where: '`ui/`, features, apps and `@repo/design-system`'
+    primitives:
+      - design-system
+    packagePaths:
+      - ui/
+      - testing/
+    files:
+      - /apps/web/
+      - /features/
+  - imports: ^@tanstack/
+    where: '`apps/web`'
+    files:
+      - /apps/web/
+  - imports: ^effect(?:/|$)
+    where: '`types/`, `config/`, `repo/`, `service/`, `runtime/`, `testing/`, `.server` files, tests, `packages/sync` and the API'
+    primitives:
+      - sync
+    packagePaths:
+      - types/
+      - config/
+      - repo/
+      - service/
+      - runtime/
+      - testing/
+    files:
+      - \.server\.[cm]?[jt]sx?$
+      - \.test\.[cm]?[jt]sx?$
+      - /apps/api/
+  - imports: ^drizzle-orm(?:/|$)
+    where: '`repo/`, `service/`, `.server` files and `packages/sync`'
+    primitives:
+      - sync
+    packagePaths:
+      - repo/
+      - service/
+    files:
+      - \.server\.[cm]?[jt]sx?$
 
 invariants: []
 

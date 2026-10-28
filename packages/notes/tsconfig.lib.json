@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "out-tsc/lib",
+    "tsBuildInfoFile": "out-tsc/lib/tsconfig.lib.tsbuildinfo",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "types": []
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "testing/**",
+    "out-tsc/**",
+    "node_modules/**",
+    "dist/**"
+  ],
+  "references": [
+    {
+      "path": "../identity/tsconfig.lib.json"
+    },
+    {
+      "path": "../sync/tsconfig.lib.json"
+    }
+  ]
+}

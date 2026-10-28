@@ -1,0 +1,5 @@
+@import '../../../packages/design-system/ui/theme.css';
+
+@source '../../../features';
+@source '../../../packages/design-system/ui';
+@source '../../../packages/notes/ui';

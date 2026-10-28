@@ -1,0 +1,27 @@
+{
+  "name": "@features/notes",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@repo/design-system": "workspace:*",
+    "@repo/notes": "workspace:*",
+    "@repo/sync": "workspace:*",
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0"
+  },
+  "nx": {
+    "tags": [
+      "type:feature"
+    ],
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/test-budget.ts 60 -- bun test features/notes"
+        }
+      }
+    }
+  }
+}

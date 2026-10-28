@@ -11,6 +11,27 @@
     },
     {
       "path": "./packages/runtime"
+    },
+    {
+      "path": "./packages/design-system"
+    },
+    {
+      "path": "./packages/identity"
+    },
+    {
+      "path": "./features/notes"
+    },
+    {
+      "path": "./packages/notes"
+    },
+    {
+      "path": "./packages/sync"
+    },
+    {
+      "path": "./apps/api"
+    },
+    {
+      "path": "./apps/web"
     }
   ]
 }

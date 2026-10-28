@@ -41,3 +41,6 @@ __pycache__/
 
 # Local review state
 .state/
+
+# Local PGlite data for the API in development.
+.data/

@@ -1,0 +1,34 @@
+{
+  "name": "@repo/notes",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@repo/identity": "workspace:*",
+    "@repo/sync": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.5",
+    "effect": "4.0.7"
+  },
+  "devDependencies": {
+    "drizzle-kit": "1.0.0-rc.5"
+  },
+  "nx": {
+    "tags": [
+      "type:package"
+    ],
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/test-budget.ts 60 -- bun test packages/notes"
+        }
+      },
+      "db-generate": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "drizzle-kit generate",
+          "cwd": "packages/notes"
+        }
+      }
+    }
+  }
+}

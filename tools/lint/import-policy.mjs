@@ -138,12 +138,16 @@ function isServerApp(root, name) {
   return serverApps.get(file);
 }
 
-/** Whether a file runs only on the server, so it may import server code. */
+/**
+ * Whether a file runs only on the server, so it may import server code. Tests
+ * and `testing/` count: only tests load them.
+ */
 function isServerFile(file, filename) {
   return (
     isTestFile(filename) ||
     isServerPath(filename.replace(/\.[cm]?[jt]sx?$/u, '')) ||
-    (file.tier === 'packages' && serverSections.has(file.section)) ||
+    (file.tier === 'packages' &&
+      (serverSections.has(file.section) || file.section === 'testing')) ||
     (file.tier === 'apps' && isServerApp(file.root, file.name)) ||
     file.tier === 'tools'
   );

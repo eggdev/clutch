@@ -1,0 +1,41 @@
+{
+  "name": "@repo/sync",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@effect/sql-pg": "4.0.7",
+    "@effect/sql-pglite": "4.0.7",
+    "@electric-sql/pglite": "0.5.13",
+    "@repo/identity": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.5",
+    "effect": "4.0.7",
+    "idb": "8.0.4",
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "drizzle-kit": "1.0.0-rc.5",
+    "react-dom": "19.3.1"
+  },
+  "nx": {
+    "tags": [
+      "type:package"
+    ],
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/test-budget.ts 60 -- bun test packages/sync"
+        }
+      },
+      "db-generate": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "drizzle-kit generate",
+          "cwd": "packages/sync"
+        }
+      }
+    }
+  }
+}

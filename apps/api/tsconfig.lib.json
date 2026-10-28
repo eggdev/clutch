@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "out-tsc/lib",
+    "tsBuildInfoFile": "out-tsc/lib/tsconfig.lib.tsbuildinfo",
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "testing/**",
+    "out-tsc/**",
+    "node_modules/**",
+    "dist/**"
+  ],
+  "references": [
+    {
+      "path": "../../packages/sync/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/notes/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/identity/tsconfig.lib.json"
+    }
+  ]
+}

@@ -54,6 +54,17 @@ export default defineConfig({
     'no-negated-condition': 'off',
     // `import/no-duplicates` covers this and fixes it.
     'no-duplicate-imports': 'off',
+    // Effect code passes anonymous generators to `Effect.gen`. A name on each
+    // one adds noise and no stack trace detail, so generators may stay anonymous.
+    'func-names': ['error', 'always', { generators: 'never' }],
+    // Effect Schema declares a value and a type with one name, such as `Note`.
+    // The base rule reads that as a redeclaration. TypeScript reports a real
+    // redeclaration (TS2451), so this rule adds nothing.
+    'no-redeclare': 'off',
+    // Effect builds error classes with calls such as `Schema.TaggedError<E>()`.
+    // The rule reads each call to a name that ends in `Error` as a missing `new`.
+    // TypeScript checks what a `throw` throws.
+    'unicorn/throw-new-error': 'off',
     // Destructure objects. `items[0]` reads better than `const [item] = items`.
     'prefer-destructuring': ['error', { object: true, array: false }],
     // `x as unknown as T` and widen-then-assert are casts that skip the type
@@ -86,7 +97,16 @@ export default defineConfig({
       // Add a route here when its gate exists. See
       // docs/principles/one-gate-per-feature.md.
       files: ['apps/*/**/*.{ts,tsx}', 'features/*/**/*.{ts,tsx}', 'packages/*/**/*.{ts,tsx}'],
-      rules: { 'repo-gates/one-gate': ['error', { gates: {} }] },
+      rules: {
+        'repo-gates/one-gate': [
+          'error',
+          {
+            gates: {
+              '/notes': { gate: 'features/notes/gate.ts', routes: 'apps/web/src/routes/notes' },
+            },
+          },
+        ],
+      },
     },
     {
       // Tools load these files through their default export.
@@ -98,6 +118,12 @@ export default defineConfig({
         'tools/lint/gate-policy.mjs',
       ],
       rules: { 'import/no-default-export': 'off' },
+    },
+    {
+      // TanStack Router registers its router by module augmentation, which
+      // needs an `interface`.
+      files: ['apps/web/src/router.ts'],
+      rules: { 'typescript/consistent-type-definitions': 'off' },
     },
     {
       // The Workers runtime loads a worker entry through its default export.

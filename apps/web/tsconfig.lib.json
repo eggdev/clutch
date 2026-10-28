@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "out-tsc/lib",
+    "tsBuildInfoFile": "out-tsc/lib/tsconfig.lib.tsbuildinfo",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "testing/**",
+    "out-tsc/**",
+    "node_modules/**",
+    "dist/**"
+  ],
+  "references": [
+    {
+      "path": "../../packages/sync/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/notes/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/design-system/tsconfig.lib.json"
+    },
+    {
+      "path": "../../features/notes/tsconfig.lib.json"
+    }
+  ]
+}
