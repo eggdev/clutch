@@ -42,7 +42,7 @@ export function layoutProblems(root: string, folder: string): Array<string> {
     }
     if (!entry.isDirectory() || !folderName.test(entry.name)) {
       problems.push(
-        `${where}: drizzle-kit did not write this. Delete it, change \`repo/schema.ts\`, and run \`mise exec -- bun nx run <package>:db-generate\`.`,
+        `${where}: drizzle-kit did not write this. Delete it, change \`repo/schema.ts\`, and run \`mise exec -- bun nx run @repo/<package>:db-generate\`.`,
       );
       continue;
     }
@@ -77,7 +77,7 @@ export function drizzleProblems(root: string, folder: string): Array<string> {
   }
   const notes = [...(output.warnings ?? []), ...(output.errors ?? [])].map(
     (note) =>
-      `${folder}: ${note.message ?? 'drizzle-kit check found a problem.'} Run \`mise exec -- bun nx run ${path.basename(folder)}:db-generate\`, and commit the migration.`,
+      `${folder}: ${note.message ?? 'drizzle-kit check found a problem.'} Run \`mise exec -- bun nx run @repo/${path.basename(folder)}:db-generate\`, and commit the migration.`,
   );
   if (output.status !== 'ok' && !notes.length) {
     notes.push(`${folder}: drizzle-kit check returned \`${output.status}\`.`);

@@ -166,7 +166,7 @@ test('a model gets a table only in a package with repo/, and only drizzle-kit wr
     const problems = checkDb(folder);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toEndWith(
-      'Run `mise exec -- bun nx run ledger:db-generate`, and commit the migration.',
+      'Run `mise exec -- bun nx run @repo/ledger:db-generate`, and commit the migration.',
     );
   });
 });

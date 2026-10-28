@@ -17,7 +17,7 @@ with a `snapshot.json`. Each package's `drizzle.config.ts` names both paths.
 
 | Task               | Command                                                                           |
 | ------------------ | --------------------------------------------------------------------------------- |
-| Make a migration   | `mise exec -- bun nx run <package>:db-generate`                                   |
+| Make a migration   | `mise exec -- bun nx run @repo/<package>:db-generate`                             |
 | Apply migrations   | Start the API. `apps/api/src/server.ts` runs them first.                          |
 | Register a package | The `package` generator adds its `migrate` function to `apps/api/src/packages.ts` |
 

@@ -31,7 +31,7 @@ record until `--record` names one. A package with `repo/` needs `runtime/` and
 a record.
 
 No generator writes a migration. After a schema change, run
-`mise exec -- bun nx run <package>:db-generate`. See
+`mise exec -- bun nx run @repo/<package>:db-generate`. See
 [migrations](./migrations.md#only-drizzle-kit-writes-migrations).
 
 Each generator then installs the workspace links, runs `nx sync` for the

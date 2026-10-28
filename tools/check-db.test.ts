@@ -34,7 +34,7 @@ test('a hand-written migration or a changed folder fails with the fix', async ()
     checkDb,
   );
   expect(problems).toEqual([
-    'packages/demo/repo/migrations/0001_init.sql: drizzle-kit did not write this. Delete it, change `repo/schema.ts`, and run `mise exec -- bun nx run <package>:db-generate`.',
+    'packages/demo/repo/migrations/0001_init.sql: drizzle-kit did not write this. Delete it, change `repo/schema.ts`, and run `mise exec -- bun nx run @repo/<package>:db-generate`.',
     'packages/demo/repo/migrations/20261028120000_init: holds migration.sql, notes.md, snapshot.json, but drizzle-kit writes only migration.sql and snapshot.json. Restore the folder from main, or generate a new migration.',
   ]);
 });
@@ -67,7 +67,7 @@ test('a schema change with no migration fails, and passes once drizzle-kit write
   expect(results.changed).toHaveLength(1);
   expect(results.changed[0]).toStartWith('packages/demo: The schema differs from the migrations.');
   expect(results.changed[0]).toEndWith(
-    'Run `mise exec -- bun nx run demo:db-generate`, and commit the migration.',
+    'Run `mise exec -- bun nx run @repo/demo:db-generate`, and commit the migration.',
   );
   expect(results.regenerated).toEqual([]);
 });
