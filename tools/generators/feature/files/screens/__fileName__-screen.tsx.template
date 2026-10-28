@@ -1,0 +1,8 @@
+/** The <%= title %> screen. Its gate, `open<%= className %>`, is the only way here. */
+export function <%= className %>Screen() {
+  return (
+    <main className="mx-auto flex max-w-xl flex-col gap-4 p-4">
+      <h1 className="text-heading text-fg"><%= heading %></h1>
+    </main>
+  );
+}

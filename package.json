@@ -6,7 +6,8 @@
   "workspaces": [
     "apps/*",
     "features/*",
-    "packages/*"
+    "packages/*",
+    "tools/generators"
   ],
   "type": "module",
   "scripts": {
@@ -106,6 +107,13 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/check-suppressions.ts"
+        },
+        "cache": false
+      },
+      "check-structure": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-structure.ts"
         },
         "cache": false
       },
@@ -220,6 +228,7 @@
           "check-docs-temporal",
           "check-suppressions",
           "check-terms",
+          "check-structure",
           "check-sentences",
           "check-commands",
           "check-vendor-leaks",

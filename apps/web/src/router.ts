@@ -6,6 +6,7 @@ import { rootRoute } from '@/routes/root';
 
 /** Code-based routes. A route renders a screen; a gate loads what it needs. No route loaders. */
 export const router = createRouter({
+  // The `feature` generator adds each feature's route here.
   routeTree: rootRoute.addChildren([homeRoute, notesRoute]),
 });
 

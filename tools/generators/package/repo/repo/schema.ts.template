@@ -1,0 +1,11 @@
+import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+
+/** The owner records of <%= title %>. Each one belongs to one organization. */
+export const <%= tableName %> = pgTable('<%= sqlName %>', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
+});
+
+export type <%= className %>Row = typeof <%= tableName %>.$inferSelect;

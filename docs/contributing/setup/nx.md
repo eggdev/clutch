@@ -13,6 +13,31 @@ Prefix each command with `mise exec -- bun`. That uses the workspace's pinned
 Bun and Nx, and never a global CLI. The root project is named after the root
 `package.json`. Packages are `@repo/<package>`.
 
+## Generators
+
+Make a package, a feature, a command or a model with a generator. Do not copy
+files by hand. A generator writes the shape that the checks expect, then
+registers the result.
+
+| Generator | Example                                                                                              | Writes and registers                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `package` | `mise exec -- bun nx g @tools/generators:package billing --sections=types,models,repo`               | Only the named sections, the first record, its table in `repo/`, and a primitive                        |
+| `model`   | `mise exec -- bun nx g @tools/generators:model billing invoice`                                      | The record schema in `types/` and its model in `models/`                                                |
+| `command` | `mise exec -- bun nx g @tools/generators:command billing pay-invoice --model=invoice --waits=server` | The paired command files, the input schema, and both halves in `runtime/` and in the apps               |
+| `feature` | `mise exec -- bun nx g @tools/generators:feature billing`                                            | The gate, a screen, `components/`, a route in `apps/web`, the gate in the lint options, and a primitive |
+
+Each generator then installs the workspace links, runs `nx sync` for the
+tsconfig references, and formats each file. Add `--dry-run` to see the files
+first.
+
+A generated command rejects each run until you write its server change. A
+generated feature has no caller. The first button or link that opens it calls
+the gate.
+
+The generators are a local Nx plugin in `tools/generators/`. Node loads them
+with its built-in type stripping. One generator file imports another with the
+`.ts` extension, because Node does not read tsconfig `paths`.
+
 ## Cache keys
 
 Nx hashes the inputs of each target and reuses a stored result when the hash

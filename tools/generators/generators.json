@@ -1,0 +1,24 @@
+{
+  "generators": {
+    "package": {
+      "factory": "./package/generator.ts#packageGenerator",
+      "schema": "./package/schema.json",
+      "description": "A package with only the sections it needs, its first record and its primitive."
+    },
+    "feature": {
+      "factory": "./feature/generator.ts#featureGenerator",
+      "schema": "./feature/schema.json",
+      "description": "A feature with its gate, a screen, its route in the web app and its primitive."
+    },
+    "command": {
+      "factory": "./command/generator.ts#commandGenerator",
+      "schema": "./command/schema.json",
+      "description": "A command as paired files, registered in the package and the apps."
+    },
+    "model": {
+      "factory": "./model/generator.ts#modelGenerator",
+      "schema": "./model/schema.json",
+      "description": "A record schema in types/ and its model in models/."
+    }
+  }
+}

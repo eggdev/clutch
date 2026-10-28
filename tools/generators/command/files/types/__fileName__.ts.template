@@ -1,0 +1,8 @@
+import { Schema } from 'effect';
+
+/** The input of the `<%= packageName %>/<%= fileName %>` command. */
+export const <%= className %>Input = Schema.Struct({
+  id: Schema.String,
+  at: Schema.String,
+});
+export type <%= className %>Input = typeof <%= className %>Input.Type;

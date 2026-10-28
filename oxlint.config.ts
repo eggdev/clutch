@@ -271,7 +271,7 @@ export default defineConfig({
     {
       // TanStack Router registers its router by module augmentation, which
       // needs an `interface`.
-      files: ['apps/web/src/router.ts'],
+      files: ['**/apps/web/src/router.ts'],
       rules: { 'typescript/consistent-type-definitions': 'off' },
     },
     {

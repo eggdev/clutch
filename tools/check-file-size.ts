@@ -18,7 +18,7 @@ async function countLines(file: string) {
 }
 
 /** The files that Git ignores, such as build output. None when `root` is not a repository. */
-function ignoredByGit(root: string, files: Array<string>): Set<string> {
+export function ignoredByGit(root: string, files: Array<string>): Set<string> {
   const run = Bun.spawnSync(['git', 'check-ignore', '--stdin'], {
     cwd: root,
     stdin: new TextEncoder().encode(files.join('\n')),

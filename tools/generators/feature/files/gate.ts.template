@@ -1,0 +1,8 @@
+/**
+ * The one way into the <%= title %> feature. Settle what the feature needs
+ * here, such as records or a permission, then navigate once.
+ * See docs/principles/one-gate-per-feature.md.
+ */
+export function open<%= className %>(navigate: (href: string) => void) {
+  navigate('/<%= fileName %>');
+}

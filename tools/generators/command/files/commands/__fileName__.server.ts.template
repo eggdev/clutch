@@ -1,0 +1,16 @@
+import { <%= propertyName %> } from '@repo/<%= packageName %>/commands/<%= fileName %>';
+import { <%= className %>Input } from '@repo/<%= packageName %>/types/<%= fileName %>';
+import { defineServerChange } from '@repo/sync/commands/define.server';
+import { CommandRejected } from '@repo/sync/types/command-rejected';
+import { Effect } from 'effect';
+
+/**
+ * The server half of `<%= packageName %>/<%= fileName %>`. Until you write it, each run is
+ * rejected. Write the owner records with `db`, check access with `actor`, and
+ * return each record it changed.
+ */
+export const <%= propertyName %>Server = defineServerChange(<%= propertyName %>, <%= className %>Input, () =>
+  Effect.fail(
+    new CommandRejected({ reason: 'The <%= packageName %>/<%= fileName %> command has no server change yet.' }),
+  ),
+);

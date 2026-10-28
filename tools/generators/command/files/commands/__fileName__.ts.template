@@ -1,0 +1,15 @@
+import { <%= modelProperty %>Model } from '@repo/<%= packageName %>/models/<%= modelFile %>';
+import type { <%= className %>Input } from '@repo/<%= packageName %>/types/<%= fileName %>';
+import { defineCommand } from '@repo/sync/commands/define';
+
+/** Say what the command changes. The local change shows at once; the server confirms it later. */
+export const <%= propertyName %> = defineCommand<<%= className %>Input>({
+  name: '<%= packageName %>/<%= fileName %>',
+  waits: '<%= waits %>',
+  apply: (draft, input) => {
+    const record = draft.get(<%= modelProperty %>Model, input.id);
+    if (record) {
+      draft.put(<%= modelProperty %>Model, { ...record, updatedAt: input.at });
+    }
+  },
+});

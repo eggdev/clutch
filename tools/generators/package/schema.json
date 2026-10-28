@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "package",
+  "title": "Add a package",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The package name, in kebab case, such as billing.",
+      "$default": { "$source": "argv", "index": 0 }
+    },
+    "sections": {
+      "type": "string",
+      "description": "The sections to make, separated by commas. types is required.",
+      "default": "types,models,commands,runtime,ui,testing"
+    },
+    "record": {
+      "type": "string",
+      "description": "The first record, in kebab case. It defaults to the package name."
+    },
+    "summary": {
+      "type": "string",
+      "description": "One line, at most 120 characters, for the primitives registry.",
+      "default": "Say what this package owns."
+    }
+  },
+  "required": ["name"]
+}

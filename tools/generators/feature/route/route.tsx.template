@@ -1,0 +1,11 @@
+import { <%= className %>Screen } from '@features/<%= fileName %>/screens/<%= fileName %>-screen';
+import { createRoute } from '@tanstack/react-router';
+
+import { rootRoute } from '@/routes/root';
+
+/** The <%= title %> screen. Only its gate, `open<%= className %>`, navigates here. */
+export const <%= propertyName %>Route = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/<%= fileName %>',
+  component: <%= className %>Screen,
+});

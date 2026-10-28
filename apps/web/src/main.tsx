@@ -1,4 +1,3 @@
-import { notesCommands } from '@repo/notes/runtime/commands';
 import { connectAfterPaint, loadPool } from '@repo/sync/runtime/boot';
 import { openLocalDatabase } from '@repo/sync/runtime/local-database';
 import { SyncProvider } from '@repo/sync/ui/sync-provider';
@@ -6,6 +5,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { commands } from '@/commands';
 import { router } from '@/router';
 
 import '@/styles.css';
@@ -15,7 +15,7 @@ import '@/styles.css';
  * local database, renders, and only then starts the sync engine.
  */
 const database = await openLocalDatabase('web');
-const pool = await loadPool(database, notesCommands);
+const pool = await loadPool(database, commands);
 const root = document.querySelector('#root');
 if (root) {
   createRoot(root).render(

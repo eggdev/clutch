@@ -25,6 +25,17 @@
       // not read. `@tailwindcss/vite` also needs it as a peer.
       "ignoreDependencies": ["tailwindcss"],
     },
+    "tools/generators": {
+      // Nx loads each generator through generators.json.
+      "entry": ["*/generator.ts", "**/*.test.ts"],
+      "project": ["**/*.ts"],
+    },
+    "features/*": {
+      // A gate is the way into its feature. A new feature has no caller yet:
+      // the first button or link that opens it calls the gate.
+      "entry": ["gate.ts", "**/*.test.{ts,tsx}"],
+      "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+    },
     "{apps,features,packages}/*": {
       // Bun test runs every test file.
       "entry": ["**/*.test.{ts,tsx}"],

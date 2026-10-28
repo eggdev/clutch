@@ -1,0 +1,7 @@
+# <%= heading %>
+
+<%= summary %>
+
+This package has these sections: <%= sectionList %>. See
+[package sections](../../docs/contributing/architecture/index.md) for what each
+one holds and who may import it.

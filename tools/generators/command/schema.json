@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "command",
+  "title": "Add a command to a package",
+  "type": "object",
+  "properties": {
+    "package": {
+      "type": "string",
+      "description": "The package folder name under packages/.",
+      "$default": { "$source": "argv", "index": 0 }
+    },
+    "name": {
+      "type": "string",
+      "description": "The command name, in kebab case, such as archive-invoice.",
+      "$default": { "$source": "argv", "index": 1 }
+    },
+    "model": {
+      "type": "string",
+      "description": "The model that the local change writes, such as invoice. It must exist."
+    },
+    "waits": {
+      "type": "string",
+      "enum": ["local", "server"],
+      "description": "local: the screen shows the change at once. server: the screen waits for the server."
+    }
+  },
+  "required": ["package", "name", "model", "waits"]
+}

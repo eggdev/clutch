@@ -6,7 +6,8 @@
     "emitDeclarationOnly": false,
     "declarationMap": false,
     "allowJs": true,
-    "types": ["bun"]
+    "types": ["bun"],
+    "allowImportingTsExtensions": true
   },
   "include": ["**/*.ts"]
 }
