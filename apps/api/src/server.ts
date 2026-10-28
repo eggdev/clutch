@@ -3,6 +3,7 @@ import { migrateNotes } from '@repo/notes/runtime/migrate.server';
 import { migrateSync } from '@repo/sync/runtime/migrate.server';
 import { SyncServer } from '@repo/sync/runtime/server.server';
 import { Database } from '@repo/sync/service/database';
+import { SessionsLive } from '@repo/sync/service/sessions';
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/http';
 import { RpcSerialization } from 'effect/rpc';
@@ -24,5 +25,7 @@ export function api<E, R>(database: Layer.Layer<Database, E, R>) {
   return HttpRouter.serve(SyncServer(notesServerChanges)).pipe(
     Layer.provide(RpcSerialization.layerJson),
     Layer.provide(Layer.provideMerge(migrated, database)),
+    // The app keeps `Sessions`, so a sign-out can end a user's sockets.
+    Layer.provideMerge(SessionsLive),
   );
 }

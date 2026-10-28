@@ -16,8 +16,8 @@ network.
 - After the first load, a service worker precaches the remaining hashed
   assets. Later navigations read from the cache.
 - Inline the CSS that paints the app shell. An inline script reads the last
-  shell settings from device storage, such as the theme and the sidebar width,
-  and applies them before the first paint.
+  shell settings from device storage, such as the theme and the sidebar width.
+  It applies them before the first paint.
 - Use one variable font file for each family. Preload it with
   `crossorigin="anonymous"` and declare it with `font-display: swap`.
 - Each budget in [client performance](../contributing/architecture/client-performance.md)

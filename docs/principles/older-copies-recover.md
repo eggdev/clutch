@@ -19,8 +19,9 @@ the app.
   that can never pass.
 - A reader that cannot read a stored copy discards it and reads again from the
   owner. It never crashes and never shows a guess.
-- A change to a server rule, a field or a stored shape adds a test that feeds
-  the older copy through today's code and asserts that the session recovers.
+- A change to a server rule, a field or a stored shape adds a test. The test
+  feeds the older copy through today's code and asserts that the session
+  recovers.
 
 ## Example
 

@@ -3,11 +3,8 @@ import type { Command, Model, ReadablePool, RecordRow } from '@repo/sync/types/r
 import { createContext, use, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 
-type Sync = {
-  readonly pool: ReadablePool;
-  readonly run: Pool['run'];
-  readonly isPending: Pool['isPending'];
-};
+/** What screens see of the pool: reads, and `run` for commands. No other write. */
+type Sync = ReadablePool & Pick<Pool, 'run' | 'isPending'>;
 
 const SyncContext = createContext<Sync | null>(null);
 
@@ -19,9 +16,7 @@ export function SyncProvider({
   readonly pool: Pool;
   readonly children: ReactNode;
 }) {
-  return (
-    <SyncContext value={{ pool, run: pool.run, isPending: pool.isPending }}>{children}</SyncContext>
-  );
+  return <SyncContext value={pool}>{children}</SyncContext>;
 }
 
 function useSync(): Sync {
@@ -38,7 +33,7 @@ function useSync(): Sync {
  * cannot keep a stale list.
  */
 export function useRecords<Row extends RecordRow>(model: Model<Row>): ReadonlyArray<Row> {
-  const { pool } = useSync();
+  const pool = useSync();
   const read = () => pool.all(model);
   return useSyncExternalStore(pool.subscribe, read, read);
 }
@@ -51,6 +46,6 @@ export function useCommand<Input>(command: Command<Input>): (input: Input) => st
 
 /** The reason for the last rejected transaction, for the screen to show. */
 export function useLastRejection() {
-  const { pool } = useSync();
+  const pool = useSync();
   return useSyncExternalStore(pool.subscribe, pool.lastRejection, pool.lastRejection);
 }

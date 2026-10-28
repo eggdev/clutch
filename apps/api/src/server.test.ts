@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import { BunHttpServer } from '@effect/platform-bun';
 import { CurrentActorTest } from '@repo/identity/testing/actor';
 import { DatabasePglite } from '@repo/sync/runtime/database.server';
+import { Sessions } from '@repo/sync/service/sessions';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import { Effect, Fiber, Layer, Stream } from 'effect';
 import { HttpServer } from 'effect/http';
@@ -62,4 +63,25 @@ test('the sender gets the delta of its own transaction over the socket', async (
     id: 'n1',
     data: { title: 'Hello' },
   });
+});
+
+test('a sign-out closes each socket of the user with code 4401', async () => {
+  const result = await Effect.runPromise(
+    Effect.gen(function* () {
+      const url = yield* HttpServer.addressFormattedWith((address) =>
+        Effect.succeed(`${address.replace('http', 'ws')}/sync`),
+      );
+      const socket = new WebSocket(url);
+      const closed = Effect.callback<number>((resume) => {
+        socket.addEventListener('close', (event) => resume(Effect.succeed(event.code)));
+      });
+      yield* Effect.callback<true>((resume) => {
+        socket.addEventListener('open', () => resume(Effect.succeed(true)));
+      });
+      const sessions = yield* Sessions;
+      const ended = yield* sessions.end('user-test');
+      return { ended, code: yield* closed };
+    }).pipe(Effect.provide(server)),
+  );
+  expect(result).toEqual({ ended: 1, code: 4401 });
 });

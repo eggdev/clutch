@@ -52,6 +52,10 @@ tests the workflow and dependency checks.
 | `check-docs-temporal`        | Changelog phrases in durable docs                                                                                                          |
 | `check-suppressions`         | A lint or type suppression comment, such as `oxlint-disable` or `@ts-expect-error`. See [lint rules](./lint-rules.md#how-a-rule-is-chosen) |
 | `check-terms`                | A word from the [glossary](../glossary.md#rejected-words)'s rejected words table, or an em dash, in contributor docs                       |
+| `check-sentences`            | A sentence over 25 words in `docs/`. Decision records, skills and `AGENTS.md` are exempt                                                   |
+| `check-commands`             | A command without its `.server.ts` half, a server half without its command or a registration in `runtime/`, or a command with no `waits`   |
+| `check-vendor-leaks`         | A vendor type in the built declarations of a public section. It runs after `typecheck`                                                     |
+| `check-bundle`               | A first screen of `apps/web` over 150 kB compressed, or with Effect code in it. It builds the app                                          |
 | `check-decisions`            | Duplicate decision numbers, or an index that does not match                                                                                |
 | `check-file-size`            | `AGENTS.md` over 20 lines, or a source file over its limit. See [file size](#file-size)                                                    |
 | `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                                                          |
@@ -170,6 +174,10 @@ A performance check compares a measurement with a committed budget:
 
 Run the check after the parallel targets, so other work does not inflate the
 samples.
+
+`check-bundle` is the budget for the first screen of `apps/web`. A byte count
+does not vary between runs, so it takes one sample. See
+[client performance](../architecture/client-performance.md).
 
 <!-- kickoff: The performance budgets of the project: what each one measures (startup time, bundle bytes, query count), the budget file, the check target and the user cost it protects. Delete this slot when the project has no budget. -->
 

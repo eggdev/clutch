@@ -116,6 +116,40 @@
         },
         "cache": false
       },
+      "check-commands": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-commands.ts"
+        },
+        "cache": false
+      },
+      "check-vendor-leaks": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-vendor-leaks.ts"
+        },
+        "dependsOn": [
+          {
+            "projects": "*",
+            "target": "typecheck"
+          }
+        ],
+        "cache": false
+      },
+      "check-bundle": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-bundle.ts"
+        },
+        "cache": false
+      },
+      "check-sentences": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-sentences.ts"
+        },
+        "cache": false
+      },
       "check-decisions": {
         "executor": "nx:run-commands",
         "options": {
@@ -186,6 +220,10 @@
           "check-docs-temporal",
           "check-suppressions",
           "check-terms",
+          "check-sentences",
+          "check-commands",
+          "check-vendor-leaks",
+          "check-bundle",
           "check-decisions",
           "check-file-size",
           "check-kickoff-slots",

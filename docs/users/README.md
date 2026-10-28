@@ -42,10 +42,14 @@ audience: agents
 | `audience` | No       | `agents` only. Set it on a page that an agent follows step by step.                       |
 
 The `check-user-docs` check reads each `.md` file in this folder, except this
-file. It rejects a page when the frontmatter is missing, a required field is
-missing or empty, a field is not in the table, `type` or `audience` has a value
-that is not in the table, `id` does not match the file name, or two pages have
-the same `id`.
+file. It rejects a page when:
+
+- the frontmatter is missing
+- a required field is missing or empty
+- a field is not in the table
+- `type` or `audience` has a value that is not in the table
+- `id` does not match the file name
+- two pages have the same `id`
 
 Use `type: reference` for a page with no template: the [index](./index.md),
 [troubleshooting](./troubleshooting.md) and the
@@ -55,8 +59,8 @@ Use `type: reference` for a page with no template: the [index](./index.md),
 
 A page can hold notes that only an agent reads. Put them in one HTML comment
 right after the H1. Start the comment with `Agent notes:`. Use the notes for
-rules that would distract a person: what not to create, which page to load
-next, and which paths are relative to the origin that served the page. A web
+rules that would distract a person. Examples are what not to create, which page
+to load next, and which paths are relative to the origin that served the page. A web
 page does not show the comment.
 
 ```markdown

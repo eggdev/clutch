@@ -11,10 +11,10 @@ languages and the exceptions. [`oxlint.config.ts`](../../oxlint.config.ts) turns
 each rule. The policy also exports its matchers and its registry parser, so a
 test can check them without a lint run.
 
-Every rule reads each module specifier in a file: static imports, re-exports,
-dynamic `import()`, type imports, `require`, and the first argument of
-`vi.mock`, `jest.mock`, `mock.module` and their relatives, such as
-`vi.importActual`. A test cannot route around a boundary with a mock.
+Every rule reads each module specifier in a file. That includes static
+imports, re-exports, dynamic `import()`, type imports and `require`. It also
+includes the first argument of `vi.mock`, `jest.mock`, `mock.module` and their
+relatives, such as `vi.importActual`. A test cannot route around a boundary with a mock.
 
 ## Services and domains
 
@@ -106,6 +106,24 @@ The owner of a vendor is the `packages/<name>/` folder in the `code` roots of
 its primitive. A language applies to the package folders of its `primitives`.
 `packagePaths` are paths inside any package. `files` are regular expressions on
 the full file path, for app folders.
+
+## Client code
+
+Client code imports Effect and schemas as types only. Effect code loads after
+the first paint, in the sync transport. The
+[lint rules for client code](./setup/lint-rules.md#client-code) reject a value
+import, and `check-bundle` rejects Effect code in the first screen.
+
+## Server code
+
+`config/`, `repo/`, `service/` and each `.server.ts` file hold server code. The
+`repo-imports/server-only` rule lets only server code import them. Server code
+is a `.server.ts` file, a file in a server section, a test, `tools/`, or an app
+with the Nx tag `platform:server`.
+
+A server change registers in `packages/<name>/runtime/handlers.server.ts`. A
+server app loads that file. Only an edge runs an Effect: `runtime/`, an app or
+a test. See [lint rules for Effect code](./setup/lint-rules.md#effect-code).
 
 ## Tests
 

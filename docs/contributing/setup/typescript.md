@@ -1,8 +1,8 @@
 # TypeScript
 
 Each runtime gets its own TypeScript environment. Code for a browser, a server
-runtime and a test runner see different globals, so one shared config would let
-a global type-check in code that cannot use it.
+runtime and a test runner see different globals. One shared config would let a
+global type-check in code that cannot use it.
 
 ## One config for each environment
 

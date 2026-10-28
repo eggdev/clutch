@@ -1,6 +1,74 @@
 import { defineConfig } from 'oxlint';
 import antiSlop from 'ultracite/oxlint/anti-slop';
 import core from 'ultracite/oxlint/core';
+import react from 'ultracite/oxlint/react';
+
+/**
+ * Client code: what runs in the browser or on a device. The React preset,
+ * the network ban and the Effect import ban apply here. See
+ * docs/contributing/import-boundaries.md#client-code.
+ */
+const client = [
+  '**/apps/web/**/*.{ts,tsx}',
+  '**/features/**/*.{ts,tsx}',
+  '**/packages/*/ui/**/*.{ts,tsx}',
+];
+/** Client code that is plain TypeScript: models and the client half of commands. */
+const portable = ['**/packages/*/models/**/*.ts', '**/packages/*/commands/**/*.ts'];
+
+/** Effects belong to the sync hooks. Everything else derives in render or runs in a handler. */
+const effectHooks = {
+  name: 'react',
+  importNames: ['useEffect', 'useLayoutEffect', 'useInsertionEffect'],
+  message:
+    'Do not use an effect. Derive the value in render, run the work in an event handler, or read records with the sync hooks (useRecords, useCommand). See docs/principles/local-first.md.',
+};
+/** The first screen holds no Effect code. Type imports are erased, so they stay allowed. */
+const noEffectValues = {
+  paths: [
+    effectHooks,
+    {
+      name: 'effect',
+      allowTypeImports: true,
+      message:
+        'Client code imports Effect types only (`import type`). Effect code loads after the first paint, in the sync transport. See docs/contributing/architecture/client-performance.md.',
+    },
+  ],
+  patterns: [
+    {
+      group: ['effect/*', '@repo/*/types/*'],
+      allowTypeImports: true,
+      message:
+        'Client code imports schema types only (`import type`). A value that UI needs, such as a limit, lives in plain TypeScript in `models/`, and `types/` builds its schema from it. See docs/contributing/architecture/client-performance.md.',
+    },
+  ],
+};
+/** Only the sync engine talks to the network or stores data on the device. */
+const networkMessage =
+  'Only the sync engine (`packages/sync`) uses the network or device storage. Read records from the object pool and run a command. See docs/principles/local-first.md.';
+const networkGlobals = [
+  'fetch',
+  'WebSocket',
+  'XMLHttpRequest',
+  'EventSource',
+  'indexedDB',
+  'localStorage',
+  'sessionStorage',
+].map((name) => ({ name, message: networkMessage }));
+const networkProperties = [
+  ...['window', 'globalThis', 'self'].flatMap((object) =>
+    [
+      'fetch',
+      'WebSocket',
+      'XMLHttpRequest',
+      'EventSource',
+      'indexedDB',
+      'localStorage',
+      'sessionStorage',
+    ].map((property) => ({ object, property, message: networkMessage })),
+  ),
+  { object: 'navigator', property: 'sendBeacon', message: networkMessage },
+];
 
 /**
  * The lint baseline. Ultracite's core preset turns on most rules. This file
@@ -22,6 +90,7 @@ export default defineConfig({
     { name: 'repo-imports', specifier: './tools/lint/import-policy.mjs' },
     { name: 'repo-classes', specifier: './tools/lint/class-policy.mjs' },
     { name: 'repo-gates', specifier: './tools/lint/gate-policy.mjs' },
+    { name: 'repo-effect', specifier: './tools/lint/effect-policy.mjs' },
   ],
   rules: {
     // Function declarations read as the module's API and hoist. Arrow
@@ -84,12 +153,91 @@ export default defineConfig({
     'repo-imports/no-internal-mocks': 'error',
     'repo-imports/no-reexports': 'error',
 
+    // Effects belong to the sync hooks. The client overrides below add the
+    // Effect import ban to this list.
+    'no-restricted-imports': ['error', { paths: [effectHooks] }],
+
+    'repo-effect/run-at-edges': 'error',
+    'repo-effect/tagged-errors': 'error',
+    'repo-effect/no-react-effects': 'error',
+
     'repo-classes/no-arbitrary-values': 'error',
     'repo-classes/speed-tokens-only': 'error',
     'repo-classes/no-transition-all': 'error',
     'repo-classes/no-dark-variant': 'error',
   },
   overrides: [
+    {
+      // Client code: React rules, no Effect values, no network and no device storage.
+      files: client,
+      plugins: react.plugins,
+      rules: {
+        ...react.rules,
+        // A component is a function declaration, like every other function
+        // here (`func-style`). One way to write a component.
+        'react/function-component-definition': [
+          'error',
+          { namedComponents: 'function-declaration', unnamedComponents: 'arrow-function' },
+        ],
+        'no-restricted-imports': ['error', noEffectValues],
+        'no-restricted-globals': ['error', ...networkGlobals],
+        'no-restricted-properties': ['error', ...networkProperties],
+      },
+    },
+    {
+      // Models and the client half of commands run on the client too.
+      files: portable,
+      rules: {
+        'no-restricted-imports': ['error', noEffectValues],
+        'no-restricted-globals': ['error', ...networkGlobals],
+        'no-restricted-properties': ['error', ...networkProperties],
+      },
+    },
+    {
+      // The server half of a command runs on the server.
+      files: ['**/packages/*/commands/**/*.server.ts'],
+      rules: {
+        'no-restricted-imports': ['error', { paths: [effectHooks] }],
+        'no-restricted-globals': 'error',
+        'no-restricted-properties': 'off',
+      },
+    },
+    {
+      // The sync engine owns the network, the device storage and the effects
+      // that subscribe to them. Its UI still imports Effect types only.
+      files: ['**/packages/sync/**/*.{ts,tsx}'],
+      rules: {
+        'no-restricted-globals': 'error',
+        'no-restricted-properties': 'off',
+      },
+    },
+    {
+      files: ['**/packages/sync/ui/**/*.{ts,tsx}'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          { paths: noEffectValues.paths.slice(1), patterns: noEffectValues.patterns },
+        ],
+      },
+    },
+    {
+      // The design system's Button is the one place that renders `<button>`.
+      // It forwards `type` and defaults it to `button`. The rule cannot read a
+      // forwarded value, and each caller still passes a literal.
+      files: ['**/packages/design-system/ui/button.tsx'],
+      plugins: react.plugins,
+      rules: { 'react/button-has-type': 'off' },
+    },
+    {
+      // Tests run on the server and may use Effect to run Test Layers. The
+      // effect-hook ban still holds.
+      files: ['**/*.test.{ts,tsx}'],
+      rules: {
+        'no-restricted-imports': ['error', { paths: [effectHooks] }],
+        'no-restricted-globals': 'error',
+        'no-restricted-properties': 'off',
+      },
+    },
     {
       // One gate into each feature. In app code, a gated route opens only
       // through its gate, which settles permissions and data before the first
@@ -116,6 +264,7 @@ export default defineConfig({
         'tools/lint/import-policy.mjs',
         'tools/lint/class-policy.mjs',
         'tools/lint/gate-policy.mjs',
+        'tools/lint/effect-policy.mjs',
       ],
       rules: { 'import/no-default-export': 'off' },
     },

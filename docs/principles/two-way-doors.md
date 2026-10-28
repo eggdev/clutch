@@ -2,15 +2,20 @@
 
 A merge to `main` is a production write.
 
-A change is two-way when a revert and a redeploy remove every trace of it: copy,
-layout, an internal refactor, or any change still on a branch. Ship it and
-change it if it is wrong.
+A change is two-way when a revert and a redeploy remove every trace of it.
+Examples are copy, layout, an internal refactor, or any change still on a
+branch. Ship it and change it if it is wrong.
 
-A change is one-way when a copy outlives the deploy: a migration that ran, a
-saved document on a device, a request shape that an installed build sends, a
-link in a sent email, or deleted user data. A change that touches a
-[hard invariant](../contributing/project-intent.md#hard-invariants) is one-way
-by definition.
+A change is one-way when a copy outlives the deploy. Examples are:
+
+- a migration that ran
+- a saved document on a device
+- a request shape that an installed build sends
+- a link in a sent email
+- deleted user data
+
+A change that touches a [hard invariant](../contributing/project-intent.md#hard-invariants)
+is one-way by definition.
 
 ## One-way changes need the owner
 

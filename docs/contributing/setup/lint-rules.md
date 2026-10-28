@@ -53,10 +53,10 @@ The plugin allows four paint properties for short hover and focus changes:
 
 ## Tailwind classes
 
-Stylelint does not read class names in TSX. The `repo-classes` oxlint plugin,
-[`tools/lint/class-policy.mjs`](../../../tools/lint/class-policy.mjs), reads
-the strings in `className` and `class` attributes, and the strings in calls to
-`cn`, `clsx`, `cx`, `cva`, `tv`, `twMerge` and `twJoin`. It enforces
+Stylelint does not read class names in TSX. The `repo-classes` oxlint plugin is
+[`tools/lint/class-policy.mjs`](../../../tools/lint/class-policy.mjs). It reads
+the strings in `className` and `class` attributes. It also reads the strings in
+calls to `cn`, `clsx`, `cx`, `cva`, `tv`, `twMerge` and `twJoin`. It enforces
 [tokens for every visual value](../../principles/design-tokens.md) and
 [compositor-only motion](../../principles/compositor-only-motion.md).
 `tools/lint/class-policy.test.ts` proves each rule with classes that pass and
@@ -99,6 +99,39 @@ To gate a new feature:
 
 `tools/lint/gate-policy.test.ts` proves that a second way in fails and that a
 name that does not navigate passes.
+
+## Client code
+
+Client code runs in the browser or on a device. It is `apps/web`, `features/`
+and the `ui/` of each package. The `models/` and `commands/` of a package run
+there too. `oxlint.config.ts` applies these rules to client code:
+
+| Rule                                                   | Rejects                                                                                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| The Ultracite React preset                             | React mistakes, with the React Compiler rules as errors. A component is a function declaration                                  |
+| `no-restricted-imports`                                | `useEffect`, `useLayoutEffect` and `useInsertionEffect`, in any code outside `packages/sync/ui/`                                |
+| `no-restricted-imports`                                | A value import from `effect`, `effect/*` or `@repo/*/types/*`. A type import passes                                             |
+| `no-restricted-globals` and `no-restricted-properties` | `fetch`, `WebSocket`, `XMLHttpRequest`, `EventSource`, `indexedDB`, `localStorage`, `sessionStorage` and `navigator.sendBeacon` |
+
+Only the sync engine, `packages/sync`, uses the network and device storage.
+Test files may import Effect, because they run Test Layers. The effect-hook ban
+holds in tests too. See [local first](../../principles/local-first.md).
+
+## Effect code
+
+The `repo-effect` plugin,
+[`tools/lint/effect-policy.mjs`](../../../tools/lint/effect-policy.mjs), has
+three rules. `tools/lint/client-rules.test.ts` proves each rule with code that
+passes and code that fails.
+
+| Rule               | Rejects                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `run-at-edges`     | `Effect.runPromise` and the other run calls outside `runtime/`, an app, `tools/` or a test                               |
+| `tagged-errors`    | `throw`, an `async` function or `new Promise` in `service/` and `.server.ts` files of a `type:package` package           |
+| `no-react-effects` | `React.useEffect` and the other effect hooks through a default or namespace import of React, outside `packages/sync/ui/` |
+
+A `type:tool` package, such as `packages/runtime`, is exempt from
+`tagged-errors`.
 
 ## Formatting
 

@@ -5,9 +5,9 @@ write. A later quiet fallback hides which fact was missing.
 
 - A loud failure is a typed error with a stable code. It reaches the caller or
   the user. Code never logs it and continues.
-- Do not use `catch {}` to continue with partial data, `?? default` on a fact
-  that must exist, an empty list when the read failed, or a fallback that
-  writes.
+- Do not continue with partial data. That rules out `catch {}` that continues,
+  `?? default` on a fact that must exist, an empty list when the read failed,
+  and a fallback that writes.
 
 A disposable client copy is the one exception. When its read fails, it falls
 back to a fresh read from the owner, never to a guess. See

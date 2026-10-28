@@ -28,7 +28,7 @@ use the highest rung that exists:
 1. **The real service, run locally.** For example workerd and Miniflare for
    Cloudflare, a Postgres container, or `stripe-mock`.
 2. **A mock API server, when the vendor speaks HTTP and has no local
-   runtime.** It answers the vendor's API on a local port, and our code calls
+   runtime.** It answers the vendor's API on a local port. Our code calls
    it the way it calls the vendor, through its normal client and
    configuration. It lives in `tools/mocks/<vendor>/`, so production code
    cannot import it, and it shows what it received at a `/__mocks` route. Local development, previews and end-to-end tests share it.
@@ -48,8 +48,9 @@ and passes on the stand-in shows that the stand-in drifted.
   mutable state.
 - Do not pin exported constants, copy production helpers or repeat checks that
   the type system makes.
-- An absence assertion runs on a live path that could still show the thing:
-  an admin view next to a user view, a full list next to an empty one.
+- An absence assertion runs on a live path that could still show the thing.
+  Examples are an admin view next to a user view, or a full list next to an
+  empty one.
 - Tests run with no network. A vendor is a local runtime or a fake.
 - Put setup builders in `packages/<name>/src/testing/`. Tests in any package can
   import them. Production code cannot.

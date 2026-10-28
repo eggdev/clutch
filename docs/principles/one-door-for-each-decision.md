@@ -29,8 +29,8 @@ Use it for security, money and who sees what. Do not use it for layout,
 formatting or plain business logic. There, a second way to do a thing costs
 little.
 
-When you add a new kind of guard, such as a rate limit or an export
-permission, give it a door and a declaration before the second caller exists.
+A new kind of guard can be a rate limit or an export permission. Give it a
+door and a declaration before the second caller exists.
 
 ## Example
 

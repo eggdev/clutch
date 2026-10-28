@@ -7,9 +7,14 @@ not take. A leftover trains the next change to preserve it.
 A finished migration is one case. The migration is not done until the old way is
 gone. Do not run two lanes, unless a sender we cannot update still uses the
 old one (see below). The `knip` check reports unused files, exports and
-dependencies. Hunt for the leftovers that it cannot see: compat shims, aliases,
-codemods with nothing left to migrate, checks that still police an old name,
-and doc sentences that only say the old name is gone.
+dependencies.
+
+Hunt for the leftovers that knip cannot see:
+
+- compat shims and aliases
+- codemods with nothing left to migrate
+- checks that still police an old name
+- doc sentences that only say the old name is gone
 
 Speculative code is another case. Add no empty tables, no flags for features
 that do not exist, and no placeholder branches. The
@@ -20,8 +25,8 @@ never code for them.
 ## When an old copy can still arrive
 
 A merge to `main` is production. When a shape reached `main`, a copy of it can
-still arrive from outside: a stored record, a device cache or a request from an
-installed build. Code that never reached `main` needs no guard.
+still arrive from outside. It can be a stored record, a device cache or a
+request from an installed build. Code that never reached `main` needs no guard.
 
 Who controls the sender decides the rule:
 

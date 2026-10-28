@@ -1,5 +1,6 @@
 import type { Pool } from '@repo/sync/runtime/pool';
 import { SyncRpcs } from '@repo/sync/types/protocol';
+import { sessionEndedCode } from '@repo/sync/types/session-ended';
 import { Effect, Layer, Queue, Schedule, Stream } from 'effect';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
 import { Socket } from 'effect/socket';
@@ -10,10 +11,29 @@ import { Socket } from 'effect/socket';
  * `Pull` streams deltas from the last sync ID, and `Push` sends the
  * transactions that wait, in batches.
  */
-function protocol(url: string) {
+/**
+ * The browser WebSocket, watched for the close code of an ended session. The
+ * server closes each socket of a signed-out user with code 4401.
+ */
+function watchedWebSocket(onSessionEnded: () => void) {
+  return Layer.succeed(Socket.WebSocketConstructor)((url, options) => {
+    const socket = new WebSocket(
+      url,
+      typeof options === 'string' || Array.isArray(options) ? options : undefined,
+    );
+    socket.addEventListener('close', (event) => {
+      if (event.code === sessionEndedCode) {
+        onSessionEnded();
+      }
+    });
+    return socket;
+  });
+}
+
+function protocol(url: string, onSessionEnded: () => void) {
   return RpcClient.layerProtocolSocket({ retryTransientErrors: true }).pipe(
     Layer.provide(Socket.layerWebSocket(url)),
-    Layer.provide(Socket.layerWebSocketConstructorGlobal),
+    Layer.provide(watchedWebSocket(onSessionEnded)),
     Layer.provide(RpcSerialization.layerJson),
   );
 }
@@ -65,6 +85,8 @@ export function connect(
   options: { readonly url: string; readonly onSessionEnded: () => void },
 ) {
   return Effect.runFork(
-    session(pool, options.onSessionEnded).pipe(Effect.provide(protocol(options.url))),
+    session(pool, options.onSessionEnded).pipe(
+      Effect.provide(protocol(options.url, options.onSessionEnded)),
+    ),
   );
 }

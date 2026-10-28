@@ -70,18 +70,23 @@ A message that names only the problem costs a round trip to find the fix. See
 
 ## Keep docs from drifting
 
-The checks in `tools/` catch most drift on each change: missing file
-references, changelog language, decision record numbering, the `AGENTS.md`
-budget, leftover kickoff slots, workflow references and undocumented dependency
-overrides.
+The checks in `tools/` catch most drift on each change. They find:
+
+- missing file references
+- changelog language
+- decision record numbering
+- the `AGENTS.md` budget
+- leftover kickoff slots
+- workflow references
+- undocumented dependency overrides
 
 Cursor Bugbot reviews each PR against `.cursor/BUGBOT.md`. That file holds only
 the rules that a check cannot catch yet. When a check covers a rule, delete the
 rule from `BUGBOT.md`.
 
 Record follow-up work as an issue. Leftovers from a migration follow
-[delete what is off the common path](../principles/delete-off-the-common-path.md):
-remove them in the same change when safe, otherwise open an issue with the
+[delete what is off the common path](../principles/delete-off-the-common-path.md).
+Remove them in the same change when safe. Otherwise, open an issue with the
 [cleanup form](../../.github/ISSUE_TEMPLATE/cleanup.yml). Its "Ready when"
 field is a criterion that a person can prove true or false. A code comment is
 never the only record of a leftover. Report a bug with the
