@@ -21,6 +21,7 @@ one hop away in a focused page, and state each rule in one place only.
 | How one module or flow works                 | `contributing/architecture/`     |
 | How to run, check or deploy                  | `contributing/setup/`            |
 | A no that the next agent would propose again | `contributing/decisions/`        |
+| A term and its one meaning                   | `contributing/glossary.md`       |
 | A repeatable task with steps                 | `.agents/skills/`                |
 | A module's API and limits                    | That package's `README.md`       |
 | Work that is not done                        | The issue tracker                |

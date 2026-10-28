@@ -15,7 +15,7 @@ The [primitives registry](./primitives.yaml) is the list of primitives. Each
 entry names its group, its kind (service, domain, app or tool), the folders it
 owns, its docs and, for a service, its vendors. `check-primitives` rejects a
 registry entry that names a missing path, and an Nx project that no primitive
-owns. The import policy reads the vendor owners and the layers from it.
+owns. The import policy reads the vendor owners and the languages from it.
 
 The registry never records dependencies between primitives. Nx derives them
 from the imports. Run `mise exec -- bun nx graph` to see them.
@@ -47,7 +47,7 @@ packages/<name>/src/
 ## Module design
 
 - Prefer deep modules: a small caller interface that hides real complexity.
-  Avoid pass-through layers and speculative packages.
+  Avoid pass-through modules and speculative packages.
 - Add a module when ownership, lifecycle or callers need independent behavior.
 - Test through caller-facing interfaces. See
   [test the workflow](../../principles/test-the-workflow.md).
@@ -69,8 +69,8 @@ packages/<name>/src/
 - [API errors](./api-errors.md): one error shape, and the code for each status
 - [Soft delete](./soft-delete.md): the restore window, live reads and the purge
 - [MCP server](./mcp.md): the tools that agents call, and how to add one
-- [Local-first sync](./local-first-sync.md): the local store, the mutation
-  queue, and the writes that wait for the server
+- [Local-first sync](./local-first-sync.md): the local store, the transaction
+  queue, and the commands that wait for the server
 - [Client performance](./client-performance.md): the speed budgets and the
   check for each one
 - [Styling](./styling.md): the token roles, the theme, the platforms and the

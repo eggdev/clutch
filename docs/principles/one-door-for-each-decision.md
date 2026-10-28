@@ -49,4 +49,4 @@ later grant model narrows it with no new code.
 
 - [Authorization](../contributing/architecture/authorization.md)
 - [Request context](../contributing/architecture/request-context.md)
-- [Fail loudly at the right layer](./fail-loudly.md)
+- [Fail loudly in the right module](./fail-loudly.md)

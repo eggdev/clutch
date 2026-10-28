@@ -3,8 +3,9 @@ import { mkdir, readFile, readlink, symlink } from 'node:fs/promises';
 import path from 'node:path';
 
 import { detectProject } from '@apps/cli/src/detect-project';
+import { gitOrThrow as git } from '@apps/cli/src/git';
 import { installTemplate } from '@apps/cli/src/install-template';
-import { git, gitRepo } from '@apps/cli/src/testing/git-repo';
+import { gitRepo } from '@apps/cli/src/testing/git-repo';
 
 const copyList = `
 files:

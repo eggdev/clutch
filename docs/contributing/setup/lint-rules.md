@@ -15,7 +15,8 @@ is in the same file. See [import boundaries](../import-boundaries.md).
    a comment that gives the reason.
 3. **No suppression comments.** A rule is on everywhere or off everywhere. A
    rule with legitimate exceptions is configured or turned off, with the
-   reason. It is never silenced in one file.
+   reason. It is never silenced in one file. The `check-suppressions` target
+   rejects each lint and type suppression comment, `@ts-expect-error` too.
 4. **An Ultracite upgrade is a reviewed change.** Read the preset diff. Run the
    lint, and decide each new rule that fires, as in step 2.
 
@@ -23,12 +24,13 @@ is in the same file. See [import boundaries](../import-boundaries.md).
 
 The comments in `oxlint.config.ts` are the record. In short:
 
-| Kind          | Rules                                                                                                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Style         | Function declarations, `Array<T>`, `type` over `interface`, named exports                                                                                                       |
-| Off           | `sort-keys`, `no-await-in-loop`, `promise/avoid-new`, `default-case`, `prefer-named-capture-group`, `no-plusplus`, `no-bitwise`, and two rules that another rule already covers |
-| Configured    | `prefer-destructuring` for objects only                                                                                                                                         |
-| Default files | Config files, lint plugins and Worker entries (`apps/*/src/worker.ts`) that a tool loads by default export may use one                                                          |
+| Kind          | Rules                                                                                                                                                                             |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Style         | Function declarations, `Array<T>`, `type` over `interface`, named exports                                                                                                         |
+| Off           | `sort-keys`, `no-await-in-loop`, `promise/avoid-new`, `default-case`, `prefer-named-capture-group`, `no-plusplus`, `no-bitwise`, and two rules that another rule already covers   |
+| Configured    | `prefer-destructuring` for objects only                                                                                                                                           |
+| Added         | `anti-slop/no-chained-type-assertions` and `anti-slop/no-widen-then-assert` from Ultracite's anti-slop plugin. They reject `x as unknown as T`. The rest of that preset stays off |
+| Default files | Config files, lint plugins and Worker entries (`apps/*/src/worker.ts`) that a tool loads by default export may use one                                                            |
 
 `typescript/no-explicit-any` and `no-warning-comments` come from the preset. A
 marker comment such as FIXME or HACK fails lint. Record the work in an issue.

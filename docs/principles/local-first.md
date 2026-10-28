@@ -7,8 +7,8 @@ the server confirms it later.
 
 ## Reads
 
-- The device keeps the user's working set in a local store. Boot hydrates the
-  store from device storage before the first paint.
+- The device keeps the user's working set in a local store. Boot loads the
+  local store from device storage before the first paint.
 - A screen reads the local store. A screen that shows data the device has
   never shows a spinner or a skeleton.
 - Search, filters and the command palette query the local store. They send no
@@ -20,8 +20,8 @@ the server confirms it later.
 
 ## Writes
 
-- A mutation changes the local store at once and adds a transaction to a queue.
-  The sync engine sends the queue in batches.
+- A command changes the local store at once and adds a transaction to the
+  transaction queue. The sync engine sends the queue in batches.
 - The server decides. It accepts or rejects each transaction. On a rejection,
   the store rolls back the change and the screen tells the user what failed.
   See [normalized source of truth](./normalized-source-of-truth.md#client-copies).

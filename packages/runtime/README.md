@@ -52,5 +52,5 @@ There is no installed daemon or CLI. The existing broker/T3 integration remains
 to be resolved before the module can arbitrate real host access. Its verification
 of a cleanup receipt is state-machine validation, not physical cleanup proof.
 
-Schema version 1 is persisted via SQLite user_version. Unknown versions fail
+Schema version 1 is persisted through SQLite user_version. Unknown versions fail
 closed. Sessions have no automatic deletion or evidence-retention policy.

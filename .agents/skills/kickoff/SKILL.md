@@ -158,7 +158,7 @@ Write the registry entries as the owner agrees to each part:
    kind, a one-line summary, its `code` roots and its `docs` pages.
 2. A `vendors` entry on the service that owns each vendor. Only a service owns
    a vendor.
-3. A `layers` entry for each shared language, such as a query builder or a UI
+3. A `languages` entry for each shared language, such as a query builder or a UI
    framework, with the folders that may import it.
 4. An `invariants` entry for each hard invariant from phase 1. Its `docs` list
    links `docs/contributing/project-intent.md#hard-invariants`.

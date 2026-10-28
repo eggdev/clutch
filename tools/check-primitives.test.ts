@@ -28,7 +28,7 @@ primitives:
     summary: The browser app.
     code: [apps/web/]
     docs: []
-layers:
+languages:
   - imports: ^drizzle-orm(?:/|$)
     where: the billing service
     primitives: [billing]
@@ -76,7 +76,7 @@ primitives:
     summary: ${'x'.repeat(121)}
     code: [packages/billing/]
     docs: []
-layers:
+languages:
   - imports: ^drizzle-orm(?:/|$)
     where: the storage service
     primitives: [storage]
@@ -100,9 +100,16 @@ exceptions:
     `${file}: primitive \`billing\` names the unknown group \`money\`. Add it under \`groups\`, or use one there.`,
     `${file}: primitive \`billing\` has the kind \`widget\`. Use one of service, domain, app, tool.`,
     `${file}: primitive \`billing\` has a \`summary\` of 121 characters. Keep it at 120 or less, and move the detail into its docs.`,
-    `${file}: layers[0] names the unknown primitive \`storage\`. Use an id under \`primitives\`.`,
+    `${file}: languages[0] names the unknown primitive \`storage\`. Use an id under \`primitives\`.`,
     `${file}: invariant \`paid-plans\` has no \`docs\`. Link the page that states it, such as docs/contributing/project-intent.md#hard-invariants.`,
     `${file}: no primitive owns the Nx project \`apps/web/\`. Add a primitive with \`apps/web/\` in its \`code\`.`,
+  ]);
+});
+
+test('the old `layers` key fails with the rename', async () => {
+  const old = valid.replace(/^languages:$/mu, 'layers:');
+  expect(await inRepo({ ...projects, [file]: old }, checkPrimitives)).toEqual([
+    `${file}: \`layers\` is the old name of \`languages\`. Rename the key. In Effect code, "Layer" means an Effect Layer only.`,
   ]);
 });
 

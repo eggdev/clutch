@@ -8,8 +8,10 @@ the page that owns your task. Do not read this folder from top to bottom.
 - [Project intent](./project-intent.md): users, goals, hard invariants and
   what not to assume. Read it before a product decision.
 - [Engineering principles](../principles/index.md)
-- [Decision records](./decisions/index.md): the nos already decided. Read them
-  before you propose a new primitive, surface or storage home.
+- [Glossary](./glossary.md): one meaning for each term. Use these words in
+  code, docs and PRs.
+- [Decision records](./decisions/index.md): the decisions already made. Read
+  them before you propose a new primitive, surface or storage home.
 - [Root README](../../README.md): set up and run the project from a fresh clone
 
 The docs decide how this project works. Follow the page that owns a topic,
@@ -43,7 +45,7 @@ decision record.
 ## Code and tooling
 
 - [Import boundaries](./import-boundaries.md): services and domains, vendor
-  owners, aliases and test imports, with the lint rule for each
+  owners, aliases, re-exports and test imports, with the lint rule for each
 - [Nx](./setup/nx.md) and [checks](./setup/checks.md)
 
 <!-- kickoff: A list of module READMEs, one link each. Write it when the first module exists. Delete this slot if kickoff ends before that. -->

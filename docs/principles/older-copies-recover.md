@@ -43,5 +43,5 @@ await run(session.execute(command)); // the next command runs
 ## Related
 
 - [Two-way and one-way doors](./two-way-doors.md): the shapes that outlive a deploy
-- [Fail loudly at the right layer](./fail-loudly.md): a refusal has a stable code
+- [Fail loudly in the right module](./fail-loudly.md): a refusal has a stable code
 - [Local first](./local-first.md): why devices hold copies at all

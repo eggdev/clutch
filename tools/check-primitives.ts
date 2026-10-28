@@ -26,7 +26,8 @@ type Entry = {
 type Registry = {
   groups?: Array<Entry>;
   primitives?: Array<Entry>;
-  layers?: Array<Entry>;
+  languages?: Array<Entry>;
+  layers?: unknown;
   invariants?: Array<Entry>;
 };
 
@@ -113,10 +114,16 @@ function registryProblems(root: string, registry: Registry): Array<string> {
     }
   }
   const primitiveIds = new Set(primitives.map((primitive) => primitive.id));
-  for (const [index, layer] of (registry.layers ?? []).entries()) {
-    for (const id of (layer.primitives ?? []).filter((name) => !primitiveIds.has(name))) {
+  if (registry.layers !== undefined) {
+    problems.push([
+      '`layers`',
+      'is the old name of `languages`. Rename the key. In Effect code, "Layer" means an Effect Layer only.',
+    ]);
+  }
+  for (const [index, language] of (registry.languages ?? []).entries()) {
+    for (const id of (language.primitives ?? []).filter((name) => !primitiveIds.has(name))) {
       problems.push([
-        `layers[${index}]`,
+        `languages[${index}]`,
         `names the unknown primitive \`${id}\`. Use an id under \`primitives\`.`,
       ]);
     }

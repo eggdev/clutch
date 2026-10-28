@@ -1,6 +1,4 @@
 import { expect, test } from 'bun:test';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
@@ -10,38 +8,11 @@ import {
   registryFile,
   registryOf,
 } from '@tools/lint/import-policy.mjs';
+import { lint } from '@tools/testing/lint-imports';
 import { stringify } from 'yaml';
 
 const root = path.resolve(import.meta.dir, '../..');
 
-/** Writes the files into a new directory, lints it, and lists `path rule` for each diagnostic. */
-async function lint(files: Record<string, string>): Promise<Array<string>> {
-  const directory = await mkdtemp(path.join(tmpdir(), 'import-rule-'));
-  try {
-    for (const [name, source] of Object.entries(files)) {
-      await mkdir(path.resolve(directory, name, '..'), { recursive: true });
-      await writeFile(path.join(directory, name), source);
-    }
-    const run = Bun.spawnSync([
-      path.resolve(root, 'node_modules/.bin/oxlint'),
-      '-c',
-      path.resolve(root, 'oxlint.config.ts'),
-      '--format',
-      'json',
-      directory,
-    ]);
-    const result = JSON.parse(run.stdout.toString());
-    const lines: Array<string> = result.diagnostics
-      .filter((item: { code: string }) => item.code.startsWith('repo-imports('))
-      .map(
-        (item: { code: string; filename: string }) =>
-          `${path.relative(directory, item.filename)} ${item.code.replace(/^repo-imports\((.+)\)$/u, '$1')}`,
-      );
-    return lines.toSorted();
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-}
 /** A primitive whose code root is `packages/<id>/`. */
 const primitive = (id: string, vendors: Array<{ vendor: string; imports: string }> = []) => ({
   id,
@@ -70,7 +41,7 @@ const registry = {
     primitive('storage'),
     primitive('design-system'),
   ],
-  layers: [
+  languages: [
     {
       imports: '^drizzle-orm(?:/|$)',
       where: '`src/server/db/**` and `@repo/storage`',
@@ -111,11 +82,42 @@ test('Oxlint rejects relative static, type, re-export, dynamic and CommonJS impo
         'import "@repo/projects";',
       ].join('\n'),
     }),
-  ).toEqual(Array.from({ length: 10 }, () => 'bad.ts aliases-only'));
+  ).toEqual([
+    ...Array.from({ length: 10 }, () => 'bad.ts aliases-only'),
+    'bad.ts no-reexports',
+    'bad.ts no-reexports',
+  ]);
   expect(
     await lint({
       'clean.ts':
         'import "@/lib/auth-context"; import "@repo/sync/src/server"; import "@tools/lint/check-manifests"; import "node:fs";',
+    }),
+  ).toEqual([]);
+});
+
+test('a re-export fails, and a local export passes', async () => {
+  expect(
+    await lint({
+      'reexports.ts': [
+        'export { git } from "@repo/runtime/src/git";',
+        'export { git as run } from "@repo/runtime/src/git";',
+        'export * from "@repo/runtime/src/schema";',
+        'export * as schema from "@repo/runtime/src/schema";',
+        'export type { Outcome } from "@repo/runtime/src/session-queue";',
+        'export * from "stripe";',
+      ].join('\n'),
+    }),
+  ).toEqual(Array.from({ length: 6 }, () => 'reexports.ts no-reexports'));
+  expect(
+    await lint({
+      'local.ts': [
+        'import { git } from "@repo/runtime/src/git";',
+        'export const value = 1;',
+        'export function run() { return git; }',
+        'const hidden = 2;',
+        'export { hidden };',
+        'export type Item = { id: string };',
+      ].join('\n'),
     }),
   ).toEqual([]);
 });
@@ -220,7 +222,7 @@ test('an import that closes a package cycle fails at each end, and passes once t
   ).toEqual([]);
 });
 
-test('vendor and layer rules do nothing until the registry names them', async () => {
+test('vendor and language rules do nothing until the registry names them', async () => {
   expect(
     await lint({
       'packages/projects/src/server.ts': 'import "stripe"; import "drizzle-orm"; import "react";',
@@ -257,7 +259,7 @@ test('a vendor is imported only in its owner module', async () => {
   ).toEqual([]);
 });
 
-test('drizzle-orm, one and react are imported only in their layers', async () => {
+test('drizzle-orm, one and react are imported only in their languages', async () => {
   expect(
     await lint({
       [registryFile]: registryYaml,
@@ -268,12 +270,12 @@ test('drizzle-orm, one and react are imported only in their layers', async () =>
       'packages/identity/src/server.ts': 'import "react-native";',
     }),
   ).toEqual([
-    'apps/api/worker.ts layers',
-    'apps/app/lib/gate.tsx layers',
-    'packages/identity/src/server.ts layers',
-    'packages/projects/src/server/model.ts layers',
-    'packages/projects/src/server/model.ts layers',
-    'packages/projects/src/ui/workspace.tsx layers',
+    'apps/api/worker.ts languages',
+    'apps/app/lib/gate.tsx languages',
+    'packages/identity/src/server.ts languages',
+    'packages/projects/src/server/model.ts languages',
+    'packages/projects/src/server/model.ts languages',
+    'packages/projects/src/ui/workspace.tsx languages',
   ]);
   expect(
     await lint({
@@ -333,7 +335,7 @@ test('every rule reads vi.mock, jest.mock and mock.module specifiers like import
   ).toEqual([
     'packages/projects/test/sync.test.ts aliases-only',
     'packages/projects/test/sync.test.ts aliases-only',
-    'packages/projects/test/sync.test.ts layers',
+    'packages/projects/test/sync.test.ts languages',
     'packages/projects/test/sync.test.ts no-internal-mocks',
     'packages/projects/test/sync.test.ts no-internal-mocks',
     'packages/projects/test/sync.test.ts vendor-owner',
@@ -375,7 +377,7 @@ test('an exception lets one file import one specifier past one rule, and needs a
     }),
   ).toEqual([
     'packages/projects/src/server/invoices.ts vendor-owner',
-    'packages/projects/src/server/legacy-billing.ts layers',
+    'packages/projects/src/server/legacy-billing.ts languages',
   ]);
   expect(() => parseRegistry({ exceptions: [{ ...exception, reason: ' ' }] })).toThrow(
     'docs/contributing/architecture/primitives.yaml exceptions[0]: `reason` must say why the import cannot move behind a boundary.',

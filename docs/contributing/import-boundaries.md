@@ -7,7 +7,7 @@ policy with `mise exec -- bun nx run-many -t lint-policy-test`.
 The policy is [`tools/lint/import-policy.mjs`](../../tools/lint/import-policy.mjs).
 Its project data is the
 [primitives registry](./architecture/primitives.yaml): the vendor owners, the
-layers and the exceptions. [`oxlint.config.ts`](../../oxlint.config.ts) turns on
+languages and the exceptions. [`oxlint.config.ts`](../../oxlint.config.ts) turns on
 each rule. The policy also exports its matchers and its registry parser, so a
 test can check them without a lint run.
 
@@ -49,7 +49,8 @@ A service can import any other service. Apps compose domains.
 | `@tools/…` | `tools/…`            | Tooling                           |
 
 Aliases mirror source paths, including `src`. Import the file you need. Deep
-imports are allowed, and packages have no barrel files. Platform suffixes such
+imports are allowed, and packages have no barrel files. `repo-imports/no-reexports`
+rejects each `export ... from`, so each thing has one import path. Platform suffixes such
 as `.native` stay part of the file name:
 
 ```ts
@@ -66,15 +67,15 @@ import { createIdentity } from '@repo/identity/src/server';
 Relative file system and configuration paths are not module imports. This rule
 does not cover them.
 
-## Vendors and layers
+## Vendors and languages
 
-| Rule                                                                                                       | Enforced by                        |
-| ---------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| A vendor is imported only in its owner module. See [generic platform](../principles/generic-platform.md)   | `repo-imports/vendor-owner`        |
-| A shared language, such as a query builder or a UI framework, is imported only in the folders of its layer | `repo-imports/layers`              |
-| `src/client` and `src/contracts` files never import server code, registry vendors or framework runtimes    | `repo-imports/module-dependencies` |
+| Rule                                                                                                          | Enforced by                        |
+| ------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| A vendor is imported only in its owner module. See [generic platform](../principles/generic-platform.md)      | `repo-imports/vendor-owner`        |
+| A shared language, such as a query builder or a UI framework, is imported only in the folders of its language | `repo-imports/languages`           |
+| `src/client` and `src/contracts` files never import server code, registry vendors or framework runtimes       | `repo-imports/module-dependencies` |
 
-Add a vendor or a layer to the registry in the same change that adds the
+Add a vendor or a language to the registry in the same change that adds the
 dependency. A vendor goes in the `vendors` list of its owner, which is a
 service:
 
@@ -92,7 +93,7 @@ primitives:
     vendors:
       - vendor: Stripe
         imports: ^stripe(?:/|$)
-layers:
+languages:
   - imports: ^drizzle-orm(?:/|$)
     where: '`src/server/db/**` and `@repo/storage`'
     primitives:
@@ -102,7 +103,7 @@ layers:
 ```
 
 The owner of a vendor is the `packages/<name>/` folder in the `code` roots of
-its primitive. A layer applies to the package folders of its `primitives`.
+its primitive. A language applies to the package folders of its `primitives`.
 `packagePaths` are paths inside any package. `files` are regular expressions on
 the full file path, for app folders.
 

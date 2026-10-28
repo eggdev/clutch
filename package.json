@@ -100,6 +100,20 @@
         },
         "cache": false
       },
+      "check-suppressions": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-suppressions.ts"
+        },
+        "cache": false
+      },
+      "check-terms": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-terms.ts"
+        },
+        "cache": false
+      },
       "check-decisions": {
         "executor": "nx:run-commands",
         "options": {
@@ -168,6 +182,8 @@
         "dependsOn": [
           "check-docs-file-refs",
           "check-docs-temporal",
+          "check-suppressions",
+          "check-terms",
           "check-decisions",
           "check-file-size",
           "check-kickoff-slots",

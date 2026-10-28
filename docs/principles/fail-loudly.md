@@ -1,6 +1,6 @@
-# Fail loudly at the right layer
+# Fail loudly in the right module
 
-Fail at the first layer that can name the mistake and can still refuse the bad
+Fail in the first module that can name the mistake and can still refuse the bad
 write. A later quiet fallback hides which fact was missing.
 
 - A loud failure is a typed error with a stable code. It reaches the caller or

@@ -1,4 +1,5 @@
 import { defineConfig } from 'oxlint';
+import antiSlop from 'ultracite/oxlint/anti-slop';
 import core from 'ultracite/oxlint/core';
 
 /**
@@ -16,6 +17,8 @@ export default defineConfig({
     '.cursor/**',
   ],
   jsPlugins: [
+    // Only the rules turned on below. The rest of the anti-slop preset stays off.
+    ...(antiSlop.jsPlugins ?? []),
     { name: 'repo-imports', specifier: './tools/lint/import-policy.mjs' },
     { name: 'repo-classes', specifier: './tools/lint/class-policy.mjs' },
     { name: 'repo-gates', specifier: './tools/lint/gate-policy.mjs' },
@@ -53,15 +56,20 @@ export default defineConfig({
     'no-duplicate-imports': 'off',
     // Destructure objects. `items[0]` reads better than `const [item] = items`.
     'prefer-destructuring': ['error', { object: true, array: false }],
+    // `x as unknown as T` and widen-then-assert are casts that skip the type
+    // check. Decode a value from outside the program with a schema instead.
+    'anti-slop/no-chained-type-assertions': 'error',
+    'anti-slop/no-widen-then-assert': 'error',
 
     'repo-imports/aliases-only': 'error',
     'repo-imports/module-dependencies': 'error',
     'repo-imports/module-direction': 'error',
     'repo-imports/no-cycles': 'error',
     'repo-imports/vendor-owner': 'error',
-    'repo-imports/layers': 'error',
+    'repo-imports/languages': 'error',
     'repo-imports/testing-imports': 'error',
     'repo-imports/no-internal-mocks': 'error',
+    'repo-imports/no-reexports': 'error',
 
     'repo-classes/no-arbitrary-values': 'error',
     'repo-classes/speed-tokens-only': 'error',

@@ -163,12 +163,13 @@ export const ruleNames = [
   'module-direction',
   'no-cycles',
   'vendor-owner',
-  'layers',
+  'languages',
   'testing-imports',
   'no-internal-mocks',
+  'no-reexports',
 ];
 
-/** Whether a layer applies to a file, by package name, package path or file pattern. */
+/** Whether a language applies to a file, by package name, package path or file pattern. */
 const within = (rule, packages) => (file, filename) =>
   packages.includes(file?.name) ||
   (!!file?.name && (rule.packagePaths ?? []).some((prefix) => file.path.startsWith(prefix))) ||
@@ -177,7 +178,7 @@ const within = (rule, packages) => (file, filename) =>
 export const registryFile = 'docs/contributing/architecture/primitives.yaml';
 
 /**
- * Vendor owners, layers and exceptions from the primitives registry. A vendor
+ * Vendor owners, languages and exceptions from the primitives registry. A vendor
  * owner is a `packages/<name>/` folder in its primitive's code roots. See
  * docs/contributing/import-boundaries.md.
  */
@@ -199,7 +200,7 @@ export function parseRegistry(data) {
         allowed: (file) => owners.includes(file?.name),
       }));
     }),
-    layers: (data.layers ?? []).map((rule) => ({
+    languages: (data.languages ?? []).map((rule) => ({
       pattern: new RegExp(rule.imports, 'u'),
       where: rule.where,
       allowed: within(rule, packagesOf(rule.primitives ?? [])),
@@ -424,12 +425,12 @@ export default {
         });
       },
     },
-    layers: {
+    languages: {
       meta: {
         type: 'problem',
         schema: [],
         messages: {
-          layer:
+          language:
             '`{{value}}` is imported only in {{where}}. See docs/contributing/import-boundaries.md.',
         },
       },
@@ -439,17 +440,17 @@ export default {
         if (!file) {
           return {};
         }
-        const { layers } = registryOf(file.root);
+        const { languages } = registryOf(file.root);
         return specifiers((source) => {
           const value = valueOf(source);
           if (typeof value !== 'string') {
             return;
           }
-          const rule = layers.find((layer) => layer.pattern.test(value));
+          const rule = languages.find((language) => language.pattern.test(value));
           if (rule && !rule.allowed(file, filename)) {
-            report(context, 'layers', {
+            report(context, 'languages', {
               node: source,
-              messageId: 'layer',
+              messageId: 'language',
               data: { value, where: rule.where },
             });
           }
@@ -519,6 +520,24 @@ export default {
             }
           },
         };
+      },
+    },
+    'no-reexports': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          reexport:
+            'A re-export gives one thing a second import path. Delete it, and import from the file that declares the thing. See docs/contributing/import-boundaries.md#aliases.',
+        },
+      },
+      create(context) {
+        const check = (node) => {
+          if (node.source) {
+            report(context, 'no-reexports', { node, messageId: 'reexport' }, valueOf(node.source));
+          }
+        };
+        return { ExportNamedDeclaration: check, ExportAllDeclaration: check };
       },
     },
   },

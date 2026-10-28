@@ -49,5 +49,5 @@ function readSaved(raw: string | null): Saved | null {
 
 ## Related
 
-- [Fail loudly at the right layer](./fail-loudly.md)
+- [Fail loudly in the right module](./fail-loudly.md)
 - [Two-way and one-way doors](./two-way-doors.md)

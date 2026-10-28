@@ -84,4 +84,4 @@ rehearsal.
 ## Related
 
 - [Secret rotation](./secret-rotation.md)
-- [Fail loudly at the right layer](../../principles/fail-loudly.md)
+- [Fail loudly in the right module](../../principles/fail-loudly.md)

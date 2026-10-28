@@ -9,7 +9,7 @@ and for the runtime check.
 
 - **Fail fast.** Startup checks the environment against the schema. A missing
   or bad required value stops startup. See
-  [fail loudly at the right layer](../../principles/fail-loudly.md).
+  [fail loudly in the right module](../../principles/fail-loudly.md).
 - **Say where to get the value.** The error message names the variable and
   where to get its value.
 - **One change for a new variable.** Update the example env file, the schema

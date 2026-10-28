@@ -3,9 +3,10 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { detectProject } from '@apps/cli/src/detect-project';
+import { gitOrThrow as git } from '@apps/cli/src/git';
 import { installTemplate } from '@apps/cli/src/install-template';
 import { nextStep } from '@apps/cli/src/next-step';
-import { git, gitRepo } from '@apps/cli/src/testing/git-repo';
+import { gitRepo } from '@apps/cli/src/testing/git-repo';
 
 async function installed() {
   const template = await gitRepo({

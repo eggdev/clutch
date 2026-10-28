@@ -43,24 +43,26 @@ target on the root project. [`tools/docs-checks.test.ts`](../../../tools/docs-ch
 tests the docs checks. [`tools/repo-checks.test.ts`](../../../tools/repo-checks.test.ts)
 tests the workflow and dependency checks.
 
-| Target                       | Rejects                                                                                                           |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `lint`                       | Oxlint rules, including the [import boundaries](../import-boundaries.md), and the [CSS lint](./lint-rules.md#css) |
-| `lint-policy-test`           | A change to the import policy that breaks its fixtures                                                            |
-| `format-check`               | Oxfmt differences                                                                                                 |
-| `check-docs-file-refs`       | A doc link or path to a file that does not exist                                                                  |
-| `check-docs-temporal`        | Changelog phrases in durable docs                                                                                 |
-| `check-decisions`            | Duplicate decision numbers, or an index that does not match                                                       |
-| `check-file-size`            | `AGENTS.md` over 20 lines, or a source file over its limit. See [file size](#file-size)                           |
-| `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                                 |
-| `check-kickoff-slots`        | A kickoff slot left in a doc after `KICKOFF.md` is deleted                                                        |
-| `check-primitives`           | A broken [registry](../architecture/primitives.yaml) entry, or an Nx project with no primitive                    |
-| `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target`                  |
-| `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)                              |
-| `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md)                |
-| `check-lockfile`             | A `bun.lock` that does not match the manifests                                                                    |
-| `check-dependency-overrides` | An override without a documented reason, a stale reason, or a repeated JSON key                                   |
-| `audit-prod`                 | A moderate or worse advisory in a production dependency                                                           |
+| Target                       | Rejects                                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `lint`                       | Oxlint rules, including the [import boundaries](../import-boundaries.md), and the [CSS lint](./lint-rules.md#css)                          |
+| `lint-policy-test`           | A change to the import policy that breaks its fixtures                                                                                     |
+| `format-check`               | Oxfmt differences                                                                                                                          |
+| `check-docs-file-refs`       | A doc link or path to a file that does not exist                                                                                           |
+| `check-docs-temporal`        | Changelog phrases in durable docs                                                                                                          |
+| `check-suppressions`         | A lint or type suppression comment, such as `oxlint-disable` or `@ts-expect-error`. See [lint rules](./lint-rules.md#how-a-rule-is-chosen) |
+| `check-terms`                | A word from the [glossary](../glossary.md#rejected-words)'s rejected words table, or an em dash, in contributor docs                       |
+| `check-decisions`            | Duplicate decision numbers, or an index that does not match                                                                                |
+| `check-file-size`            | `AGENTS.md` over 20 lines, or a source file over its limit. See [file size](#file-size)                                                    |
+| `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                                                          |
+| `check-kickoff-slots`        | A kickoff slot left in a doc after `KICKOFF.md` is deleted                                                                                 |
+| `check-primitives`           | A broken [registry](../architecture/primitives.yaml) entry, or an Nx project with no primitive                                             |
+| `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target`                                           |
+| `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)                                                       |
+| `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md)                                         |
+| `check-lockfile`             | A `bun.lock` that does not match the manifests                                                                                             |
+| `check-dependency-overrides` | An override without a documented reason, a stale reason, or a repeated JSON key                                                            |
+| `audit-prod`                 | A moderate or worse advisory in a production dependency                                                                                    |
 
 Add a check as `tools/check-<name>.ts`. Export a `check<Name>(root)` function
 that returns the problems, so a test can call it on a temporary repository. Add

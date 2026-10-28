@@ -92,7 +92,7 @@ the risk and delete the entry in the same change.
 
 ## Related
 
-- [Fail loudly at the right layer](../principles/fail-loudly.md)
+- [Fail loudly in the right module](../principles/fail-loudly.md)
 - [Secret rotation](./operations/secret-rotation.md)
 - [Operator accounts](./operations/operator-accounts.md)
 - [Environment variables](./setup/environment-variables.md)

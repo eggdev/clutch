@@ -38,7 +38,7 @@ A finding without a reproducible runtime path may still have concrete source
 evidence; label what was and was not exercised.
 
 Use the configured tracker within existing authorization. External publication
-and label creation are separate mutations, not mandatory audit side effects.
+and label creation are separate writes, not mandatory audit side effects.
 Keep a local result when publication is unavailable or unrequested. Do not
 hardcode GitHub when the project uses Linear.
 

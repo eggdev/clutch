@@ -4,7 +4,7 @@ Entry: tools/verification/test_verify.py and
 .agents/skills/deliver-linear/scripts/test_intake.py through run review-tools.
 
 Actor: agent using disposable repositories, commands, receipts and issue snapshots.
-No Linear request, real driver or cloud mutation is made. Required runtime:
+No Linear request, real driver or cloud write is made. Required runtime:
 Python 3.11+, Git and POSIX process tools ps/pgrep.
 
 Run successful and failing flows, resist graceful termination in a descendant,

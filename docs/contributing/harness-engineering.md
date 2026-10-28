@@ -62,6 +62,9 @@ A message that names only the problem costs a round trip to find the fix. See
 - Put the verification commands you ran in the PR description.
 - Update docs in the same change when a workflow or constraint shifts.
 - Document when to use a new pattern in the change that adds it.
+- Turn on a new rule everywhere at once. Fix each violation in the same change,
+  or in a few short sessions before the rule merges. Do not keep a baseline
+  file of old violations. It goes stale.
 - On request, the [`pr-recap`](../../.agents/skills/pr-recap/SKILL.md)
   skill writes a PR recap block: the primitives touched, the risk and a diagram.
 

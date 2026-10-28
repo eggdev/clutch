@@ -17,7 +17,7 @@ module sends a code through the email module. It never imports the email
 provider.
 
 Some dependencies are shared languages, not wrapped vendors: a query builder or
-a UI framework. Each shared language is a `layers` entry in the registry
+a UI framework. Each shared language is a `languages` entry in the registry
 that names the folders that may speak it. The owner of the driver still owns the
 connection, migrations and transactions.
 

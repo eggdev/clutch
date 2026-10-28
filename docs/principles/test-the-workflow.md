@@ -8,7 +8,7 @@ it. An assertion needs an oracle that the production code does not share.
 
 ## What to test
 
-- Each layer has behavioral tests in its own package: design-system atoms,
+- Each kind of module has behavioral tests in its own package: design-system atoms,
   service behavior, domain commands and API endpoints.
 - A few end-to-end journeys prove the
   [hard invariants](../contributing/project-intent.md#hard-invariants). Each

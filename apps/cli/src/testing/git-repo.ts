@@ -4,8 +4,6 @@ import path from 'node:path';
 
 import { gitOrThrow } from '@apps/cli/src/git';
 
-export { gitOrThrow as git } from '@apps/cli/src/git';
-
 async function writeFiles(root: string, files: Record<string, string>) {
   for (const [name, content] of Object.entries(files)) {
     await mkdir(path.join(root, path.dirname(name)), { recursive: true });

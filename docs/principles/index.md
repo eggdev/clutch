@@ -38,7 +38,7 @@ Each surface starts on a phone and takes every visual value from a token.
 | [Generic platform](./generic-platform.md)                                   | Importing a vendor, adding a module, or deciding which module owns a vendor                   |
 | [Normalized source of truth](./normalized-source-of-truth.md)               | Adding a cache, index or second store for a fact that already has a record                    |
 | [Delete what is off the common path](./delete-off-the-common-path.md)       | A migration left an old lane, or a branch, field, flag or doc serves a path the product skips |
-| [Fail loudly at the right layer](./fail-loudly.md)                          | An error could be swallowed so a partial result continues                                     |
+| [Fail loudly in the right module](./fail-loudly.md)                         | An error could be swallowed so a partial result continues                                     |
 | [Fix the root bottleneck](./fix-the-root-bottleneck.md)                     | Masking slowness with timeouts, fallbacks or caches                                           |
 | [One door for each decision](./one-door-for-each-decision.md)               | Adding a route, job or tool that touches access, money or visibility, or a new kind of guard  |
 | [One gate into each feature](./one-gate-per-feature.md)                     | Adding a way into a feature, or a check that a feature needs before its first screen          |

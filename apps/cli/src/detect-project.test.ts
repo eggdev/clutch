@@ -2,7 +2,8 @@ import { expect, test } from 'bun:test';
 import path from 'node:path';
 
 import { detectProject } from '@apps/cli/src/detect-project';
-import { git, gitRepo } from '@apps/cli/src/testing/git-repo';
+import { gitOrThrow as git } from '@apps/cli/src/git';
+import { gitRepo } from '@apps/cli/src/testing/git-repo';
 
 test('an npm repo with commits is an existing project', async () => {
   await using repo = await gitRepo(

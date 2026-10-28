@@ -42,7 +42,8 @@ describe the failure mode and stop. Do not add a noisy half-rule. See
 [harness engineering](./harness-engineering.md) and [checks](./setup/checks.md).
 
 **Write in Simplified Technical English.** Short sentences, active voice, one
-word for one idea. No em dashes.
+word for one idea. No em dashes. The [glossary](./glossary.md) gives each term
+one meaning and lists the writing rules.
 
 ## Checks
 
@@ -53,6 +54,7 @@ word for one idea. No em dashes.
 | Decision numbers       | Duplicate record numbers, or an index that does not match      |
 | File size              | `AGENTS.md` over 20 lines, or a source file over its limit     |
 | Kickoff slots          | A kickoff slot left in a doc after kickoff ends                |
+| Glossary terms         | A word from the glossary's rejected words table, or an em dash |
 
 ## Related
 
