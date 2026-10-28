@@ -11,12 +11,11 @@
     },
     "sections": {
       "type": "string",
-      "description": "The sections to make, separated by commas. types is required.",
-      "default": "types,models,commands,runtime,ui,testing"
+      "description": "The sections to make, separated by commas, such as types,models,repo,runtime. types is required. repo needs runtime and --record."
     },
     "record": {
       "type": "string",
-      "description": "The first record, in kebab case. It defaults to the package name."
+      "description": "The first record, in kebab case. It gets a schema in types/, a model in models/ and a table in repo/, for each section the package has. Leave it out for a package that owns no records."
     },
     "summary": {
       "type": "string",
@@ -24,5 +23,5 @@
       "default": "Say what this package owns."
     }
   },
-  "required": ["name"]
+  "required": ["name", "sections"]
 }

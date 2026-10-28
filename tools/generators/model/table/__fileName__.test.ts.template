@@ -1,0 +1,13 @@
+import { expect, test } from 'bun:test';
+
+import { toRecord, toRow } from '@repo/<%= packageName %>/repo/<%= fileName %>';
+
+const record = {
+  id: '<%= fileName %>-1',
+  createdAt: '2026-10-28T12:00:00.000Z',
+  updatedAt: '2026-10-28T12:30:00.000Z',
+};
+
+test('a <%= title %> record becomes a row and comes back the same', () => {
+  expect(toRecord(toRow(record, 'org-a'))).toEqual(record);
+});

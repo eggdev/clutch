@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Tree } from '@nx/devkit';
 import { generateFiles, names } from '@nx/devkit';
 import {
+  addAppDependency,
   addDependencies,
   afterWrite,
   register,
@@ -26,16 +27,6 @@ function ensureList(tree: Tree, file: string, list: string, half: 'client' | 'se
       ? 'The client half of each command. The web app gives them to the object pool.'
       : 'The server change of each command. The server app passes them to `SyncServer`.';
   tree.write(file, `/** ${where} */\nexport const ${list} = [];\n`);
-}
-
-function addAppDependency(tree: Tree, file: string, dependency: string) {
-  const source = tree.read(file, 'utf-8');
-  if (source === null) {
-    return;
-  }
-  const manifest = JSON.parse(source);
-  manifest.dependencies = { ...manifest.dependencies, [dependency]: 'workspace:*' };
-  tree.write(file, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 /**

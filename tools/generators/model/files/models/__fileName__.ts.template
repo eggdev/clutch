@@ -1,5 +1,5 @@
 import type { <%= className %> } from '@repo/<%= packageName %>/types/<%= fileName %>';
 import { defineModel } from '@repo/sync/models/define';
 
-/** <%= className %> records in the object pool. Screens read them with `useRecords(<%= propertyName %>Model)`. */
+/** <%= className %> records in the object pool. Screens read them through the sync hooks in `@repo/sync/ui/`. */
 export const <%= propertyName %>Model = defineModel<<%= className %>>('<%= className %>');

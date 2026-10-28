@@ -87,10 +87,11 @@ and the flow of a write are on the
 ## Add a package with server code
 
 1. Run `mise exec -- bun nx g @tools/generators:package <name>
-   --sections=types,models,commands,repo,runtime`.
+   --sections=types,models,commands,repo,runtime --record=<record>`. It
+   registers the package's migrations in `apps/api/src/packages.ts`.
 2. Add a command with the `command` generator. It registers the server change.
 3. Run `mise exec -- bun nx run <name>:db-generate` after each table change.
-4. Add the package's migration to `migrations` in `apps/api/src/packages.ts`.
+   Only drizzle-kit writes migrations.
 
 ## What to read when changing it
 

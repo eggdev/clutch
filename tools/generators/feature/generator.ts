@@ -29,6 +29,7 @@ export function addFeature(tree: Tree, options: FeatureOptions) {
     dependencies: { react: versionOf(tree, 'react') },
     devDependencies: { '@types/react': versionOf(tree, '@types/react') },
     references: [],
+    react: true,
   });
   const substitutions = {
     ...name,

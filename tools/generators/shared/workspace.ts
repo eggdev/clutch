@@ -41,6 +41,8 @@ type Project = {
   readonly dependencies: Record<string, string>;
   readonly devDependencies?: Record<string, string>;
   readonly references: ReadonlyArray<string>;
+  /** Whether the project holds `.tsx` files, so its tsconfig names the React JSX runtime. */
+  readonly react: boolean;
 };
 
 /** The package.json and the three tsconfig files of a new package or feature. */
@@ -68,12 +70,12 @@ export function writeProject(tree: Tree, project: Project) {
   });
   const compilerOptions = {
     lib: ['es2024', 'dom', 'dom.iterable'],
-    jsx: 'react-jsx',
+    ...(project.react ? { jsx: 'react-jsx' } : {}),
   };
   writeJson(tree, `${project.directory}/tsconfig.json`, {
     extends: '../../tsconfig.base.json',
     // knip reads the JSX runtime here to see that a `.tsx` file uses React.
-    compilerOptions: { jsx: 'react-jsx', jsxImportSource: 'react' },
+    ...(project.react ? { compilerOptions: { jsx: 'react-jsx', jsxImportSource: 'react' } } : {}),
     files: [],
     references: [{ path: './tsconfig.lib.json' }, { path: './tsconfig.spec.json' }],
   });
@@ -122,6 +124,17 @@ export function addDependencies(
       .map((reference) => ({ path: reference }));
     return { ...config, references: [...(config.references ?? []), ...added] };
   });
+}
+
+/** Adds a workspace dependency to an app. A project without that app is skipped. */
+export function addAppDependency(tree: Tree, file: string, dependency: string) {
+  const source = tree.read(file, 'utf-8');
+  if (source === null) {
+    return;
+  }
+  const manifest = JSON.parse(source);
+  manifest.dependencies = { ...manifest.dependencies, [dependency]: 'workspace:*' };
+  tree.write(file, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 /**

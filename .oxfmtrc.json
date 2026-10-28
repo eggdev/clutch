@@ -10,5 +10,12 @@
     "order": "asc"
   },
   "sortPackageJson": true,
-  "ignorePatterns": ["bun.lock", ".agents/**", ".claude/**", ".codex/**", ".cursor/**"]
+  "ignorePatterns": [
+    "bun.lock",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**",
+    ".cursor/**",
+    "**/repo/migrations/**"
+  ]
 }

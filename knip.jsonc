@@ -41,6 +41,12 @@
       "entry": ["gate.ts", "**/*.test.{ts,tsx}"],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },
+    "packages/*": {
+      // A model is how screens read a record. A new model has no reader until
+      // the first screen uses it.
+      "entry": ["models/*.ts", "**/*.test.{ts,tsx}"],
+      "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+    },
     "{apps,features,packages}/*": {
       // Bun test runs every test file.
       "entry": ["**/*.test.{ts,tsx}"],

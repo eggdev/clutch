@@ -1,0 +1,21 @@
+import type { <%= className %>Row } from '@repo/<%= packageName %>/repo/schema';
+import type { <%= className %> } from '@repo/<%= packageName %>/types/<%= fileName %>';
+
+/** The public record of a row. The table shape stays inside this package. */
+export function toRecord(row: <%= className %>Row): <%= className %> {
+  return {
+    id: row.id,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** The row of a record, in one organization. */
+export function toRow(record: <%= className %>, organizationId: string): <%= className %>Row {
+  return {
+    id: record.id,
+    organizationId,
+    createdAt: new Date(record.createdAt),
+    updatedAt: new Date(record.updatedAt),
+  };
+}

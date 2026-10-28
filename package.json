@@ -120,6 +120,13 @@
         },
         "cache": false
       },
+      "check-db": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-db.ts"
+        },
+        "cache": false
+      },
       "check-terms": {
         "executor": "nx:run-commands",
         "options": {
@@ -253,6 +260,7 @@
           "check-user-docs",
           "knip",
           "check-migrations",
+          "check-db",
           "check-lockfile",
           "check-skills",
           "skill-tests"

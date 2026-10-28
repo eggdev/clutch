@@ -15,18 +15,35 @@ Drizzle Kit `1.0.0-rc.5` writes each package's migrations. It reads
 `repo/schema.ts` and writes `repo/migrations/<timestamp>_<name>/migration.sql`
 with a `snapshot.json`. Each package's `drizzle.config.ts` names both paths.
 
-| Task               | Command                                                                  |
-| ------------------ | ------------------------------------------------------------------------ |
-| Make a migration   | `mise exec -- bun nx run <package>:db-generate`                          |
-| Apply migrations   | Start the API. `apps/api/src/server.ts` runs them first.                 |
-| Register a package | Add its `migrate` function to `migrations` in `apps/api/src/packages.ts` |
+| Task               | Command                                                                           |
+| ------------------ | --------------------------------------------------------------------------------- |
+| Make a migration   | `mise exec -- bun nx run <package>:db-generate`                                   |
+| Apply migrations   | Start the API. `apps/api/src/server.ts` runs them first.                          |
+| Register a package | The `package` generator adds its `migrate` function to `apps/api/src/packages.ts` |
 
 The API runs each package's migrations in order, with the sync tables first.
 The same migrator runs on PGlite and on Postgres.
 
 <!-- kickoff: The command that dry-runs a migration against a copy of production data. -->
 
-## The check
+## Only drizzle-kit writes migrations
+
+Never write a migration by hand, and never edit one. Change `repo/schema.ts`,
+then run `db-generate`. No generator writes a migration either.
+
+`check-db` runs in `validate`, in the pre-push hook and in CI. It takes about
+one second. For each package with a `drizzle.config.ts`, it rejects:
+
+- A schema change with no migration. It runs `drizzle-kit check`, which
+  compares `repo/schema.ts` with the newest snapshot.
+- An entry in `repo/migrations/` that drizzle-kit did not write. Each entry is
+  a `<timestamp>_<name>/` folder that holds only `migration.sql` and
+  `snapshot.json`.
+
+To see a change before you write it, run
+`mise exec -- bun x drizzle-kit generate --explain` in the package folder.
+
+## The check of merged migrations
 
 `check-migrations` compares the working tree with a base commit on `main`. It
 rejects a change, a rename or a deletion of a migration that the base has. A new
