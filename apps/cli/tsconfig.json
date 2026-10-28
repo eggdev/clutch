@@ -1,5 +1,20 @@
 {
   "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "@repo/*": ["../../packages/*"],
+      "@features/*": ["../../features/*"],
+      "@tools/*": ["../../tools/*"]
+    }
+  },
   "files": [],
-  "references": [{ "path": "./tsconfig.lib.json" }, { "path": "./tsconfig.spec.json" }]
+  "references": [
+    {
+      "path": "./tsconfig.lib.json"
+    },
+    {
+      "path": "./tsconfig.spec.json"
+    }
+  ]
 }

@@ -2,11 +2,11 @@ import { expect, test } from 'bun:test';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { detectProject } from '@apps/cli/src/detect-project';
-import { gitOrThrow as git } from '@apps/cli/src/git';
-import { installTemplate } from '@apps/cli/src/install-template';
-import { nextStep } from '@apps/cli/src/next-step';
-import { gitRepo } from '@apps/cli/src/testing/git-repo';
+import { detectProject } from '@/detect-project';
+import { gitOrThrow as git } from '@/git';
+import { installTemplate } from '@/install-template';
+import { nextStep } from '@/next-step';
+import { gitRepo } from '@/testing/git-repo';
 
 async function installed() {
   const template = await gitRepo({

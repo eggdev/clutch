@@ -61,33 +61,95 @@ const valueOf = (source) =>
   source?.type === 'TemplateLiteral' ? source.quasis[0]?.value.cooked : source?.value;
 const filenameOf = (context) => (context.filename ?? context.getFilename()).replaceAll('\\', '/');
 
-/** The repository root and package of a linted file. */
-function locate(filename) {
-  const match = filename.match(/^(.*?)\/(?:packages\/([^/]+)\/(.*)|apps\/|tools\/)/u);
-  return match ? { root: match[1], name: match[2], path: match[3] } : null;
+/** The folders a package may have. See docs/contributing/architecture/index.md#package-sections. */
+export const sections = {
+  types: 'public',
+  config: 'private',
+  models: 'public',
+  commands: 'public',
+  repo: 'private',
+  service: 'public',
+  runtime: 'apps',
+  ui: 'public',
+  testing: 'tests',
+};
+/** Sections that hold server code. Client code never imports them. */
+const serverSections = new Set(['config', 'repo', 'service']);
+
+/**
+ * The repository root, tier, project and section of a linted file. `path` is
+ * the path inside the project. `section` is set for package files only.
+ */
+export function locate(filename) {
+  const match = filename.match(/^(.*?)\/(apps|features|packages|tools)\/(?:([^/]+)\/(.*))?/u);
+  if (!match) {
+    return null;
+  }
+  const [, root, tier, name, rest = ''] = match;
+  const inProject = tier === 'tools' ? `${name}/${rest}` : rest;
+  const first = inProject.split('/')[0];
+  return {
+    root,
+    tier,
+    name: tier === 'tools' ? undefined : name,
+    path: inProject,
+    section: tier === 'packages' && Object.hasOwn(sections, first) ? first : null,
+  };
 }
-/** Framework and platform runtimes. Client and contract files stay plain TypeScript. */
-const runtimes =
-  /^(?:node:|bun:|cloudflare:|@cloudflare\/|wrangler(?:\/|$)|react(?:-dom|-native)?(?:\/|$)|next(?:\/|$)|expo(?:-|\/|$)|one(?:\/|$))/u;
-const repoTarget = (value) => value.match(/^@repo\/([^/]+)\//u)?.[1];
+
+/** A `.server` module, with or without its extension. */
+const isServerPath = (value) => /\.server(?:\.[cm]?[jt]sx?)?$/u.test(value);
+/** What a repository specifier points at: tier, project, section and whether it is a `.server` file. */
+export function targetOf(value) {
+  const pkg = value.match(/^@repo\/([^/]+)\/([^/]+)(?:\/|$)/u);
+  if (pkg) {
+    return { tier: 'packages', name: pkg[1], section: pkg[2], server: isServerPath(value) };
+  }
+  const feature = value.match(/^@features\/([^/]+)\//u);
+  if (feature) {
+    return { tier: 'features', name: feature[1], server: isServerPath(value) };
+  }
+  if (value.startsWith('@/')) {
+    return { tier: 'app', server: isServerPath(value) };
+  }
+  if (value.startsWith('@tools/')) {
+    return { tier: 'tools' };
+  }
+  return null;
+}
+
 export const isTestFile = (filename) =>
   /(?:^|\/)test\//u.test(filename) || /\.(?:test|spec|pw)\.[cm]?[jt]sx?$/u.test(filename);
 /** A specifier for one of our own modules. */
-export const internal = (value) => /^(?:@repo\/|@apps\/|@tools\/|@\/|\.{1,2}(?:\/|$))/u.test(value);
+export const internal = (value) =>
+  /^(?:@repo\/|@features\/|@tools\/|@\/|\.{1,2}(?:\/|$))/u.test(value);
 /** A specifier that `aliases-only` rejects. */
-export const notAnAlias = (value) => /^(?:\.{1,2}(?:\/|$)|\/|file:|@repo\/[^/]+$|~\/)/u.test(value);
+export const notAnAlias = (value) =>
+  /^(?:\.{1,2}(?:\/|$)|\/|file:|@repo\/[^/]+\/?$|@features\/[^/]+\/?$|@apps\/|~\/)/u.test(value);
 
-const kinds = new Map();
-/** Reads `type:service` or `type:domain` from the package manifest. */
-function kindOf(root, name) {
-  const file = path.join(root, 'packages', name, 'package.json');
-  if (!kinds.has(file)) {
+const serverApps = new Map();
+/** An app whose package.json has the Nx tag `platform:server`, such as `apps/api`. */
+function isServerApp(root, name) {
+  const file = path.join(root, 'apps', name, 'package.json');
+  if (!serverApps.has(file)) {
     const tags = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf-8')).nx?.tags ?? []) : [];
-    const kind = tags.filter((tag) => tag === 'type:service' || tag === 'type:domain');
-    kinds.set(file, kind.length === 1 ? kind[0].slice(5) : null);
+    serverApps.set(file, tags.includes('platform:server'));
   }
-  return kinds.get(file);
+  return serverApps.get(file);
 }
+
+/** Whether a file runs only on the server, so it may import server code. */
+function isServerFile(file, filename) {
+  return (
+    isTestFile(filename) ||
+    isServerPath(filename.replace(/\.[cm]?[jt]sx?$/u, '')) ||
+    (file.tier === 'packages' && serverSections.has(file.section)) ||
+    (file.tier === 'apps' && isServerApp(file.root, file.name)) ||
+    file.tier === 'tools'
+  );
+}
+
+const repoTarget = (value) => value.match(/^@repo\/([^/]+)\//u)?.[1];
 
 /** Adds each `@repo/<name>` import under `directory` to `edges`. */
 function collectEdges(directory, edges) {
@@ -159,8 +221,10 @@ function rootName(node) {
 
 export const ruleNames = [
   'aliases-only',
-  'module-dependencies',
-  'module-direction',
+  'tier-direction',
+  'feature-isolation',
+  'section-access',
+  'server-only',
   'no-cycles',
   'vendor-owner',
   'languages',
@@ -169,17 +233,20 @@ export const ruleNames = [
   'no-reexports',
 ];
 
-/** Whether a language applies to a file, by package name, package path or file pattern. */
+/** Whether a language applies to a file, by package name, path inside a package or file pattern. */
 const within = (rule, packages) => (file, filename) =>
-  packages.includes(file?.name) ||
-  (!!file?.name && (rule.packagePaths ?? []).some((prefix) => file.path.startsWith(prefix))) ||
+  (file?.tier === 'packages' && packages.includes(file.name)) ||
+  (file?.tier === 'packages' &&
+    (rule.packagePaths ?? []).some((prefix) => file.path.startsWith(prefix))) ||
   (rule.files ?? []).some((pattern) => new RegExp(pattern, 'u').test(filename));
 
 export const registryFile = 'docs/contributing/architecture/primitives.yaml';
 
 /**
  * Vendor owners, languages and exceptions from the primitives registry. A vendor
- * owner is a `packages/<name>/` folder in its primitive's code roots. See
+ * owner is a `packages/<name>/` folder in its primitive's code roots. Inside the
+ * owner, only `config/`, `repo/` and `runtime/` import the vendor, so no public
+ * section shows it. See
  * docs/contributing/import-boundaries.md.
  */
 export function parseRegistry(data) {
@@ -197,7 +264,10 @@ export function parseRegistry(data) {
         vendor: rule.vendor,
         pattern: new RegExp(rule.imports, 'u'),
         owner: owners.map((name) => `packages/${name}`).join('`, `'),
-        allowed: (file) => owners.includes(file?.name),
+        allowed: (file, filename) =>
+          file?.tier === 'packages' &&
+          owners.includes(file.name) &&
+          (['config', 'repo', 'runtime', 'testing'].includes(file.section) || isTestFile(filename)),
       }));
     }),
     languages: (data.languages ?? []).map((rule) => ({
@@ -269,7 +339,7 @@ export default {
         schema: [],
         messages: {
           alias:
-            'Use a TypeScript path alias (@/, @apps/, @repo/, or @tools/) for repository imports. Relative paths and workspace package entrypoints are not allowed.',
+            'Use a path alias: `@/` inside an app, `@repo/<package>/<section>/...`, `@features/<feature>/...` or `@tools/...`. Relative paths, `@apps/` and bare package names are not allowed. See docs/contributing/import-boundaries.md#aliases.',
         },
       },
       create(context) {
@@ -281,85 +351,125 @@ export default {
         });
       },
     },
-    'module-dependencies': {
+    'tier-direction': {
       meta: {
         type: 'problem',
         schema: [],
         messages: {
-          application:
-            'Packages cannot depend on applications or repository tooling. Inject an adapter at the module interface.',
-          portable:
-            'Client and contract files cannot import server code, vendors or framework runtimes. Use a plain contract or inject an adapter.',
+          package:
+            'A package imports only other packages. It never imports a feature, an app or `tools/`. Inject what it needs at its interface.',
+          feature:
+            'A feature imports only packages and its own files. It never imports an app or `tools/`.',
+          app: '`@/` is for files inside an app. Packages and features never import an app.',
+        },
+      },
+      create(context) {
+        const file = locate(filenameOf(context));
+        if (!file || file.tier === 'apps' || file.tier === 'tools') {
+          return {};
+        }
+        return specifiers((source) => {
+          const value = valueOf(source);
+          const target = typeof value === 'string' && targetOf(value);
+          if (!target) {
+            return;
+          }
+          if (target.tier === 'app') {
+            report(context, 'tier-direction', { node: source, messageId: 'app' });
+          } else if (file.tier === 'packages' && target.tier !== 'packages') {
+            report(context, 'tier-direction', { node: source, messageId: 'package' });
+          } else if (file.tier === 'features' && target.tier === 'tools') {
+            report(context, 'tier-direction', { node: source, messageId: 'feature' });
+          }
+        });
+      },
+    },
+    'feature-isolation': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          feature:
+            'A feature never imports another feature. Move the shared part into a package: the design system, or the `ui/` of the package that owns the records.',
+        },
+      },
+      create(context) {
+        const file = locate(filenameOf(context));
+        if (file?.tier !== 'features') {
+          return {};
+        }
+        return specifiers((source) => {
+          const value = valueOf(source);
+          const target = typeof value === 'string' && targetOf(value);
+          if (target?.tier === 'features' && target.name !== file.name) {
+            report(context, 'feature-isolation', { node: source, messageId: 'feature' });
+          }
+        });
+      },
+    },
+    'section-access': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          unknown:
+            '`{{section}}` is not a package section. Use one of: {{sections}}. See docs/contributing/architecture/index.md#package-sections.',
+          private:
+            '`{{section}}/` is private to `packages/{{name}}`. Call its public `service/` or `types/` instead.',
+          runtime:
+            '`runtime/` is wiring for apps. Only an app, or its own package, imports `packages/{{name}}/runtime/`.',
         },
       },
       create(context) {
         const filename = filenameOf(context);
         const file = locate(filename);
-        const pkg = filename.match(/(?:^|\/)packages\/([^/]+)\/src\/(.+)$/u);
-        // `src/client.ts` and `src/contracts.ts`, or a folder of the same name.
-        const portable = pkg && /^(?:client|contracts)(?:\/|\.)/u.test(pkg[2]);
-        const vendors = portable && file ? registryOf(file.root).vendors : [];
-        return specifiers((source) => {
-          const value = valueOf(source);
-          if (typeof value !== 'string') {
-            return;
-          }
-          if (pkg && /^@(?:apps|tools)?\//u.test(value)) {
-            report(context, 'module-dependencies', { node: source, messageId: 'application' });
-            return;
-          }
-          if (
-            portable &&
-            (/^@repo\/[^/]+\/src\/server(?:\/|\.|$)/u.test(value) ||
-              runtimes.test(value) ||
-              vendors.some((vendor) => vendor.pattern.test(value)))
-          ) {
-            report(context, 'module-dependencies', { node: source, messageId: 'portable' });
-          }
-        });
-      },
-    },
-    'module-direction': {
-      meta: {
-        type: 'problem',
-        schema: [],
-        messages: {
-          untagged:
-            '`packages/{{name}}` needs exactly one Nx tag, `type:service` or `type:domain`, in its package.json.',
-          service:
-            'A service never imports a domain. Move the shared behavior into a service, or compose both in the app.',
-          domain:
-            'A domain never imports another domain. Move the shared behavior into a service, or compose both in the app.',
-        },
-      },
-      create(context) {
-        const file = locate(filenameOf(context));
-        if (!file?.name) {
+        if (!file) {
           return {};
         }
         return specifiers((source) => {
           const value = valueOf(source);
-          const target = typeof value === 'string' && repoTarget(value);
-          if (!target || target === file.name) {
+          const target = typeof value === 'string' && targetOf(value);
+          if (target?.tier !== 'packages') {
             return;
           }
-          for (const name of [file.name, target]) {
-            if (!kindOf(file.root, name)) {
-              report(context, 'module-direction', {
-                node: source,
-                messageId: 'untagged',
-                data: { name },
-              });
-              return;
-            }
+          const data = { section: target.section, name: target.name };
+          const own = file.tier === 'packages' && file.name === target.name;
+          const access = sections[target.section];
+          if (!access) {
+            data.sections = Object.keys(sections).join(', ');
+            report(context, 'section-access', { node: source, messageId: 'unknown', data });
+          } else if (access === 'private' && !own) {
+            report(context, 'section-access', { node: source, messageId: 'private', data });
+          } else if (access === 'apps' && !own && file.tier !== 'apps' && !isTestFile(filename)) {
+            report(context, 'section-access', { node: source, messageId: 'runtime', data });
           }
-          if (kindOf(file.root, target) !== 'domain') {
-            return;
+        });
+      },
+    },
+    'server-only': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          server:
+            'Client code cannot import server code (`config/`, `repo/`, `service/` or a `.server` file). Register a server change in `packages/<name>/runtime/handlers.server.ts`; a server app loads that file. See docs/contributing/import-boundaries.md#server-code.',
+        },
+      },
+      create(context) {
+        const filename = filenameOf(context);
+        const file = locate(filename);
+        if (!file || isServerFile(file, filename)) {
+          return {};
+        }
+        return specifiers((source) => {
+          const value = valueOf(source);
+          const target = typeof value === 'string' && targetOf(value);
+          if (
+            target &&
+            (target.server || (target.tier === 'packages' && serverSections.has(target.section)))
+          ) {
+            report(context, 'server-only', { node: source, messageId: 'server' });
           }
-          report(context, 'module-direction', {
-            node: source,
-            messageId: kindOf(file.root, file.name),
-          });
         });
       },
     },
@@ -369,12 +479,12 @@ export default {
         schema: [],
         messages: {
           cycle:
-            'This import closes a package cycle: {{path}}. Move the shared code into a service that both can import.',
+            'This import closes a package cycle: {{path}}. Move the shared code into a package that both can import.',
         },
       },
       create(context) {
         const file = locate(filenameOf(context));
-        if (!file?.name) {
+        if (file?.tier !== 'packages') {
           return {};
         }
         return specifiers((source) => {
@@ -400,11 +510,12 @@ export default {
         schema: [],
         messages: {
           owner:
-            '{{vendor}} is imported only in `{{owner}}`. Ask the owner module for the capability. See docs/principles/generic-platform.md.',
+            '{{vendor}} is imported only in the `config/`, `repo/` or `runtime/` of `{{owner}}`. Call the service of that package. See docs/principles/generic-platform.md.',
         },
       },
       create(context) {
-        const file = locate(filenameOf(context));
+        const filename = filenameOf(context);
+        const file = locate(filename);
         if (!file) {
           return {};
         }
@@ -415,7 +526,7 @@ export default {
             return;
           }
           const rule = vendors.find((vendor) => vendor.pattern.test(value));
-          if (rule && !rule.allowed(file ?? {})) {
+          if (rule && !rule.allowed(file, filename)) {
             report(context, 'vendor-owner', {
               node: source,
               messageId: 'owner',
@@ -463,17 +574,17 @@ export default {
         schema: [],
         messages: {
           testing:
-            '`src/testing/**` is imported only by test files and other `src/testing/` files. Production code never loads test builders or fakes.',
+            '`testing/` is imported only by test files and other `testing/` files. Production code never loads fakes or Test Layers.',
         },
       },
       create(context) {
         const filename = filenameOf(context);
-        if (isTestFile(filename) || /\/src\/testing\//u.test(filename)) {
+        if (isTestFile(filename) || locate(filename)?.section === 'testing') {
           return {};
         }
         return specifiers((source) => {
           const value = valueOf(source);
-          if (typeof value === 'string' && /^@repo\/[^/]+\/src\/testing\//u.test(value)) {
+          if (typeof value === 'string' && /^@repo\/[^/]+\/testing\//u.test(value)) {
             report(context, 'testing-imports', { node: source, messageId: 'testing' });
           }
         });
@@ -484,7 +595,7 @@ export default {
         type: 'problem',
         schema: [],
         messages: {
-          mock: 'Never mock our own modules. Run the real code, or connect a vendor fake through the owner module port. See docs/principles/test-the-workflow.md.',
+          mock: 'Never mock our own modules. Run the real code, or provide the Test Layer of the package that owns the vendor. See docs/principles/test-the-workflow.md.',
         },
       },
       create(context) {

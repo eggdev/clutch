@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 
-import { chooseProvider, findProviders } from '@apps/cli/src/providers';
-import { fakeBin } from '@apps/cli/src/testing/fake-bin';
+import { chooseProvider, findProviders } from '@/providers';
+import { fakeBin } from '@/testing/fake-bin';
 
 test('only the agent CLIs on PATH are offered', async () => {
   await using bin = await fakeBin(['codex']);

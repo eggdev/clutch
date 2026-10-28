@@ -8,6 +8,7 @@ export async function listDocs(root: string): Promise<Array<string>> {
     'KICKOFF.md',
     'README.md',
     'apps/*/README.md',
+    'features/*/README.md',
     'packages/*/README.md',
     'docs/**/*.md',
     '.agents/skills/**/*.md',

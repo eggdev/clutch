@@ -1,7 +1,7 @@
 # Session ownership
 
-Entry: SessionQueue in packages/runtime/src/session-queue.ts, exercised by
-packages/runtime/src/session-queue.test.ts through run session-queue.
+Entry: SessionQueue in packages/runtime/service/session-queue.ts, exercised by
+packages/runtime/service/session-queue.test.ts through run session-queue.
 
 Actor: trusted controller. Each test owns disposable SQLite state and processes.
 No actual device is allocated. Required runtime: pinned Bun and its SQLite API.

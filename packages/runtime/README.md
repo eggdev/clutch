@@ -1,6 +1,6 @@
 # Review runtime
 
-The durable native-session queue is in src/session-queue.ts. It uses Bun's real
+The durable native-session queue is in service/session-queue.ts. It uses Bun's real
 SQLite runtime, WAL, full synchronous writes and immediate transactions. No new
 dependency or running service is required.
 

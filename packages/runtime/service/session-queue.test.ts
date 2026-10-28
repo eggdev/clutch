@@ -4,9 +4,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import type { Lease, QueueErrorCode } from '@repo/runtime/src/contracts';
-import { QueueError } from '@repo/runtime/src/contracts';
-import { SessionQueue } from '@repo/runtime/src/session-queue';
+import { SessionQueue } from '@repo/runtime/service/session-queue';
+import type { Lease, QueueErrorCode } from '@repo/runtime/types/contracts';
+import { QueueError } from '@repo/runtime/types/contracts';
 
 function store() {
   const root = mkdtempSync(path.join(tmpdir(), 'project-review-queue-'));

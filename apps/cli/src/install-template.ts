@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { Detection } from '@apps/cli/src/detect-project';
-import { gitOrThrow } from '@apps/cli/src/git';
-import { mergePackageJson } from '@apps/cli/src/merge-package-json';
-import type { Conflict } from '@apps/cli/src/merge-package-json';
 import { isMap, isSeq, parseDocument } from 'yaml';
+
+import type { Detection } from '@/detect-project';
+import { gitOrThrow } from '@/git';
+import { mergePackageJson } from '@/merge-package-json';
+import type { Conflict } from '@/merge-package-json';
 
 type Rule = 'replace' | 'merge' | 'add';
 type CopyList = { files: Array<{ path: string; rule: Rule }>; exclude?: Array<string> };

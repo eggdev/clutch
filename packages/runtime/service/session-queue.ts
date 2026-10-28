@@ -1,9 +1,15 @@
 import { Database } from 'bun:sqlite';
 import { randomUUID } from 'node:crypto';
 
-import type { CleanupTicket, Enqueue, Lease, Outcome, Session } from '@repo/runtime/src/contracts';
-import { QueueError } from '@repo/runtime/src/contracts';
-import { initialize } from '@repo/runtime/src/schema';
+import { initialize } from '@repo/runtime/repo/schema';
+import type {
+  CleanupTicket,
+  Enqueue,
+  Lease,
+  Outcome,
+  Session,
+} from '@repo/runtime/types/contracts';
+import { QueueError } from '@repo/runtime/types/contracts';
 
 type Row = Session & { leaseToken: string | null; cleanupToken: string | null };
 

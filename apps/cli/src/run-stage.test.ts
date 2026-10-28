@@ -2,10 +2,10 @@ import { expect, test } from 'bun:test';
 import { chmod } from 'node:fs/promises';
 import path from 'node:path';
 
-import { gitOrThrow as git } from '@apps/cli/src/git';
-import { runStage } from '@apps/cli/src/run-stage';
-import { fakeBin } from '@apps/cli/src/testing/fake-bin';
-import { gitRepo } from '@apps/cli/src/testing/git-repo';
+import { gitOrThrow as git } from '@/git';
+import { runStage } from '@/run-stage';
+import { fakeBin } from '@/testing/fake-bin';
+import { gitRepo } from '@/testing/git-repo';
 
 const claude = { id: 'claude', label: 'Claude Code', bin: 'claude' };
 const codex = { id: 'codex', label: 'Codex', bin: 'codex' };

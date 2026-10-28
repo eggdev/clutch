@@ -14,7 +14,7 @@ primitives:
   - id: billing
     group: platform
     name: Billing
-    kind: service
+    kind: package
     summary: Charges a team for its plan.
     code: [packages/billing/]
     docs: [docs/billing.md]
@@ -60,7 +60,7 @@ primitives:
   - id: billing
     group: platform
     name: Billing
-    kind: domain
+    kind: feature
     summary: |
       Charges a team.
       Sends invoices.
@@ -96,9 +96,9 @@ exceptions:
     `${file}: primitive \`billing\` has a \`summary\` over one line. Keep one line, and move the detail into its docs.`,
     `${file}: primitive \`billing\` names \`packages/gone/\`, which does not exist. Fix the path, or remove it.`,
     `${file}: primitive \`billing\` names \`docs/missing.md\`, which does not exist. Fix the path, or remove it.`,
-    `${file}: primitive \`billing\` lists vendors, but only a service owns a vendor. Move each vendor into a service.`,
+    `${file}: primitive \`billing\` lists vendors, but only a package owns a vendor. Move each vendor into a package.`,
     `${file}: primitive \`billing\` names the unknown group \`money\`. Add it under \`groups\`, or use one there.`,
-    `${file}: primitive \`billing\` has the kind \`widget\`. Use one of service, domain, app, tool.`,
+    `${file}: primitive \`billing\` has the kind \`widget\`. Use one of package, feature, app, tool.`,
     `${file}: primitive \`billing\` has a \`summary\` of 121 characters. Keep it at 120 or less, and move the detail into its docs.`,
     `${file}: languages[0] names the unknown primitive \`storage\`. Use an id under \`primitives\`.`,
     `${file}: invariant \`paid-plans\` has no \`docs\`. Link the page that states it, such as docs/contributing/project-intent.md#hard-invariants.`,

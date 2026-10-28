@@ -6,7 +6,7 @@ import path from 'node:path';
  * one. The directive names are joined from parts, so this file does not match
  * itself.
  */
-const sources = '{apps,packages,tools}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,css}';
+const sources = '{apps,features,packages,tools}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,css}';
 const rootFiles = '*.{ts,mts,js,mjs,cjs,css}';
 
 export const directives: Array<[label: string, fix: string, pattern: RegExp]> = [

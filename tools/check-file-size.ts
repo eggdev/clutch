@@ -8,7 +8,7 @@ import path from 'node:path';
  * that gives a line budget and the reason the file stays deep.
  */
 export const fixed: Record<string, number> = { 'AGENTS.md': 20 };
-const sources = '{apps,packages,tools}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}';
+const sources = '{apps,features,packages,tools}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}';
 
 type Budgets = { limit: number; files: Record<string, { lines: number; reason: string }> };
 

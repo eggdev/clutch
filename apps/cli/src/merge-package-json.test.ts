@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { mergePackageJson } from '@apps/cli/src/merge-package-json';
+import { mergePackageJson } from '@/merge-package-json';
 
 test("the project keeps its identity and dependencies, and gains the template's scripts and tools", () => {
   const project = {

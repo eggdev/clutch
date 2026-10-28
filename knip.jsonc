@@ -13,7 +13,7 @@
       ],
       "project": ["tools/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },
-    "{apps,packages}/*": {
+    "{apps,features,packages}/*": {
       // Bun test runs every test file.
       "entry": ["**/*.test.{ts,tsx}"],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],

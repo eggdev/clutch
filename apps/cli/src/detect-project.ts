@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { git, gitOrThrow } from '@apps/cli/src/git';
+import { git, gitOrThrow } from '@/git';
 
 export type Detection =
   | { kind: 'existing'; root: string; name: string; defaultBranch: string }

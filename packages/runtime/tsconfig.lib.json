@@ -5,6 +5,6 @@
     "tsBuildInfoFile": "out-tsc/lib/tsconfig.lib.tsbuildinfo",
     "types": ["bun"]
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts", "src/testing/**"]
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts", "testing/**", "out-tsc/**", "node_modules/**"]
 }

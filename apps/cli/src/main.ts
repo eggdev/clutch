@@ -2,18 +2,19 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { loadConfig, saveConfig } from '@apps/cli/src/config';
-import { describeEvent } from '@apps/cli/src/describe-event';
-import { detectProject } from '@apps/cli/src/detect-project';
-import { branch, installTemplate, manifestPath } from '@apps/cli/src/install-template';
-import { nextStep } from '@apps/cli/src/next-step';
-import type { Stage } from '@apps/cli/src/next-step';
-import { notify } from '@apps/cli/src/notify';
-import { chooseProvider, findProviders } from '@apps/cli/src/providers';
-import type { Provider } from '@apps/cli/src/providers';
-import { reviewCommand } from '@apps/cli/src/review-command';
-import { runStage } from '@apps/cli/src/run-stage';
 import * as prompts from '@clack/prompts';
+
+import { loadConfig, saveConfig } from '@/config';
+import { describeEvent } from '@/describe-event';
+import { detectProject } from '@/detect-project';
+import { branch, installTemplate, manifestPath } from '@/install-template';
+import { nextStep } from '@/next-step';
+import type { Stage } from '@/next-step';
+import { notify } from '@/notify';
+import { chooseProvider, findProviders } from '@/providers';
+import type { Provider } from '@/providers';
+import { reviewCommand } from '@/review-command';
+import { runStage } from '@/run-stage';
 
 /** The template repo is the clone that this CLI runs from. */
 const template = path.resolve(import.meta.dir, '../../..');

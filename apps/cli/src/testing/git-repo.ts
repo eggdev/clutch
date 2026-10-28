@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { gitOrThrow } from '@apps/cli/src/git';
+import { gitOrThrow } from '@/git';
 
 async function writeFiles(root: string, files: Record<string, string>) {
   for (const [name, content] of Object.entries(files)) {

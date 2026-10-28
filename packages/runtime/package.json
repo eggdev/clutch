@@ -4,7 +4,7 @@
   "type": "module",
   "nx": {
     "tags": [
-      "type:service"
+      "type:tool"
     ],
     "targets": {
       "test": {

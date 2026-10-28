@@ -62,8 +62,10 @@ export default defineConfig({
     'anti-slop/no-widen-then-assert': 'error',
 
     'repo-imports/aliases-only': 'error',
-    'repo-imports/module-dependencies': 'error',
-    'repo-imports/module-direction': 'error',
+    'repo-imports/tier-direction': 'error',
+    'repo-imports/feature-isolation': 'error',
+    'repo-imports/section-access': 'error',
+    'repo-imports/server-only': 'error',
     'repo-imports/no-cycles': 'error',
     'repo-imports/vendor-owner': 'error',
     'repo-imports/languages': 'error',
@@ -83,7 +85,7 @@ export default defineConfig({
       // render. Tests may open a route directly to prove a cold deep link.
       // Add a route here when its gate exists. See
       // docs/principles/one-gate-per-feature.md.
-      files: ['apps/*/**/*.{ts,tsx}', 'packages/*/src/**/*.{ts,tsx}'],
+      files: ['apps/*/**/*.{ts,tsx}', 'features/*/**/*.{ts,tsx}', 'packages/*/**/*.{ts,tsx}'],
       rules: { 'repo-gates/one-gate': ['error', { gates: {} }] },
     },
     {

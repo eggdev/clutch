@@ -5,11 +5,11 @@ import { parseRegistry, readRegistry, registryFile } from '@tools/lint/import-po
 
 /**
  * Checks the primitives registry: unique ids, known groups and kinds, real
- * paths, short summaries, vendors only on services, docs for each invariant,
+ * paths, short summaries, vendors only on packages, docs for each invariant,
  * and a primitive for each Nx project folder. See
  * docs/contributing/architecture/index.md#modules.
  */
-const kinds = new Set(['service', 'domain', 'app', 'tool']);
+const kinds = new Set(['package', 'feature', 'app', 'tool']);
 const maxSummary = 120;
 
 type Entry = {
@@ -51,9 +51,9 @@ function summaryProblem(summary: string | undefined): string | null {
   return null;
 }
 
-/** Each folder under `apps/` and `packages/` that has a package.json. */
+/** Each folder under `apps/`, `features/` and `packages/` that has a package.json. */
 function projectFolders(root: string): Array<string> {
-  return ['apps', 'packages'].flatMap((parent) =>
+  return ['apps', 'features', 'packages'].flatMap((parent) =>
     existsSync(path.join(root, parent))
       ? readdirSync(path.join(root, parent), { withFileTypes: true })
           .filter((entry) => entry.isDirectory())
@@ -81,8 +81,8 @@ function primitiveProblems(root: string, primitive: Entry, groups: Set<unknown>)
     !primitive.code?.length && 'has no `code` roots. Name the folders it owns.',
     ...missingPaths(root, [...(primitive.code ?? []), ...(primitive.docs ?? [])]),
     !!primitive.vendors?.length &&
-      primitive.kind !== 'service' &&
-      'lists vendors, but only a service owns a vendor. Move each vendor into a service.',
+      primitive.kind !== 'package' &&
+      'lists vendors, but only a package owns a vendor. Move each vendor into a package.',
   ].filter((problem): problem is string => typeof problem === 'string');
 }
 

@@ -1,5 +1,5 @@
-import { git, gitOrThrow } from '@apps/cli/src/git';
-import { branch, manifestPath } from '@apps/cli/src/install-template';
+import { git, gitOrThrow } from '@/git';
+import { branch, manifestPath } from '@/install-template';
 
 export type Stage = 'survey' | 'interview' | 'migrate' | 'done';
 export type Step = { step: 'install' } | { step: Stage };

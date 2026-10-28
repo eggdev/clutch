@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, rename, rmdir, symlink, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { gitOrThrow } from '@apps/cli/src/git';
-import type { ReviewFile, ReviewSource } from '@apps/cli/src/review-source';
-import { loadReviewSource, localFile, safeRelative } from '@apps/cli/src/review-source';
+import { gitOrThrow } from '@/git';
+import type { ReviewFile, ReviewSource } from '@/review-source';
+import { loadReviewSource, localFile, safeRelative } from '@/review-source';
 
 const manifestPath = '.review/tooling.json';
 type Manifest = { schemaVersion: 1; templateCommit: string; files: Record<string, string> };

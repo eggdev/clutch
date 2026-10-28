@@ -1,6 +1,6 @@
 /**
  * A migration that reached `main` never changes. Migration `.sql` files live
- * in a folder named `migrations` under apps/ or packages/. This check compares
+ * in a folder named `migrations` under apps/, features/ or packages/. This check compares
  * the working tree with a base commit on `main` and rejects a change, rename or
  * deletion of a migration that the base already has. A new migration passes.
  * Other files in the folder, such as the migration tool's journal, can change.
@@ -10,7 +10,7 @@
  * on `main` yet, so the check passes. So does the first push to `main`, whose
  * base is the zero commit.
  */
-const migration = /^(?:apps|packages)\/(?:.+\/)?migrations\/.+\.sql$/u;
+const migration = /^(?:apps|features|packages)\/(?:.+\/)?migrations\/.+\.sql$/u;
 
 function git(root: string, ...args: Array<string>): string | null {
   const run = Bun.spawnSync(['git', '-C', root, ...args]);

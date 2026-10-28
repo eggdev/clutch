@@ -2,10 +2,10 @@ import { expect, test } from 'bun:test';
 import { mkdir, readFile, readlink, symlink } from 'node:fs/promises';
 import path from 'node:path';
 
-import { detectProject } from '@apps/cli/src/detect-project';
-import { gitOrThrow as git } from '@apps/cli/src/git';
-import { installTemplate } from '@apps/cli/src/install-template';
-import { gitRepo } from '@apps/cli/src/testing/git-repo';
+import { detectProject } from '@/detect-project';
+import { gitOrThrow as git } from '@/git';
+import { installTemplate } from '@/install-template';
+import { gitRepo } from '@/testing/git-repo';
 
 const copyList = `
 files:

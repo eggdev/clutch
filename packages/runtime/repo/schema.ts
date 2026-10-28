@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 
-import { QueueError } from '@repo/runtime/src/contracts';
+import { QueueError } from '@repo/runtime/types/contracts';
 
 export function initialize(db: Database): void {
   db.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');

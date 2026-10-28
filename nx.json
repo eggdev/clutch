@@ -38,6 +38,7 @@
         "{workspaceRoot}/tools/lint/**/*",
         "{workspaceRoot}/docs/contributing/architecture/primitives.yaml",
         "{workspaceRoot}/apps/*/package.json",
+        "{workspaceRoot}/features/*/package.json",
         "{workspaceRoot}/packages/**/*",
         {
           "externalDependencies": [

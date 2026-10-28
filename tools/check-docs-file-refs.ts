@@ -10,7 +10,7 @@ import { blankFences, listDocs, readDoc } from '@tools/docs-files';
  * folder that a doc proposes is not an error. A code path right after "no",
  * "not" or "without" states an absence and is skipped.
  */
-const roots = ['apps/', 'packages/', 'docs/', 'tools/', '.agents/', '.github/'];
+const roots = ['apps/', 'features/', 'packages/', 'docs/', 'tools/', '.agents/', '.github/'];
 const ignored = /(?:^|\/)(?:\.wrangler\/|\.env(?:\.(?!example$)[^/]+)?$|\.dev\.vars$)|NNNN|\.\.\./u;
 
 export type Reference = { file: string; line: number; path: string; kind: 'code' | 'link' };

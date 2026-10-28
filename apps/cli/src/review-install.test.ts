@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, readlink, symlink } from 'node:fs/promises';
 import path from 'node:path';
 
-import { gitOrThrow as git } from '@apps/cli/src/git';
-import { installReview } from '@apps/cli/src/review-install';
-import { gitRepo } from '@apps/cli/src/testing/git-repo';
+import { gitOrThrow as git } from '@/git';
+import { installReview } from '@/review-install';
+import { gitRepo } from '@/testing/git-repo';
 
 async function source() {
   const repo = await gitRepo({

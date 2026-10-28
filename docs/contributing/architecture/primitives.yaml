@@ -11,10 +11,10 @@
 #
 # Fields:
 #   groups:     id, name
-#   primitives: id, group, name, kind (service | domain | app | tool),
+#   primitives: id, group, name, kind (package | feature | app | tool),
 #               summary (one line, at most 120 characters),
 #               code (folder roots; the longest matching root owns a file),
-#               docs (paths), vendors (a service only: vendor, imports)
+#               docs (paths), vendors (a package only: vendor, imports)
 #   languages:  shared languages: imports, where, primitives, packagePaths, files
 #   invariants: id, summary, docs
 #   exceptions: rule, file, imports, reason. See
@@ -39,7 +39,7 @@ primitives:
   - id: review-runtime
     group: repository
     name: Review runtime
-    kind: service
+    kind: tool
     summary: Central durable review-session queue, lease fencing and cleanup quarantine.
     code:
       - packages/runtime/

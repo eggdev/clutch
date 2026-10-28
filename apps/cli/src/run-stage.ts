@@ -1,9 +1,9 @@
 import { appendFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { gitOrThrow } from '@apps/cli/src/git';
-import type { Stage } from '@apps/cli/src/next-step';
-import type { Provider } from '@apps/cli/src/providers';
+import { gitOrThrow } from '@/git';
+import type { Stage } from '@/next-step';
+import type { Provider } from '@/providers';
 
 type RunnableStage = Exclude<Stage, 'done'>;
 

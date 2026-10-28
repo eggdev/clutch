@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 
-import { installReview } from '@apps/cli/src/review-install';
+import { installReview } from '@/review-install';
 
 export async function reviewCommand(
   args: Array<string>,

@@ -2,10 +2,10 @@ import { expect, test } from 'bun:test';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { saveConfig } from '@apps/cli/src/config';
-import { gitOrThrow as git } from '@apps/cli/src/git';
-import { fakeBin } from '@apps/cli/src/testing/fake-bin';
-import { gitRepo } from '@apps/cli/src/testing/git-repo';
+import { saveConfig } from '@/config';
+import { gitOrThrow as git } from '@/git';
+import { fakeBin } from '@/testing/fake-bin';
+import { gitRepo } from '@/testing/git-repo';
 
 const main = path.join(import.meta.dir, 'main.ts');
 

@@ -23,12 +23,15 @@ export async function checkManifests(root: string): Promise<Array<string>> {
         `${file}: package exports are forbidden; use TypeScript path aliases to source files.`,
       );
     }
-    const kinds = (manifest.nx?.tags ?? []).filter(
-      (tag: string) => tag === 'type:service' || tag === 'type:domain',
-    );
-    if (file.startsWith('packages/') && kinds.length !== 1) {
+    const tags: Array<string> = manifest.nx?.tags ?? [];
+    const kinds = tags.filter((tag) => tag.startsWith('type:'));
+    const allowed = file.startsWith('packages/') ? ['type:package', 'type:tool'] : ['type:feature'];
+    if (
+      (file.startsWith('packages/') || file.startsWith('features/')) &&
+      (kinds.length !== 1 || !allowed.includes(kinds[0]))
+    ) {
       errors.push(
-        `${file}: a package needs exactly one Nx tag, type:service or type:domain. See docs/contributing/import-boundaries.md.`,
+        `${file}: needs exactly one Nx tag, ${allowed.join(' or ')}. See docs/contributing/import-boundaries.md.`,
       );
     }
   }
@@ -48,6 +51,8 @@ if (import.meta.main) {
     );
     process.exitCode = 1;
   } else {
-    console.log('Workspace manifests have no exports maps, and each package has one type tag.');
+    console.log(
+      'Workspace manifests have no exports maps, and each package and feature has one type tag.',
+    );
   }
 }
