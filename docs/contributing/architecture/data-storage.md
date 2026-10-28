@@ -49,11 +49,11 @@ unless a migration rewrites every stored copy. See
 
 The template's sync engine holds these frozen contracts:
 
-| Contract                                                   | Defined in                                |
-| ---------------------------------------------------------- | ----------------------------------------- |
-| The `sync_counters` and `sync_events` tables               | `packages/sync/repo/schema.ts`            |
-| The change shape in each event                             | `packages/sync/types/protocol.ts`         |
-| The `pool` store and its `state` key in the local database | `packages/sync/runtime/local-database.ts` |
+| Contract                                                   | Defined in                            |
+| ---------------------------------------------------------- | ------------------------------------- |
+| The `sync_counters` and `sync_events` tables               | `packages/sync/repo/schema.ts`        |
+| The change shape in each event                             | `packages/sync/types/protocol.ts`     |
+| The `pool` store and its `state` key in the local database | `packages/sync/runtime/indexed-db.ts` |
 
 An event keeps its organization ID, so the log is scoped by tenant too.
 

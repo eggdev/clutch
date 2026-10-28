@@ -21,17 +21,17 @@ whole engine.
 
 The engine is our own code, not a vendor.
 
-| Part           | File                                                                 | Runs on                       |
-| -------------- | -------------------------------------------------------------------- | ----------------------------- |
-| Object pool    | `packages/sync/runtime/pool.ts`                                      | Client                        |
-| Local database | `packages/sync/runtime/local-database.ts` (IndexedDB through `idb`)  | Web                           |
-| Boot           | `packages/sync/runtime/boot.ts`                                      | Client                        |
-| Transport      | `packages/sync/runtime/transport.ts`                                 | Client, after the first paint |
-| React bindings | `packages/sync/ui/sync-provider.tsx`                                 | Client                        |
-| Protocol       | `packages/sync/types/protocol.ts`                                    | Both                          |
-| Event log      | `packages/sync/service/event-log.ts`, `packages/sync/repo/events.ts` | Server                        |
-| RPC server     | `packages/sync/runtime/server.server.ts`                             | Server                        |
-| Sessions       | `packages/sync/service/sessions.ts`                                  | Server                        |
+| Part           | File                                                                              | Runs on                       |
+| -------------- | --------------------------------------------------------------------------------- | ----------------------------- |
+| Object pool    | `packages/sync/runtime/pool.ts`                                                   | Client                        |
+| Local database | `packages/sync/types/local-database.ts` (the seam), `runtime/indexed-db.ts` (web) | Client                        |
+| Boot           | `packages/sync/runtime/boot.ts`                                                   | Client                        |
+| Transport      | `packages/sync/runtime/transport.ts`                                              | Client, after the first paint |
+| React bindings | `packages/sync/ui/sync-provider.tsx`                                              | Client                        |
+| Protocol       | `packages/sync/types/protocol.ts`                                                 | Both                          |
+| Event log      | `packages/sync/service/event-log.ts`, `packages/sync/repo/events.ts`              | Server                        |
+| RPC server     | `packages/sync/runtime/server.server.ts`                                          | Server                        |
+| Sessions       | `packages/sync/service/sessions.ts`                                               | Server                        |
 
 The protocol has two calls over one WebSocket for each organization, through
 `effect/rpc`:

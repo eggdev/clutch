@@ -1,5 +1,5 @@
 import { connectAfterPaint, loadPool } from '@repo/sync/runtime/boot';
-import { openLocalDatabase } from '@repo/sync/runtime/local-database';
+import { openIndexedDb } from '@repo/sync/runtime/indexed-db';
 import { SyncProvider } from '@repo/sync/ui/sync-provider';
 import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
@@ -15,7 +15,7 @@ import '@/styles.css';
  * The composition root of the web app. It loads the object pool from the
  * local database, renders, and only then starts the sync engine.
  */
-const database = await openLocalDatabase('web');
+const database = await openIndexedDb('web');
 const pool = await loadPool(database, commands);
 const root = document.querySelector('#root');
 if (root) {

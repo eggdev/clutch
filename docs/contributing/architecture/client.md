@@ -83,6 +83,34 @@ the subscriptions that the sync hooks wrap.
 One is the usual choice for native. A project with no client deletes
 `apps/web`, `features/` and the React language entry at kickoff.
 
+## Local database
+
+The sync engine keeps its state on the device through one seam,
+`LocalDatabase` in `packages/sync/types/local-database.ts`. It has three
+operations: `read`, `write` and `clear`. Each one takes or gives the whole
+pool state: the confirmed records, the last sync ID and the transaction queue.
+
+| Adapter   | File                                      | Platform           |
+| --------- | ----------------------------------------- | ------------------ |
+| IndexedDB | `packages/sync/runtime/indexed-db.ts`     | Web                |
+| SQLite    | `runtime/sqlite.ts` in `packages/sync`    | Native, at kickoff |
+| Memory    | `packages/sync/testing/local-database.ts` | Tests              |
+
+The template has no native app, so it has no SQLite adapter. When kickoff
+picks a native profile, it adds one:
+
+1. Add the SQLite driver of the profile to `packages/sync`, at an exact
+   version. Expo uses `expo-sqlite`. One or a bare React Native app uses
+   `@op-engineering/op-sqlite`. Check the current version with `npm view`.
+2. Add the driver as a vendor of the `sync` primitive in the registry.
+3. Write `runtime/sqlite.ts` in `packages/sync`. It opens one table with a key
+   column and a JSON column, and keeps the pool state in one row, as the
+   IndexedDB adapter does.
+4. Run the memory fake's tests against it, on a simulator or device. Start the
+   simulator with `mise exec -- bun run dev`, never directly.
+5. In the native app's composition root, open the SQLite adapter and pass it
+   to `loadPool`.
+
 ## Design system
 
 `packages/design-system/ui/` holds the shared components, such as `Button` and

@@ -250,6 +250,11 @@ Pick the profile of each client app. The template ships Vite with TanStack
 Router in `apps/web`. For a project with no client, delete `apps/web`,
 `features/notes` and the React language entry. For a native profile, add the
 app and fill the native slot in `docs/contributing/architecture/styling.md`.
+Then add the SQLite adapter of the local database. Follow the steps in
+[local database](../../../docs/contributing/architecture/client.md#local-database):
+the driver at an exact version, its vendor entry, `runtime/sqlite.ts` in
+`packages/sync`, and the composition root. A native app is not done until it keeps its pool in
+SQLite.
 Remove the notes example (`packages/notes`, `features/notes`, its route and its
 registrations) once the first product package exists.
 

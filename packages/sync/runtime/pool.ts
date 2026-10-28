@@ -1,3 +1,4 @@
+import type { PoolState } from '@repo/sync/types/local-database';
 import type { Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
 import type {
   Command,
@@ -11,13 +12,6 @@ import type {
 type Table = Map<string, RecordRow>;
 type Tables = Map<string, Table>;
 type Pending = { readonly transaction: Transaction; sent: boolean; acceptedAt: number | null };
-
-/** What the local database keeps: the confirmed records and the transactions that wait. */
-export type PoolState = {
-  readonly lastSyncId: number;
-  readonly tables: Readonly<Record<string, ReadonlyArray<RecordRow>>>;
-  readonly pending: ReadonlyArray<Transaction>;
-};
 
 /** The object pool, with the writes that only the sync engine and commands use. */
 export type Pool = ReadablePool & {

@@ -1,5 +1,6 @@
 import { createPool } from '@repo/sync/runtime/pool';
-import type { Pool, PoolState } from '@repo/sync/runtime/pool';
+import type { Pool } from '@repo/sync/runtime/pool';
+import type { PoolState } from '@repo/sync/types/local-database';
 import type { Command } from '@repo/sync/types/records';
 import { SyncProvider } from '@repo/sync/ui/sync-provider';
 import type { ReactElement } from 'react';

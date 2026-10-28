@@ -61,7 +61,7 @@ These terms come from the
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
 | Local store            | The client copy of the records: the object pool and the local database together.                                                              | cache (for records)             |
 | Object pool            | The in-memory map of records, keyed by model and ID. Screens read it.                                                                         | state, cache                    |
-| Local database         | Device storage for the confirmed records, the last sync ID and the transaction queue. It is IndexedDB in `apps/web`.                          | offline cache                   |
+| Local database         | Device storage for the confirmed records, the last sync ID and the transaction queue. It is IndexedDB on the web and SQLite on native.        | offline cache                   |
 | Sync engine            | The code in `packages/sync` that moves transactions to the server and deltas to the client. It is the only client code that uses the network. | API client, data layer          |
 | Model                  | The definition of one kind of record, in `models/`.                                                                                           | entity, schema (for this)       |
 | Record                 | One instance of a model, with one ID. Each fact has exactly one owner record.                                                                 | entity, row (on the client)     |

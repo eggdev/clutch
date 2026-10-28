@@ -1,6 +1,6 @@
-import type { LocalDatabase } from '@repo/sync/runtime/local-database';
 import { createPool } from '@repo/sync/runtime/pool';
 import type { Pool } from '@repo/sync/runtime/pool';
+import type { LocalDatabase } from '@repo/sync/types/local-database';
 import type { Command } from '@repo/sync/types/records';
 
 /**
