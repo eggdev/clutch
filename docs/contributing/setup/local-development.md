@@ -20,28 +20,60 @@ mise exec -- bun run validate
 mise exec -- bun run dev
 ```
 
-This runs the `dev` target of each app through Nx:
+This is the only way to start the dev servers. It runs
+[`tools/dev.ts`](../../../tools/dev.ts), which starts each app with an Nx `dev`
+target through [portless](https://github.com/vercel-labs/portless). Portless
+gives each app a stable name in place of a port:
 
-| App        | Command                   | URL                        |
-| ---------- | ------------------------- | -------------------------- |
-| `apps/api` | `bun --watch src/main.ts` | `ws://localhost:4000/sync` |
-| `apps/web` | `vite`                    | `http://localhost:5173`    |
+| App        | Command                   | URL                                          |
+| ---------- | ------------------------- | -------------------------------------------- |
+| `apps/web` | `vite`                    | `http://project-template.localhost:1355`     |
+| `apps/api` | `bun --watch src/main.ts` | `http://api.project-template.localhost:1355` |
+
+The name comes from the root `package.json` name. The web app gets the bare
+name, and each other app gets `<app>.<name>`. In a linked Git worktree,
+portless puts the branch name in front, so two checkouts never collide.
 
 The API keeps Postgres in the process with PGlite, in `apps/api/.data/pglite`,
 so it needs no database server. It runs the migrations before it takes a
 request. The web app sends `/sync` to the API, so the browser has one origin.
 Delete `apps/api/.data/` to start from an empty database.
 
+## One copy of each server
+
+The dev command never starts a second copy of a server:
+
+1. It asks portless for the URL of each app.
+2. It sends each app a health request through the portless proxy. The API
+   answers `/health`, and the web app answers `/`.
+3. It uses each server that answers again, and prints `reused`.
+4. It starts each missing app, and waits until the app answers. Then it prints
+   `started`.
+5. When every server already runs, it prints the URLs and exits.
+
+A lock file, `.data/dev.lock`, holds a second run until the first one has
+started its servers. The second run then finds them and uses them again.
+
+`mise exec -- bun run dev --check` prints `up` or `down` for each app. It exits
+1 when an app is down.
+
+An agent hook refuses commands that start a server or a simulator directly:
+`vite`, `bun --watch`, an Nx `dev` target, `portless run`, `expo start`,
+`xcrun simctl boot`, `open -a Simulator` and `emulator -avd`. Its message
+points to the dev command. See [agent hooks](../harness-engineering.md#agent-hooks).
+
+## Plain HTTP by default
+
+Portless runs on port 1355 with plain HTTP. That port needs no `sudo`, and
+plain HTTP needs no trusted certificate. For HTTPS, run
+`mise exec -- bunx portless trust` once. Then set `PORTLESS_HTTPS=1` and
+`PORTLESS_PORT=443` before the dev command. Trust adds a local certificate
+authority to your system, so a person does it, never an agent.
+
 <!-- kickoff: How to start each other app and local service, with the command and the URL. -->
 
-A start command must be safe to run again. Agents start it often, and a second
-copy on a busy port fails in ways that are hard to read. The command:
-
-1. Reuses a server that is already running and healthy.
-2. Otherwise starts one, and waits for its health route to answer.
-3. Prints the URL and the path of the log file.
-4. Stops early with a fix hint when it finds a known misconfiguration, such as
-   a missing environment variable.
+A start command for each other app or service must be safe to run again, in
+the same way. Add it as an Nx `dev` target, so the dev command starts it.
 
 The workflow also exposes status, logs and stop for this task's stack. A stop
 never shuts down another task. Document process ownership and restart behavior

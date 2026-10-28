@@ -148,3 +148,22 @@ test('the entry scripts read stdin and answer each tool in its own format', asyn
   ).toEqual(['ask', 'deny']);
   expect(answers.map((answer) => answer.exitCode)).toEqual([0, 0]);
 });
+
+test('the dev-server entry script denies a direct start for both tools', () => {
+  const answers = ['claude', 'codex'].map((agent) =>
+    hook('guard-dev-servers', agent, {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'cd apps/web && bunx vite' },
+    }),
+  );
+  expect(
+    answers.map((answer) => JSON.parse(answer.stdout).hookSpecificOutput.permissionDecision),
+  ).toEqual(['deny', 'deny']);
+  expect(
+    hook('guard-dev-servers', 'claude', {
+      tool_name: 'Bash',
+      tool_input: { command: 'mise exec -- bun run dev' },
+    }),
+  ).toEqual({ exitCode: 0, stdout: '' });
+});

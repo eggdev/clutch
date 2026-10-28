@@ -11,6 +11,16 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && mise exec -- bun .agents/hooks/guard-dev-servers.ts codex",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "PostToolUse": [

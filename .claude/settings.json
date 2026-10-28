@@ -11,6 +11,16 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && mise exec -- bun .agents/hooks/guard-dev-servers.ts claude",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "PostToolUse": [

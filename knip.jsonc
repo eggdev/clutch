@@ -14,6 +14,9 @@
         ".agents/hooks/*.ts",
       ],
       "project": ["tools/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+      // tools/dev.ts runs node_modules/.bin/portless as a child process, which
+      // knip cannot read.
+      "ignoreDependencies": ["portless"],
     },
     "apps/api": {
       // The dev target runs this file with `bun --watch`, which knip cannot read.

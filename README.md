@@ -28,12 +28,18 @@ mise exec -- bun install
 mise exec -- bun run dev
 ```
 
-- `http://localhost:5173` opens the web app: Vite, React and TanStack Router.
-  The notes example shows the sync engine. Open it in two tabs, and an edit in
-  one shows in the other.
-- `ws://localhost:4000/sync` is the API: Bun and Effect, with Postgres in the
-  process through PGlite. It needs no database server.
+- `http://project-template.localhost:1355` opens the web app: Vite, React and
+  TanStack Router. The notes example shows the sync engine. Open it in two
+  tabs, and an edit in one shows in the other.
+- `http://api.project-template.localhost:1355` is the API: Bun and Effect, with
+  Postgres in the process through PGlite. It needs no database server.
+- `bun run dev` uses servers that already run and starts only the missing ones.
+  `bun run dev --check` shows which run.
 - `mise exec -- bun run validate` runs every check.
+
+[Portless](https://github.com/vercel-labs/portless) gives each app a stable
+name in place of a port. See
+[local development](./docs/contributing/setup/local-development.md).
 
 Make each new part with a generator, such as
 `mise exec -- bun nx g @tools/generators:feature billing`. See
