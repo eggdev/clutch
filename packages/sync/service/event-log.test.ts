@@ -81,3 +81,16 @@ test('a client gets the backlog after its sync ID, then live deltas, its own too
     received.map((element) => element.map((delta) => [delta.syncId, delta.transactionId])),
   ).toEqual([[[2, 't2']], [[3, 't4']]]);
 });
+
+test('the head is the newest sync ID of an organization, or 0', async () => {
+  const heads = await run(
+    Effect.gen(function* () {
+      const log = yield* EventLog;
+      const empty = yield* log.head('org-a');
+      yield* log.commit('org-a', 't1', () => Effect.succeed([change('a')]));
+      yield* log.commit('org-a', 't2', () => Effect.succeed([change('b')]));
+      return [empty, yield* log.head('org-a'), yield* log.head('org-b')];
+    }),
+  );
+  expect(heads).toEqual([0, 2, 0]);
+});

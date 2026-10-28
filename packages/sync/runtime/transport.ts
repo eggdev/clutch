@@ -54,8 +54,18 @@ function pendingSignals(pool: Pool) {
 function session(pool: Pool, onSessionEnded: () => void) {
   return Effect.gen(function* () {
     const client = yield* RpcClient.make(SyncRpcs);
-    yield* client.Pull({ lastSyncId: pool.lastSyncId() }).pipe(
-      Stream.runForEach((deltas) => Effect.sync(() => pool.applyDeltas(deltas))),
+    const pull = Effect.suspend(() =>
+      client
+        .Pull({ lastSyncId: pool.lastSyncId() })
+        .pipe(Stream.runForEach((deltas) => Effect.sync(() => pool.applyDeltas(deltas)))),
+    );
+    // After a database restore, the server's log ends before our last sync
+    // ID. Drop the confirmed records, keep the pending transactions, and
+    // load again from 0.
+    yield* pull.pipe(
+      Effect.catchTag('ServerBehind', () =>
+        Effect.sync(() => pool.resetConfirmed()).pipe(Effect.andThen(pull)),
+      ),
       Effect.catchTag('SessionEnded', () => Effect.sync(onSessionEnded)),
       Effect.forkScoped,
     );

@@ -29,6 +29,7 @@ export type Pool = ReadablePool & {
   readonly unsent: () => ReadonlyArray<Transaction>;
   readonly markSent: (ids: ReadonlyArray<string>, sent: boolean) => void;
   readonly applyDeltas: (deltas: ReadonlyArray<Delta>) => void;
+  readonly resetConfirmed: () => void;
   readonly settle: (outcomes: ReadonlyArray<Outcome>) => void;
   readonly onPending: (listener: () => void) => () => void;
 };
@@ -181,6 +182,18 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
       }
       dropSettled();
       recompute();
+    },
+    resetConfirmed() {
+      confirmed = new Map();
+      lastSyncId = 0;
+      for (const entry of pending) {
+        entry.sent = false;
+        entry.acceptedAt = null;
+      }
+      recompute();
+      for (const listener of pendingListeners) {
+        listener();
+      }
     },
     settle(outcomes) {
       for (const outcome of outcomes) {

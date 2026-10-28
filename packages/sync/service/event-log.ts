@@ -1,4 +1,4 @@
-import { appendEvent, eventsAfter, findTransaction } from '@repo/sync/repo/events';
+import { appendEvent, eventsAfter, findTransaction, headOf } from '@repo/sync/repo/events';
 import { Database } from '@repo/sync/service/database';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import type { Change, Delta } from '@repo/sync/types/protocol';
@@ -23,6 +23,7 @@ export class EventLog extends Context.Service<
   EventLog,
   {
     readonly commit: Commit;
+    readonly head: (organizationId: string) => Effect.Effect<number, unknown>;
     readonly deltas: (
       organizationId: string,
       lastSyncId: number,
@@ -98,6 +99,6 @@ export const EventLogLive = Layer.effect(EventLog)(
         }),
       );
 
-    return { commit, deltas };
+    return { commit, deltas, head: (organizationId: string) => headOf(db, organizationId) };
   }),
 );

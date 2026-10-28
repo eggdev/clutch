@@ -6,6 +6,7 @@ import { Sessions } from '@repo/sync/service/sessions';
 import { CommandRejected } from '@repo/sync/types/command-rejected';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import type { Outcome, Transaction } from '@repo/sync/types/protocol';
+import { ServerBehind } from '@repo/sync/types/server-behind';
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { RpcServer } from 'effect/rpc';
@@ -90,7 +91,18 @@ export function SyncServer(changes: ReadonlyArray<ServerChange>) {
       };
       return {
         Push: ({ transactions }) => Effect.all(transactions.map(push)),
-        Pull: ({ lastSyncId }) => log.deltas(actor.organizationId, lastSyncId).pipe(Stream.orDie),
+        // After a database restore, the log can end before the client's last
+        // sync ID. The client then loads again from 0.
+        Pull: ({ lastSyncId }) =>
+          Stream.unwrap(
+            Effect.gen(function* () {
+              const head = yield* log.head(actor.organizationId).pipe(Effect.orDie);
+              if (lastSyncId > head) {
+                return yield* new ServerBehind({ head });
+              }
+              return log.deltas(actor.organizationId, lastSyncId).pipe(Stream.orDie);
+            }),
+          ),
       };
     }),
   );

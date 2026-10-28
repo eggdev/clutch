@@ -1,3 +1,4 @@
+import { ServerBehind } from '@repo/sync/types/server-behind';
 import { SessionEnded } from '@repo/sync/types/session-ended';
 import { Schema } from 'effect';
 import { Rpc, RpcGroup } from 'effect/rpc';
@@ -55,7 +56,7 @@ export class SyncRpcs extends RpcGroup.make(
   Rpc.make('Pull', {
     payload: { lastSyncId: Schema.Int },
     success: Schema.Array(Delta),
-    error: SessionEnded,
+    error: Schema.Union([SessionEnded, ServerBehind]),
     stream: true,
   }),
 ) {}

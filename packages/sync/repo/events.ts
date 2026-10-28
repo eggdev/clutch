@@ -1,7 +1,7 @@
 import { syncCounters, syncEvents } from '@repo/sync/repo/schema';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import type { Change, Delta } from '@repo/sync/types/protocol';
-import { and, asc, eq, gt } from 'drizzle-orm';
+import { and, asc, eq, gt, max } from 'drizzle-orm';
 import { Effect } from 'effect';
 
 /** The sync ID of a transaction that the log already holds, so a resent transaction applies once. */
@@ -48,6 +48,15 @@ export function appendEvent(
     yield* db.insert(syncEvents).values({ organizationId, syncId, transactionId, changes });
     return syncId;
   });
+}
+
+/** The newest sync ID of an organization, or 0 when its log is empty. */
+export function headOf(db: DrizzleDatabase, organizationId: string) {
+  return db
+    .select({ head: max(syncEvents.syncId) })
+    .from(syncEvents)
+    .where(eq(syncEvents.organizationId, organizationId))
+    .pipe(Effect.map((rows) => rows[0]?.head ?? 0));
 }
 
 /** Up to `limit` events after `lastSyncId`, oldest first. */

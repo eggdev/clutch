@@ -101,3 +101,23 @@ test('a snapshot loads back with its pending transactions applied', () => {
   expect(reloaded.get(card, 'a')?.title).toBe('Offline');
   expect(reloaded.unsent()).toHaveLength(1);
 });
+
+test('after a restore, the pool drops confirmed records and keeps pending work to send again', () => {
+  const pool = warmPool();
+  const id = pool.run(rename, { id: 'a', title: 'Mine' });
+  pool.markSent([id], true);
+  pool.settle([{ transactionId: id, status: 'accepted', syncId: 4, reason: null }]);
+  pool.resetConfirmed();
+  expect(pool.lastSyncId()).toBe(0);
+  expect(pool.get(card, 'a')).toBeUndefined();
+  expect(pool.unsent().map((transaction) => transaction.id)).toEqual([id]);
+  pool.applyDeltas([
+    {
+      syncId: 1,
+      transactionId: null,
+      changes: [{ model: 'Card', id: 'a', action: 'upsert', data: { title: 'Old' } }],
+    },
+  ]);
+  expect(pool.get(card, 'a')?.title).toBe('Mine');
+  expect(pool.snapshot().lastSyncId).toBe(1);
+});

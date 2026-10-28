@@ -110,3 +110,18 @@ test('a socket request from an origin that SYNC_ORIGINS does not list gets 403',
   expect(statuses[0]).toBe(403);
   expect(statuses[1]).not.toBe(403);
 });
+
+test('a pull from a sync ID past the log end fails with ServerBehind, as after a restore', async () => {
+  const failure = await Effect.runPromise(
+    Effect.gen(function* () {
+      const url = yield* HttpServer.addressFormattedWith((address) =>
+        Effect.succeed(`${address.replace('http', 'ws')}/sync`),
+      );
+      return yield* Effect.gen(function* () {
+        const rpc = yield* RpcClient.make(SyncRpcs);
+        return yield* rpc.Pull({ lastSyncId: 99 }).pipe(Stream.runCollect, Effect.flip);
+      }).pipe(Effect.scoped, Effect.provide(client(url)));
+    }).pipe(Effect.provide(server)),
+  );
+  expect(failure).toMatchObject({ _tag: 'ServerBehind', head: 0 });
+});

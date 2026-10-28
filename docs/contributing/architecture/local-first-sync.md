@@ -38,7 +38,9 @@ The protocol has two calls over one WebSocket for each organization, through
 
 - `Push` sends a batch of transactions and returns one outcome for each.
 - `Pull` sends the deltas after the client's last sync ID, then each live
-  delta. It fails with `SessionEnded` when the session ends.
+  delta. It fails with `SessionEnded` when the session ends. It fails with
+  `ServerBehind` when the client's last sync ID is above the server's newest
+  event.
 
 Records travel as plain JSON objects. The wire form and the stored form are
 the same, so loading the local database needs no decode.
@@ -79,6 +81,10 @@ the same, so loading the local database needs no decode.
   The organization is the only sync group.
 - A sign-out calls `Sessions.end` with the user. Each of the user's sockets
   closes with code 4401, and the client clears its local database.
+- After a database restore, the server's log can end before a client's last
+  sync ID. `Pull` then fails with `ServerBehind`. The client drops its
+  confirmed records and sets its last sync ID to 0. It keeps its pending
+  transactions, sends them again, and pulls again from 0.
 
 ## Server-confirmed writes
 
