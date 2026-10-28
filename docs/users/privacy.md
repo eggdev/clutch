@@ -16,6 +16,9 @@ to get it or remove it.
 
 ## What the product stores
 
+The app keeps a copy of your organization's records on your device, so it
+works offline and opens at once. Signing out deletes that copy.
+
 <!-- kickoff: A table: Data, Why the product needs it, Where it lives. Build it from the data inventory in docs/contributing/architecture/data-storage.md. -->
 
 ## Who can see your data

@@ -16,9 +16,12 @@ system as it works ("The Worker builds…"), not a rollout ("The Worker now
 builds…").
 
 **Keep status and plans out of docs.** A page does not say what is built,
-partly built or planned. Work that is not done lives in the issue tracker. A
-design that is decided but not built is a [decision record](./decisions/index.md)
-until it is built. Then it becomes an architecture page.
+partly built or planned. Work that is not done lives in the issue tracker.
+
+**Template docs describe the baseline.** Each project starts with these pages,
+and they describe how its code works on day one. A project writes a
+[decision record](./decisions/index.md) only for its own departure from the
+baseline, or for its own no. It never writes one for a template default.
 
 **Exceptions.** Decision records are point-in-time by design.
 [Project intent](./project-intent.md) keeps "Later, not now" so that nobody

@@ -48,12 +48,10 @@ ask it.
 - Where does each fact live? One database for all tenants, or one for each
   tenant? Bring the cost of each at the expected scale.
 - Which sign-in methods does each user need now, and later?
-- Do two people edit the same record at the same time? If so, how do edits
-  merge, and who wins on a conflict?
-- Does the client get updates by push or by poll? The default is push from a
-  sync engine into a local store. See `docs/principles/local-first.md`.
-- Which sync engine holds the local store? Bring two or three, with the device
-  storage, the conflict rule and the local test runtime of each.
+- Do two people edit the same record at the same time, in a way that last
+  writer wins in server order cannot serve? The template's sync engine uses
+  that rule. Do not ask about the sync engine, the database or the ORM: the
+  template decides them. See `docs/contributing/architecture/local-first-sync.md`.
 - Which writes must wait for the server? Start from writes that move money,
   give consent, change access or touch a hard invariant. Every other write is
   local first.
@@ -92,10 +90,11 @@ ask it.
 Apply routine setup using the checklist reference. Use these prompts only for
 remaining gaps; do not re-ask platform choices or facts the code supplies.
 
-- Which platforms: web only, or native too? Default: web only, as a Vite
-  single-page app. Propose Next only when public pages need server rendering
-  for search. Propose One or Expo only when project intent lists a native app
-  as a must. Write the choice as a decision record.
+- Which profile does each client app use? Default: Vite with TanStack Router,
+  as `apps/web` ships. Propose Next.js only when public pages need server
+  rendering for search. Propose One, the usual native choice, or Expo only
+  when project intent lists a native app as a must. Write the profile in the
+  architecture index. It is not a decision record.
 - On native, which Tailwind binding? Look up which binding supports the
   Tailwind version of the web build, and bring its version.
 - Which deploy target for each app?
@@ -107,8 +106,8 @@ remaining gaps; do not re-ask platform choices or facts the code supplies.
   staging step?
 - What does the seed data contain, and which accounts does it create?
 - Which CI steps does each PR need beyond `validate`?
-- Which runtimes does the code target: browser, server, worker? Which tools
-  generate types?
+- Which runtimes does the code target beyond the browser and the Bun API? Which
+  tools generate types?
 - Which test runner for each test type, and which journeys does the end-to-end
   suite cover?
 - Which security rules must every later change keep? Which risks do you accept
@@ -140,7 +139,7 @@ only when they remain unresolved.
   the product's infrastructure and checks public endpoints only. It sends one
   alert for each outage, one reminder each day and one all-clear.
 - Do operators get alerts about product events? Default: the product emits a
-  domain event, and the alert subscribes to it. The product sends email
+  product event, and the alert subscribes to it. The product sends email
   directly only to the account owner, such as a password reset.
 - Does the product issue API tokens? Default: a prefix that secret scanners
   find, only a hash stored, an idle expiry and an absolute expiry, and rotate

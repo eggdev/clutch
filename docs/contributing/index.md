@@ -26,7 +26,7 @@ decision record.
 - [Delivery](./delivery.md): carry a feature, fix or refactor through review,
   verification and its authorized destination; resume from its task record
 - [Setup](./setup/index.md): local services, configuration, checks
-- [Harness engineering](./harness-engineering.md): the agent-first loop, how to
+- [Harness engineering](./harness-engineering.md): the agent-first loop, agent hooks, how to
   turn a repeated lesson into a check, and PR review
 - [Testing](./testing.md) and [end-to-end testing](./end-to-end-testing.md):
   which test type to write, console output, journeys
@@ -37,15 +37,18 @@ decision record.
 
 ## Architecture
 
-- [Architecture](./architecture/index.md): runtime map, module ownership and one
-  page for each system
+- [Architecture](./architecture/index.md): tiers, package sections, the runtime
+  map and one page for each system
+- [Server](./architecture/server.md) and [client](./architecture/client.md):
+  how Effect code and React code are written
 
 <!-- kickoff: The three to five architecture pages that agents open most, one line each with when to open it. -->
 
 ## Code and tooling
 
-- [Import boundaries](./import-boundaries.md): services and domains, vendor
-  owners, aliases, re-exports and test imports, with the lint rule for each
+- [Import boundaries](./import-boundaries.md): tiers, sections, server code,
+  vendor owners, aliases, re-exports and test imports, with the lint rule for
+  each
 - [Nx](./setup/nx.md) and [checks](./setup/checks.md)
 
 <!-- kickoff: A list of module READMEs, one link each. Write it when the first module exists. Delete this slot if kickoff ends before that. -->

@@ -16,11 +16,14 @@ back to a fresh read from the owner, never to a guess. See
 ## Example
 
 ```ts
-if (!base) throw new SyncError('sync_base_expired'); // before the save, not after
+if (!note) {
+  return yield * new CommandRejected({ reason: 'This note does not exist.' }); // before the write
+}
 ```
 
-The command refuses the write and names the missing fact. The client shows the
-error and reloads.
+The server change refuses the write with a tagged error and names the missing
+fact. The client drops its local change and shows the reason. Server code never
+throws. See [server](../contributing/architecture/server.md#edges-and-errors).
 
 ## Related
 

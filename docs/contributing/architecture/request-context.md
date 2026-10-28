@@ -37,7 +37,15 @@ This page applies [one door for each decision](../../principles/one-door-for-eac
 
 ## Sources
 
-<!-- kickoff: A table: Source, how the request arrives, Actor (person, none or inherited). One row for each entry point from the journeys. -->
+| Source | How the request arrives                           | Actor  |
+| ------ | ------------------------------------------------- | ------ |
+| `sync` | `Push` on the organization's WebSocket at `/sync` | Person |
+
+The sync server reads the actor from the `CurrentActor` service in
+`packages/identity`. In local development, `runtime/dev.server.ts` builds it
+from `DEV_USER_ID` and `DEV_ORGANIZATION_ID`.
+
+<!-- kickoff: One row for each other entry point from the journeys, and the Live Layer that builds `CurrentActor` from the sign-in vendor. -->
 
 ## What to read when changing it
 

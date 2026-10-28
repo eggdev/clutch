@@ -16,11 +16,26 @@ mise exec -- bun run validate
 
 ## Start the app
 
-<!-- kickoff: How to start each app and local service, with the command and the URL. -->
+```sh
+mise exec -- bun run dev
+```
 
-The command that starts the app is safe to run again. Agents start it often,
-and a second copy on a busy port fails in ways that are hard to read. The
-command:
+This runs the `dev` target of each app through Nx:
+
+| App        | Command                   | URL                        |
+| ---------- | ------------------------- | -------------------------- |
+| `apps/api` | `bun --watch src/main.ts` | `ws://localhost:4000/sync` |
+| `apps/web` | `vite`                    | `http://localhost:5173`    |
+
+The API keeps Postgres in the process with PGlite, in `apps/api/.data/pglite`,
+so it needs no database server. It runs the migrations before it takes a
+request. The web app sends `/sync` to the API, so the browser has one origin.
+Delete `apps/api/.data/` to start from an empty database.
+
+<!-- kickoff: How to start each other app and local service, with the command and the URL. -->
+
+A start command must be safe to run again. Agents start it often, and a second
+copy on a busy port fails in ways that are hard to read. The command:
 
 1. Reuses a server that is already running and healthy.
 2. Otherwise starts one, and waits for its health route to answer.

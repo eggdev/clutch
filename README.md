@@ -3,9 +3,9 @@
 # Project template
 
 The starting point for a new project. It holds the parts that stay the same in
-every project: the engineering principles, the doc structure, the checks and
-the import policy. A kickoff interview with the owner writes the parts that
-belong to one product.
+every project: the engineering principles, the doc structure, the checks, the
+import policy and a starter that runs. A kickoff interview with the owner
+writes the parts that belong to one product.
 
 Kickoff rewrites this file for the product.
 
@@ -19,6 +19,25 @@ you want completed. The skill extracts a brief, chooses installed craft skills,
 implements, reviews, verifies and continues to the authorized destination.
 Use `$deliver` with an existing task record to resume. See
 [delivery](./docs/contributing/delivery.md) for ownership and the ready queue.
+
+## Spin it up
+
+```sh
+mise install
+mise exec -- bun install
+mise exec -- bun run dev
+```
+
+- `http://localhost:5173` opens the web app: Vite, React and TanStack Router.
+  The notes example shows the sync engine. Open it in two tabs, and an edit in
+  one shows in the other.
+- `ws://localhost:4000/sync` is the API: Bun and Effect, with Postgres in the
+  process through PGlite. It needs no database server.
+- `mise exec -- bun run validate` runs every check.
+
+Make each new part with a generator, such as
+`mise exec -- bun nx g @tools/generators:feature billing`. See
+[generators](./docs/contributing/setup/nx.md#generators).
 
 ## Start a project
 

@@ -58,14 +58,14 @@ the whole checklist. Silence is not acceptance.
 | Search beyond ordinary filters | On / off / later / undecided | Off |
 | Product analytics and feature flags | Choose each separately: on / off / later / undecided | Off for each |
 | Inbound webhooks | On / off / later / undecided | Off |
-| Shared realtime updates and offline editing | Choose each separately: on / off / later / undecided | Undecided for each |
-| Platforms | Web / native / both / other | Web |
+| Platforms and profiles | Web (Vite or Next.js) / native (One or Expo) / both / no client | Web, Vite with TanStack Router |
 | Repository access | Private / public; outside contributions yes / no | Private; no outside contributions |
 
 Add a capability when the owner's brief calls for it. Validation,
 accessibility, authorization and performance are quality rules. They are never
-optional capabilities. The local-first interface rules apply when shared
-realtime sync is off. Do not add a sync vendor to fill a checklist row.
+optional capabilities. Shared realtime updates and offline editing are not a
+row: every client app uses the template's sync engine. Do not add a sync
+vendor, an ORM or a data-fetching library.
 
 ## Apply automatic defaults
 
@@ -79,8 +79,9 @@ Apply these in the phase that owns the work:
 
 - Keep the validation gate, lint, format, type checks, and the security and
   performance rules. Add checks and test coverage from the journeys.
-- Use the framework default in the question bank for the chosen platform. In
-  an existing project, keep a framework and test runners that work.
+- Use the profile default in the question bank for the chosen platform. In an
+  existing project, keep a framework and test runners that work, and record
+  each departure from the template stack as a decision record.
 - In a new project, set up PR previews where the host supports them, and a
   production deploy on merge. In an existing project, keep the deploy pipeline.
   Ask about staging only when a release requirement needs it.

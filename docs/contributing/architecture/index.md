@@ -12,8 +12,8 @@ surface or storage home.
 ## Modules
 
 The [primitives registry](./primitives.yaml) is the list of primitives. Each
-entry names its group, its kind (service, domain, app or tool), the folders it
-owns, its docs and, for a service, its vendors. `check-primitives` rejects a
+entry names its group, its kind (package, feature, app or tool), the folders
+it owns, its docs and, for a package, its vendors. `check-primitives` rejects a
 registry entry that names a missing path, and an Nx project that no primitive
 owns. The import policy reads the vendor owners and the languages from it.
 
@@ -22,42 +22,96 @@ from the imports. Run `mise exec -- bun nx graph` to see them.
 
 <!-- kickoff: Two or three sentences: the primitives of the product and how they fit together. The registry holds the full list. -->
 
-Services are molecules: focused and the same everywhere. Domains are organisms:
-they combine services into a feature. The import rules are in
-[import boundaries](../import-boundaries.md).
+The import rules are in [import boundaries](../import-boundaries.md).
 
-## Module layout
+## Tiers
+
+The workspace has three tiers. Imports go in one direction: an app imports
+features and packages, a feature imports packages, and a package imports only
+other packages.
+
+| Tier        | Holds                                                       | Nx tag                        |
+| ----------- | ----------------------------------------------------------- | ----------------------------- |
+| `apps/`     | Routes, the composition root and runtime configuration      | `platform:server` for an API  |
+| `features/` | The gate, screens and components of one area of the product | `type:feature`                |
+| `packages/` | One capability, with its records and vendors                | `type:package` or `type:tool` |
+
+- Nothing imports an app. An app imports its own files through `@/`.
+- A feature never imports another feature.
+- A package of kind `tool` is template tooling, such as `packages/runtime`.
+  The product rules for Effect do not apply to it.
+- `tools/` holds repository automation, checks and the generators.
+
+## Feature layout
 
 ```
-packages/<name>/src/
-  client.ts        plain TypeScript for apps and organisms
-  server.ts        server entry
-  server/db/**     schemas and queries
-  ui/**            organisms and hooks (domains)
-  testing/**       setup builders and vendor fakes, for tests only
+features/<name>/
+  gate.ts        the one way into the feature
+  screens/       what a route renders
+  components/    parts used by this feature only
 ```
 
-## Workspace layout
+When two features need the same part, it moves into a package: the design
+system, or the `ui/` of the package that owns the records.
 
-- `apps/`: runnable applications. Each app owns its runtime configuration and
-  its Nx build and deploy targets.
-- `packages/`: services, domains and the design system.
-- `tools/`: repository automation and checks.
+## Package sections
+
+A package has no `src/` folder. It has only the sections that it needs. Each
+section is a folder, never a single file.
+
+| Section     | Access     | Holds                                                        |
+| ----------- | ---------- | ------------------------------------------------------------ |
+| `types/`    | Public     | Effect Schemas for records, IDs, command inputs and errors   |
+| `config/`   | Private    | Environment keys, read through Effect `Config`               |
+| `models/`   | Public     | Models: the kinds of record that the object pool holds       |
+| `commands/` | Public     | Commands, as `<name>.ts` and `<name>.server.ts` files        |
+| `repo/`     | Private    | Drizzle tables, queries and `migrations/`                    |
+| `service/`  | Public     | Effect services: invariants, access checks and the event log |
+| `runtime/`  | Apps only  | Live Layers, server change registration and client boot code |
+| `ui/`       | Public     | Hooks and components                                         |
+| `testing/`  | Tests only | Fakes and Test Layers                                        |
+
+- **Public** sections are the interface of the package. Any code may import
+  them, subject to the server rule below.
+- **Private** sections are imported only inside their own package.
+- **`runtime/`** is imported only by an app, by its own package, or by a test.
+- **`testing/`** is imported only by a test or by another `testing/` file.
+- **Server code** is `config/`, `repo/`, `service/`, `testing/` and each
+  `.server.ts` file. Only server code, a server app or a test imports it.
+
+`check-structure` rejects a package folder that is not a section, and a
+feature folder with other parts. The
+[generators](../setup/nx.md#generators) make each shape.
 
 ## Module design
 
-- Prefer deep modules: a small caller interface that hides real complexity.
-  Avoid pass-through modules and speculative packages.
-- Add a module when ownership, lifecycle or callers need independent behavior.
-- Test through caller-facing interfaces. See
+- Prefer deep modules: a small interface that hides real complexity. Avoid
+  pass-through modules and speculative packages.
+- Add a package when ownership, lifecycle or callers need independent
+  behavior.
+- Test through the interface. See
   [test the workflow](../../principles/test-the-workflow.md).
 
 ## Source of truth in code
 
-<!-- kickoff: One line for each entry point, router and composition root: the file and what it starts. -->
+| File                       | Starts                                                              |
+| -------------------------- | ------------------------------------------------------------------- |
+| `apps/web/src/main.tsx`    | The web composition root: local database, object pool, render, sync |
+| `apps/web/src/router.ts`   | The TanStack Router route tree                                      |
+| `apps/web/src/commands.ts` | The client half of each command that the web app runs               |
+| `apps/api/src/main.ts`     | The API composition root: database driver, actor, HTTP server       |
+| `apps/api/src/packages.ts` | The server change and migrations of each package                    |
+
+<!-- kickoff: One line for each other entry point, router and composition root: the file and what it starts. -->
 
 ## Pages
 
+- [Server](./server.md): Effect services, Layers, edges, errors, SQL and the
+  event log
+- [Client](./client.md): the React core, the router, the effect-hook ban and
+  the stack profiles
+- [Local-first sync](./local-first-sync.md): the object pool, the transaction
+  queue, events, deltas and the commands that wait for the server
 - [Request context](./request-context.md): how a request becomes a tenant and
   an actor
 - [Authorization](./authorization.md): the access check, and the permission
@@ -69,14 +123,12 @@ packages/<name>/src/
 - [API errors](./api-errors.md): one error shape, and the code for each status
 - [Soft delete](./soft-delete.md): the restore window, live reads and the purge
 - [MCP server](./mcp.md): the tools that agents call, and how to add one
-- [Local-first sync](./local-first-sync.md): the local store, the transaction
-  queue, and the commands that wait for the server
 - [Client performance](./client-performance.md): the speed budgets and the
   check for each one
 - [Styling](./styling.md): the token roles, the theme, the platforms and the
   styling checks
 
-<!-- kickoff: One link for each other system page, with when to open it. Each user journey from kickoff gets a page, and so does each service with real rules (authentication, sync, jobs). -->
+<!-- kickoff: One link for each other system page, with when to open it. Each user journey from kickoff gets a page, and so does each package with real rules (authentication, jobs). -->
 
 ## Page shape
 

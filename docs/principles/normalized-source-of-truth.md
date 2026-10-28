@@ -5,12 +5,13 @@ record and is disposable. The test: delete the copy. If the product recovers
 with no data loss, it is a copy. If not, it is a second source of truth, and it
 is not allowed.
 
-A module never stores another module's facts. A domain module stores an account
-ID and asks the identity module for the email address.
+A package never stores another package's facts. A package stores an account
+ID and asks the identity package for the email address. Its private `repo/`
+makes this a lint error.
 
 ## Server copies
 
-Indexes, projections, KV maps and counters are caches of the owner record.
+Indexes, summary tables, KV maps and counters are caches of the owner record.
 
 - The write that changes the owner record also updates or deletes the copy, in
   the same transaction or before the response returns.
@@ -25,9 +26,9 @@ Indexes, projections, KV maps and counters are caches of the owner record.
 
 Device caches can be stale while offline.
 
-- Each copy records the version it came from.
-- When online, a copy that is behind updates to the latest version.
-- A copy is deleted when access is lost (401 or 403).
+- The local database records the last sync ID that it applied.
+- When online, the sync engine asks for each event after that sync ID.
+- A copy is deleted when the session ends: the socket closes with code 4401.
 - A copy never decides a command, a permission or a business transition. The
   server decides.
 - The interface reads and writes the device copy first, and the server confirms

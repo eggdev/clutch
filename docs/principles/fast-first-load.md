@@ -13,11 +13,14 @@ network.
   `modulepreload`. The browser fetches them in parallel, with no import
   waterfall. Each preload uses the same `crossorigin` value as the entry
   script, so the browser reuses the fetch.
+- Never preload the sync chunk on a cold visit. It holds the Effect code, and
+  it loads after the first paint. The first screen holds no Effect code.
 - After the first load, a service worker precaches the remaining hashed
-  assets. Later navigations read from the cache.
+  assets. Later navigations read from the cache, the sync chunk too.
 - Inline the CSS that paints the app shell. An inline script reads the last
   shell settings from device storage, such as the theme and the sidebar width.
-  It applies them before the first paint.
+  It applies them before the first paint. This boot script in `index.html` is
+  the one place outside `packages/sync` that reads device storage.
 - Use one variable font file for each family. Preload it with
   `crossorigin="anonymous"` and declare it with `font-display: swap`.
 - Each budget in [client performance](../contributing/architecture/client-performance.md)
@@ -42,12 +45,11 @@ The `<head>` paints the shell and starts every critical fetch at once:
   if (shell.dark) document.documentElement.classList.add('dark');
   if (shell.sidebarWidth)
     document.documentElement.style.setProperty('--sidebar-width', `${shell.sidebarWidth}px`);
-  if (localStorage.getItem('store') === null) document.documentElement.classList.add('signed-out');
 </script>
 <link rel="preload" href="/fonts/sans.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
 <script type="module" crossorigin src="/assets/entry.js"></script>
-<link rel="modulepreload" crossorigin href="/assets/vendor-sync.js" />
-<link rel="modulepreload" crossorigin href="/assets/store.js" />
+<link rel="modulepreload" crossorigin href="/assets/react-dom.js" />
+<link rel="modulepreload" crossorigin href="/assets/router.js" />
 ```
 
 ## Related

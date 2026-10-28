@@ -10,7 +10,7 @@ This page applies [one door for each decision](../../principles/one-door-for-eac
 | What if the service fails?  | The flag is off, and the failure is reported                  |
 | When does a flag go away?   | When its removal condition is true. Its cleanup issue says so |
 
-<!-- kickoff: The flag service that holds the state (PostHog is the default), the owner module that wraps it, and the file that holds the registry. -->
+<!-- kickoff: The flag service that holds the state (PostHog is the default), the package that owns it, and the file that holds the registry. -->
 
 ## Rules
 
@@ -21,11 +21,11 @@ This page applies [one door for each decision](../../principles/one-door-for-eac
 - **The service holds only state.** It says whether a flag is on, and for whom.
   A flag in the service with no registry entry has no effect.
 - **Evaluation fails closed.** When the service cannot answer, the flag is off.
-  The owner module reports the failure as an error. It never fails quietly. See
+  The owner package reports the failure as a tagged error. It never fails quietly. See
   [fail loudly](../../principles/fail-loudly.md).
 - **The server decides.** The client gets the values that the server
-  evaluated for its request. A client never evaluates a flag that guards data
-  or money.
+  evaluated for its actor, as records in the object pool. A client never
+  evaluates a flag that guards data or money.
 - **A flag is never a permission or a plan limit.** Access goes through the
   [access check](./authorization.md). A limit goes through its own check in the
   write transaction.
@@ -37,10 +37,10 @@ This page applies [one door for each decision](../../principles/one-door-for-eac
 
 ## Tests
 
-A test sets flag state through the owner module's setup builder in
-`src/testing/`. It never mocks the flag service or the registry. Test both
+A test sets flag state through the Test Layer in the owner package's
+`testing/`. It never mocks the flag service or the registry. Test both
 states of a flag that a journey depends on.
 
 ## What to read when changing it
 
-<!-- kickoff: The registry file, the owner module and its testing builder. -->
+<!-- kickoff: The registry file, the owner package and its Test Layer. -->

@@ -3,6 +3,24 @@
 How the repository checks its npm dependencies. Both checks run in
 `validate`. See [checks](./checks.md).
 
+## Exact versions
+
+Each dependency is pinned to an exact version in its `package.json`. An
+upgrade is a reviewed change. These are the template's core pins:
+
+| Package                                                                  | Version    |
+| ------------------------------------------------------------------------ | ---------- |
+| `effect`, `@effect/platform-bun`, `@effect/sql-pg`, `@effect/sql-pglite` | 4.0.7      |
+| `drizzle-orm`, `drizzle-kit`                                             | 1.0.0-rc.5 |
+| `react`, `react-dom`                                                     | 19.3.1     |
+| `vite`                                                                   | 8.3.5      |
+| `@tanstack/react-router`                                                 | 1.170.46   |
+| `tailwindcss`, `@tailwindcss/vite`                                       | 4.3.3      |
+
+Drizzle 1.0 is a release candidate. Its Effect drivers need Effect 4, and the
+older `@effect/sql-drizzle` package works only with Effect 3. An Effect major
+version is a planned upgrade for every package at once.
+
 ## Production audit
 
 The `audit-prod` target runs [`tools/audit-prod.ts`](../../../tools/audit-prod.ts).

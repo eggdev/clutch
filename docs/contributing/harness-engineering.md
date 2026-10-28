@@ -128,7 +128,8 @@ never the only record of a leftover. Report a bug with the
 
 ## Weekly gardening
 
-Once a week, an agent or a person does one short pass:
+Once a week, a scheduled agent does one short pass. It opens small pull
+requests, and a person reviews them:
 
 1. Read the review comments of the week's merged PRs. Find a comment that
    repeats. Read delivery records for repeated owner interventions and rework.
@@ -143,7 +144,7 @@ Once a week, an agent or a person does one short pass:
 
 Many small cleanups cost less than one large rewrite.
 
-<!-- kickoff: Who runs the weekly gardening pass, and on which day. -->
+<!-- kickoff: The scheduled agent that runs the weekly gardening pass, its day, and the person who reviews its pull requests. -->
 
 ## References
 

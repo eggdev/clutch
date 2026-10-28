@@ -1,8 +1,9 @@
 # Lint and format rules
 
 [`oxlint.config.ts`](../../../oxlint.config.ts) holds the lint baseline. It
-extends the `core` preset of [Ultracite](https://github.com/haydenbleasel/ultracite)
-and then states each choice that differs from it. The repository import policy
+extends the `core` preset of [Ultracite](https://github.com/haydenbleasel/ultracite),
+adds the Ultracite React preset for [client code](#client-code), and then
+states each choice that differs from them. The repository import policy
 is in the same file. See [import boundaries](../import-boundaries.md).
 
 ## How a rule is chosen
@@ -79,9 +80,9 @@ The `repo-gates` oxlint plugin,
 [`tools/lint/gate-policy.mjs`](../../../tools/lint/gate-policy.mjs), enforces
 [one gate into each feature](../../principles/one-gate-per-feature.md). The
 rule option in `oxlint.config.ts` is the registry. It maps each gated route to
-its gate file and its route folder. The registry starts empty; a project adds
-a route when it writes the route's gate. The rule applies to app code in
-`apps/` and `packages/*/src/`.
+its gate file and its route folder. The template registers `/notes`, with
+`features/notes/gate.ts`. The `feature` generator adds each new route. The rule
+applies to `apps/`, `features/` and `packages/`.
 
 | Rule       | Rejects                                                                                                                           |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,9 +93,10 @@ Tests may open a gated route directly to prove a cold deep link.
 
 To gate a new feature:
 
-1. Write its gate: one function that settles the feature's needs, then
+1. Run the `feature` generator. It writes the gate and the route, and adds the
+   route to the registry.
+2. Write the gate: one function that settles the feature's needs, then
    navigates.
-2. Add the route to the registry, with the gate file and the route folder.
 3. Change every way in to call the gate. Run the lint.
 
 `tools/lint/gate-policy.test.ts` proves that a second way in fails and that a

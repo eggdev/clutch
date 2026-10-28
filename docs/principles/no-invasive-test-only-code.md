@@ -8,7 +8,7 @@ this code if every test were deleted? If not, it does not belong in production.
 - Branches on `NODE_ENV`, `BUN_ENV` or `isTest` that change behavior under test
 - Exports that exist only so tests can reach them (`*ForTests`, `__testOnly*`)
 - Parameters, options or injection points that only tests use
-- Fakes in a production bundle, or production code that imports `src/testing/`
+- Fakes in a production bundle, or production code that imports `testing/`
 - Env vars, routes or timing hooks that only tests use
 - Test-only entrypoints or configs beside production entrypoints. Put fixture
   apps and their configs in the app's `test/` folder.
@@ -17,7 +17,7 @@ this code if every test were deleted? If not, it does not belong in production.
 
 - Real behavior through public interfaces
 - Real local runtimes of each vendor
-- Setup builders and vendor fakes in `packages/<name>/src/testing/`
+- Setup builders, vendor fakes and Test Layers in `packages/<name>/testing/`
 
 ## Not violations
 

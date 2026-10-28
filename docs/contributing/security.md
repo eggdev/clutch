@@ -47,7 +47,9 @@ queries, logging or deploy configuration.
 12. **CSRF protection has one design, and each part of it holds.** Write that
     design in the project rules below. When it uses `SameSite=Lax` cookies and
     JSON bodies, no mutating endpoint accepts a form post, and no session cookie
-    uses `SameSite=None`.
+    uses `SameSite=None`. Writes go over the sync socket, so the socket upgrade
+    must check the `Origin` header. The template's sync server has no `Origin`
+    check. A project adds it with its sign-in vendor.
 13. **Account recovery revokes old access.** A password reset ends every other
     session and token for the account, and tells the owner by email.
 14. **Signup and reset do not show which emails have accounts.** Send the same

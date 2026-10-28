@@ -6,12 +6,25 @@ To change the shape again, write a new migration. See
 
 ## Where migrations live
 
-Migration `.sql` files live in a folder named `migrations` under `apps/` or
-`packages/`. The migration tool writes there. The check below finds them by that
-name, so the folder needs no configuration. Other files in the folder, such as
-the tool's journal or snapshots, can change.
+Migration `.sql` files live in a folder named `migrations` under `apps/`,
+`features/` or `packages/`. The check below finds them by that name, so the
+folder needs no configuration. Other files in the folder, such as snapshots,
+can change.
 
-<!-- kickoff: The migration tool, the folder it writes to, and the commands that make, apply and dry-run a migration. -->
+Drizzle Kit `1.0.0-rc.5` writes each package's migrations. It reads
+`repo/schema.ts` and writes `repo/migrations/<timestamp>_<name>/migration.sql`
+with a `snapshot.json`. Each package's `drizzle.config.ts` names both paths.
+
+| Task               | Command                                                                  |
+| ------------------ | ------------------------------------------------------------------------ |
+| Make a migration   | `mise exec -- bun nx run <package>:db-generate`                          |
+| Apply migrations   | Start the API. `apps/api/src/server.ts` runs them first.                 |
+| Register a package | Add its `migrate` function to `migrations` in `apps/api/src/packages.ts` |
+
+The API runs each package's migrations in order, with the sync tables first.
+The same migrator runs on PGlite and on Postgres.
+
+<!-- kickoff: The command that dry-runs a migration against a copy of production data. -->
 
 ## The check
 

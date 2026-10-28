@@ -1,9 +1,8 @@
 # Environment variables
 
-One schema defines each environment variable. It is the source for the types
-and for the runtime check.
-
-<!-- kickoff: The path of the environment schema file, and the file that reads it at startup. -->
+Effect `Config` defines each environment variable. It is the source for the
+types and for the runtime check. Each package reads its own variables in
+`config/`. An app reads its runtime variables in its composition root.
 
 ## Rules
 
@@ -23,21 +22,19 @@ and for the runtime check.
 ## Example
 
 ```ts
-export const EnvSchema = object({
-  SESSION_SECRET: string().refine(
-    (value) => value.length >= 32,
-    'SESSION_SECRET must be 32 characters or more. Run: openssl rand -base64 48',
-  ),
-  MAIL_API_KEY: string().refine(
-    (value) => value.length > 0,
-    'Missing MAIL_API_KEY. Get it from the mail vendor dashboard, API keys page.',
-  ),
+// packages/mail/config/keys.ts
+export const mailConfig = Config.all({
+  apiKey: Config.Redacted('MAIL_API_KEY'),
+  from: Config.String('MAIL_FROM').pipe(Config.withDefault('hello@example.com')),
 });
 ```
 
+A Layer reads the `Config` when it builds. A missing `MAIL_API_KEY` stops
+startup with an error that names the variable.
+
 ## Add a variable
 
-1. Add it to the schema, with a message that says where to get the value.
+1. Add it to the `config/` of the package that reads it.
 2. Add it to the example env file with a safe local value.
 3. Add it to the deploy workflow as a variable or a secret.
 4. Add its secret name to [operator accounts](../operations/operator-accounts.md)
@@ -46,7 +43,12 @@ export const EnvSchema = object({
 
 ## Variables
 
-| Name | Required | Secret | Purpose |
-| ---- | -------- | ------ | ------- |
+| Name                  | Required | Secret | Purpose                                               |
+| --------------------- | -------- | ------ | ----------------------------------------------------- |
+| `DATABASE_URL`        | No       | Yes    | A Postgres server. Without it, the API runs PGlite    |
+| `PGLITE_DIR`          | No       | No     | The PGlite data folder. The default is `.data/pglite` |
+| `PORT`                | No       | No     | The API port. The default is 4000                     |
+| `DEV_USER_ID`         | No       | No     | The development actor's user ID                       |
+| `DEV_ORGANIZATION_ID` | No       | No     | The development actor's organization ID               |
 
-<!-- kickoff: One row for each variable that exists at kickoff. Delete this slot if there are none yet. -->
+<!-- kickoff: One row for each other variable that exists at kickoff. -->

@@ -1,17 +1,17 @@
 # MCP server
 
 The MCP server is a product surface for agents. An agent that acts for a user
-calls the same domain commands as the web app, through tools. Agents are
+calls the same commands as the web app, through tools. Agents are
 first-class users, so each tool gets the same care as a screen.
 
-| Question                               | Answer                                                                  |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| Where does a tool's logic live?        | In the domain command that the web app calls. The tool is a thin door   |
-| Who is acting in a tool call?          | The request context, derived from the source `mcp`                      |
-| Who may call a tool?                   | The access check, with the permission that the tool declares            |
-| What does a failed call return?        | An error result with a code from [API errors](./api-errors.md)          |
-| How does a tool that changes data act? | It follows the [rules for agents](../../users/agents.md)                |
-| How much does a list return?           | A slim index with a limit and a cursor. Details come from a second call |
+| Question                               | Answer                                                                              |
+| -------------------------------------- | ----------------------------------------------------------------------------------- |
+| Where does a tool's logic live?        | In the server change of the command that the web app calls. The tool is a thin door |
+| Who is acting in a tool call?          | The request context, derived from the source `mcp`                                  |
+| Who may call a tool?                   | The access check, with the permission that the tool declares                        |
+| What does a failed call return?        | An error result with a code from [API errors](./api-errors.md)                      |
+| How does a tool that changes data act? | It follows the [rules for agents](../../users/agents.md)                            |
+| How much does a list return?           | A slim index with a limit and a cursor. Details come from a second call             |
 
 <!-- kickoff: The MCP app or package, its transport (for example streamable HTTP), and how an agent signs in (for example OAuth). -->
 
@@ -21,9 +21,12 @@ This page applies
 [one door for each decision](../../principles/one-door-for-each-decision.md)
 to the agent surface.
 
-- **No MCP-only logic.** A tool parses its input, calls a domain command and
-  formats the result. A rule that a tool needs belongs in the domain, so the
-  web app gets it too.
+- **No MCP-only logic.** A tool parses its input, runs the server change of a
+  command and formats the result. A rule that a tool needs belongs in the
+  package that owns the command, so the web app gets it too.
+- **Writes go through the event log.** A tool commits its server change
+  through the `EventLog` service, so each client of the organization gets the
+  delta.
 - **One source for each call.** Each tool call derives its
   [request context](./request-context.md) from the source `mcp`. The credential
   is the token that the agent got at sign-in, and its scopes narrow the call.
@@ -114,8 +117,8 @@ and a registration file in one folder.
 
 ## Add a tool
 
-1. Find the domain command that the tool calls. If it does not exist, add it
-   to the domain first, with its tests.
+1. Find the command that the tool calls. If it does not exist, add it to its
+   package first, with the `command` generator and its tests.
 2. Add a file for the tool. Give it a `snake_case` name from the pattern
    above.
 3. Declare the permission, or `'none'`.
@@ -123,9 +126,9 @@ and a registration file in one folder.
 5. Write the input and output schemas, with a description on each field.
 6. Write the description: what the tool does, its gotchas, one example, and
    the next tool to call. For a tool that changes data, add the confirm step.
-7. Write the handler: derive the request context from `mcp`, call the domain
-   command, and return text and structured data.
-8. Map each domain error to its API code and a next step.
+7. Write the handler: derive the request context from `mcp`, run the server
+   change, and return text and structured data.
+8. Map each tagged error to its API code and a next step.
 9. Register the tool in the registration module.
 10. Test it through an MCP client: one success, one denial and one error.
 11. Add the tool to the table above. Add a line to the server instructions

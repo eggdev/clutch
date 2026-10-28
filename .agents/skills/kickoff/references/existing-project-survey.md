@@ -80,7 +80,10 @@ owner agrees. When neither evidence nor a default answers a slot, say so in
 the draft.
 
 Draft the registry in `docs/contributing/architecture/primitives.yaml`: one
-entry for each app and package. Run `mise exec -- bun tools/check-primitives.ts`
+entry for each app, feature and package. Map the code onto the tiers first:
+which folders become apps, which become features, and which become packages.
+Then map each package's files onto its sections. Write the map in the draft,
+so the migration step follows it. Run `mise exec -- bun tools/check-primitives.ts`
 after each change.
 
 ### 3. Annotate the manifest

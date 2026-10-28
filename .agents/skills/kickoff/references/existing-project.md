@@ -60,7 +60,9 @@ For each entry:
    into the entry.
 4. For `combine` and `keep`, write a decision record from
    `docs/contributing/decisions/0000-template.md`. Name what stays and why, so
-   that a later agent does not remove it.
+   that a later agent does not remove it. A kept library that the template
+   rejects, such as Zod, an ORM other than Drizzle or a data-fetching library,
+   needs the owner's approval and its own record.
 5. Apply a configuration change at once. Get the project's version with
    `git show <base.commit>:<path>`. Leave code changes to the migration.
 

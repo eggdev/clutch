@@ -47,11 +47,25 @@ later. A change to one adds fields on write and stays compatible on read,
 unless a migration rewrites every stored copy. See
 [two-way and one-way doors](../../principles/two-way-doors.md).
 
-<!-- kickoff: The list of frozen contracts: each key format, object name and stored JSON shape, with the file that defines it. -->
+The template's sync engine holds these frozen contracts:
+
+| Contract                                                   | Defined in                                |
+| ---------------------------------------------------------- | ----------------------------------------- |
+| The `sync_counters` and `sync_events` tables               | `packages/sync/repo/schema.ts`            |
+| The change shape in each event                             | `packages/sync/types/protocol.ts`         |
+| The `pool` store and its `state` key in the local database | `packages/sync/runtime/local-database.ts` |
+
+An event keeps its organization ID, so the log is scoped by tenant too.
+
+<!-- kickoff: Each other frozen contract: each key format, object name and stored JSON shape, with the file that defines it. -->
 
 ## What to read when changing it
 
-<!-- kickoff: The files that own storage drivers, migrations and the inventory. -->
+- `packages/sync/runtime/database.server.ts`: the PGlite and Postgres drivers
+- `repo/schema.ts` and `repo/migrations/` of each package
+- [Server](./server.md#database) and [migrations](../setup/migrations.md)
+
+<!-- kickoff: The file that holds the inventory. -->
 
 - [Normalized source of truth](../../principles/normalized-source-of-truth.md)
 - [Soft delete](./soft-delete.md): what delete does, and when data goes for good

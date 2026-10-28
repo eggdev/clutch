@@ -22,7 +22,11 @@ Tailwind is the only styling tool.
 | Web only   | Vite, or Next for public pages | Tailwind v4, configured in CSS      |
 | Native too | One or Expo, with React Native | A Tailwind binding for React Native |
 
-<!-- kickoff: The platform, the framework, and for native the Tailwind binding with its version. Link the decision record for the platform. -->
+The template ships the web profile: `apps/web` uses Vite and Tailwind 4.3.3
+through `@tailwindcss/vite`. The kickoff profile picks the row. See
+[client profiles](./client.md#profiles).
+
+<!-- kickoff: For a native profile, the Tailwind binding for React Native and its version. Delete this slot for a web-only project. -->
 
 ## Roles
 
@@ -60,7 +64,7 @@ each role under `:root` and again under `.dark`.
 
 ## Rules
 
-- App and domain code import UI only from the design system. They never import
+- Apps and features import UI only from the design system. They never import
   the upstream component kit. See [import boundaries](../import-boundaries.md).
 - One component goes in one file. Variants cover legitimate variation, so the
   design system has one `Button` and one `Card`.
@@ -102,7 +106,9 @@ rules.
 
 ## What to read when changing it
 
-<!-- kickoff: The token file, the theme file, the Tailwind entry CSS and the design-system folder. -->
+- `packages/design-system/ui/theme.css`: the tokens and the theme
+- `apps/web/src/styles.css`: the Tailwind entry CSS
+- `packages/design-system/ui/`: the components
 
 - [Client performance](./client-performance.md)
 - [Lint and format rules](../setup/lint-rules.md)

@@ -15,12 +15,12 @@ a check in CI.
 | Budget                                       | Limit                       | Measured by                                          |
 | -------------------------------------------- | --------------------------- | ---------------------------------------------------- |
 | Input to next paint, for a local write       | 50 ms at p75                | End-to-end test with a trace                         |
-| Network requests before a warm screen paints | 0                           | End-to-end test with a warm store                    |
+| Network requests before a warm screen paints | 0                           | `renderWarm` in `packages/sync/testing/`             |
 | Longest main-thread task                     | 50 ms                       | End-to-end test with a trace                         |
-| JavaScript for the first screen, compressed  | 150 KB                      | Build output check                                   |
+| JavaScript for the first screen, compressed  | 150 KB, gzip and brotli     | `check-bundle`                                       |
+| Effect code in the first screen              | 0                           | `check-bundle`                                       |
 | Largest contentful paint, cold visit         | 1.5 s at p75 on a mid phone | Lab run against each preview                         |
 | Largest contentful paint, warm visit         | 0.5 s at p75                | Lab run against each preview                         |
-| Longest main-thread task                     | 50 ms                       | End-to-end test with a trace                         |
 | Animated layout properties                   | 0                           | `lint`: `no-low-performance-animation-properties`    |
 | Duration literals outside the speed tokens   | 0                           | `lint`: `declaration-property-value-disallowed-list` |
 | Duration classes outside the speed tokens    | 0                           | `lint`: `repo-classes/speed-tokens-only`             |
@@ -32,7 +32,13 @@ The [CSS lint](../setup/lint-rules.md#css) and the
 [Tailwind class lint](../setup/lint-rules.md#tailwind-classes) run the lint
 rules.
 
-<!-- kickoff: The file or target for each check that needs the app: the end-to-end trace, the warm-store test, the warm-navigation test on a 300 ms network, the build output check and the lab run. Then the tracking issue for the weekly check against the live site. -->
+`check-bundle` builds `apps/web` with Vite and reads the manifest. It sums the
+entry chunk and its static imports, compressed, and rejects a first screen over
+the budget or with Effect code in it. The template's first screen is 98.8 kB
+gzip and 85.4 kB brotli. `validate` runs it, so CI and the pre-push hook run it
+too.
+
+<!-- kickoff: The file or target for each check that needs the app: the end-to-end trace, the warm-navigation test on a 300 ms network and the lab run. Then the tracking issue for the weekly check against the live site. -->
 
 ## Rules
 
@@ -44,11 +50,23 @@ rules.
 
 ## Build
 
-<!-- kickoff: The build tool, its config file, the browser targets, the chunk rule (one chunk for each dependency), the preload list and the service worker. -->
+`apps/web/vite.config.ts` builds the web app with Vite 8. The rules from
+[fast first load](../../principles/fast-first-load.md) apply:
+
+- The sync transport, the RPC client and Schema decode load in one chunk after
+  the first paint. The head never preloads that chunk on a cold visit.
+- Client code imports from `effect` and from `types/` as types only. A value
+  import would pull Effect into the first screen.
+
+<!-- kickoff: The browser targets, the chunk rule (one chunk for each dependency), the preload list and the service worker. -->
 
 ## What to read when changing it
 
-<!-- kickoff: The build config, the HTML entry, the service worker, the duration tokens and the budget checks. -->
+- `apps/web/vite.config.ts`, `apps/web/index.html` and `apps/web/src/main.tsx`
+- `tools/check-bundle.ts`
+- `packages/sync/runtime/boot.ts`
+
+<!-- kickoff: The service worker and the other budget checks. -->
 
 - [Local-first sync](./local-first-sync.md)
 - [Fix the root bottleneck](../../principles/fix-the-root-bottleneck.md)

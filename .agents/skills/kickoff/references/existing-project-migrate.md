@@ -37,9 +37,21 @@ Do the steps in order. Each step starts from a clean tree.
    `mise exec -- bun install`.
 2. **Replaced tools.** For each entry resolved as `template`, delete the
    project's configuration files, dependencies and scripts for that tool.
-3. **Projects.** Give each app and package the shape that the template
-   expects: its `package.json`, its tsconfig files, its Nx tags and its
-   registry entry. Run the project's existing tests from its Nx `test` target.
+3. **Projects.** Give each app, feature and package the shape that the
+   template expects:
+   - Move each user-facing area into `features/<name>/`, with `gate.ts`,
+     `screens/` and `components/`.
+   - Move each package's `src/` files into sections: schemas into `types/`,
+     environment reads into `config/`, tables and queries into `repo/`,
+     services into `service/`, wiring into `runtime/`, React into `ui/`, and
+     fakes into `testing/`. Delete `src/`.
+   - Change each import to the aliases: `@/` in an app, `@repo/<package>/<section>/...`
+     and `@features/<feature>/...`. Delete each barrel file and re-export.
+   - Give each package `package.json` the Nx tag `type:package`, and each
+     feature `type:feature`. Tag a server app `platform:server`.
+   - Add its tsconfig files and its registry entry.
+   Run the project's existing tests from its Nx `test` target, and run
+   `mise exec -- bun tools/check-structure.ts`.
 4. **Format.** Run `mise exec -- bun run format`. Commit this step alone,
    because its diff is large and mechanical.
 5. **Lint fixes.** Run `mise exec -- bun x oxlint --fix .`.

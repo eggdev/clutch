@@ -11,6 +11,12 @@ How to get each store back after data loss, and how we know the path works.
 
 ## Recovery targets
 
+The authority database holds the event log and every owner record, so its
+backup restores both. A client never needs a backup. After a restore, each
+client asks for the events after its last sync ID. A client whose last sync ID
+is above the restored log must clear its local database. The sync engine does
+not detect that case, so a restore also ends every session with code 4401.
+
 <!-- kickoff: A table: Store, Recovery point (the most data it may lose, such as 24 hours), Recovery time (how long a restore may take), Recovery path. One row for each store in the runtime map. -->
 
 ## What comes back

@@ -2,7 +2,7 @@
 
 A feature that needs something before it can show its first screen has one
 gate. The gate is one function. It settles every need, then it navigates. A
-need can be sign-in, a device permission, an open local store or the record
+need can be sign-in, a device permission, a loaded object pool or the record
 that the feature edits.
 
 Without a gate, each screen of the feature checks its needs as it renders. The
@@ -15,7 +15,7 @@ skips one.
 1. **One function opens the feature.** Every button, tab, menu item, shortcut
    and link calls it. No caller builds the feature's address.
 2. **The gate settles needs before the first render.** It asks the system for a
-   permission at the tap, and it waits for the store or record to open. Then it
+   permission at the tap, and it waits for the object pool or record to load. Then it
    navigates once.
 3. **The feature renders once.** Its first screen shows what the person asked
    for. It does not show a loading state, a permission prompt or an empty save
@@ -46,13 +46,18 @@ void openFeature({ project: projectId });
 The gate settles the needs together:
 
 ```ts
+// features/<name>/gate.ts
 export function useOpenFeature(navigate: (href: string) => void) {
   return async (options: FeatureOptions) => {
-    await Promise.all([devicePermission(), openStore()]);
+    await devicePermission();
     navigate(featureHref(newId(), options));
   };
 }
 ```
+
+The object pool loads from the local database before the first paint, so the
+records are ready when the gate navigates. `features/notes/gate.ts` is the
+template's gate.
 
 ## Related
 

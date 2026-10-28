@@ -10,7 +10,7 @@ Pick the lightest type that can prove the behavior wrong.
 
 | Type        | Use when                                                                                        | Avoid when                                                               |
 | ----------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Unit        | Pure logic, or a module that a typed fake from `src/testing/` covers honestly                   | The assertion needs a real vendor runtime, such as a database or a queue |
+| Unit        | Pure logic, or a module that a Test Layer from `testing/` covers honestly                       | The assertion needs a real vendor runtime, such as a database or a queue |
 | Integration | The behavior depends on the real local runtime of a vendor: queries, storage, sockets           | The code under test never touches the runtime                            |
 | End-to-end  | A user-critical journey through the real app. See [end-to-end testing](./end-to-end-testing.md) | An edge case, copy, or anything a faster test covers                     |
 
@@ -56,8 +56,14 @@ test('fetches from a disposable server', async () => {
 
 ## Setup
 
-Put setup builders in `packages/<name>/src/testing/`, and call them inside each
-test. Do not hide setup in `beforeEach`.
+Put setup builders and Test Layers in `packages/<name>/testing/`, and call them
+inside each test. Do not hide setup in `beforeEach`. Examples:
+
+- `packages/sync/testing/database.ts` gives a PGlite database for a test.
+- `packages/sync/testing/render-warm.tsx` renders a screen with a warm object
+  pool and fails on any network call.
+- `packages/notes/testing/notes.ts` runs the notes commands through the Test
+  Layers.
 
 ## Split a test file
 

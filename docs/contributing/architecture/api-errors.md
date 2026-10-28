@@ -19,9 +19,13 @@ and [fail loudly](../../principles/fail-loudly.md).
 - **One shape.** `code` is stable `snake_case` that a client can branch on.
   `message` is for people and can change. `details` is optional and holds
   facts that a program reads, such as the limit and the current count.
-- **One door.** Code throws a typed error with its code. One function turns it
-  into a response with the status from the table. A handler never builds an
-  error response by hand.
+- **One door.** Code fails with a tagged error that carries its code. One
+  function turns it into a response with the status from the table. A handler
+  never builds an error response by hand. Server code never throws. See
+  [server](./server.md#edges-and-errors).
+- **A rejected command is not an HTTP error.** On the sync socket, a server
+  change fails with `CommandRejected`. The client gets a rejected outcome with
+  the reason, and drops the local change.
 - **A closed set of codes.** A new code is a row in the table, in the change
   that adds it. A code never changes meaning. A client that sees an unknown
   code treats it as the generic code for its status.
