@@ -15,12 +15,18 @@ network.
   script, so the browser reuses the fetch.
 - Never preload the sync chunk on a cold visit. It holds the Effect code, and
   it loads after the first paint. The first screen holds no Effect code.
-- After the first load, a service worker precaches the remaining hashed
-  assets. Later navigations read from the cache, the sync chunk too.
+- After the first load, a service worker precaches every file of the build:
+  the page, each chunk and each style sheet. A warm visit reads each of them
+  from the cache, the sync chunk too.
+- On a warm visit, the service worker controls the page. The boot script then
+  adds a `modulepreload` for each sync chunk, from the cache. The build writes
+  the chunk names into the boot script.
 - Inline the CSS that paints the app shell. An inline script reads the last
   shell settings from device storage, such as the theme and the sidebar width.
   It applies them before the first paint. This boot script in `index.html` is
   the one place outside `packages/sync` that reads device storage.
+- The boot script marks the app start with `performance.mark('appStart')`, as
+  its first line.
 - Use one variable font file for each family. Preload it with
   `crossorigin="anonymous"` and declare it with `font-display: swap`.
 - Each budget in [client performance](../contributing/architecture/client-performance.md)
@@ -41,6 +47,16 @@ The `<head>` paints the shell and starts every critical fetch at once:
   }
 </style>
 <script>
+  performance.mark('appStart');
+  const syncChunks = ['/assets/transport-C9dwMqnR.js']; // the build writes the list
+  if (navigator.serviceWorker?.controller) {
+    for (const href of syncChunks) {
+      const link = document.createElement('link');
+      link.rel = 'modulepreload';
+      link.href = href;
+      document.head.append(link);
+    }
+  }
   const shell = JSON.parse(localStorage.getItem('shell') ?? '{}');
   if (shell.dark) document.documentElement.classList.add('dark');
   if (shell.sidebarWidth)

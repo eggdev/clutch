@@ -5,8 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Notes</title>
     <script>
+      // The boot script. It runs before the first paint. See
+      // docs/principles/fast-first-load.md.
+      performance.mark('appStart');
+      // On a warm visit, a service worker controls the page and holds the
+      // sync chunks. Preload them from its cache, so the sync engine starts
+      // sooner. A cold visit never preloads them. The build fills the list.
+      const syncChunks = [];
+      if (navigator.serviceWorker?.controller) {
+        for (const href of syncChunks) {
+          const link = document.createElement('link');
+          link.rel = 'modulepreload';
+          link.href = href;
+          document.head.append(link);
+        }
+      }
       // Sets the scheme before the first paint, so the page never flashes.
-      // See docs/principles/fast-first-load.md.
       try {
         const scheme = localStorage.getItem('scheme');
         const dark = scheme

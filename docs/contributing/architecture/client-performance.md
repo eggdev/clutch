@@ -55,18 +55,27 @@ too.
 
 - The sync transport, the RPC client and Schema decode load in one chunk after
   the first paint. The head never preloads that chunk on a cold visit.
+- The `build` target of `apps/web` runs `vite build`, then
+  `tools/web/service-worker.ts`. That step writes `dist/sw.js`, which
+  precaches every file of the build. It also writes the sync chunk names into
+  the boot script of `dist/index.html`.
+- `apps/web/src/service-worker.ts` registers the worker after the page loads,
+  in a production build only. A dev server has no service worker.
+- Each build gets a new cache name. The new worker deletes the caches of older
+  builds when it activates.
 - Client code imports from `effect` and from `types/` as types only. A value
   import would pull Effect into the first screen.
 
-<!-- kickoff: The browser targets, the chunk rule (one chunk for each dependency), the preload list and the service worker. -->
+<!-- kickoff: The browser targets, the chunk rule (one chunk for each dependency) and the preload list. -->
 
 ## What to read when changing it
 
 - `apps/web/vite.config.ts`, `apps/web/index.html` and `apps/web/src/main.tsx`
 - `tools/check-bundle.ts`
+- `tools/web/service-worker.ts` and `apps/web/src/service-worker.ts`
 - `packages/sync/runtime/boot.ts`
 
-<!-- kickoff: The service worker and the other budget checks. -->
+<!-- kickoff: The other budget checks. -->
 
 - [Local-first sync](./local-first-sync.md)
 - [Fix the root bottleneck](../../principles/fix-the-root-bottleneck.md)

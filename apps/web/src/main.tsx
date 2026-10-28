@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 
 import { commands } from '@/commands';
 import { router } from '@/router';
+import { registerServiceWorker } from '@/service-worker';
 
 import '@/styles.css';
 
@@ -28,6 +29,7 @@ if (root) {
 }
 const socket = new URL('/sync', location.href);
 socket.protocol = socket.protocol === 'https:' ? 'wss:' : 'ws:';
+registerServiceWorker();
 connectAfterPaint(pool, {
   url: socket.href,
   onSessionEnded: async () => {
