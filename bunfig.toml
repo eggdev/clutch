@@ -2,4 +2,4 @@
 linker = "hoisted"
 
 [test]
-preload = ["./tools/testing/console-guard.ts"]
+preload = ["./tools/testing/console-guard.ts", "./tools/testing/react-compiler.ts"]

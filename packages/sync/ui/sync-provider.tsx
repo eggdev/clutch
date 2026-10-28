@@ -1,5 +1,5 @@
 import type { Pool } from '@repo/sync/runtime/pool';
-import type { Command, Model, ReadablePool, RecordRow } from '@repo/sync/types/records';
+import type { Command, Model, Order, ReadablePool, RecordRow } from '@repo/sync/types/records';
 import { createContext, use, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 
@@ -28,14 +28,28 @@ function useSync(): Sync {
 }
 
 /**
- * Every record of one model, as the pool holds it now. The pool returns the
- * same array until it changes, so the snapshot is stable, and React Compiler
- * cannot keep a stale list.
+ * The IDs of a model's records, for a list. The component re-renders only
+ * when a record is added or removed, or when the order changes. A change to a
+ * field that does not move a record leaves the list alone: each row reads its
+ * own record with `useRecord`.
  */
-export function useRecords<Row extends RecordRow>(model: Model<Row>): ReadonlyArray<Row> {
+export function useRecordIds<Row extends RecordRow>(
+  model: Model<Row>,
+  order?: Order<Row>,
+): ReadonlyArray<string> {
   const pool = useSync();
-  const read = () => pool.all(model);
-  return useSyncExternalStore(pool.subscribe, read, read);
+  const read = () => pool.ids(model, order);
+  return useSyncExternalStore((listener) => pool.watchModel(model, listener), read, read);
+}
+
+/**
+ * One record, for the component that shows it. The component re-renders only
+ * when this record changes. `undefined` means the record is gone.
+ */
+export function useRecord<Row extends RecordRow>(model: Model<Row>, id: string): Row | undefined {
+  const pool = useSync();
+  const read = () => pool.get(model, id);
+  return useSyncExternalStore((listener) => pool.watchRecord(model, id, listener), read, read);
 }
 
 /** Runs a command: the local change shows at once, and the sync engine sends it. */
@@ -47,5 +61,5 @@ export function useCommand<Input>(command: Command<Input>): (input: Input) => st
 /** The reason for the last rejected transaction, for the screen to show. */
 export function useLastRejection() {
   const pool = useSync();
-  return useSyncExternalStore(pool.subscribe, pool.lastRejection, pool.lastRejection);
+  return useSyncExternalStore(pool.watchRejection, pool.lastRejection, pool.lastRejection);
 }

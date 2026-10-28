@@ -14,7 +14,8 @@ in the next frame, and the server confirms it later.
 - Search, filters and the command palette query the object pool. They send no
   request.
 - Each component subscribes to the records it reads. A change to one record
-  re-renders only the components that read it.
+  re-renders only the components that read it. See
+  [reading records](../contributing/architecture/client.md#reading-records).
 - A screen loads a large or rare table on demand. It shows the first rows it
   has, and it shows the loading state only for rows it does not have.
 

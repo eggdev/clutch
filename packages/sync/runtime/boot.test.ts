@@ -37,5 +37,5 @@ test('the pool loads from any local database adapter, and each change is written
 test('an empty local database gives an empty pool', async () => {
   const pool = await loadPool(memoryLocalDatabase(), [rename]);
   expect(pool.lastSyncId()).toBe(0);
-  expect(pool.all(card)).toEqual([]);
+  expect(pool.ids(card)).toEqual([]);
 });

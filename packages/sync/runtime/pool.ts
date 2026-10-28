@@ -4,6 +4,7 @@ import type {
   Command,
   Draft,
   Model,
+  Order,
   ReadablePool,
   RecordRow,
   Rejection,
@@ -26,6 +27,8 @@ export type Pool = ReadablePool & {
   readonly resetConfirmed: () => void;
   readonly settle: (outcomes: ReadonlyArray<Outcome>) => void;
   readonly onPending: (listener: () => void) => () => void;
+  /** Wakes after every change to the pool, so the engine can save it. Screens never use it. */
+  readonly onChange: (listener: () => void) => () => void;
 };
 
 function copy(tables: Tables): Tables {
@@ -54,12 +57,97 @@ function draftOver(tables: Tables): Draft {
   };
 }
 
+/** Whether two JSON values hold the same data. Records hold only JSON, as the server sent it. */
+function sameJson(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, index) => sameJson(item, b[index]));
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const aKeys = Object.keys(a);
+    return (
+      aKeys.length === Object.keys(b).length &&
+      aKeys.every((key) => sameJson(Reflect.get(a, key), Reflect.get(b, key)))
+    );
+  }
+  return false;
+}
+
+/**
+ * Puts each record of `before` that did not change back into `after`, so it
+ * stays the same object. Returns each model and record ID that did change.
+ */
+function keepUnchanged(before: Tables, after: Tables): Array<[model: string, id: string]> {
+  const changed: Array<[model: string, id: string]> = [];
+  for (const name of new Set([...before.keys(), ...after.keys()])) {
+    const old = before.get(name) ?? new Map<string, RecordRow>();
+    const next = after.get(name) ?? new Map<string, RecordRow>();
+    for (const [id, row] of next) {
+      const previous = old.get(id);
+      if (previous && sameJson(previous, row)) {
+        next.set(id, previous);
+      } else {
+        changed.push([name, id]);
+      }
+    }
+    for (const id of old.keys()) {
+      if (!next.has(id)) {
+        changed.push([name, id]);
+      }
+    }
+  }
+  return changed;
+}
+
+/** Sorts IDs by one field of their records, then by ID. */
+function sortedIds(table: Table | undefined, order: Order<RecordRow> | undefined): Array<string> {
+  const rows = [...(table?.values() ?? [])];
+  const sign = order?.direction === 'desc' ? -1 : 1;
+  const key = (row: RecordRow) => String(order ? row[order.by] : '');
+  rows.sort((a, b) => sign * key(a).localeCompare(key(b)) || a.id.localeCompare(b.id));
+  return rows.map((row) => row.id);
+}
+
+/** A set of listeners for each key, so a change wakes only its own listeners. */
+function listenerMap() {
+  const map = new Map<string, Set<() => void>>();
+  return {
+    add(key: string, listener: () => void) {
+      let set = map.get(key);
+      if (!set) {
+        set = new Set();
+        map.set(key, set);
+      }
+      set.add(listener);
+      return () => {
+        set.delete(listener);
+        if (!set.size) {
+          map.delete(key);
+        }
+      };
+    },
+    wake(key: string) {
+      for (const listener of map.get(key) ?? []) {
+        listener();
+      }
+    },
+  };
+}
+
+const recordKey = (model: string, id: string) => `${model}\u0000${id}`;
+
 /**
  * Creates the object pool. Confirmed records come only from server deltas.
  * What screens see is the confirmed records with each pending local change
  * applied again on top, so a delta rebases pending work and a rejection rolls
  * it back. `commands` lists every command, so a pending transaction loaded
  * from the local database can run its local change again.
+ *
+ * Each change keeps every record that did not change as the same object, and
+ * wakes only the watchers of the models and records that changed. A rename of
+ * one record re-renders the one component that reads it.
  */
 export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
   const byName = new Map(commands.map((command) => [command.name, command]));
@@ -67,26 +155,40 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
   let visible: Tables = new Map();
   let pending: Array<Pending> = [];
   let lastSyncId = 0;
-  let version = 0;
   let rejection: Rejection | undefined;
-  // One array for each model until the next change, so a snapshot read in
-  // `useSyncExternalStore` stays the same object between changes.
-  let lists = new Map<string, ReadonlyArray<RecordRow>>();
-  const listeners = new Set<() => void>();
+  // The ID lists handed out, keyed by model and order. A list is rebuilt only
+  // after its model changes, and the old array is kept when the IDs match.
+  const idLists = new Map<string, { ids: ReadonlyArray<string>; stale: boolean }>();
+  const modelWatchers = listenerMap();
+  const recordWatchers = listenerMap();
+  const rejectionWatchers = new Set<() => void>();
+  const changeListeners = new Set<() => void>();
   const pendingListeners = new Set<() => void>();
 
   function recompute() {
-    visible = copy(confirmed);
-    const draft = draftOver(visible);
+    const next = copy(confirmed);
+    const draft = draftOver(next);
     for (const { transaction } of pending) {
       const command = byName.get(transaction.command);
       if (command?.waits === 'local') {
         command.apply(draft, transaction.input as never);
       }
     }
-    lists = new Map();
-    version += 1;
-    for (const listener of listeners) {
+    const changed = keepUnchanged(visible, next);
+    visible = next;
+    const models = new Set(changed.map(([name]) => name));
+    for (const [key, list] of idLists) {
+      if (models.has(key.slice(0, key.indexOf('\u0000')))) {
+        list.stale = true;
+      }
+    }
+    for (const [name, id] of changed) {
+      recordWatchers.wake(recordKey(name, id));
+    }
+    for (const name of models) {
+      modelWatchers.wake(name);
+    }
+    for (const listener of changeListeners) {
       listener();
     }
   }
@@ -96,22 +198,26 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
   }
 
   return {
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    version: () => version,
-    all: <Row extends RecordRow>(model: Model<Row>) => {
-      let rows = lists.get(model.name);
-      if (!rows) {
-        rows = [...(visible.get(model.name)?.values() ?? [])];
-        lists.set(model.name, rows);
-      }
-      return rows as Array<Row>;
-    },
     get: <Row extends RecordRow>(model: Model<Row>, id: string) =>
       visible.get(model.name)?.get(id) as Row | undefined,
+    ids(model, order) {
+      const key = `${model.name}\u0000${order ? `${order.by}:${order.direction}` : ''}`;
+      const cached = idLists.get(key);
+      if (cached && !cached.stale) {
+        return cached.ids;
+      }
+      const ids = sortedIds(visible.get(model.name), order as Order<RecordRow> | undefined);
+      const kept = cached && sameJson(cached.ids, ids) ? cached.ids : ids;
+      idLists.set(key, { ids: kept, stale: false });
+      return kept;
+    },
+    watchModel: (model, listener) => modelWatchers.add(model.name, listener),
+    watchRecord: (model, id, listener) => recordWatchers.add(recordKey(model.name, id), listener),
     lastRejection: () => rejection,
+    watchRejection(listener) {
+      rejectionWatchers.add(listener);
+      return () => rejectionWatchers.delete(listener);
+    },
     run(command, input) {
       const id = crypto.randomUUID();
       pending.push({
@@ -190,6 +296,7 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
       }
     },
     settle(outcomes) {
+      const before = rejection;
       for (const outcome of outcomes) {
         const entry = pending.find(({ transaction }) => transaction.id === outcome.transactionId);
         if (!entry) {
@@ -207,10 +314,19 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
       }
       dropSettled();
       recompute();
+      if (rejection !== before) {
+        for (const listener of rejectionWatchers) {
+          listener();
+        }
+      }
     },
     onPending(listener) {
       pendingListeners.add(listener);
       return () => pendingListeners.delete(listener);
+    },
+    onChange(listener) {
+      changeListeners.add(listener);
+      return () => changeListeners.delete(listener);
     },
   };
 }

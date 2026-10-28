@@ -2,17 +2,18 @@ import { NoteRow } from '@features/notes/components/note-row';
 import { Button } from '@repo/design-system/ui/button';
 import { TextField } from '@repo/design-system/ui/text-field';
 import { createNote } from '@repo/notes/commands/create-note';
-import { renameNote } from '@repo/notes/commands/rename-note';
 import { maxTitleLength } from '@repo/notes/models/note';
-import { useNotes } from '@repo/notes/ui/use-notes';
+import { useNoteIds } from '@repo/notes/ui/use-notes';
 import { useCommand, useLastRejection } from '@repo/sync/ui/sync-provider';
 import type { FormEvent } from 'react';
 
-/** The notes of the organization. Each change shows at once and syncs in the background. */
+/**
+ * The notes of the organization. Each change shows at once and syncs in the
+ * background. The screen reads only the IDs, so a rename re-renders one row.
+ */
 export function NotesScreen() {
-  const notes = useNotes();
+  const ids = useNoteIds();
   const create = useCommand(createNote);
-  const rename = useCommand(renameNote);
   const rejection = useLastRejection();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -39,14 +40,10 @@ export function NotesScreen() {
           {rejection.reason}
         </p>
       ) : null}
-      {notes.length ? (
+      {ids.length ? (
         <ul className="flex flex-col gap-2">
-          {notes.map((note) => (
-            <NoteRow
-              key={note.id}
-              note={note}
-              onRename={(title) => rename({ id: note.id, title, at: new Date().toISOString() })}
-            />
+          {ids.map((id) => (
+            <NoteRow key={id} id={id} />
           ))}
         </ul>
       ) : (

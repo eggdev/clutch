@@ -121,3 +121,67 @@ test('after a restore, the pool drops confirmed records and keeps pending work t
   expect(pool.get(card, 'a')?.title).toBe('Mine');
   expect(pool.snapshot().lastSyncId).toBe(1);
 });
+
+const tag = defineModel<{ readonly id: string; readonly label: string }>('Tag');
+
+function twoCards() {
+  const pool = createPool([rename, archive]);
+  pool.load({
+    lastSyncId: 3,
+    tables: {
+      Card: [
+        { id: 'a', title: 'Old' },
+        { id: 'b', title: 'Other' },
+      ],
+    },
+    pending: [],
+  });
+  return pool;
+}
+
+test('a change keeps every record that did not change as the same object', () => {
+  const pool = twoCards();
+  const other = pool.get(card, 'b');
+  pool.run(rename, { id: 'a', title: 'New' });
+  expect(pool.get(card, 'b')).toBe(other);
+  const renamed = pool.get(card, 'a');
+  pool.applyDeltas([{ syncId: 4, transactionId: 'x', changes: [] }]);
+  expect(pool.get(card, 'a')).toBe(renamed);
+});
+
+test('the ID list stays the same array until the IDs or their order change', () => {
+  const pool = twoCards();
+  const order = { by: 'title', direction: 'asc' } as const;
+  const ids = pool.ids(card, order);
+  expect(ids).toEqual(['a', 'b']);
+  pool.run(rename, { id: 'a', title: 'Older' });
+  expect(pool.ids(card, order)).toBe(ids);
+  pool.run(rename, { id: 'a', title: 'Zebra' });
+  expect(pool.ids(card, order)).toEqual(['b', 'a']);
+  expect(pool.ids(card)).toEqual(['a', 'b']);
+});
+
+test('a change wakes only the watchers of its model and its record', () => {
+  const pool = twoCards();
+  const woke: Array<string> = [];
+  pool.watchModel(card, () => woke.push('model:Card'));
+  pool.watchModel(tag, () => woke.push('model:Tag'));
+  pool.watchRecord(card, 'a', () => woke.push('record:a'));
+  pool.watchRecord(card, 'b', () => woke.push('record:b'));
+  pool.run(rename, { id: 'a', title: 'New' });
+  expect(woke).toEqual(['record:a', 'model:Card']);
+  woke.length = 0;
+  pool.run(rename, { id: 'a', title: 'New' });
+  expect(woke).toEqual([]);
+});
+
+test('a watcher stops waking after it unsubscribes', () => {
+  const pool = twoCards();
+  let wakes = 0;
+  const stop = pool.watchRecord(card, 'a', () => {
+    wakes += 1;
+  });
+  stop();
+  pool.run(rename, { id: 'a', title: 'New' });
+  expect(wakes).toBe(0);
+});

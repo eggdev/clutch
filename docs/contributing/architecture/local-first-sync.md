@@ -7,7 +7,7 @@ whole engine.
 
 | Question                              | Answer                                                                 |
 | ------------------------------------- | ---------------------------------------------------------------------- |
-| Where does a screen read?             | The object pool, through `useRecords`                                  |
+| Where does a screen read?             | The object pool, through `useRecordIds` and `useRecord`                |
 | How does a screen write?              | It calls a command through `useCommand`. It never starts a request.    |
 | What does a write change first?       | The object pool, in the same frame. The transaction goes to the queue. |
 | What does the local database hold?    | The confirmed records, the last sync ID and the waiting transactions   |

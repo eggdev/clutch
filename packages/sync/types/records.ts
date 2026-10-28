@@ -8,14 +8,31 @@ export type Model<Row extends RecordRow> = {
   readonly row?: Row;
 };
 
-/** The pool that screens see. It has no way to write. */
+/** How a list of IDs is sorted: by one field, then by ID so the order is stable. */
+export type Order<Row extends RecordRow> = {
+  readonly by: keyof Row & string;
+  readonly direction: 'asc' | 'desc';
+};
+
+/**
+ * The pool that screens see. It has no way to write. Each watch wakes only
+ * for its own part of the pool: a model, one record, or the last rejection.
+ */
 export type ReadablePool = {
-  readonly subscribe: (listener: () => void) => () => void;
-  readonly version: () => number;
-  readonly all: <Row extends RecordRow>(model: Model<Row>) => ReadonlyArray<Row>;
+  /** One record. The same object comes back until one of its fields changes. */
   readonly get: <Row extends RecordRow>(model: Model<Row>, id: string) => Row | undefined;
+  /** The IDs of a model. The same array comes back until the IDs or their order change. */
+  readonly ids: <Row extends RecordRow>(
+    model: Model<Row>,
+    order?: Order<Row>,
+  ) => ReadonlyArray<string>;
+  /** Wakes when a record of the model is added, removed or changed. */
+  readonly watchModel: (model: Model<RecordRow>, listener: () => void) => () => void;
+  /** Wakes when this one record is added, removed or changed. */
+  readonly watchRecord: (model: Model<RecordRow>, id: string, listener: () => void) => () => void;
   /** The last rejected transaction and its reason, for the screen that sent it. */
   readonly lastRejection: () => Rejection | undefined;
+  readonly watchRejection: (listener: () => void) => () => void;
 };
 
 /** The writable view that only a command's local change receives. */

@@ -1,7 +1,10 @@
 import type { Note } from '@repo/notes/types/note';
 import { defineModel } from '@repo/sync/models/define';
 
-/** Notes in the object pool. Screens read them with `useRecords(noteModel)`. */
+/**
+ * Notes in the object pool. A list reads their IDs with `useRecordIds(noteModel)`,
+ * and each row reads its note with `useRecord(noteModel, id)`.
+ */
 export const noteModel = defineModel<Note>('Note');
 
 /**

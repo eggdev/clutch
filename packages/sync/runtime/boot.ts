@@ -32,7 +32,7 @@ export async function loadPool(
     } while (again);
     writing = false;
   }
-  pool.subscribe(() => {
+  pool.onChange(() => {
     void save();
   });
   return pool;

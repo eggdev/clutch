@@ -2,17 +2,21 @@ import { expect, test } from 'bun:test';
 
 import { defineModel } from '@repo/sync/models/define';
 import { renderWarm } from '@repo/sync/testing/render-warm';
-import { useRecords } from '@repo/sync/ui/sync-provider';
+import { useRecord, useRecordIds } from '@repo/sync/ui/sync-provider';
 
 const card = defineModel<{ readonly id: string; readonly title: string }>('Card');
 const state = { lastSyncId: 1, tables: { Card: [{ id: 'a', title: 'Warm' }] }, pending: [] };
 
+function CardItem({ id }: { readonly id: string }) {
+  return <li>{useRecord(card, id)?.title}</li>;
+}
+
 function Cards() {
-  const cards = useRecords(card);
+  const ids = useRecordIds(card);
   return (
     <ul>
-      {cards.map((item) => (
-        <li key={item.id}>{item.title}</li>
+      {ids.map((id) => (
+        <CardItem key={id} id={id} />
       ))}
     </ul>
   );

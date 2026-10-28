@@ -22,12 +22,14 @@
     "recap:upsert": "bun tools/recap/upsert-recap-block.ts"
   },
   "devDependencies": {
+    "@babel/core": "8.0.9",
     "@cloudflare/workers-types": "5.20261001.1",
     "@nx/js": "23.3.0",
     "@nx/oxlint": "23.3.0",
     "@types/bun": "1.4.3",
     "@types/node": "22.20.5",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "babel-plugin-react-compiler": "1.0.0",
     "knip": "6.39.0",
     "lint-staged": "17.6.0",
     "nx": "23.3.0",

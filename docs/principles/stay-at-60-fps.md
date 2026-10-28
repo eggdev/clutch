@@ -46,8 +46,8 @@ The fast path reads the setup record from the object pool. It renders at once
 and redirects only when setup is missing:
 
 ```tsx
-function ProjectLayout({ children }: { children: React.ReactNode }) {
-  const [setup] = useRecords(setupModel); // no request
+function ProjectLayout({ projectId, children }: { projectId: string; children: React.ReactNode }) {
+  const setup = useRecord(setupModel, projectId); // no request
   if (setup && !setup.done) return <Navigate to="/setup" />;
   return children;
 }

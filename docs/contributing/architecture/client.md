@@ -4,16 +4,16 @@ How client code is written. Client code runs in the browser or on a device:
 `apps/web`, `features/`, and the `ui/`, `models/` and client `commands/` of
 each package.
 
-| Question                             | Answer                                                          |
-| ------------------------------------ | --------------------------------------------------------------- |
-| Which framework?                     | React 19, with React Compiler                                   |
-| Which profile ships in the template? | Vite with TanStack Router, in `apps/web`                        |
-| Where does a screen read?            | The object pool, through `useRecords` or a package's `ui/` hook |
-| How does a screen write?             | `useCommand` with a command. Never a request.                   |
-| Where can `useEffect` run?           | Only in `packages/sync/ui/`                                     |
-| How does a route open?               | Through the feature's gate                                      |
-| How does client code use a schema?   | As a type only, through `import type`                           |
-| Where do the shared parts live?      | `packages/design-system/ui/`                                    |
+| Question                             | Answer                                                  |
+| ------------------------------------ | ------------------------------------------------------- |
+| Which framework?                     | React 19, with React Compiler                           |
+| Which profile ships in the template? | Vite with TanStack Router, in `apps/web`                |
+| Where does a screen read?            | The object pool, through `useRecordIds` and `useRecord` |
+| How does a screen write?             | `useCommand` with a command. Never a request.           |
+| Where can `useEffect` run?           | Only in `packages/sync/ui/`                             |
+| How does a route open?               | Through the feature's gate                              |
+| How does client code use a schema?   | As a type only, through `import type`                   |
+| Where do the shared parts live?      | `packages/design-system/ui/`                            |
 
 ## React core
 
@@ -24,21 +24,40 @@ The React core is the same in every profile:
 - The Ultracite React preset runs on client code, with the React Compiler
   rules as errors. A component is a function declaration.
 - A hook reads the object pool through `useSyncExternalStore`, in
-  `packages/sync/ui/sync-provider.tsx`. The pool keeps one list for each model
-  until the next change, so the compiler never holds an old list.
+  `packages/sync/ui/sync-provider.tsx`. Each snapshot stays the same object
+  until its data changes, so the compiler never holds an old value.
+
+## Reading records
+
+A change re-renders only the components that show it. Two hooks make this
+work:
+
+- `useRecordIds(model, order)` gives a list its IDs. The list re-renders only
+  when a record is added or removed, or when the order changes.
+- `useRecord(model, id)` gives a row its record. The row re-renders only when
+  that record changes.
+
+A list maps its IDs to rows, and each row reads its own record. Wrap a row in
+`memo`, and give it only stable props, such as its ID. A list rebuilds its row
+elements when a record is added or moved, and `memo` keeps the other rows from
+rendering again. `features/notes/components/note-row.tsx` shows the pattern.
+
+The pool keeps each record that did not change as the same object. It wakes
+only the watchers of the models and records that changed. A test that counts
+renders is in `packages/sync/ui/sync-provider.test.tsx`.
 
 ## No effects outside the sync package
 
 `useEffect`, `useLayoutEffect` and `useInsertionEffect` fail lint everywhere
 except `packages/sync/ui/`. Use the tool that fits instead:
 
-| You want to                        | Use                                       |
-| ---------------------------------- | ----------------------------------------- |
-| Show a value computed from records | Derive it in render                       |
-| Respond to a click or a submit     | An event handler                          |
-| Read records                       | `useRecords`, or the package's `ui/` hook |
-| Write records                      | `useCommand`                              |
-| Load what a screen needs           | The feature's gate                        |
+| You want to                        | Use                            |
+| ---------------------------------- | ------------------------------ |
+| Show a value computed from records | Derive it in render            |
+| Respond to a click or a submit     | An event handler               |
+| Read records                       | `useRecordIds` and `useRecord` |
+| Write records                      | `useCommand`                   |
+| Load what a screen needs           | The feature's gate             |
 
 The ban covers aliased imports, namespace imports and `React.useEffect`. See
 [lint rules for client code](../setup/lint-rules.md#client-code).
