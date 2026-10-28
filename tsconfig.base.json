@@ -20,6 +20,7 @@
       "@repo/*": ["./packages/*"],
       "@features/*": ["./features/*"],
       "@tools/*": ["./tools/*"]
-    }
+    },
+    "verbatimModuleSyntax": true
   }
 }
