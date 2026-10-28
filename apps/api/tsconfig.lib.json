@@ -9,12 +9,15 @@
   "exclude": [
     "**/*.test.ts",
     "**/*.test.tsx",
-    "testing/**",
+    "src/test/**",
     "out-tsc/**",
     "node_modules/**",
     "dist/**"
   ],
   "references": [
+    {
+      "path": "../../packages/access/tsconfig.lib.json"
+    },
     {
       "path": "../../packages/sync/tsconfig.lib.json"
     },

@@ -26,6 +26,23 @@ Nothing caches a grant across requests. Each request reads the current access
 state. See [fix the root bottleneck](../../principles/fix-the-root-bottleneck.md)
 for what to do when the check gets slow.
 
+## Who sees which records
+
+`packages/access` owns what each actor may see.
+
+- `Access.groupsFor(actor)` names the sync groups the actor may load. Every
+  actor loads its organization and its user groups at once. Each space of the
+  actor loads when a gate asks for it.
+- `canUseSpace(db, actor, spaceId)` is the check that a server change runs in
+  its own transaction. A note command calls it before it writes.
+- Every actor is in the general space, which has no record, and no one can
+  leave it.
+- A membership is a record in the user's own group. A change to it makes the
+  sync server ask `groupsFor` again.
+
+`runtime/sync-groups.server.ts` gives `groupsFor` to the sync server through
+the `SyncGroups` seam. See [local-first sync](./local-first-sync.md#sync-groups).
+
 ## Every surface declares its permission
 
 This page applies [one door for each decision](../../principles/one-door-for-each-decision.md).
@@ -52,4 +69,5 @@ A surface declares the requirement once, and the dispatch path checks it.
 
 <!-- kickoff: The files that define permissions, the access check and the route table test. -->
 
+- `packages/access/service/access.ts` and `packages/access/runtime/sync-groups.server.ts`
 - [Request context](./request-context.md)

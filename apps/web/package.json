@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@features/notes": "workspace:*",
+    "@repo/access": "workspace:*",
     "@repo/design-system": "workspace:*",
     "@repo/notes": "workspace:*",
     "@repo/sync": "workspace:*",

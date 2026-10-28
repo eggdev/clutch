@@ -4,11 +4,13 @@ import { NotesScreen } from '@features/notes/screens/notes-screen';
 import { createNote } from '@repo/notes/commands/create-note';
 import { renameNote } from '@repo/notes/commands/rename-note';
 import { notesCommands } from '@repo/notes/runtime/commands';
+import { poolState } from '@repo/sync/testing/pool-state';
 import { renderLive } from '@repo/sync/testing/render-live';
 import { renderWarm } from '@repo/sync/testing/render-warm';
 
 const note = {
   id: 'n1',
+  spaceId: 'general',
   title: 'Warm note',
   createdAt: '2026-10-28T12:00:00.000Z',
   updatedAt: '2026-10-28T12:00:00.000Z',
@@ -16,15 +18,18 @@ const note = {
 
 test('the notes screen paints from a warm pool with no request', () => {
   const html = renderWarm(
-    () => <NotesScreen />,
-    { lastSyncId: 1, tables: { Note: [note] }, pending: [] },
+    () => <NotesScreen spaceId="general" onOpen={(spaceId) => spaceId} />,
+    poolState({ lastSyncId: 1, tables: { Note: [note] }, groups: ['space:general'] }),
     notesCommands,
   );
   expect(html).toContain('Warm note');
 });
 
 test('an empty pool shows the empty state, not a spinner', () => {
-  const html = renderWarm(() => <NotesScreen />, { lastSyncId: 0, tables: {}, pending: [] });
+  const html = renderWarm(
+    () => <NotesScreen spaceId="general" onOpen={(spaceId) => spaceId} />,
+    poolState({ lastSyncId: 0, tables: {} }),
+  );
   expect(html).toContain('No notes yet.');
 });
 
@@ -36,8 +41,8 @@ const titles = (container: HTMLElement) =>
 
 test('a rename changes one row and leaves the list and the other rows in place', async () => {
   const live = await renderLive(
-    () => <NotesScreen />,
-    { lastSyncId: 1, tables: { Note: [note, second] }, pending: [] },
+    () => <NotesScreen spaceId="general" onOpen={(spaceId) => spaceId} />,
+    poolState({ lastSyncId: 1, tables: { Note: [note, second] }, groups: ['space:general'] }),
     notesCommands,
   );
   const [, otherInput] = live.container.querySelectorAll('input[aria-label="Note title"]');
@@ -51,13 +56,33 @@ test('a rename changes one row and leaves the list and the other rows in place',
 
 test('a new note shows at the top of the list at once', async () => {
   const live = await renderLive(
-    () => <NotesScreen />,
-    { lastSyncId: 1, tables: { Note: [note] }, pending: [] },
+    () => <NotesScreen spaceId="general" onOpen={(spaceId) => spaceId} />,
+    poolState({ lastSyncId: 1, tables: { Note: [note] }, groups: ['space:general'] }),
     notesCommands,
   );
   await live.change(() =>
-    live.pool.run(createNote, { id: 'n3', title: 'Newest', at: '2026-10-28T13:00:00.000Z' }),
+    live.pool.run(createNote, {
+      id: 'n3',
+      spaceId: 'general',
+      title: 'Newest',
+      at: '2026-10-28T13:00:00.000Z',
+    }),
   );
   expect(titles(live.container)).toEqual(['Newest', 'Warm note']);
   await live.unmount();
+});
+
+test('the screen shows only the notes of its space', () => {
+  const elsewhere = { ...note, id: 'n9', spaceId: 'design', title: 'Design note' };
+  const html = renderWarm(
+    () => <NotesScreen spaceId="general" onOpen={(spaceId) => spaceId} />,
+    poolState({
+      lastSyncId: 1,
+      tables: { Note: [note, elsewhere] },
+      groups: ['space:general', 'space:design'],
+    }),
+    notesCommands,
+  );
+  expect(html).toContain('Warm note');
+  expect(html).not.toContain('Design note');
 });

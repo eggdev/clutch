@@ -1,12 +1,12 @@
 import { expect, test } from 'bun:test';
 
 import { defineCommand } from '@repo/sync/commands/define';
-import { defineModel } from '@repo/sync/models/define';
 import { loadPool } from '@repo/sync/runtime/boot';
 import { memoryLocalDatabase } from '@repo/sync/testing/local-database';
+import { poolState, testModel } from '@repo/sync/testing/pool-state';
 
 type Card = { readonly id: string; readonly title: string };
-const card = defineModel<Card>('Card');
+const card = testModel<Card>('Card');
 const rename = defineCommand<{ id: string; title: string }>({
   name: 'cards/rename',
   waits: 'local',
@@ -19,11 +19,9 @@ const rename = defineCommand<{ id: string; title: string }>({
 });
 
 test('the pool loads from any local database adapter, and each change is written back', async () => {
-  const database = memoryLocalDatabase({
-    lastSyncId: 2,
-    tables: { Card: [{ id: 'a', title: 'Saved' }] },
-    pending: [],
-  });
+  const database = memoryLocalDatabase(
+    poolState({ lastSyncId: 2, tables: { Card: [{ id: 'a', title: 'Saved' }] } }),
+  );
   const pool = await loadPool(database, [rename]);
   expect(pool.get(card, 'a')?.title).toBe('Saved');
   pool.run(rename, { id: 'a', title: 'Changed' });

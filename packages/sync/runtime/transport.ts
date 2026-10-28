@@ -7,9 +7,10 @@ import { Socket } from 'effect/socket';
 
 /**
  * The network side of the sync engine. It loads after the first paint, in its
- * own chunk, because it holds the Effect code. One socket carries both calls:
- * `Pull` streams deltas from the last sync ID, and `Push` sends the
- * transactions that wait, in batches.
+ * own chunk, because it holds the Effect code. One socket carries three calls:
+ * `Pull` streams messages from the last sync ID for the loaded groups, `Push`
+ * sends the transactions that wait, in batches, and `Load` asks for a group
+ * that a gate needs.
  */
 /**
  * The browser WebSocket, watched for the close code of an ended session. The
@@ -38,6 +39,21 @@ function protocol(url: string, onSessionEnded: () => void) {
   );
 }
 
+/** Each group that a gate asks for, starting with the ones asked for before the socket opened. */
+function loadRequests(pool: Pool) {
+  return Stream.callback<string>((queue) =>
+    Effect.acquireRelease(
+      Effect.sync(() => {
+        for (const group of pool.requestedGroups()) {
+          Queue.offerUnsafe(queue, group);
+        }
+        return pool.onLoadRequest((group) => Queue.offerUnsafe(queue, group));
+      }),
+      (unsubscribe) => Effect.sync(unsubscribe),
+    ),
+  );
+}
+
 /** One signal each time the pool has new transactions to send. */
 function pendingSignals(pool: Pool) {
   return Stream.callback<true>((queue) =>
@@ -56,8 +72,16 @@ function session(pool: Pool, onSessionEnded: () => void) {
     const client = yield* RpcClient.make(SyncRpcs);
     const pull = Effect.suspend(() =>
       client
-        .Pull({ lastSyncId: pool.lastSyncId() })
-        .pipe(Stream.runForEach((deltas) => Effect.sync(() => pool.applyDeltas(deltas)))),
+        .Pull({ lastSyncId: pool.lastSyncId(), groups: pool.loadedGroups() })
+        .pipe(
+          Stream.runForEach((message) =>
+            Effect.sync(() =>
+              message._tag === 'Deltas'
+                ? pool.applyDeltas(message.deltas)
+                : pool.applyGroups(message.loaded, message.backfill),
+            ),
+          ),
+        ),
     );
     // After a database restore, the server's log ends before our last sync
     // ID. Drop the confirmed records, keep the pending transactions, and
@@ -81,6 +105,11 @@ function session(pool: Pool, onSessionEnded: () => void) {
         .pipe(Effect.tapError(() => Effect.sync(() => pool.markSent(ids, false))));
       pool.settle(outcomes);
     });
+    // A group the actor may not load stays unloaded; its gate stops waiting.
+    yield* loadRequests(pool).pipe(
+      Stream.runForEach((group) => client.Load({ group }).pipe(Effect.ignore)),
+      Effect.forkScoped,
+    );
     yield* pendingSignals(pool).pipe(
       Stream.runForEach(() =>
         push.pipe(Effect.retry(Schedule.exponential('200 millis')), Effect.ignore),

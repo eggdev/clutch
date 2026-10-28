@@ -1,0 +1,202 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "9c1d77e8-5a68-4f76-8ff4-1db48549173c",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "space_memberships"
+      ],
+      "writes": [
+        "s|tbl|public.space_memberships",
+        "n|tbl|public.space_memberships",
+        "e|tbl|public.space_memberships",
+        "n|rel|public.space_memberships",
+        "n|type|public.space_memberships",
+        "n|rel|public.space_memberships_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "spaces"
+      ],
+      "writes": [
+        "s|tbl|public.spaces",
+        "n|tbl|public.spaces",
+        "e|tbl|public.spaces",
+        "n|rel|public.spaces",
+        "n|type|public.spaces",
+        "n|rel|public.spaces_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "schema": "public",
+      "name": "space_memberships",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "spaces",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "table": "space_memberships",
+      "name": "organization_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "space_memberships",
+      "name": "space_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "space_memberships",
+      "name": "user_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "space_memberships",
+      "name": "joined_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "spaces",
+      "name": "id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "spaces",
+      "name": "organization_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "spaces",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "spaces",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "spaces",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "space_memberships",
+      "name": "space_memberships_pkey",
+      "columns": [
+        "organization_id",
+        "space_id",
+        "user_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "spaces",
+      "name": "spaces_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    }
+  ]
+}

@@ -32,6 +32,9 @@
     },
     {
       "path": "./apps/web"
+    },
+    {
+      "path": "./packages/access"
     }
   ]
 }

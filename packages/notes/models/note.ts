@@ -1,11 +1,18 @@
+import { spaceGroup } from '@repo/access/models/space';
 import type { Note } from '@repo/notes/types/note';
-import { defineModel } from '@repo/sync/models/define';
+import { defineLoad, defineModel } from '@repo/sync/models/define';
 
 /**
- * Notes in the object pool. A list reads their IDs with `useRecordIds(noteModel)`,
- * and each row reads its note with `useRecord(noteModel, id)`.
+ * Notes in the object pool. A note is in the group of its space, so only
+ * members of the space get it. A list reads note IDs with `useRecordIds`,
+ * and each row reads its note with `useRecord`.
  */
-export const noteModel = defineModel<Note>('Note');
+export const noteModel = defineModel<Note>('Note', {
+  groupsOf: (note) => [spaceGroup(note.spaceId)],
+});
+
+/** The load function of notes: a gate asks for the notes of one space. */
+export const notesOf = defineLoad(noteModel, (spaceId: string) => spaceGroup(spaceId));
 
 /**
  * The longest title. UI code needs it as a value, so it lives here in plain

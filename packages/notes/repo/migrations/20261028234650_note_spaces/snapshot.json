@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "9086c735-566c-4872-b6e8-5a4060261f05",
+  "prevIds": [
+    "417876db-c961-46d3-966a-c0975b22f633"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "notes",
+        "space_id"
+      ],
+      "writes": [
+        "s|col|public.notes.space_id",
+        "n|col|public.notes.space_id",
+        "e|col|public.notes.space_id"
+      ],
+      "reads": [
+        "n|tbl|public.notes",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "notes",
+        "name": "space_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'general'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

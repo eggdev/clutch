@@ -1,0 +1,1 @@
+ALTER TABLE "notes" ADD COLUMN "space_id" text DEFAULT 'general' NOT NULL;

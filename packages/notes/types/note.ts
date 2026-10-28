@@ -4,6 +4,7 @@ import { Schema } from 'effect';
 /** A note, as the server sends it and the object pool holds it. Dates are ISO strings. */
 export const Note = Schema.Struct({
   id: Schema.String,
+  spaceId: Schema.String,
   title: Schema.String,
   createdAt: Schema.String,
   updatedAt: Schema.String,
@@ -14,6 +15,7 @@ const Title = Schema.String.pipe(Schema.check(Schema.isMaxLength(maxTitleLength)
 
 export const CreateNoteInput = Schema.Struct({
   id: Schema.String,
+  spaceId: Schema.String,
   title: Title,
   at: Schema.String,
 });

@@ -1,13 +1,16 @@
-import { CurrentActor } from '@repo/identity/service/current-actor';
+import { Actors } from '@repo/identity/service/actors';
 import type { ServerChange } from '@repo/sync/commands/define.server';
 import { originAllowed, syncOrigins } from '@repo/sync/config/origins';
 import { EventLog, EventLogLive } from '@repo/sync/service/event-log';
+import { feed } from '@repo/sync/service/feed';
 import { Sessions } from '@repo/sync/service/sessions';
+import { SyncGroups } from '@repo/sync/service/sync-groups';
 import { CommandRejected } from '@repo/sync/types/command-rejected';
+import { GroupNotAllowed } from '@repo/sync/types/group-not-allowed';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import type { Outcome, Transaction } from '@repo/sync/types/protocol';
 import { ServerBehind } from '@repo/sync/types/server-behind';
-import { Effect, Layer, Stream } from 'effect';
+import { Deferred, Effect, Layer, Queue, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { RpcServer } from 'effect/rpc';
 
@@ -30,7 +33,7 @@ const trackedWebsocket = Layer.effect(RpcServer.Protocol)(
     const { httpEffect, protocol } = yield* RpcServer.makeProtocolWithHttpEffectWebsocket;
     const router = yield* HttpRouter.HttpRouter;
     const sessions = yield* Sessions;
-    const actor = yield* CurrentActor;
+    const actors = yield* Actors;
     const origins = yield* syncOrigins;
     yield* router.add('GET', syncPath, (request) => {
       if (!originAllowed(request.headers.origin, origins)) {
@@ -38,71 +41,120 @@ const trackedWebsocket = Layer.effect(RpcServer.Protocol)(
           HttpServerResponse.text('This origin may not open the sync socket.', { status: 403 }),
         );
       }
-      const tracked: HttpServerRequest.HttpServerRequest = Object.create(request, {
-        upgrade: {
-          value: request.upgrade.pipe(Effect.tap((socket) => sessions.track(actor.userId, socket))),
-        },
+      return Effect.gen(function* () {
+        const actor = yield* actors.fromHeaders(request.headers);
+        const tracked: HttpServerRequest.HttpServerRequest = Object.create(request, {
+          upgrade: {
+            value: request.upgrade.pipe(
+              Effect.tap((socket) => sessions.track(actor.userId, socket)),
+            ),
+          },
+        });
+        return yield* httpEffect.pipe(
+          Effect.provideService(HttpServerRequest.HttpServerRequest, tracked),
+        );
       });
-      return httpEffect.pipe(Effect.provideService(HttpServerRequest.HttpServerRequest, tracked));
     });
     return protocol;
   }),
 );
 
 /**
- * The sync server: the `Push` and `Pull` calls over one WebSocket. `changes`
+ * The sync server: `Push`, `Pull` and `Load` over one WebSocket. `changes`
  * lists the server change of every command, from each package's
- * `runtime/handlers.server.ts`. A server app adds this layer to its router.
+ * `runtime/handlers.server.ts`. The actor of each call comes from `Actors`,
+ * and the groups it may load come from `SyncGroups`. A server app adds this
+ * layer to its router.
  */
 export function SyncServer(changes: ReadonlyArray<ServerChange>) {
   const byName = new Map(changes.map((change) => [change.name, change]));
   const handlers = SyncRpcs.toLayer(
     Effect.gen(function* () {
       const log = yield* EventLog;
-      const actor = yield* CurrentActor;
-      const push = (transaction: Transaction) => {
-        const change = byName.get(transaction.command);
-        if (!change) {
-          return Effect.succeed(
-            rejected(transaction, `The server has no command ${transaction.command}.`),
-          );
-        }
-        return log
-          .commit(actor.organizationId, transaction.id, (db) =>
-            change.run(transaction.input, { db, actor }),
-          )
-          .pipe(
-            Effect.matchEffect({
-              onSuccess: (syncId) =>
-                Effect.succeed<Outcome>({
-                  transactionId: transaction.id,
-                  status: 'accepted',
-                  syncId,
-                  reason: null,
-                }),
-              onFailure: (failure) =>
-                failure instanceof CommandRejected
-                  ? Effect.succeed(rejected(transaction, failure.reason))
-                  : Effect.logError('A server change failed', failure).pipe(
-                      Effect.as(rejected(transaction, 'The server could not apply this change.')),
-                    ),
-            }),
-          );
-      };
+      const actors = yield* Actors;
+      const syncGroups = yield* SyncGroups;
+      // The `Load` queue of each open `Pull` stream, by RPC client. A `Load`
+      // that comes before its `Pull` stream opens waits for the queue.
+      const requests = new Map<number, Deferred.Deferred<Queue.Queue<string>>>();
+      const requestsOf = (id: number) =>
+        Effect.gen(function* () {
+          const known = requests.get(id);
+          if (known) {
+            return known;
+          }
+          const made = yield* Deferred.make<Queue.Queue<string>>();
+          requests.set(id, made);
+          return made;
+        });
+      const push = (transaction: Transaction, headers: Readonly<Record<string, string>>) =>
+        Effect.gen(function* () {
+          const actor = yield* actors.fromHeaders(headers);
+          const change = byName.get(transaction.command);
+          if (!change) {
+            return rejected(transaction, `The server has no command ${transaction.command}.`);
+          }
+          return yield* log
+            .commit(actor.organizationId, transaction.id, (db) =>
+              change.run(transaction.input, { db, actor }),
+            )
+            .pipe(
+              Effect.matchEffect({
+                onSuccess: (syncId) =>
+                  Effect.succeed<Outcome>({
+                    transactionId: transaction.id,
+                    status: 'accepted',
+                    syncId,
+                    reason: null,
+                  }),
+                onFailure: (failure) =>
+                  failure instanceof CommandRejected
+                    ? Effect.succeed(rejected(transaction, failure.reason))
+                    : Effect.logError('A server change failed', failure).pipe(
+                        Effect.as(rejected(transaction, 'The server could not apply this change.')),
+                      ),
+              }),
+            );
+        });
       return {
-        Push: ({ transactions }) => Effect.all(transactions.map(push)),
+        Push: ({ transactions }, { headers }) =>
+          Effect.all(transactions.map((transaction) => push(transaction, headers))),
         // After a database restore, the log can end before the client's last
         // sync ID. The client then loads again from 0.
-        Pull: ({ lastSyncId }) =>
+        Pull: ({ lastSyncId, groups }, { client, headers }) =>
           Stream.unwrap(
             Effect.gen(function* () {
+              const actor = yield* actors.fromHeaders(headers);
               const head = yield* log.head(actor.organizationId).pipe(Effect.orDie);
               if (lastSyncId > head) {
                 return yield* new ServerBehind({ head });
               }
-              return log.deltas(actor.organizationId, lastSyncId).pipe(Stream.orDie);
+              const granted = syncGroups.groupsFor(actor);
+              const allowed = yield* granted.pipe(Effect.orDie);
+              const queue = yield* Queue.unbounded<string>();
+              yield* Deferred.succeed(yield* requestsOf(client.id), queue);
+              return feed(log, {
+                organizationId: actor.organizationId,
+                userId: actor.userId,
+                lastSyncId,
+                loaded: [
+                  ...allowed.eager,
+                  ...groups.filter((group) => allowed.lazy.includes(group)),
+                ],
+                granted,
+                requests: queue,
+              }).pipe(Stream.orDie, Stream.ensuring(Effect.sync(() => requests.delete(client.id))));
             }),
           ),
+        Load: ({ group }, { client, headers }) =>
+          Effect.gen(function* () {
+            const actor = yield* actors.fromHeaders(headers);
+            const allowed = yield* syncGroups.groupsFor(actor).pipe(Effect.orDie);
+            if (![...allowed.eager, ...allowed.lazy].includes(group)) {
+              return yield* new GroupNotAllowed({ group });
+            }
+            const queue = yield* Deferred.await(yield* requestsOf(client.id));
+            yield* Queue.offer(queue, group);
+          }),
       };
     }),
   );

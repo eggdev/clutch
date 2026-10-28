@@ -1,7 +1,7 @@
 import { syncCounters, syncEvents } from '@repo/sync/repo/schema';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import type { Change, Delta } from '@repo/sync/types/protocol';
-import { and, asc, eq, gt, max } from 'drizzle-orm';
+import { and, arrayOverlaps, asc, eq, gt, lte, max } from 'drizzle-orm';
 import { Effect } from 'effect';
 
 /** The sync ID of a transaction that the log already holds, so a resent transaction applies once. */
@@ -25,7 +25,8 @@ export function findTransaction(
 /**
  * Appends one event. It locks the organization's counter row, so two writes
  * in one organization get sync IDs in commit order. Run it inside the
- * transaction that wrote the changes.
+ * transaction that wrote the changes. The event's groups are the groups of
+ * all its changes.
  */
 export function appendEvent(
   db: DrizzleDatabase,
@@ -45,7 +46,8 @@ export function appendEvent(
       .update(syncCounters)
       .set({ nextSyncId: syncId + 1 })
       .where(eq(syncCounters.organizationId, organizationId));
-    yield* db.insert(syncEvents).values({ organizationId, syncId, transactionId, changes });
+    const groups = [...new Set(changes.flatMap((change) => change.groups))];
+    yield* db.insert(syncEvents).values({ organizationId, syncId, transactionId, changes, groups });
     return syncId;
   });
 }
@@ -59,26 +61,79 @@ export function headOf(db: DrizzleDatabase, organizationId: string) {
     .pipe(Effect.map((rows) => rows[0]?.head ?? 0));
 }
 
-/** Up to `limit` events after `lastSyncId`, oldest first. */
+/** The deltas of event rows, with only the changes of `groups`. An event with none left is dropped. */
+function visible(
+  rows: ReadonlyArray<{
+    syncId: number;
+    transactionId: string | null;
+    changes: ReadonlyArray<Change>;
+  }>,
+  groups: ReadonlySet<string>,
+): ReadonlyArray<Delta> {
+  return rows.flatMap((row) => {
+    const changes = row.changes.filter((change) =>
+      change.groups.some((group) => groups.has(group)),
+    );
+    return changes.length
+      ? [{ syncId: row.syncId, transactionId: row.transactionId, changes }]
+      : [];
+  });
+}
+
+/**
+ * Up to `limit` events after `lastSyncId` that touch `groups`, oldest first,
+ * with only the changes of those groups. `last` is the sync ID of the last
+ * event read, so the next page starts after it.
+ */
 export function eventsAfter(
   db: DrizzleDatabase,
   organizationId: string,
   lastSyncId: number,
+  groups: ReadonlySet<string>,
   limit: number,
 ) {
   return db
     .select()
     .from(syncEvents)
-    .where(and(eq(syncEvents.organizationId, organizationId), gt(syncEvents.syncId, lastSyncId)))
+    .where(
+      and(
+        eq(syncEvents.organizationId, organizationId),
+        gt(syncEvents.syncId, lastSyncId),
+        arrayOverlaps(syncEvents.groups, [...groups]),
+      ),
+    )
     .orderBy(asc(syncEvents.syncId))
     .limit(limit)
     .pipe(
-      Effect.map((rows): ReadonlyArray<Delta> =>
-        rows.map((row) => ({
-          syncId: row.syncId,
-          transactionId: row.transactionId,
-          changes: row.changes,
-        })),
-      ),
+      Effect.map((rows) => ({
+        deltas: visible(rows, groups),
+        last: rows.at(-1)?.syncId,
+        full: rows.length === limit,
+      })),
     );
+}
+
+/**
+ * Every event up to `upTo` that touches `groups`, oldest first, with only the
+ * changes of those groups. A client that loads a group gets these as its
+ * backfill.
+ */
+export function eventsUpTo(
+  db: DrizzleDatabase,
+  organizationId: string,
+  upTo: number,
+  groups: ReadonlySet<string>,
+) {
+  return db
+    .select()
+    .from(syncEvents)
+    .where(
+      and(
+        eq(syncEvents.organizationId, organizationId),
+        lte(syncEvents.syncId, upTo),
+        arrayOverlaps(syncEvents.groups, [...groups]),
+      ),
+    )
+    .orderBy(asc(syncEvents.syncId))
+    .pipe(Effect.map((rows) => visible(rows, groups)));
 }

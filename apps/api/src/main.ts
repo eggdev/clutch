@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 
 import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
-import { CurrentActorDev } from '@repo/identity/runtime/dev.server';
+import { ActorsDev } from '@repo/identity/runtime/dev.server';
 import { DatabasePglite, DatabasePostgres } from '@repo/sync/runtime/database.server';
 import { Config, Effect, Layer, Option } from 'effect';
 
@@ -31,6 +31,4 @@ const http = Layer.unwrap(
   ),
 );
 
-BunRuntime.runMain(
-  Layer.launch(api(database).pipe(Layer.provide(CurrentActorDev), Layer.provide(http))),
-);
+BunRuntime.runMain(Layer.launch(api(database).pipe(Layer.provide(ActorsDev), Layer.provide(http))));

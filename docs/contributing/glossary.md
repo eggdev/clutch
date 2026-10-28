@@ -77,7 +77,8 @@ These terms come from the
 | Sync ID                | The number that the server gives each event. It only increases. Each client stores the last sync ID that it applied.                          | version, cursor, offset         |
 | Delta                  | One event with its changed records, as the server pushes it to each client of the organization.                                               | patch, diff                     |
 | Rebase                 | Apply the pending local changes again on top of the confirmed records after a delta arrives.                                                  | replay                          |
-| Sync group             | The clients that receive an event. In the template, it is the organization.                                                                   | channel, room, topic            |
+| Sync group             | A label on a record, such as `space:<id>`, that decides which clients get it. A client gets a change when it has loaded one of its groups.    | channel, room, topic            |
+| Load function          | A function from `defineLoad` that names the group holding the records a screen asks for. A gate calls it through `useLoad`.                   | loader, fetcher                 |
 | Gate                   | The one function that opens a feature. It settles the needs of the feature, then navigates once.                                              | guard, wrapper                  |
 
 ## Server

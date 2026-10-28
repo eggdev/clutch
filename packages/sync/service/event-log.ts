@@ -1,10 +1,17 @@
-import { appendEvent, eventsAfter, findTransaction, headOf } from '@repo/sync/repo/events';
+import {
+  appendEvent,
+  eventsAfter,
+  eventsUpTo,
+  findTransaction,
+  headOf,
+} from '@repo/sync/repo/events';
 import { Database } from '@repo/sync/service/database';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import type { Change, Delta } from '@repo/sync/types/protocol';
 import { Context, Effect, Layer, Option, PubSub, Stream } from 'effect';
+import type { Scope } from 'effect';
 
-/** At most this many deltas go in one stream element, so one decode stays short. */
+/** At most this many events go in one stream element, so one decode stays short. */
 const deltasPerElement = 1000;
 
 type Commit = <E, R>(
@@ -13,23 +20,50 @@ type Commit = <E, R>(
   write: (db: DrizzleDatabase) => Effect.Effect<ReadonlyArray<Change>, E, R>,
 ) => Effect.Effect<number, unknown, R>;
 
+/** One page of the backlog: the visible deltas, and the sync ID of the last event read. */
+export type BacklogPage = { readonly deltas: ReadonlyArray<Delta>; readonly last: number };
+
 /**
  * The append-only log of one server. `commit` writes the owner records and
  * the event in one database transaction, then publishes the delta after the
- * commit. `deltas` sends the backlog after a sync ID, then live deltas above
- * the backlog's last ID, to every client of the organization, sender too.
+ * commit. Each change must name its sync groups. `backlog`, `backfill` and
+ * `subscribe` give a connection its events; see `service/feed.ts`.
  */
 export class EventLog extends Context.Service<
   EventLog,
   {
     readonly commit: Commit;
     readonly head: (organizationId: string) => Effect.Effect<number, unknown>;
-    readonly deltas: (
+    /** The events after a sync ID that touch the groups, in pages. */
+    readonly backlog: (
       organizationId: string,
       lastSyncId: number,
-    ) => Stream.Stream<ReadonlyArray<Delta>, unknown>;
+      groups: ReadonlySet<string>,
+    ) => Stream.Stream<BacklogPage, unknown>;
+    /** Every event up to a sync ID that touches the groups. */
+    readonly backfill: (
+      organizationId: string,
+      upTo: number,
+      groups: ReadonlySet<string>,
+    ) => Effect.Effect<ReadonlyArray<Delta>, unknown>;
+    /** Every new event of the organization, from now on. */
+    readonly subscribe: (
+      organizationId: string,
+    ) => Effect.Effect<PubSub.Subscription<Delta>, never, Scope.Scope>;
   }
 >()('sync/EventLog') {}
+
+/** A change with no group reaches no client, so a server change must name them. */
+function checkGroups(changes: ReadonlyArray<Change>) {
+  const missing = changes.find((change) => change.groups.length === 0);
+  return missing
+    ? Effect.die(
+        new Error(
+          `The change of ${missing.model} ${missing.id} has no sync groups. Build it with upsertChange or deleteChange from @repo/sync/models/change.`,
+        ),
+      )
+    : Effect.void;
+}
 
 export const EventLogLive = Layer.effect(EventLog)(
   Effect.gen(function* () {
@@ -55,6 +89,7 @@ export const EventLogLive = Layer.effect(EventLog)(
               return { syncId: known, delta: null };
             }
             const changes = yield* write(tx);
+            yield* checkGroups(changes);
             const syncId = yield* appendEvent(tx, organizationId, transactionId, changes);
             return { syncId, delta: { syncId, transactionId, changes } };
           }),
@@ -65,40 +100,26 @@ export const EventLogLive = Layer.effect(EventLog)(
         return result.syncId;
       });
 
-    const backlog = (organizationId: string, after: number) =>
+    const backlog = (organizationId: string, after: number, groups: ReadonlySet<string>) =>
       Stream.paginate(after, (cursor) =>
-        eventsAfter(db, organizationId, cursor, deltasPerElement).pipe(
+        eventsAfter(db, organizationId, cursor, groups, deltasPerElement).pipe(
           Effect.map((page) => {
-            const last = page.at(-1)?.syncId;
-            const next = page.length === deltasPerElement && last !== undefined ? last : undefined;
+            const last = page.last ?? cursor;
             return [
-              page.length ? [page] : [],
-              next === undefined ? Option.none() : Option.some(next),
+              page.last === undefined ? [] : [{ deltas: page.deltas, last }],
+              page.full ? Option.some(last) : Option.none(),
             ] as const;
           }),
         ),
       );
 
-    const deltas = (organizationId: string, lastSyncId: number) =>
-      Stream.unwrap(
-        Effect.gen(function* () {
-          const subscription = yield* PubSub.subscribe(yield* hubOf(organizationId));
-          let watermark = lastSyncId;
-          const pages = backlog(organizationId, lastSyncId).pipe(
-            Stream.tap((page) =>
-              Effect.sync(() => {
-                watermark = page.at(-1)?.syncId ?? watermark;
-              }),
-            ),
-          );
-          const live = Stream.fromSubscription(subscription).pipe(
-            Stream.filter((delta) => delta.syncId > watermark),
-            Stream.map((delta): ReadonlyArray<Delta> => [delta]),
-          );
-          return Stream.concat(pages, live);
-        }),
-      );
-
-    return { commit, deltas, head: (organizationId: string) => headOf(db, organizationId) };
+    return {
+      commit,
+      head: (organizationId: string) => headOf(db, organizationId),
+      backlog,
+      backfill: (organizationId, upTo, groups) => eventsUpTo(db, organizationId, upTo, groups),
+      subscribe: (organizationId) =>
+        Effect.flatMap(hubOf(organizationId), (hub) => PubSub.subscribe(hub)),
+    };
   }),
 );

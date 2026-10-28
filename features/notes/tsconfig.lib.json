@@ -18,10 +18,13 @@
   ],
   "references": [
     {
-      "path": "../../packages/sync/tsconfig.lib.json"
+      "path": "../../packages/design-system/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/design-system/tsconfig.lib.json"
+      "path": "../../packages/access/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/sync/tsconfig.lib.json"
     },
     {
       "path": "../../packages/notes/tsconfig.lib.json"

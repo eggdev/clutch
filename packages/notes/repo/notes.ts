@@ -1,8 +1,9 @@
+import { noteModel } from '@repo/notes/models/note';
 import { notes } from '@repo/notes/repo/schema';
 import type { NoteRow } from '@repo/notes/repo/schema';
 import type { Note } from '@repo/notes/types/note';
+import { upsertChange } from '@repo/sync/models/change';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
-import type { Change } from '@repo/sync/types/protocol';
 import { and, eq } from 'drizzle-orm';
 import { Effect } from 'effect';
 
@@ -10,6 +11,7 @@ import { Effect } from 'effect';
 export function toRecord(row: NoteRow): Note {
   return {
     id: row.id,
+    spaceId: row.spaceId,
     title: row.title,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -20,15 +22,16 @@ export function toRow(note: Note, organizationId: string): NoteRow {
   return {
     id: note.id,
     organizationId,
+    spaceId: note.spaceId,
     title: note.title,
     createdAt: new Date(note.createdAt),
     updatedAt: new Date(note.updatedAt),
   };
 }
 
-/** The change that tells each client about a row. */
-export function toChange(row: NoteRow): Change {
-  return { model: 'Note', id: row.id, action: 'upsert', data: toRecord(row) };
+/** The change that tells each member of the note's space about a row. */
+export function toChange(row: NoteRow) {
+  return upsertChange(noteModel, toRecord(row), { organizationId: row.organizationId });
 }
 
 export function findNote(db: DrizzleDatabase, organizationId: string, id: string) {

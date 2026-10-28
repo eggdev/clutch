@@ -1,15 +1,15 @@
 import { expect, test } from 'bun:test';
 
 import { defineCommand } from '@repo/sync/commands/define';
-import { defineModel } from '@repo/sync/models/define';
+import { poolState, testModel } from '@repo/sync/testing/pool-state';
 import { renderLive } from '@repo/sync/testing/render-live';
 import { useRecord, useRecordIds } from '@repo/sync/ui/sync-provider';
 import { memo } from 'react';
 
 type Card = { readonly id: string; readonly title: string; readonly rank: string };
 type Tag = { readonly id: string; readonly label: string };
-const card = defineModel<Card>('Card');
-const tag = defineModel<Tag>('Tag');
+const card = testModel<Card>('Card');
+const tag = testModel<Tag>('Tag');
 const putCard = defineCommand<Card>({
   name: 'cards/put',
   waits: 'local',
@@ -21,7 +21,7 @@ const putTag = defineCommand<Tag>({
   apply: (draft, input) => draft.put(tag, input),
 });
 
-const state = {
+const state = poolState({
   lastSyncId: 1,
   tables: {
     Card: [
@@ -29,8 +29,7 @@ const state = {
       { id: 'b', title: 'Second', rank: '2' },
     ],
   },
-  pending: [],
-};
+});
 
 /** A list and its rows, built the way a screen builds them, with a render count for each. */
 function counted() {

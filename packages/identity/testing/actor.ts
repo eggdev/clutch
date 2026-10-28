@@ -1,10 +1,20 @@
-import { CurrentActor } from '@repo/identity/service/current-actor';
+import { Actors } from '@repo/identity/service/actors';
 import type { Actor } from '@repo/identity/types/actor';
-import { Layer } from 'effect';
+import { Effect, Layer } from 'effect';
 
-const testActor: Actor = { userId: 'user-test', organizationId: 'org-test' };
+/** The actor of a test that names no other one. */
+export const testActor: Actor = { userId: 'user-test', organizationId: 'org-test' };
 
-/** A fixed actor for tests. */
-export function CurrentActorTest(actor: Actor = testActor) {
-  return Layer.succeed(CurrentActor)(actor);
+/**
+ * Actors for tests: `x-dev-user-id` picks the user, and every other
+ * connection is `actor`.
+ */
+export function ActorsTest(actor: Actor = testActor) {
+  return Layer.succeed(Actors)({
+    fromHeaders: (headers) =>
+      Effect.succeed({
+        userId: headers['x-dev-user-id'] ?? actor.userId,
+        organizationId: headers['x-dev-organization-id'] ?? actor.organizationId,
+      }),
+  });
 }

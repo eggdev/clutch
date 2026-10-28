@@ -41,11 +41,16 @@ This page applies [one door for each decision](../../principles/one-door-for-eac
 | ------ | ------------------------------------------------- | ------ |
 | `sync` | `Push` on the organization's WebSocket at `/sync` | Person |
 
-The sync server reads the actor from the `CurrentActor` service in
-`packages/identity`. In local development, `runtime/dev.server.ts` builds it
-from `DEV_USER_ID` and `DEV_ORGANIZATION_ID`.
+The sync server asks the `Actors` service in `packages/identity` for the actor
+of each socket and each call. It passes the request headers of the socket.
 
-<!-- kickoff: One row for each other entry point from the journeys, and the Live Layer that builds `CurrentActor` from the sign-in vendor. -->
+- In local development, `runtime/dev.server.ts` reads the `x-dev-user-id` and
+  `x-dev-organization-id` headers. Without them, it uses `DEV_USER_ID` and
+  `DEV_ORGANIZATION_ID`.
+- Any client can claim any actor with the development Layer. A project replaces
+  it with a Live Layer for its sign-in vendor.
+
+<!-- kickoff: One row for each other entry point from the journeys, and the Live Layer that builds `Actors` from the sign-in vendor. -->
 
 ## What to read when changing it
 

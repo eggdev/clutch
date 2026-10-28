@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@effect/platform-bun": "4.0.7",
+    "@repo/access": "workspace:*",
     "@repo/identity": "workspace:*",
     "@repo/notes": "workspace:*",
     "@repo/sync": "workspace:*",

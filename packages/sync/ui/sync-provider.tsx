@@ -1,10 +1,18 @@
 import type { Pool } from '@repo/sync/runtime/pool';
-import type { Command, Model, Order, ReadablePool, RecordRow } from '@repo/sync/types/records';
+import type {
+  Command,
+  Load,
+  Model,
+  Order,
+  ReadablePool,
+  RecordRow,
+  Where,
+} from '@repo/sync/types/records';
 import { createContext, use, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 
-/** What screens see of the pool: reads, and `run` for commands. No other write. */
-type Sync = ReadablePool & Pick<Pool, 'run' | 'isPending'>;
+/** What screens see of the pool: reads, `run` for commands and group loads. No other write. */
+type Sync = ReadablePool & Pick<Pool, 'run' | 'isPending' | 'loadGroup'>;
 
 const SyncContext = createContext<Sync | null>(null);
 
@@ -36,9 +44,10 @@ function useSync(): Sync {
 export function useRecordIds<Row extends RecordRow>(
   model: Model<Row>,
   order?: Order<Row>,
+  where?: Where<Row>,
 ): ReadonlyArray<string> {
   const pool = useSync();
-  const read = () => pool.ids(model, order);
+  const read = () => pool.ids(model, order, where);
   return useSyncExternalStore((listener) => pool.watchModel(model, listener), read, read);
 }
 
@@ -62,4 +71,30 @@ export function useCommand<Input>(command: Command<Input>): (input: Input) => st
 export function useLastRejection() {
   const pool = useSync();
   return useSyncExternalStore(pool.watchRejection, pool.lastRejection, pool.lastRejection);
+}
+
+/** How long a gate waits for a group before it opens the screen with what the pool has. */
+const loadWait = 3000;
+
+/**
+ * The loader that a gate calls before it navigates. It asks the sync engine
+ * for the group of a load function and waits until its records are in the
+ * pool. Offline, or past `loadWait`, it stops waiting and reports `false`, so
+ * the gate still opens the screen.
+ */
+export function useLoad(): <Args extends ReadonlyArray<unknown>>(
+  load: Load<Args>,
+  ...args: Args
+) => Promise<boolean> {
+  const { loadGroup } = useSync();
+  return (load, ...args) => {
+    const loaded = (async () => {
+      await loadGroup(load.group(...args));
+      return true;
+    })();
+    const timedOut = new Promise<boolean>((resolve) => {
+      setTimeout(() => resolve(false), loadWait);
+    });
+    return Promise.race([loaded, timedOut]);
+  };
 }

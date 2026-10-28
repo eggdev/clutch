@@ -1,29 +1,12 @@
 import { expect, test } from 'bun:test';
 
-import { BunHttpServer } from '@effect/platform-bun';
-import { CurrentActorTest } from '@repo/identity/testing/actor';
-import { DatabasePglite } from '@repo/sync/runtime/database.server';
 import { Sessions } from '@repo/sync/service/sessions';
 import { SyncRpcs } from '@repo/sync/types/protocol';
-import { Effect, Fiber, Layer, Stream } from 'effect';
+import { Effect, Fiber, Stream } from 'effect';
 import { HttpServer } from 'effect/http';
-import { RpcClient, RpcSerialization } from 'effect/rpc';
-import { Socket } from 'effect/socket';
+import { RpcClient } from 'effect/rpc';
 
-import { api } from '@/server';
-
-const server = api(DatabasePglite()).pipe(
-  Layer.provide(CurrentActorTest()),
-  Layer.provideMerge(BunHttpServer.layerTest),
-);
-
-function client(url: string) {
-  return RpcClient.layerProtocolSocket().pipe(
-    Layer.provide(Socket.layerWebSocket(url)),
-    Layer.provide(Socket.layerWebSocketConstructorGlobal),
-    Layer.provide(RpcSerialization.layerJson),
-  );
-}
+import { deltasOnly, socketClient as client, testServer as server } from '@/test/socket';
 
 test('the sender gets the delta of its own transaction over the socket', async () => {
   const result = await Effect.runPromise(
@@ -33,16 +16,25 @@ test('the sender gets the delta of its own transaction over the socket', async (
       );
       return yield* Effect.gen(function* () {
         const rpc = yield* RpcClient.make(SyncRpcs);
-        const reading = yield* rpc
-          .Pull({ lastSyncId: 0 })
-          .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
+        const reading = yield* rpc.Pull({ lastSyncId: 0, groups: ['space:general'] }).pipe(
+          Stream.map(deltasOnly),
+          Stream.filter((deltas) => deltas.length > 0),
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.forkChild,
+        );
         yield* Effect.sleep('100 millis');
         const outcomes = yield* rpc.Push({
           transactions: [
             {
               id: 't1',
               command: 'notes/create',
-              input: { id: 'n1', title: 'Hello', at: '2026-10-28T12:00:00.000Z' },
+              input: {
+                id: 'n1',
+                spaceId: 'general',
+                title: 'Hello',
+                at: '2026-10-28T12:00:00.000Z',
+              },
             },
             {
               id: 't2',
@@ -69,7 +61,7 @@ test('the sender gets the delta of its own transaction over the socket', async (
 const create = (id: string) => ({
   id: `t-${id}`,
   command: 'notes/create',
-  input: { id, title: id, at: '2026-10-28T12:00:00.000Z' },
+  input: { id, spaceId: 'general', title: id, at: '2026-10-28T12:00:00.000Z' },
 });
 
 test('another client gets the first delta live, with no second change', async () => {
@@ -84,9 +76,13 @@ test('another client gets the first delta live, with no second change', async ()
       }).pipe(Effect.scoped, Effect.provide(client(url)));
       return yield* Effect.gen(function* () {
         const rpc = yield* RpcClient.make(SyncRpcs);
-        const reading = yield* rpc
-          .Pull({ lastSyncId: 0 })
-          .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
+        const reading = yield* rpc.Pull({ lastSyncId: 0, groups: ['space:general'] }).pipe(
+          Stream.map(deltasOnly),
+          Stream.filter((deltas) => deltas.length > 0),
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.forkChild,
+        );
         yield* Effect.sleep('100 millis');
         yield* sender;
         return yield* Fiber.join(reading).pipe(Effect.timeout('1 second'));
@@ -150,7 +146,7 @@ test('a pull from a sync ID past the log end fails with ServerBehind, as after a
       );
       return yield* Effect.gen(function* () {
         const rpc = yield* RpcClient.make(SyncRpcs);
-        return yield* rpc.Pull({ lastSyncId: 99 }).pipe(Stream.runCollect, Effect.flip);
+        return yield* rpc.Pull({ lastSyncId: 99, groups: [] }).pipe(Stream.runCollect, Effect.flip);
       }).pipe(Effect.scoped, Effect.provide(client(url)));
     }).pipe(Effect.provide(server)),
   );

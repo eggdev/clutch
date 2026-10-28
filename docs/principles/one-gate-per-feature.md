@@ -55,9 +55,18 @@ export function useOpenFeature(navigate: (href: string) => void) {
 }
 ```
 
-The object pool loads from the local database before the first paint, so the
-records are ready when the gate navigates. `features/notes/gate.ts` is the
-template's gate.
+The object pool loads from the local database before the first paint. A gate
+that needs a group the client has not loaded calls its load function first:
+
+```ts
+// features/notes/gate.ts
+export async function openNotes(open: OpenNotes, spaceId: string = generalSpaceId) {
+  await open.load(notesOf, spaceId);
+  open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
+}
+```
+
+See [load functions](../contributing/architecture/local-first-sync.md#load-functions).
 
 ## Related
 

@@ -22,12 +22,16 @@ change of vendor is a new Layer and one line in the composition root. See
 [generic platform](../../principles/generic-platform.md).
 
 ```ts
-export class CurrentActor extends Context.Service<CurrentActor, Actor>()('identity/CurrentActor') {}
+export class Actors extends Context.Service<
+  Actors,
+  { readonly fromHeaders: (headers: RequestHeaders) => Effect.Effect<Actor> }
+>()('identity/Actors') {}
 ```
 
-`packages/identity` shows the pattern. `service/current-actor.ts` declares the
+`packages/identity` shows the pattern. `service/actors.ts` declares the
 service. `runtime/dev.server.ts` builds it from `config/dev.ts`, and
-`testing/actor.ts` builds it for tests.
+`testing/actor.ts` builds it for tests. The sync server asks it for the actor
+of each socket and each call.
 
 ## Edges and errors
 

@@ -158,6 +158,16 @@ primitives:
     docs:
       - docs/contributing/architecture/local-first-sync.md
 
+  - id: access
+    group: product
+    name: Access
+    kind: package
+    summary: 'Who may see what: spaces, memberships and the sync groups of each actor.'
+    code:
+      - packages/access/
+    docs:
+      - packages/access/README.md
+
 languages:
   - imports: ^react(?:-dom)?(?:/|$)
     where: '`ui/`, features, apps and `@repo/design-system`'

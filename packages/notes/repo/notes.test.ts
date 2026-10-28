@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 
 const note = {
   id: 'n1',
+  spaceId: 'general',
   title: 'First',
   createdAt: '2026-10-28T12:00:00.000Z',
   updatedAt: '2026-10-28T12:30:00.000Z',

@@ -31,14 +31,17 @@ connection, migrations and transactions.
 
 ## Example
 
-`packages/identity` declares the current actor as a service:
+`packages/identity` declares how to find the actor of a request as a service:
 
 ```ts
-// packages/identity/service/current-actor.ts
-export class CurrentActor extends Context.Service<CurrentActor, Actor>()('identity/CurrentActor') {}
+// packages/identity/service/actors.ts
+export class Actors extends Context.Service<
+  Actors,
+  { readonly fromHeaders: (headers: RequestHeaders) => Effect.Effect<Actor> }
+>()('identity/Actors') {}
 ```
 
-A server change reads the actor and does not know which vendor signs people
+The sync server gets the actor and does not know which vendor signs people
 in. `runtime/dev.server.ts` builds the service for local development. A project
 adds a Live Layer for its sign-in vendor in `runtime/`, and the composition root
 in `apps/api/src/main.ts` selects it.

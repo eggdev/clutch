@@ -1,10 +1,19 @@
 import type { Transaction } from '@repo/sync/types/protocol';
 import type { RecordRow } from '@repo/sync/types/records';
 
-/** What the local database keeps: the confirmed records and the transactions that wait. */
+/** The sync groups of one confirmed record, and the sync ID of its last change. */
+export type RecordMeta = { readonly groups: ReadonlyArray<string>; readonly syncId: number };
+
+/**
+ * What the local database keeps: the confirmed records, the groups the client
+ * loaded, each record's groups, and the transactions that wait. `meta` is
+ * keyed by `<model> <id>`.
+ */
 export type PoolState = {
   readonly lastSyncId: number;
   readonly tables: Readonly<Record<string, ReadonlyArray<RecordRow>>>;
+  readonly groups: ReadonlyArray<string>;
+  readonly meta: Readonly<Record<string, RecordMeta>>;
   readonly pending: ReadonlyArray<Transaction>;
 };
 

@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 
-import { defineModel } from '@repo/sync/models/define';
+import { poolState, testModel } from '@repo/sync/testing/pool-state';
 import { renderWarm } from '@repo/sync/testing/render-warm';
 import { useRecord, useRecordIds } from '@repo/sync/ui/sync-provider';
 
-const card = defineModel<{ readonly id: string; readonly title: string }>('Card');
-const state = { lastSyncId: 1, tables: { Card: [{ id: 'a', title: 'Warm' }] }, pending: [] };
+const card = testModel<{ readonly id: string; readonly title: string }>('Card');
+const state = poolState({ lastSyncId: 1, tables: { Card: [{ id: 'a', title: 'Warm' }] } });
 
 function CardItem({ id }: { readonly id: string }) {
   return <li>{useRecord(card, id)?.title}</li>;

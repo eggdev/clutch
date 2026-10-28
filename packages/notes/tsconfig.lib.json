@@ -22,6 +22,9 @@
     },
     {
       "path": "../sync/tsconfig.lib.json"
+    },
+    {
+      "path": "../access/tsconfig.lib.json"
     }
   ]
 }

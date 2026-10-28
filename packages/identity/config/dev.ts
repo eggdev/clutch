@@ -2,7 +2,7 @@ import { Config } from 'effect';
 
 /**
  * The actor for local development. A project replaces this with its sign-in
- * vendor, in `runtime/`, behind the same `CurrentActor` service.
+ * vendor, in `runtime/`, behind the same `Actors` service.
  */
 export const devActor = Config.all({
   userId: Config.String('DEV_USER_ID').pipe(Config.withDefault('user-dev')),

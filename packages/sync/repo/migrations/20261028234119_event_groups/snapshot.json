@@ -1,0 +1,91 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "d473fa5a-924c-4f07-aaab-8b80090c1cb0",
+  "prevIds": [
+    "3b2aa6f2-174b-45ec-b2e9-8c97271adbc7"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "sync_events",
+        "groups"
+      ],
+      "writes": [
+        "s|col|public.sync_events.groups",
+        "n|col|public.sync_events.groups",
+        "e|col|public.sync_events.groups"
+      ],
+      "reads": [
+        "n|tbl|public.sync_events",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "sync_events",
+        "sync_events_groups"
+      ],
+      "writes": [
+        "s|idx|public.sync_events_groups",
+        "n|idx|public.sync_events_groups",
+        "e|idx|public.sync_events_groups",
+        "n|rel|public.sync_events_groups"
+      ],
+      "reads": [
+        "n|tbl|public.sync_events",
+        "n|sch|public",
+        "n|col|public.sync_events.groups"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sync_events",
+        "name": "groups",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sync_events",
+        "name": "sync_events_groups",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "groups",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "gin",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

@@ -51,13 +51,13 @@ renders is in `packages/sync/ui/sync-provider.test.tsx`.
 `useEffect`, `useLayoutEffect` and `useInsertionEffect` fail lint everywhere
 except `packages/sync/ui/`. Use the tool that fits instead:
 
-| You want to                        | Use                            |
-| ---------------------------------- | ------------------------------ |
-| Show a value computed from records | Derive it in render            |
-| Respond to a click or a submit     | An event handler               |
-| Read records                       | `useRecordIds` and `useRecord` |
-| Write records                      | `useCommand`                   |
-| Load what a screen needs           | The feature's gate             |
+| You want to                        | Use                                                       |
+| ---------------------------------- | --------------------------------------------------------- |
+| Show a value computed from records | Derive it in render                                       |
+| Respond to a click or a submit     | An event handler                                          |
+| Read records                       | `useRecordIds` and `useRecord`                            |
+| Write records                      | `useCommand`                                              |
+| Load what a screen needs           | The feature's gate, through a load function and `useLoad` |
 
 The ban covers aliased imports, namespace imports and `React.useEffect`. See
 [lint rules for client code](../setup/lint-rules.md#client-code).

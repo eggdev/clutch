@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@repo/access": "workspace:*",
     "@repo/design-system": "workspace:*",
     "@repo/notes": "workspace:*",
     "@repo/sync": "workspace:*",

@@ -1,17 +1,26 @@
-import type { PoolState } from '@repo/sync/types/local-database';
-import type { Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
+import {
+  copy,
+  draftOver,
+  keepUnchanged,
+  listenerMap,
+  recordKey,
+  sameJson,
+  sortedIds,
+  tableOf,
+} from '@repo/sync/runtime/tables';
+import type { Tables } from '@repo/sync/runtime/tables';
+import type { PoolState, RecordMeta } from '@repo/sync/types/local-database';
+import type { Change, Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
 import type {
   Command,
-  Draft,
   Model,
   Order,
   ReadablePool,
   RecordRow,
   Rejection,
+  Where,
 } from '@repo/sync/types/records';
 
-type Table = Map<string, RecordRow>;
-type Tables = Map<string, Table>;
 type Pending = { readonly transaction: Transaction; sent: boolean; acceptedAt: number | null };
 
 /** The object pool, with the writes that only the sync engine and commands use. */
@@ -24,119 +33,28 @@ export type Pool = ReadablePool & {
   readonly unsent: () => ReadonlyArray<Transaction>;
   readonly markSent: (ids: ReadonlyArray<string>, sent: boolean) => void;
   readonly applyDeltas: (deltas: ReadonlyArray<Delta>) => void;
+  /**
+   * Sets the loaded groups. It applies the backfill of each new group, and
+   * deletes each confirmed record that is in no loaded group.
+   */
+  readonly applyGroups: (loaded: ReadonlyArray<string>, backfill: ReadonlyArray<Delta>) => void;
+  /** The groups loaded now, which the engine names when it connects. */
+  readonly loadedGroups: () => ReadonlyArray<string>;
+  /**
+   * Asks the engine to load a group, and resolves once its records are in
+   * the pool. A group that is loaded resolves at once.
+   */
+  readonly loadGroup: (group: string) => Promise<void>;
+  /** The groups that a gate asked for and that are not loaded yet. */
+  readonly requestedGroups: () => ReadonlyArray<string>;
+  /** Wakes when a gate asks for a group. Only the engine uses it. */
+  readonly onLoadRequest: (listener: (group: string) => void) => () => void;
   readonly resetConfirmed: () => void;
   readonly settle: (outcomes: ReadonlyArray<Outcome>) => void;
   readonly onPending: (listener: () => void) => () => void;
   /** Wakes after every change to the pool, so the engine can save it. Screens never use it. */
   readonly onChange: (listener: () => void) => () => void;
 };
-
-function copy(tables: Tables): Tables {
-  return new Map([...tables].map(([name, table]) => [name, new Map(table)]));
-}
-
-function tableOf(tables: Tables, name: string): Table {
-  let table = tables.get(name);
-  if (!table) {
-    table = new Map();
-    tables.set(name, table);
-  }
-  return table;
-}
-
-function draftOver(tables: Tables): Draft {
-  return {
-    get: <Row extends RecordRow>(model: Model<Row>, id: string) =>
-      tables.get(model.name)?.get(id) as Row | undefined,
-    put: (model, row) => {
-      tableOf(tables, model.name).set(row.id, row);
-    },
-    remove: (model, id) => {
-      tables.get(model.name)?.delete(id);
-    },
-  };
-}
-
-/** Whether two JSON values hold the same data. Records hold only JSON, as the server sent it. */
-function sameJson(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) {
-    return true;
-  }
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((item, index) => sameJson(item, b[index]));
-  }
-  if (a && b && typeof a === 'object' && typeof b === 'object') {
-    const aKeys = Object.keys(a);
-    return (
-      aKeys.length === Object.keys(b).length &&
-      aKeys.every((key) => sameJson(Reflect.get(a, key), Reflect.get(b, key)))
-    );
-  }
-  return false;
-}
-
-/**
- * Puts each record of `before` that did not change back into `after`, so it
- * stays the same object. Returns each model and record ID that did change.
- */
-function keepUnchanged(before: Tables, after: Tables): Array<[model: string, id: string]> {
-  const changed: Array<[model: string, id: string]> = [];
-  for (const name of new Set([...before.keys(), ...after.keys()])) {
-    const old = before.get(name) ?? new Map<string, RecordRow>();
-    const next = after.get(name) ?? new Map<string, RecordRow>();
-    for (const [id, row] of next) {
-      const previous = old.get(id);
-      if (previous && sameJson(previous, row)) {
-        next.set(id, previous);
-      } else {
-        changed.push([name, id]);
-      }
-    }
-    for (const id of old.keys()) {
-      if (!next.has(id)) {
-        changed.push([name, id]);
-      }
-    }
-  }
-  return changed;
-}
-
-/** Sorts IDs by one field of their records, then by ID. */
-function sortedIds(table: Table | undefined, order: Order<RecordRow> | undefined): Array<string> {
-  const rows = [...(table?.values() ?? [])];
-  const sign = order?.direction === 'desc' ? -1 : 1;
-  const key = (row: RecordRow) => String(order ? row[order.by] : '');
-  rows.sort((a, b) => sign * key(a).localeCompare(key(b)) || a.id.localeCompare(b.id));
-  return rows.map((row) => row.id);
-}
-
-/** A set of listeners for each key, so a change wakes only its own listeners. */
-function listenerMap() {
-  const map = new Map<string, Set<() => void>>();
-  return {
-    add(key: string, listener: () => void) {
-      let set = map.get(key);
-      if (!set) {
-        set = new Set();
-        map.set(key, set);
-      }
-      set.add(listener);
-      return () => {
-        set.delete(listener);
-        if (!set.size) {
-          map.delete(key);
-        }
-      };
-    },
-    wake(key: string) {
-      for (const listener of map.get(key) ?? []) {
-        listener();
-      }
-    },
-  };
-}
-
-const recordKey = (model: string, id: string) => `${model}\u0000${id}`;
 
 /**
  * Creates the object pool. Confirmed records come only from server deltas.
@@ -156,6 +74,11 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
   let pending: Array<Pending> = [];
   let lastSyncId = 0;
   let rejection: Rejection | undefined;
+  // The groups and last sync ID of each confirmed record, by `recordKey`.
+  let meta = new Map<string, RecordMeta>();
+  let loaded = new Set<string>();
+  const waiters = new Map<string, Array<() => void>>();
+  const loadListeners = new Set<(group: string) => void>();
   // The ID lists handed out, keyed by model and order. A list is rebuilt only
   // after its model changes, and the old array is kept when the IDs match.
   const idLists = new Map<string, { ids: ReadonlyArray<string>; stale: boolean }>();
@@ -193,6 +116,46 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
     }
   }
 
+  /** Applies one change unless the record already holds a later one. */
+  function applyChange(change: Change, syncId: number) {
+    const key = recordKey(change.model, change.id);
+    const known = meta.get(key);
+    if (known && known.syncId > syncId) {
+      return;
+    }
+    const table = tableOf(confirmed, change.model);
+    if (change.action === 'delete' || change.data === null) {
+      table.delete(change.id);
+      meta.delete(key);
+    } else {
+      table.set(change.id, { ...change.data, id: change.id });
+      meta.set(key, { groups: change.groups, syncId });
+    }
+  }
+
+  /** Deletes each confirmed record that is in no loaded group. */
+  function purge() {
+    const current = loaded;
+    for (const [key, { groups }] of meta) {
+      if (!groups.some((group) => current.has(group))) {
+        const [model = '', id = ''] = key.split('\u0000');
+        confirmed.get(model)?.delete(id);
+        meta.delete(key);
+      }
+    }
+  }
+
+  function wakeLoaded() {
+    for (const [group, resolves] of waiters) {
+      if (loaded.has(group)) {
+        waiters.delete(group);
+        for (const resolve of resolves) {
+          resolve();
+        }
+      }
+    }
+  }
+
   function dropSettled() {
     pending = pending.filter(({ acceptedAt }) => acceptedAt === null || acceptedAt > lastSyncId);
   }
@@ -200,13 +163,17 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
   return {
     get: <Row extends RecordRow>(model: Model<Row>, id: string) =>
       visible.get(model.name)?.get(id) as Row | undefined,
-    ids(model, order) {
-      const key = `${model.name}\u0000${order ? `${order.by}:${order.direction}` : ''}`;
+    ids(model, order, where) {
+      const key = `${model.name}\u0000${order ? `${order.by}:${order.direction}` : ''}\u0000${where ? `${where.field}=${where.equals}` : ''}`;
       const cached = idLists.get(key);
       if (cached && !cached.stale) {
         return cached.ids;
       }
-      const ids = sortedIds(visible.get(model.name), order as Order<RecordRow> | undefined);
+      const ids = sortedIds(
+        visible.get(model.name),
+        order as Order<RecordRow> | undefined,
+        where as Where<RecordRow> | undefined,
+      );
       const kept = cached && sameJson(cached.ids, ids) ? cached.ids : ids;
       idLists.set(key, { ids: kept, stale: false });
       return kept;
@@ -235,6 +202,13 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
       pending.some(({ transaction }) => transaction.id === transactionId),
     lastSyncId: () => lastSyncId,
     load(state) {
+      // A state saved before records had groups cannot be purged by group.
+      // Start empty: the next connection loads everything again.
+      if (!state.meta || !state.groups) {
+        return;
+      }
+      meta = new Map(Object.entries(state.meta));
+      loaded = new Set(state.groups);
       confirmed = new Map(
         Object.entries(state.tables).map(([name, rows]) => [
           name,
@@ -242,6 +216,7 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
         ]),
       );
       ({ lastSyncId } = state);
+      wakeLoaded();
       pending = state.pending.map((transaction) => ({
         transaction,
         sent: false,
@@ -251,6 +226,8 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
     },
     snapshot: () => ({
       lastSyncId,
+      groups: [...loaded],
+      meta: Object.fromEntries(meta),
       tables: Object.fromEntries(
         [...confirmed].map(([name, table]) => [name, [...table.values()]]),
       ),
@@ -270,12 +247,7 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
           continue;
         }
         for (const change of delta.changes) {
-          const table = tableOf(confirmed, change.model);
-          if (change.action === 'delete' || change.data === null) {
-            table.delete(change.id);
-          } else {
-            table.set(change.id, { ...change.data, id: change.id });
-          }
+          applyChange(change, delta.syncId);
         }
         lastSyncId = delta.syncId;
         pending = pending.filter(({ transaction }) => transaction.id !== delta.transactionId);
@@ -283,8 +255,39 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
       dropSettled();
       recompute();
     },
+    applyGroups(groups, backfill) {
+      loaded = new Set(groups);
+      for (const delta of backfill) {
+        for (const change of delta.changes) {
+          applyChange(change, delta.syncId);
+        }
+      }
+      purge();
+      recompute();
+      wakeLoaded();
+    },
+    loadedGroups: () => [...loaded],
+    loadGroup(group) {
+      if (loaded.has(group)) {
+        return Promise.resolve();
+      }
+      return new Promise((resolve) => {
+        const resolves = waiters.get(group) ?? [];
+        resolves.push(resolve);
+        waiters.set(group, resolves);
+        for (const listener of loadListeners) {
+          listener(group);
+        }
+      });
+    },
+    requestedGroups: () => [...waiters.keys()],
+    onLoadRequest(listener) {
+      loadListeners.add(listener);
+      return () => loadListeners.delete(listener);
+    },
     resetConfirmed() {
       confirmed = new Map();
+      meta = new Map();
       lastSyncId = 0;
       for (const entry of pending) {
         entry.sent = false;

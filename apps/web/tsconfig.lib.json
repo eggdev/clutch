@@ -18,6 +18,9 @@
   ],
   "references": [
     {
+      "path": "../../packages/access/tsconfig.lib.json"
+    },
+    {
       "path": "../../packages/sync/tsconfig.lib.json"
     },
     {

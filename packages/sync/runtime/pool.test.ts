@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 
 import { defineCommand } from '@repo/sync/commands/define';
-import { defineModel } from '@repo/sync/models/define';
 import { createPool } from '@repo/sync/runtime/pool';
+import { poolState, testGroup, testModel } from '@repo/sync/testing/pool-state';
 
 type Card = { readonly id: string; readonly title: string };
-const card = defineModel<Card>('Card');
+const card = testModel<Card>('Card');
 const rename = defineCommand<{ id: string; title: string }>({
   name: 'cards/rename',
   waits: 'local',
@@ -24,7 +24,7 @@ const archive = defineCommand<{ id: string }>({
 
 function warmPool() {
   const pool = createPool([rename, archive]);
-  pool.load({ lastSyncId: 3, tables: { Card: [{ id: 'a', title: 'Old' }] }, pending: [] });
+  pool.load(poolState({ lastSyncId: 3, tables: { Card: [{ id: 'a', title: 'Old' }] } }));
   return pool;
 }
 
@@ -47,7 +47,15 @@ test('a delta from another client rebases the pending change on top', () => {
     {
       syncId: 4,
       transactionId: 'other',
-      changes: [{ model: 'Card', id: 'b', action: 'upsert', data: { title: 'Theirs' } }],
+      changes: [
+        {
+          model: 'Card',
+          id: 'b',
+          action: 'upsert',
+          data: { title: 'Theirs' },
+          groups: [testGroup],
+        },
+      ],
     },
   ]);
   expect(pool.get(card, 'a')?.title).toBe('Mine');
@@ -57,7 +65,9 @@ test('a delta from another client rebases the pending change on top', () => {
     {
       syncId: 5,
       transactionId: id,
-      changes: [{ model: 'Card', id: 'a', action: 'upsert', data: { title: 'Mine' } }],
+      changes: [
+        { model: 'Card', id: 'a', action: 'upsert', data: { title: 'Mine' }, groups: [testGroup] },
+      ],
     },
   ]);
   expect(pool.isPending(id)).toBe(false);
@@ -70,7 +80,7 @@ test('a delta at or below the last sync ID changes nothing', () => {
     {
       syncId: 3,
       transactionId: null,
-      changes: [{ model: 'Card', id: 'a', action: 'delete', data: null }],
+      changes: [{ model: 'Card', id: 'a', action: 'delete', data: null, groups: [testGroup] }],
     },
   ]);
   expect(pool.get(card, 'a')?.title).toBe('Old');
@@ -115,27 +125,30 @@ test('after a restore, the pool drops confirmed records and keeps pending work t
     {
       syncId: 1,
       transactionId: null,
-      changes: [{ model: 'Card', id: 'a', action: 'upsert', data: { title: 'Old' } }],
+      changes: [
+        { model: 'Card', id: 'a', action: 'upsert', data: { title: 'Old' }, groups: [testGroup] },
+      ],
     },
   ]);
   expect(pool.get(card, 'a')?.title).toBe('Mine');
   expect(pool.snapshot().lastSyncId).toBe(1);
 });
 
-const tag = defineModel<{ readonly id: string; readonly label: string }>('Tag');
+const tag = testModel<{ readonly id: string; readonly label: string }>('Tag');
 
 function twoCards() {
   const pool = createPool([rename, archive]);
-  pool.load({
-    lastSyncId: 3,
-    tables: {
-      Card: [
-        { id: 'a', title: 'Old' },
-        { id: 'b', title: 'Other' },
-      ],
-    },
-    pending: [],
-  });
+  pool.load(
+    poolState({
+      lastSyncId: 3,
+      tables: {
+        Card: [
+          { id: 'a', title: 'Old' },
+          { id: 'b', title: 'Other' },
+        ],
+      },
+    }),
+  );
   return pool;
 }
 

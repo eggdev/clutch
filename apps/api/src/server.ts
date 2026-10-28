@@ -1,3 +1,4 @@
+import { SyncGroupsFromAccess } from '@repo/access/runtime/sync-groups.server';
 import { SyncServer } from '@repo/sync/runtime/server.server';
 import { Database } from '@repo/sync/service/database';
 import { SessionsLive } from '@repo/sync/service/sessions';
@@ -26,12 +27,14 @@ const health = Layer.effectDiscard(
 );
 
 /**
- * The API without its HTTP server, database driver or actor. The composition
- * root in `main.ts` provides them; a test provides test versions.
+ * The API without its HTTP server, database driver or actors. The composition
+ * root in `main.ts` provides them; a test provides test versions. Access
+ * names the sync groups that each actor may load.
  */
 export function api<E, R>(database: Layer.Layer<Database, E, R>) {
   return HttpRouter.serve(Layer.mergeAll(SyncServer(serverChanges), health)).pipe(
     Layer.provide(RpcSerialization.layerJson),
+    Layer.provide(SyncGroupsFromAccess),
     Layer.provide(Layer.provideMerge(migrated, database)),
     // The app keeps `Sessions`, so a sign-out can end a user's sockets.
     Layer.provideMerge(SessionsLive),
