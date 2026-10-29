@@ -3,7 +3,12 @@ import { expect, test } from 'bun:test';
 import { defineCommand } from '@repo/sync/commands/define';
 import { poolState, testModel } from '@repo/sync/testing/pool-state';
 import { renderLive } from '@repo/sync/testing/render-live';
-import { useRecord, useRecordIds } from '@repo/sync/ui/sync-provider';
+import {
+  usePending,
+  usePendingCommand,
+  useRecord,
+  useRecordIds,
+} from '@repo/sync/ui/sync-provider';
 import { memo } from 'react';
 
 type Card = { readonly id: string; readonly title: string; readonly rank: string };
@@ -90,5 +95,63 @@ test('a change that moves a record re-renders the list, and the moved row only',
   await live.change(() => live.pool.run(putCard, { id: 'a', title: 'First', rank: '9' }));
   expect(Object.fromEntries(renders)).toEqual({ list: 1, 'row:a': 1 });
   expect(live.container.textContent).toBe('SecondFirst');
+  await live.unmount();
+});
+
+const askServer = defineCommand<{ readonly label: string }>({
+  name: 'cards/ask-server',
+  waits: 'server',
+  apply: () => null,
+});
+
+/** Two controls that each send a command that waits, with a render count for each. */
+function pendingControls() {
+  const renders = new Map<string, number>();
+  function ControlView({ name }: { readonly name: string }) {
+    renders.set(name, (renders.get(name) ?? 0) + 1);
+    const ask = usePendingCommand(askServer);
+    return (
+      <button type="button" id={name} onClick={() => ask.run({ label: name })}>
+        {ask.pending ? `${name}:waiting` : `${name}:idle`}
+      </button>
+    );
+  }
+  const Control = memo(ControlView);
+  return { renders, Control };
+}
+
+test('a pending command re-renders only its own control, and again when its delta arrives', async () => {
+  const { renders, Control } = pendingControls();
+  const live = await renderLive(
+    () => (
+      <>
+        <Control name="a" />
+        <Control name="b" />
+      </>
+    ),
+    state,
+    [askServer],
+  );
+  renders.clear();
+  await live.change(() => document.querySelector<HTMLButtonElement>('#a')?.click());
+  expect(live.container.textContent).toBe('a:waitingb:idle');
+  expect(renders.get('b')).toBeUndefined();
+  const [sent] = live.pool.unsent();
+  renders.clear();
+  await live.change(() =>
+    live.pool.applyDeltas([{ syncId: 2, transactionId: sent?.id ?? null, changes: [] }]),
+  );
+  expect(live.container.textContent).toBe('a:idleb:idle');
+  expect(Object.fromEntries(renders)).toEqual({ a: 1 });
+  await live.unmount();
+});
+
+function NoTransaction() {
+  return <p>{usePending() ? 'waiting' : 'idle'}</p>;
+}
+
+test('no transaction reads as not waiting', async () => {
+  const live = await renderLive(() => <NoTransaction />, state, [askServer]);
+  expect(live.container.textContent).toBe('idle');
   await live.unmount();
 });

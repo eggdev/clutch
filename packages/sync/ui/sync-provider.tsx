@@ -8,11 +8,11 @@ import type {
   RecordRow,
   Where,
 } from '@repo/sync/types/records';
-import { createContext, use, useSyncExternalStore } from 'react';
+import { createContext, use, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 
 /** What screens see of the pool: reads, `run` for commands and group loads. No other write. */
-type Sync = ReadablePool & Pick<Pool, 'run' | 'isPending' | 'loadGroup'>;
+type Sync = ReadablePool & Pick<Pool, 'run' | 'isPending' | 'loadGroup' | 'onPending' | 'onChange'>;
 
 const SyncContext = createContext<Sync | null>(null);
 
@@ -65,6 +65,51 @@ export function useRecord<Row extends RecordRow>(model: Model<Row>, id: string):
 export function useCommand<Input>(command: Command<Input>): (input: Input) => string {
   const { run } = useSync();
   return (input) => run(command, input);
+}
+
+/**
+ * Whether a transaction still waits for the server. The component re-renders
+ * only when this transaction starts or stops waiting. No ID reads as
+ * not waiting. A transaction stops waiting when its delta arrives or the
+ * server rejects it.
+ */
+export function usePending(transactionId?: string): boolean {
+  const pool = useSync();
+  const read = () => transactionId !== undefined && pool.isPending(transactionId);
+  return useSyncExternalStore(
+    (listener) => {
+      const stopNew = pool.onPending(listener);
+      const stopChange = pool.onChange(listener);
+      return () => {
+        stopNew();
+        stopChange();
+      };
+    },
+    read,
+    read,
+  );
+}
+
+/**
+ * Runs a command and reports whether its last run still waits. Use it for a
+ * command with `waits: 'server'`, so the control that sent it shows a pending
+ * state while the rest of the screen stays live.
+ */
+export function usePendingCommand<Input>(command: Command<Input>): {
+  readonly run: (input: Input) => string;
+  readonly pending: boolean;
+} {
+  const { run } = useSync();
+  const [last, setLast] = useState<string>();
+  const pending = usePending(last);
+  return {
+    pending,
+    run: (input) => {
+      const id = run(command, input);
+      setLast(id);
+      return id;
+    },
+  };
 }
 
 /** The reason for the last rejected transaction, for the screen to show. */

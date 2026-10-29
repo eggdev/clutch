@@ -5,7 +5,8 @@ import type { <%= className %> } from '@repo/<%= packageName %>/types/<%= fileNa
 export function toRecord(row: <%= className %>Row): <%= className %> {
   return {
     id: row.id,
-    createdAt: row.createdAt.toISOString(),
+<% if (groupField) { %>    <%= groupField %>: row.<%= groupField %>,
+<% } %>    createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -15,7 +16,8 @@ export function toRow(record: <%= className %>, organizationId: string): <%= cla
   return {
     id: record.id,
     organizationId,
-    createdAt: new Date(record.createdAt),
+<% if (groupField) { %>    <%= groupField %>: record.<%= groupField %>,
+<% } %>    createdAt: new Date(record.createdAt),
     updatedAt: new Date(record.updatedAt),
   };
 }

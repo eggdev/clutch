@@ -7,13 +7,24 @@
     "package": {
       "type": "string",
       "description": "The package folder name under packages/.",
-      "$default": { "$source": "argv", "index": 0 }
+      "$default": {
+        "$source": "argv",
+        "index": 0
+      }
     },
     "name": {
       "type": "string",
       "description": "The model name, in kebab case, such as invoice.",
-      "$default": { "$source": "argv", "index": 1 }
+      "$default": {
+        "$source": "argv",
+        "index": 1
+      }
+    },
+    "group": {
+      "type": "string",
+      "description": "The sync group of each record: org, user, or <kind>:<field> such as space:spaceId. A record syncs only to actors who load its group.",
+      "pattern": "^(org|user|[a-z][a-z-]*:[a-z][A-Za-z0-9]*)$"
     }
   },
-  "required": ["package", "name"]
+  "required": ["package", "name", "group"]
 }

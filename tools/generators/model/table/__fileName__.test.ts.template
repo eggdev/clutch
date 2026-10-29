@@ -4,7 +4,8 @@ import { toRecord, toRow } from '@repo/<%= packageName %>/repo/<%= fileName %>';
 
 const record = {
   id: '<%= fileName %>-1',
-  createdAt: '2026-10-28T12:00:00.000Z',
+<% if (groupField) { %>  <%= groupField %>: '<%= groupKind %>-1',
+<% } %>  createdAt: '2026-10-28T12:00:00.000Z',
   updatedAt: '2026-10-28T12:30:00.000Z',
 };
 

@@ -3,7 +3,8 @@ import { Schema } from 'effect';
 /** A <%= title %>, as the server sends it and the object pool holds it. Dates are ISO strings. */
 export const <%= className %> = Schema.Struct({
   id: Schema.String,
-  createdAt: Schema.String,
+<% if (groupField) { %>  <%= groupField %>: Schema.String,
+<% } %>  createdAt: Schema.String,
   updatedAt: Schema.String,
 });
 export type <%= className %> = typeof <%= className %>.Type;

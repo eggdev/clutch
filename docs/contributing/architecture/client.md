@@ -46,6 +46,19 @@ The pool keeps each record that did not change as the same object. It wakes
 only the watchers of the models and records that changed. A test that counts
 renders is in `packages/sync/ui/sync-provider.test.tsx`.
 
+## Pending writes
+
+A command with `waits: 'server'` shows a pending state on the control that
+sent it. The rest of the screen stays live.
+
+- `usePendingCommand(command)` returns `run` and `pending`. `pending` is true
+  while the last run waits for its delta or its rejection.
+- `usePending(transactionId)` reads one transaction. A component re-renders
+  only when that transaction starts or stops waiting.
+
+`features/notes/components/space-row.tsx` disables Join and Leave and changes
+their labels while they wait.
+
 ## No effects outside the sync package
 
 `useEffect`, `useLayoutEffect` and `useInsertionEffect` fail lint everywhere
@@ -56,7 +69,7 @@ except `packages/sync/ui/`. Use the tool that fits instead:
 | Show a value computed from records | Derive it in render                                       |
 | Respond to a click or a submit     | An event handler                                          |
 | Read records                       | `useRecordIds` and `useRecord`                            |
-| Write records                      | `useCommand`                                              |
+| Write records                      | `useCommand`, or `usePendingCommand` for a server wait    |
 | Load what a screen needs           | The feature's gate, through a load function and `useLoad` |
 
 The ban covers aliased imports, namespace imports and `React.useEffect`. See

@@ -1,11 +1,10 @@
 import type { <%= className %> } from '@repo/<%= packageName %>/types/<%= fileName %>';
-import { defineModel, organizationGroup } from '@repo/sync/models/define';
+import { defineModel<% if (groupHelper) { %>, <%= groupHelper %><% } %> } from '@repo/sync/models/define';
 
 /**
  * <%= className %> records in the object pool. Screens read them through the sync hooks in
- * `@repo/sync/ui/`. Every actor in the organization gets them; name a narrower
- * group in `groupsOf`, such as a space, when only some actors may see them.
+ * `@repo/sync/ui/`. <%= groupNote %>
  */
 export const <%= propertyName %>Model = defineModel<<%= className %>>('<%= className %>', {
-  groupsOf: (_, scope) => [organizationGroup(scope.organizationId)],
+  groupsOf: <%- groupsOf %>,
 });

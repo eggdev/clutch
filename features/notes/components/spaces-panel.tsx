@@ -4,7 +4,7 @@ import { generalSpaceId, maxSpaceNameLength } from '@repo/access/models/space';
 import { useSpaceIds } from '@repo/access/ui/use-spaces';
 import { Button } from '@repo/design-system/ui/button';
 import { TextField } from '@repo/design-system/ui/text-field';
-import { useCommand } from '@repo/sync/ui/sync-provider';
+import { usePendingCommand } from '@repo/sync/ui/sync-provider';
 import type { FormEvent } from 'react';
 
 /**
@@ -19,14 +19,14 @@ export function SpacesPanel({
   readonly onOpen: (spaceId: string) => void;
 }) {
   const ids = useSpaceIds();
-  const create = useCommand(createSpace);
+  const create = usePendingCommand(createSpace);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const name = String(new FormData(form).get('name') ?? '').trim();
     if (name) {
-      create({ id: crypto.randomUUID(), name, at: new Date().toISOString() });
+      create.run({ id: crypto.randomUUID(), name, at: new Date().toISOString() });
       form.reset();
     }
   }
@@ -52,7 +52,9 @@ export function SpacesPanel({
           name="name"
           maxLength={maxSpaceNameLength}
         />
-        <Button type="submit">Create</Button>
+        <Button type="submit" disabled={create.pending}>
+          {create.pending ? 'Creating…' : 'Create'}
+        </Button>
       </form>
     </section>
   );
