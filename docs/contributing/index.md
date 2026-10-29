@@ -19,6 +19,53 @@ even when you know another way. To change a rule, change its page in the same
 PR. Ask the owner first when the page is project intent, a principle or a
 decision record.
 
+## Tasks
+
+Each task lists the pages and generators to open, in order. The rules live
+on those pages; this list only points at them.
+
+**Add a feature**
+
+1. [Project intent](./project-intent.md): what the feature is for.
+2. [Architecture](./architecture/index.md#package-sections): the tiers.
+3. [Generators](./setup/nx.md#generators): the `feature` generator.
+4. [One gate into each feature](../principles/one-gate-per-feature.md).
+5. [Client](./architecture/client.md): how a screen reads and writes.
+
+**Add a model or command**
+
+1. [Local-first sync](./architecture/local-first-sync.md): records, groups
+   and commands.
+2. [Generators](./setup/nx.md#generators): the `model` and `command`
+   generators.
+3. [One door for each write](./architecture/authorization.md#one-door-for-each-write).
+4. [Migrations](./setup/migrations.md), when the record has a table.
+
+**Add a vendor**
+
+1. [Generic platform](../principles/generic-platform.md): one owner package.
+2. [Import boundaries](./import-boundaries.md): the registry entry.
+3. [Server](./architecture/server.md#services-and-layers): the service and its
+   Layers.
+4. [Jobs and the outbox](./architecture/server.md#jobs-and-the-outbox): where
+   a vendor call runs.
+
+**Show server-computed or third-party data**
+
+1. [Server data on a screen](./architecture/local-first-sync.md#server-data-on-a-screen).
+2. [Jobs and the outbox](./architecture/server.md#jobs-and-the-outbox).
+
+**Add a job or a webhook**
+
+1. [Jobs and the outbox](./architecture/server.md#jobs-and-the-outbox).
+2. [System writes, routes and webhooks](./architecture/server.md#system-writes-routes-and-webhooks).
+3. [Generators](./setup/nx.md#generators): the `job` generator.
+
+**Add a migration**
+
+1. [Migrations](./setup/migrations.md): only drizzle-kit writes one.
+2. [Two-way and one-way doors](../principles/two-way-doors.md).
+
 ## Setup and workflow
 
 - [Agent workflow](./agent-workflow.md): lifecycle phases, exit conditions and

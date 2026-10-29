@@ -154,6 +154,27 @@ it. `check-commands` rejects a command without `waits`.
 
 <!-- kickoff: One line for each command that waits for the server: what it does and why. Start from writes that move money, give consent, change access or touch a hard invariant. -->
 
+## Server data on a screen
+
+Some data comes from the server, not from a person: a count over many rows,
+or a result from a vendor. A screen never fetches it, and never computes it
+from a large list. The pattern:
+
+1. A model defines the record, such as `spaceNoteCountModel`.
+2. A job or a server change computes the value on the server, then commits
+   the record. See [jobs and the outbox](./server.md#jobs-and-the-outbox).
+3. The record reaches each client of its sync group as a delta.
+4. The screen reads it with `useRecord` or `useRecordIds`, like any record.
+
+Put the record in the group of the records that it describes when every
+reader loads that group anyway. Give it its own group when a reader must not
+load the other records. For example, a dashboard that shows counts must not
+pull every note.
+
+`packages/notes/jobs/count-notes.ts` and the count in the notes screen header
+show the pattern. The count is `undefined` until the first one arrives, so the
+screen shows nothing in its place.
+
 ## Add a command
 
 1. Run `mise exec -- bun nx g @tools/generators:command <package> <name>

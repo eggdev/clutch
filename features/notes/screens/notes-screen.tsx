@@ -7,6 +7,7 @@ import { TextField } from '@repo/design-system/ui/text-field';
 import { createNote } from '@repo/notes/commands/create-note';
 import { maxTitleLength } from '@repo/notes/models/note';
 import { useNoteIds } from '@repo/notes/ui/use-notes';
+import { useSpaceNoteCount } from '@repo/notes/ui/use-space-note-count';
 import { useCommand, useLastRejection } from '@repo/sync/ui/sync-provider';
 import type { FormEvent } from 'react';
 
@@ -23,6 +24,7 @@ export function NotesScreen({
   readonly onOpen: (spaceId: string) => void;
 }) {
   const ids = useNoteIds(spaceId);
+  const count = useSpaceNoteCount(spaceId);
   const space = useSpace(spaceId);
   const member = useIsMember(spaceId) || spaceId === generalSpaceId;
   const create = useCommand(createNote);
@@ -40,7 +42,12 @@ export function NotesScreen({
 
   return (
     <main className="mx-auto flex max-w-xl flex-col gap-6 p-4">
-      <h1 className="text-heading text-fg">{space?.name ?? 'General'}</h1>
+      <header className="flex items-baseline justify-between gap-2">
+        <h1 className="text-heading text-fg">{space?.name ?? 'General'}</h1>
+        {count === undefined ? null : (
+          <p className="text-caption text-fg-muted">{count === 1 ? '1 note' : `${count} notes`}</p>
+        )}
+      </header>
       {member ? null : (
         <output className="text-body text-fg-muted">
           You are not in this space. Join it below to see its notes.
