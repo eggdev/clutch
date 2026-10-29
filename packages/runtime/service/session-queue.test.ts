@@ -30,7 +30,7 @@ function grant(queue: SessionQueue, leaseMs = 60_000): Lease {
   return lease;
 }
 
-function errorCode(action: () => unknown, expected: QueueErrorCode) {
+function expectErrorCode(action: () => unknown, expected: QueueErrorCode) {
   try {
     action();
     throw new Error('Expected queue operation to fail.');
@@ -47,7 +47,7 @@ test('requests survive reopening; identical delivery deduplicates and changed id
     using queue = new SessionQueue(files.path);
     ({ id } = queue.enqueue(review('source-1')));
     expect(queue.enqueue(review('source-1')).id).toBe(id);
-    errorCode(
+    expectErrorCode(
       () => queue.enqueue({ ...review('source-1'), revision: 'changed' }),
       'request_conflict',
     );
@@ -72,7 +72,7 @@ test('FIFO spans connections and successful cleanup is required before the next 
   expect(first.claim({ leaseMs: 60_000, maxRunMs: 120_000 })).toBeNull();
   expect(first.authorize(lease).state).toBe('active');
   const ticket = second.finish(lease, 'passed');
-  errorCode(() => first.authorize(lease), 'stale_lease');
+  expectErrorCode(() => first.authorize(lease), 'stale_lease');
   expect(first.get(a.id).outcome).toBe('passed');
   expect(first.claim({ leaseMs: 60_000, maxRunMs: 120_000 })).toBeNull();
   const result = first.completeCleanup(ticket, {
@@ -84,8 +84,8 @@ test('FIFO spans connections and successful cleanup is required before the next 
   const next = grant(second);
   expect(next.sessionId).toBe(b.id);
   expect(next.generation).toBeGreaterThan(lease.generation);
-  errorCode(() => first.renew(lease, 100), 'stale_lease');
-  errorCode(() => first.interrupt(lease), 'stale_lease');
+  expectErrorCode(() => first.renew(lease, 100), 'stale_lease');
+  expectErrorCode(() => first.interrupt(lease), 'stale_lease');
   expect(second.authorize(next).id).toBe(b.id);
 });
 
@@ -157,7 +157,7 @@ test('failed cleanup persists quarantine and a stale receipt cannot release a re
     expect(result.state).toBe('quarantined');
     expect(result.outcome).toBe('failed');
     expect(result.finished).toBeNull();
-    errorCode(
+    expectErrorCode(
       () => queue.completeCleanup(oldTicket, { verified: true, detail: 'Late response.' }),
       'invalid_state',
     );
@@ -167,13 +167,13 @@ test('failed cleanup persists quarantine and a stale receipt cannot release a re
   expect(queue.claim({ leaseMs: 60_000, maxRunMs: 120_000 })).toBeNull();
   const ticket = queue.retryCleanup(oldTicket);
   expect(ticket.token).not.toBe(oldTicket.token);
-  errorCode(
+  expectErrorCode(
     () => queue.completeCleanup(oldTicket, { verified: true, detail: 'Stale response.' }),
     'stale_cleanup',
   );
   queue.completeCleanup(ticket, { verified: true, detail: 'Termination and release verified.' });
   const next = grant(queue);
-  errorCode(
+  expectErrorCode(
     () => queue.completeCleanup(ticket, { verified: true, detail: 'Duplicate response.' }),
     'stale_cleanup',
   );
@@ -185,7 +185,7 @@ test('cancellation checks ownership, skips queued work, and fences active intera
   using queue = new SessionQueue(files.path);
   const waiting = queue.enqueue(review('cancel-before-start'));
   const active = queue.enqueue(review('cancel-after-start'));
-  errorCode(() => queue.cancel(waiting.id, 'other-owner'), 'forbidden');
+  expectErrorCode(() => queue.cancel(waiting.id, 'other-owner'), 'forbidden');
   expect(queue.cancel(waiting.id, 'agent-a')).toBeNull();
   expect(queue.get(waiting.id).state).toBe('cancelled');
   const lease = grant(queue);
@@ -194,7 +194,7 @@ test('cancellation checks ownership, skips queued work, and fences active intera
   expect(ticket).not.toBeNull();
   expect(queue.cancel(active.id, 'agent-a')).toEqual(ticket);
   expect(queue.get(active.id).outcome).toBe('cancelled');
-  errorCode(() => queue.authorize(lease), 'stale_lease');
+  expectErrorCode(() => queue.authorize(lease), 'stale_lease');
 });
 
 test('expired leases cannot act or renew, and claiming does not bypass expired cleanup', async () => {
@@ -204,8 +204,8 @@ test('expired leases cannot act or renew, and claiming does not bypass expired c
   queue.enqueue(review('next'));
   const lease = grant(queue, 1);
   await Bun.sleep(10);
-  errorCode(() => queue.authorize(lease), 'stale_lease');
-  errorCode(() => queue.renew(lease, 60_000), 'stale_lease');
+  expectErrorCode(() => queue.authorize(lease), 'stale_lease');
+  expectErrorCode(() => queue.renew(lease, 60_000), 'stale_lease');
   expect(queue.claim({ leaseMs: 60_000, maxRunMs: 120_000 })).toBeNull();
   expect(queue.get(first.id).outcome).toBe('expired');
   const ticket = queue.pendingCleanup();
@@ -224,8 +224,11 @@ test('renewal is bounded by maximum runtime and forged identities are rejected',
   const before = queue.get(lease.sessionId);
   const renewed = queue.renew(lease, 300_000);
   expect(renewed.deadline).toBe(before.maxDeadline);
-  errorCode(() => queue.authorize({ ...lease, token: 'wrong' }), 'stale_lease');
-  errorCode(() => queue.authorize({ ...lease, generation: lease.generation + 1 }), 'stale_lease');
+  expectErrorCode(() => queue.authorize({ ...lease, token: 'wrong' }), 'stale_lease');
+  expectErrorCode(
+    () => queue.authorize({ ...lease, generation: lease.generation + 1 }),
+    'stale_lease',
+  );
   expect(queue.authorize(lease).state).toBe('active');
 });
 
@@ -241,7 +244,7 @@ test('reopening does not interrupt another controller; explicit recovery fences 
   using queue = new SessionQueue(files.path);
   expect(queue.authorize(lease).state).toBe('active');
   const ticket = queue.interrupt(lease);
-  errorCode(() => queue.authorize(lease), 'stale_lease');
+  expectErrorCode(() => queue.authorize(lease), 'stale_lease');
   expect(queue.get(lease.sessionId).outcome).toBe('interrupted');
   expect(queue.claim({ leaseMs: 60_000, maxRunMs: 120_000 })).toBeNull();
   queue.completeCleanup(ticket, {
@@ -274,12 +277,12 @@ test('invalid policy and incompatible persisted schema fail closed', () => {
   using files = store();
   {
     using queue = new SessionQueue(files.path);
-    errorCode(() => queue.claim({ leaseMs: 0, maxRunMs: 10 }), 'invalid_request');
-    errorCode(() => queue.claim({ leaseMs: 20, maxRunMs: 10 }), 'invalid_request');
-    errorCode(() => queue.enqueue({ ...review('invalid'), owner: '' }), 'invalid_request');
+    expectErrorCode(() => queue.claim({ leaseMs: 0, maxRunMs: 10 }), 'invalid_request');
+    expectErrorCode(() => queue.claim({ leaseMs: 20, maxRunMs: 10 }), 'invalid_request');
+    expectErrorCode(() => queue.enqueue({ ...review('invalid'), owner: '' }), 'invalid_request');
   }
   const database = new Database(files.path);
   database.exec('PRAGMA user_version=2');
   database.close();
-  errorCode(() => new SessionQueue(files.path), 'unsupported_schema');
+  expectErrorCode(() => new SessionQueue(files.path), 'unsupported_schema');
 });

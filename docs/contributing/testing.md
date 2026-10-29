@@ -16,6 +16,40 @@ Pick the lightest type that can prove the behavior wrong.
 
 <!-- kickoff: The test runner and the file suffix for each type, and the command that runs one file of each type. -->
 
+## Test rules
+
+A test proves the behavior that a user or a caller sees. A test that only
+raises a coverage number costs run time and proves nothing. The
+`repo-tests` lint plugin in `tools/lint/test-policy.mjs` enforces these rules
+in every test file:
+
+| Rule              | Rejects                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| `no-hidden-tests` | `skip`, `only`, `todo`, `if`, `skipIf`, `todoIf` and `failing`, and `xtest`, `xit`, `fit` |
+| `no-snapshots`    | `toMatchSnapshot`, `toMatchInlineSnapshot` and the snapshot forms of `toThrow`            |
+| `assert-behavior` | A test with no assertion, and a test whose only assertions check that a value exists      |
+
+An existence check is `toBeDefined`, `toBeTruthy`, `not.toBeNull`,
+`not.toBeUndefined`, `not.toBeFalsy` or `not.toThrow`. Assert the value
+instead. A helper that asserts has a name that starts with `expect` or
+`assert`, such as `expectErrorCode`, so the rule counts it.
+
+## Test integrity
+
+`check-test-integrity` compares the working tree with the base commit. CI
+sets the base in `CHECK_BASE`. Locally, the base is the merge base with
+`origin/main`. The check fails when a change does any of these:
+
+- It deletes a test file.
+- It renames a test file to a name that no test runner runs.
+- It lowers the number of tests or assertions in a test file.
+
+A test file may go in the same change that deletes the module it tests:
+`pool.test.ts` goes with `pool.ts`. For any other reason, list the test file
+in [`tools/test-integrity-allow.json`](../../tools/test-integrity-allow.json)
+with the reason. That file is a guardrail file, so a person reviews the
+entry. Delete the entry after the change merges.
+
 ## Console output
 
 An unexpected `console.error` or `console.warn` fails the test. Stray output

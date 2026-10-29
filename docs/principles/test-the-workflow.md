@@ -15,6 +15,14 @@ it. An assertion needs an oracle that the production code does not share.
   invariant has one journey. Project intent lists the journeys. Add each
   journey when its feature exists.
 
+## Behavior, not coverage
+
+A test earns its run time only when it fails on a real regression. A test
+that only snapshots an output, only checks that a value exists, or skips
+itself never fails on a wrong value. The `repo-tests` lint plugin rejects
+each of these, and `check-test-integrity` rejects a change that deletes tests
+or assertions. See [testing](../contributing/testing.md#test-rules).
+
 ## No mocks of our code
 
 Never mock an internal module. The `repo-imports/no-internal-mocks` lint rule

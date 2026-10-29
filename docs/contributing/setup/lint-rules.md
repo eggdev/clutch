@@ -133,6 +133,13 @@ casts in apps, features and packages. `as const` stays allowed.
 - Each other escape hatch lives in a guardrail file, so a person reviews it.
   See [guardrail files](../harness-engineering.md#guardrail-files).
 
+## Test files
+
+The `repo-tests` plugin in `tools/lint/test-policy.mjs` runs on each test
+file. It rejects skipped and focused tests, snapshots, tests with no
+assertion, and tests that only check that a value exists. See
+[test rules](../testing.md#test-rules).
+
 ## Effect code
 
 The `repo-effect` plugin,

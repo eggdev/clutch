@@ -91,6 +91,7 @@ export default defineConfig({
     { name: 'repo-classes', specifier: './tools/lint/class-policy.mjs' },
     { name: 'repo-gates', specifier: './tools/lint/gate-policy.mjs' },
     { name: 'repo-effect', specifier: './tools/lint/effect-policy.mjs' },
+    { name: 'repo-tests', specifier: './tools/lint/test-policy.mjs' },
   ],
   rules: {
     // Function declarations read as the module's API and hoist. Arrow
@@ -242,6 +243,17 @@ export default defineConfig({
       rules: { 'typescript/consistent-type-assertions': ['error', { assertionStyle: 'never' }] },
     },
     {
+      // A test proves behavior that a user or a caller sees: it runs every
+      // time, asserts a value, and does not only snapshot an output or check
+      // that something exists. See docs/contributing/testing.md#test-rules.
+      files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/*.pw.ts'],
+      rules: {
+        'repo-tests/no-hidden-tests': 'error',
+        'repo-tests/no-snapshots': 'error',
+        'repo-tests/assert-behavior': 'error',
+      },
+    },
+    {
       // A repo maps database rows to records, and a test builds what it
       // needs, so both may assert a type.
       files: [
@@ -289,6 +301,7 @@ export default defineConfig({
         'tools/lint/class-policy.mjs',
         'tools/lint/gate-policy.mjs',
         'tools/lint/effect-policy.mjs',
+        'tools/lint/test-policy.mjs',
       ],
       rules: { 'import/no-default-export': 'off' },
     },

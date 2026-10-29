@@ -45,7 +45,7 @@ test('a merged migration cannot change, move or go away, and a new one or the jo
       'packages/a/migrations/0002.sql is deleted. It reached main, so it never changes.',
       'packages/a/migrations/0003.sql is renamed to packages/a/migrations/0003-c.sql. It reached main, so it never changes.',
     ]);
-    expect(() => findBase(root, 'not-a-commit')).toThrow('MIGRATIONS_BASE is not-a-commit');
+    expect(() => findBase(root, 'not-a-commit')).toThrow('CHECK_BASE is not-a-commit');
     expect(findBase(root, '0000000000000000000000000000000000000000')).toBeNull();
   } finally {
     await rm(root, { recursive: true, force: true });

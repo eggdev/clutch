@@ -273,7 +273,8 @@
           "check-skills",
           "skill-tests",
           "check-guardrail-coverage",
-          "check-transaction-safe"
+          "check-transaction-safe",
+          "check-test-integrity"
         ]
       },
       "check-guardrail-coverage": {
@@ -287,6 +288,13 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/check-transaction-safe.ts"
+        },
+        "cache": false
+      },
+      "check-test-integrity": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-test-integrity.ts"
         },
         "cache": false
       },
