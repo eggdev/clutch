@@ -81,3 +81,34 @@ test('CODEOWNERS must name an owner for each guardrail pattern', async () => {
     '.github/CODEOWNERS: the file is missing. Restore it from the project template.',
   ]);
 });
+
+/** A config that runs guard-guardrails, guard-dev-servers with `matcher`, and end-of-turn. */
+const both = (agent: string, matcher: string) =>
+  JSON.stringify({
+    hooks: {
+      PreToolUse: [
+        { hooks: [{ command: command('guard-guardrails', agent) }] },
+        { matcher, hooks: [{ command: command('guard-dev-servers', agent) }] },
+      ],
+      Stop: [{ hooks: [{ command: command('end-of-turn', agent) }] }],
+    },
+  });
+
+/** A repository whose Claude Code config sends `matcher` to guard-dev-servers. */
+const guarded = (matcher: string) => ({
+  ...valid,
+  '.agents/hooks/guard-dev-servers.ts': '',
+  [configs.claude]: both('claude', matcher),
+  [configs.codex]: both('codex', 'Bash'),
+});
+
+test('the Claude Code matcher of guard-dev-servers must name each iOS Simulator tool', async () => {
+  expect(await inRepo(guarded('Bash|mcp__Claude_Code_iOS_Simulator__.*'), checkAgentHooks)).toEqual(
+    [],
+  );
+  expect(
+    await inRepo(guarded('Bash|mcp__Claude_Code_iOS_Simulator__build'), checkAgentHooks),
+  ).toEqual([
+    '.claude/settings.json: the PreToolUse matcher of guard-dev-servers misses `mcp__Claude_Code_iOS_Simulator__control`. Add it, so the hook sees each simulator call.',
+  ]);
+});

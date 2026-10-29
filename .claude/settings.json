@@ -13,7 +13,7 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|mcp__Claude_Code_iOS_Simulator__.*",
         "hooks": [
           {
             "type": "command",

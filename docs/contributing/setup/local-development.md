@@ -57,10 +57,12 @@ started its servers. The second run then finds them and uses them again.
 `mise exec -- bun run dev --check` prints `up` or `down` for each app. It exits
 1 when an app is down.
 
-An agent hook refuses commands that start a server or a simulator directly:
-`vite`, `bun --watch`, an Nx `dev` target, `portless run`, `expo start`,
-`xcrun simctl boot`, `open -a Simulator` and `emulator -avd`. Its message
-points to the dev command. See [agent hooks](../harness-engineering.md#agent-hooks).
+An agent hook refuses commands that start a server directly: `vite`,
+`bun --watch`, an Nx `dev` target, `portless run`, `expo start` and `one dev`.
+Its message points to the dev command. See
+[agent hooks](../harness-engineering.md#agent-hooks). The same hook refuses
+commands that start a simulator or make a native build. See
+[native builds and devices](./native.md).
 
 ## Plain HTTP by default
 

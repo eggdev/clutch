@@ -17,6 +17,7 @@
     "validate": "CI=1 nx run-many -t typecheck test lint format-check lint-policy-test skill-tests audit-prod checks",
     "check": "nx run-many -t typecheck lint format-check",
     "dev": "bun tools/dev.ts",
+    "native:build": "bun tools/native/build.ts",
     "format": "nx run-many -t format",
     "recap:classify": "bun tools/recap/classify-primitives.ts",
     "recap:upsert": "bun tools/recap/upsert-recap-block.ts"

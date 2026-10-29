@@ -11,6 +11,8 @@ How to run, check and ship the project. Open only the page you need.
 - [TypeScript](./typescript.md): one config for each environment, and committed
   generated types
 - [Nx](./nx.md): how to run tasks, project names and the generators
+- [Native builds and devices](./native.md): the device host, the device lock,
+  and `native:build`, which builds only when the native fingerprint changed
 - [Checks](./checks.md): `validate`, each check, CI
 - [Previews](./previews.md): a preview for each PR, flow checks, and the name
   guard on destructive automation
