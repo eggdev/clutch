@@ -1,5 +1,5 @@
 {
-  "description": "Files that configure a check, a lint rule, a budget or an agent hook. After kickoff, an agent edit to one of them needs a person's approval, and .github/CODEOWNERS asks a person to review it. See docs/contributing/harness-engineering.md#agent-hooks.",
+  "description": "Files that configure a check, a lint rule, a budget, a test rule or an agent hook. After kickoff, an agent edit to one of them needs a person's approval, and .github/CODEOWNERS asks a person to review it. check-guardrail-coverage fails when a file that a check, a lint plugin or a hook reads matches no pattern here. `exempt` lists files that tooling reads but that set no rule. See docs/contributing/harness-engineering.md#guardrail-files.",
   "patterns": [
     "oxlint.config.ts",
     "stylelint.config.ts",
@@ -21,6 +21,34 @@
     ".codex/hooks.json",
     ".githooks/**",
     ".github/workflows/**",
-    ".github/CODEOWNERS"
-  ]
+    ".github/CODEOWNERS",
+    "KICKOFF.md",
+    "tsconfig.json",
+    "apps/*/tsconfig*.json",
+    "features/*/tsconfig*.json",
+    "packages/*/tsconfig*.json",
+    "tools/tsconfig.json",
+    "apps/*/package.json",
+    "features/*/package.json",
+    "packages/*/package.json",
+    "bunfig.toml",
+    "mise.toml",
+    "docs/contributing/glossary.md",
+    "tools/docs-files.ts",
+    "tools/testing/**",
+    "tools/generators/**",
+    "tools/audit-prod.ts",
+    "tools/accepted-advisories.yaml",
+    "tools/test-budget.ts",
+    "tools/dev.ts",
+    "tools/test-integrity-allow.json",
+    "packages/sync/service/transaction-safe.ts"
+  ],
+  "exempt": {
+    "AGENTS.md": "check-file-size measures its length, and the doc checks read it as a doc. It sets no rule.",
+    "README.md": "check-structure allows it in a package, and the doc checks read it as a doc. It sets no rule.",
+    "docs/contributing/documentation.md": "check-docs-temporal skips it because it quotes the changelog phrases. It sets no rule.",
+    "tools/recap/classify-primitives.ts": "It writes the PR recap block. It enforces no rule.",
+    "tools/recap/upsert-recap-block.ts": "It writes the PR recap block. It enforces no rule."
+  }
 }

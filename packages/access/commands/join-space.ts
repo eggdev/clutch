@@ -8,4 +8,5 @@ import { defineCommand } from '@repo/sync/commands/define';
 export const joinSpace = defineCommand<JoinSpaceInput>({
   name: 'access/join-space',
   waits: 'server',
+  input: { spaceId: 'string', at: 'string' },
 });

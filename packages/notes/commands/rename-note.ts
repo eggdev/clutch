@@ -6,6 +6,7 @@ import { defineCommand } from '@repo/sync/commands/define';
 export const renameNote = defineCommand<RenameNoteInput>({
   name: 'notes/rename',
   waits: 'local',
+  input: { id: 'string', title: 'string', at: 'string' },
   apply: (draft, input) => {
     const note = draft.get(noteModel, input.id);
     if (note) {

@@ -6,13 +6,16 @@ import { memoryLocalDatabase } from '@repo/sync/testing/local-database';
 import type { Change } from '@repo/sync/types/protocol';
 
 type Card = { readonly id: string; readonly title: string; readonly space: string };
-const card = defineModel<Card>('Card', { groupsOf: (row) => [`space:${row.space}`] });
+const card = defineModel<Card>('Card', {
+  fields: { id: 'string', title: 'string', space: 'string' },
+  groupsOf: (row) => [`space:${row.space}`],
+});
 
 const put = (id: string, groups: ReadonlyArray<string>, title = id): Change => ({
   model: 'Card',
   id,
   action: 'upsert',
-  data: { title },
+  data: { title, space: groups[0]?.replace('space:', '') ?? '' },
   groups,
 });
 

@@ -229,6 +229,30 @@ export default defineConfig({
       rules: { 'react/button-has-type': 'off' },
     },
     {
+      // A type assertion tells the compiler to trust a value, so a wrong
+      // shape gets through. Product code narrows instead: a schema at the
+      // boundary, a model's or command's field shape in the object pool, or a
+      // typed source. See docs/contributing/setup/lint-rules.md#escape-hatches.
+      files: [
+        '**/apps/web/**/*.{ts,tsx}',
+        '**/apps/api/**/*.{ts,tsx}',
+        '**/features/*/**/*.{ts,tsx}',
+        '**/packages/*/**/*.{ts,tsx}',
+      ],
+      rules: { 'typescript/consistent-type-assertions': ['error', { assertionStyle: 'never' }] },
+    },
+    {
+      // A repo maps database rows to records, and a test builds what it
+      // needs, so both may assert a type.
+      files: [
+        '**/packages/*/repo/**/*.ts',
+        '**/packages/*/testing/**/*.{ts,tsx}',
+        '**/*.test.{ts,tsx}',
+        '**/*.pw.ts',
+      ],
+      rules: { 'typescript/consistent-type-assertions': 'off' },
+    },
+    {
       // Tests run on the server and may use Effect to run Test Layers. The
       // effect-hook ban still holds.
       files: ['**/*.test.{ts,tsx}'],

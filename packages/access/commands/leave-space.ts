@@ -8,4 +8,5 @@ import { defineCommand } from '@repo/sync/commands/define';
 export const leaveSpace = defineCommand<LeaveSpaceInput>({
   name: 'access/leave-space',
   waits: 'server',
+  input: { spaceId: 'string' },
 });

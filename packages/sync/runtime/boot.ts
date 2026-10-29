@@ -1,7 +1,7 @@
 import { createPool } from '@repo/sync/runtime/pool';
 import type { Pool } from '@repo/sync/runtime/pool';
 import type { LocalDatabase } from '@repo/sync/types/local-database';
-import type { Command } from '@repo/sync/types/records';
+import type { Replayable } from '@repo/sync/types/records';
 
 /**
  * Loads the object pool from the local database before the first paint. Each
@@ -10,7 +10,7 @@ import type { Command } from '@repo/sync/types/records';
  */
 export async function loadPool(
   database: LocalDatabase,
-  commands: ReadonlyArray<Command<never>>,
+  commands: ReadonlyArray<Replayable>,
 ): Promise<Pool> {
   const pool = createPool(commands);
   const state = await database.read();

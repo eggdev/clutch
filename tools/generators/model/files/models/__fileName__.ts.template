@@ -6,5 +6,6 @@ import { defineModel<% if (groupHelper) { %>, <%= groupHelper %><% } %> } from '
  * `@repo/sync/ui/`. <%= groupNote %>
  */
 export const <%= propertyName %>Model = defineModel<<%= className %>>('<%= className %>', {
+  fields: { id: 'string', <% if (groupField) { %><%= groupField %>: 'string', <% } %>createdAt: 'string', updatedAt: 'string' },
   groupsOf: <%- groupsOf %>,
 });

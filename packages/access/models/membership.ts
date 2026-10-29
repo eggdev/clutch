@@ -7,6 +7,7 @@ import { defineModel, userGroup } from '@repo/sync/models/define';
  * access again which groups the user may load.
  */
 export const membershipModel = defineModel<Membership>('Membership', {
+  fields: { id: 'string', spaceId: 'string', userId: 'string', joinedAt: 'string' },
   groupsOf: (membership) => [userGroup(membership.userId)],
 });
 

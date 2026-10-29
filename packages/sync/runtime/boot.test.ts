@@ -6,10 +6,11 @@ import { memoryLocalDatabase } from '@repo/sync/testing/local-database';
 import { poolState, testModel } from '@repo/sync/testing/pool-state';
 
 type Card = { readonly id: string; readonly title: string };
-const card = testModel<Card>('Card');
+const card = testModel<Card>('Card', { id: 'string', title: 'string' });
 const rename = defineCommand<{ id: string; title: string }>({
   name: 'cards/rename',
   waits: 'local',
+  input: { id: 'string', title: 'string' },
   apply: (draft, input) => {
     const current = draft.get(card, input.id);
     if (current) {

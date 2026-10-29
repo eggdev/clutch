@@ -15,6 +15,8 @@
 #               summary (one line, at most 120 characters),
 #               code (folder roots; the longest matching root owns a file),
 #               docs (paths), vendors (a package only: vendor, imports)
+#               transactionSafe (a package only: the Context.Service keys that
+#               a server change may use; check-transaction-safe reads it)
 #   languages:  shared languages: imports, where, primitives, packagePaths, files
 #   invariants: id, summary, docs
 #   exceptions: rule, file, imports, reason. See
@@ -97,6 +99,8 @@ primitives:
         imports: ^(?:@electric-sql/pglite|@effect/sql-pglite)(?:/|$)
       - vendor: Postgres driver
         imports: ^@effect/sql-pg(?:/|$)
+    transactionSafe:
+      - sync/Outbox
 
   - id: identity
     group: product

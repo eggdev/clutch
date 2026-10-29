@@ -4,7 +4,10 @@ import { poolState, testModel } from '@repo/sync/testing/pool-state';
 import { renderWarm } from '@repo/sync/testing/render-warm';
 import { useRecord, useRecordIds } from '@repo/sync/ui/sync-provider';
 
-const card = testModel<{ readonly id: string; readonly title: string }>('Card');
+const card = testModel<{ readonly id: string; readonly title: string }>('Card', {
+  id: 'string',
+  title: 'string',
+});
 const state = poolState({ lastSyncId: 1, tables: { Card: [{ id: 'a', title: 'Warm' }] } });
 
 function CardItem({ id }: { readonly id: string }) {

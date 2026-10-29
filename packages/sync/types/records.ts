@@ -1,3 +1,5 @@
+import type { Shape } from '@repo/sync/models/shape';
+
 /** One record in the object pool. Its fields are plain JSON, as the server sent them. */
 export type RecordRow = { readonly id: string } & Readonly<Record<string, unknown>>;
 
@@ -7,11 +9,13 @@ export type GroupScope = { readonly organizationId: string };
 /**
  * The definition of one kind of record. Screens read records of a model from
  * the pool. `groupsOf` names the sync groups of a record: a client gets the
- * record only when it has loaded one of them.
+ * record only when it has loaded one of them. `is` checks a record from the
+ * pool against the fields of the model, so code reads it with its type.
  */
 export type Model<Row extends RecordRow> = {
   readonly name: string;
   readonly groupsOf: (record: Row, scope: GroupScope) => ReadonlyArray<string>;
+  readonly is: (record: RecordRow) => record is Row;
   /** Only for types. A model holds no rows. */
   readonly row?: Row;
 };
@@ -76,18 +80,34 @@ export type Draft = {
 export type Rejection = { readonly transactionId: string; readonly reason: string };
 
 /**
- * One command: its name, whether it waits for the server, and its local
- * change. A command that waits for the server shows nothing until its delta
- * arrives, so it needs no local change.
+ * What a command author writes: its name, whether it waits for the server,
+ * the shape of its input, and its local change. A command that waits for the
+ * server shows nothing until its delta arrives, so it needs no local change.
  */
-export type Command<Input> =
+export type CommandDefinition<Input> =
   | {
       readonly name: string;
       readonly waits: 'local';
+      readonly input: Shape<Input>;
       readonly apply: (draft: Draft, input: Input) => void;
     }
   | {
       readonly name: string;
       readonly waits: 'server';
+      readonly input: Shape<Input>;
       readonly apply?: (draft: Draft, input: Input) => void;
     };
+
+/**
+ * What the object pool needs to run a saved transaction again: the input of
+ * a saved transaction is plain JSON, so `replay` checks it against the input
+ * shape before it runs the local change.
+ */
+export type Replayable = {
+  readonly name: string;
+  readonly waits: 'local' | 'server';
+  readonly replay: (draft: Draft, input: unknown) => void;
+};
+
+/** One command, as `defineCommand` makes it. */
+export type Command<Input> = CommandDefinition<Input> & Replayable;

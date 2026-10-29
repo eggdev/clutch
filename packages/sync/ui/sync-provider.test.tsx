@@ -13,16 +13,18 @@ import { memo } from 'react';
 
 type Card = { readonly id: string; readonly title: string; readonly rank: string };
 type Tag = { readonly id: string; readonly label: string };
-const card = testModel<Card>('Card');
-const tag = testModel<Tag>('Tag');
+const card = testModel<Card>('Card', { id: 'string', title: 'string', rank: 'string' });
+const tag = testModel<Tag>('Tag', { id: 'string', label: 'string' });
 const putCard = defineCommand<Card>({
   name: 'cards/put',
   waits: 'local',
+  input: { id: 'string', title: 'string', rank: 'string' },
   apply: (draft, input) => draft.put(card, input),
 });
 const putTag = defineCommand<Tag>({
   name: 'tags/put',
   waits: 'local',
+  input: { id: 'string', label: 'string' },
   apply: (draft, input) => draft.put(tag, input),
 });
 
@@ -101,6 +103,7 @@ test('a change that moves a record re-renders the list, and the moved row only',
 const askServer = defineCommand<{ readonly label: string }>({
   name: 'cards/ask-server',
   waits: 'server',
+  input: { label: 'string' },
   apply: () => null,
 });
 

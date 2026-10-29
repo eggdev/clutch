@@ -6,6 +6,7 @@ import { defineCommand } from '@repo/sync/commands/define';
 export const createSpace = defineCommand<CreateSpaceInput>({
   name: 'access/create-space',
   waits: 'server',
+  input: { id: 'string', name: 'string', at: 'string' },
   apply: (draft, input) =>
     draft.put(spaceModel, {
       id: input.id,

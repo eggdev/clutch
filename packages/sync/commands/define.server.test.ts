@@ -53,7 +53,11 @@ import { defineServerChange } from '@repo/sync/commands/define.server';
 import { transactionSafe } from '@repo/sync/service/transaction-safe';
 import { Context, Effect, Schema } from 'effect';
 
-const pay = defineCommand<{ readonly id: string }>({ name: 'fixture/pay', waits: 'server' });
+const pay = defineCommand<{ readonly id: string }>({
+  name: 'fixture/pay',
+  waits: 'server',
+  input: { id: 'string' },
+});
 const Input = Schema.Struct({ id: Schema.String });
 
 /** A vendor service: it calls the network, so it has no mark. */

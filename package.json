@@ -271,8 +271,24 @@
           "check-db",
           "check-lockfile",
           "check-skills",
-          "skill-tests"
+          "skill-tests",
+          "check-guardrail-coverage",
+          "check-transaction-safe"
         ]
+      },
+      "check-guardrail-coverage": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-guardrail-coverage.ts"
+        },
+        "cache": false
+      },
+      "check-transaction-safe": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-transaction-safe.ts"
+        },
+        "cache": false
       },
       "check-migrations": {
         "executor": "nx:run-commands",

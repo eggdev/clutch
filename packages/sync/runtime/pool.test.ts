@@ -5,10 +5,11 @@ import { createPool } from '@repo/sync/runtime/pool';
 import { poolState, testGroup, testModel } from '@repo/sync/testing/pool-state';
 
 type Card = { readonly id: string; readonly title: string };
-const card = testModel<Card>('Card');
+const card = testModel<Card>('Card', { id: 'string', title: 'string' });
 const rename = defineCommand<{ id: string; title: string }>({
   name: 'cards/rename',
   waits: 'local',
+  input: { id: 'string', title: 'string' },
   apply: (draft, input) => {
     const current = draft.get(card, input.id);
     if (current) {
@@ -19,6 +20,7 @@ const rename = defineCommand<{ id: string; title: string }>({
 const archive = defineCommand<{ id: string }>({
   name: 'cards/archive',
   waits: 'server',
+  input: { id: 'string' },
   apply: (draft, input) => draft.remove(card, input.id),
 });
 
@@ -134,7 +136,10 @@ test('after a restore, the pool drops confirmed records and keeps pending work t
   expect(pool.snapshot().lastSyncId).toBe(1);
 });
 
-const tag = testModel<{ readonly id: string; readonly label: string }>('Tag');
+const tag = testModel<{ readonly id: string; readonly label: string }>('Tag', {
+  id: 'string',
+  label: 'string',
+});
 
 function twoCards() {
   const pool = createPool([rename, archive]);

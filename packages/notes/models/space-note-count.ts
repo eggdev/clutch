@@ -8,5 +8,6 @@ import { defineModel } from '@repo/sync/models/define';
  * so it loads with the notes of the space.
  */
 export const spaceNoteCountModel = defineModel<SpaceNoteCount>('SpaceNoteCount', {
+  fields: { id: 'string', spaceId: 'string', noteCount: 'number', updatedAt: 'string' },
   groupsOf: (count) => [spaceGroup(count.spaceId)],
 });

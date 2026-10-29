@@ -8,6 +8,13 @@ import { defineLoad, defineModel } from '@repo/sync/models/define';
  * and each row reads its note with `useRecord`.
  */
 export const noteModel = defineModel<Note>('Note', {
+  fields: {
+    id: 'string',
+    spaceId: 'string',
+    title: 'string',
+    createdAt: 'string',
+    updatedAt: 'string',
+  },
   groupsOf: (note) => [spaceGroup(note.spaceId)],
 });
 

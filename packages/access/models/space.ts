@@ -6,6 +6,7 @@ import { defineModel, organizationGroup } from '@repo/sync/models/define';
  * them, so each one can see a space and join it.
  */
 export const spaceModel = defineModel<Space>('Space', {
+  fields: { id: 'string', name: 'string', createdAt: 'string', updatedAt: 'string' },
   groupsOf: (_, scope) => [organizationGroup(scope.organizationId)],
 });
 

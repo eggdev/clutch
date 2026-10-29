@@ -6,6 +6,7 @@ import { defineCommand } from '@repo/sync/commands/define';
 export const <%= propertyName %> = defineCommand<<%= className %>Input>({
   name: '<%= packageName %>/<%= fileName %>',
   waits: '<%= waits %>',
+  input: { id: 'string', at: 'string' },
   apply: (draft, input) => {
     const record = draft.get(<%= modelProperty %>Model, input.id);
     if (record) {

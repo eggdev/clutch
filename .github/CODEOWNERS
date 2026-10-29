@@ -1,7 +1,15 @@
 # A person reviews each change to a guardrail file: a file that configures a
-# check, a lint rule, a budget or an agent hook. tools/guardrail-files.json
-# lists them. The check-agent-hooks target keeps this file in step with it.
-# Kickoff replaces @eggdev with the owner of the project.
+# check, a lint rule, a budget, a test rule or an agent hook.
+# tools/guardrail-files.json lists them. check-agent-hooks keeps this file in
+# step with that list, and check-guardrail-coverage keeps that list in step
+# with what the checks read. Kickoff replaces @eggdev with the owner of the
+# project.
+#
+# Escape hatches live in these files. A reviewer checks each one: an override
+# that turns a lint rule off (oxlint.config.ts), a raised file-size budget
+# (tools/file-size-budgets.json), a knip ignore (knip.jsonc), a registry
+# exception or a transaction-safe service (primitives.yaml), and an allowed
+# test removal (tools/test-integrity-allow.json).
 
 /oxlint.config.ts @eggdev
 /stylelint.config.ts @eggdev
@@ -24,3 +32,24 @@
 /.githooks/ @eggdev
 /.github/workflows/ @eggdev
 /.github/CODEOWNERS @eggdev
+/KICKOFF.md @eggdev
+/tsconfig.json @eggdev
+/apps/*/tsconfig*.json @eggdev
+/features/*/tsconfig*.json @eggdev
+/packages/*/tsconfig*.json @eggdev
+/tools/tsconfig.json @eggdev
+/apps/*/package.json @eggdev
+/features/*/package.json @eggdev
+/packages/*/package.json @eggdev
+/bunfig.toml @eggdev
+/mise.toml @eggdev
+/docs/contributing/glossary.md @eggdev
+/tools/docs-files.ts @eggdev
+/tools/testing/ @eggdev
+/tools/generators/ @eggdev
+/tools/audit-prod.ts @eggdev
+/tools/accepted-advisories.yaml @eggdev
+/tools/test-budget.ts @eggdev
+/tools/dev.ts @eggdev
+/tools/test-integrity-allow.json @eggdev
+/packages/sync/service/transaction-safe.ts @eggdev

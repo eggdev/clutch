@@ -103,9 +103,23 @@ of a record in `groupsOf`.
 
 ```ts
 export const noteModel = defineModel<Note>('Note', {
+  fields: {
+    id: 'string',
+    spaceId: 'string',
+    title: 'string',
+    createdAt: 'string',
+    updatedAt: 'string',
+  },
   groupsOf: (note) => [spaceGroup(note.spaceId)],
 });
 ```
+
+`fields` gives the JSON kind of each field. TypeScript checks it against the
+record type, so the two cannot drift. The object pool reads a record with its
+type only when the record matches its fields. A record that does not match
+reads as missing. A command declares the shape of its `input` the same way,
+so a saved transaction runs its local change again only on a valid input.
+Product code asserts no types, so these shapes replace each `as` cast.
 
 - A server change builds each change with `upsertChange` or `deleteChange`
   from `packages/sync/models/change.ts`. They add the groups of the record.

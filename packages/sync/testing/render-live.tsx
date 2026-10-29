@@ -2,7 +2,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { createPool } from '@repo/sync/runtime/pool';
 import type { Pool } from '@repo/sync/runtime/pool';
 import type { PoolState } from '@repo/sync/types/local-database';
-import type { Command } from '@repo/sync/types/records';
+import type { Replayable } from '@repo/sync/types/records';
 import { SyncProvider } from '@repo/sync/ui/sync-provider';
 import { act } from 'react';
 import type { ReactElement } from 'react';
@@ -23,7 +23,7 @@ type Live = {
 export async function renderLive(
   screen: () => ReactElement,
   state: PoolState,
-  commands: ReadonlyArray<Command<never>> = [],
+  commands: ReadonlyArray<Replayable> = [],
 ): Promise<Live> {
   if (!GlobalRegistrator.isRegistered) {
     GlobalRegistrator.register();

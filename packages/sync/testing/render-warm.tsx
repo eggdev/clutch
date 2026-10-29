@@ -1,7 +1,7 @@
 import { createPool } from '@repo/sync/runtime/pool';
 import type { Pool } from '@repo/sync/runtime/pool';
 import type { PoolState } from '@repo/sync/types/local-database';
-import type { Command } from '@repo/sync/types/records';
+import type { Replayable } from '@repo/sync/types/records';
 import { SyncProvider } from '@repo/sync/ui/sync-provider';
 import type { ReactElement } from 'react';
 import { renderToString } from 'react-dom/server';
@@ -16,7 +16,7 @@ const networkGlobals = ['fetch', 'WebSocket', 'XMLHttpRequest', 'EventSource'] a
 export function renderWarm(
   screen: (pool: Pool) => ReactElement,
   state: PoolState,
-  commands: ReadonlyArray<Command<never>> = [],
+  commands: ReadonlyArray<Replayable> = [],
 ): string {
   const pool = createPool(commands);
   pool.load(state);

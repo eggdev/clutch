@@ -6,6 +6,7 @@ import { defineCommand } from '@repo/sync/commands/define';
 export const createNote = defineCommand<CreateNoteInput>({
   name: 'notes/create',
   waits: 'local',
+  input: { id: 'string', spaceId: 'string', title: 'string', at: 'string' },
   apply: (draft, input) =>
     draft.put(noteModel, {
       id: input.id,

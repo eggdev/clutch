@@ -1,4 +1,4 @@
-import type { Draft, Model, Order, RecordRow, Where } from '@repo/sync/types/records';
+import type { Draft, Model, RecordRow } from '@repo/sync/types/records';
 
 /**
  * The plain data helpers of the object pool: tables of records, the draft a
@@ -21,10 +21,27 @@ export function tableOf(tables: Tables, name: string): Table {
   return table;
 }
 
+/** The sort of an ID list, by one field name. */
+type SortBy = { readonly by: string; readonly direction: 'asc' | 'desc' };
+/** The filter of an ID list: one field and the value it must equal. */
+type FilterBy = { readonly field: string; readonly equals: string };
+
+/**
+ * One record of a model, read with its type. A record that does not match the
+ * fields of its model reads as missing, so code never sees a wrong shape.
+ */
+export function readAs<Row extends RecordRow>(
+  model: Model<Row>,
+  tables: Tables,
+  id: string,
+): Row | undefined {
+  const record = tables.get(model.name)?.get(id);
+  return record !== undefined && model.is(record) ? record : undefined;
+}
+
 export function draftOver(tables: Tables): Draft {
   return {
-    get: <Row extends RecordRow>(model: Model<Row>, id: string) =>
-      tables.get(model.name)?.get(id) as Row | undefined,
+    get: <Row extends RecordRow>(model: Model<Row>, id: string) => readAs(model, tables, id),
     put: (model, row) => {
       tableOf(tables, model.name).set(row.id, row);
     },
@@ -81,8 +98,8 @@ export function keepUnchanged(before: Tables, after: Tables): Array<[model: stri
 /** Sorts IDs by one field of their records, then by ID. `where` keeps only matching records. */
 export function sortedIds(
   table: Table | undefined,
-  order: Order<RecordRow> | undefined,
-  where: Where<RecordRow> | undefined,
+  order: SortBy | undefined,
+  where: FilterBy | undefined,
 ): Array<string> {
   const rows = [...(table?.values() ?? [])].filter(
     (row) => !where || row[where.field] === where.equals,

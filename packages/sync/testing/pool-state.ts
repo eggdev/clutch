@@ -1,4 +1,5 @@
 import { defineModel } from '@repo/sync/models/define';
+import type { Shape } from '@repo/sync/models/shape';
 import type { PoolState } from '@repo/sync/types/local-database';
 import type { Transaction } from '@repo/sync/types/protocol';
 import type { Model, RecordRow } from '@repo/sync/types/records';
@@ -7,8 +8,8 @@ import type { Model, RecordRow } from '@repo/sync/types/records';
 export const testGroup = 'org:test';
 
 /** A model whose records are all in `testGroup`. */
-export function testModel<Row extends RecordRow>(name: string): Model<Row> {
-  return defineModel<Row>(name, { groupsOf: () => [testGroup] });
+export function testModel<Row extends RecordRow>(name: string, fields: Shape<Row>): Model<Row> {
+  return defineModel<Row>(name, { fields, groupsOf: () => [testGroup] });
 }
 
 /**

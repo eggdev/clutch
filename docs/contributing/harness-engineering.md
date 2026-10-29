@@ -89,6 +89,32 @@ and trust each hook once.
 `check-agent-hooks` fails when the two configs run different hooks. It also
 fails when `.github/CODEOWNERS` has no owner for a guardrail file.
 
+## Guardrail files
+
+A guardrail file configures a check, a lint rule, a budget, a test rule or an
+agent hook. A loosened guardrail lets drift in, so a person reviews each
+change to one.
+
+- [`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them,
+  and `.github/CODEOWNERS` names an owner for each.
+- `check-guardrail-coverage` finds the tool scripts that the root targets,
+  the lint config and the hook configs run. It follows their `@tools/`
+  imports, and reads each file path in them. It fails when no guardrail
+  pattern covers a file that one of them reads.
+- A file that tooling reads but that sets no rule goes under `exempt`, with
+  the reason.
+
+Each escape hatch lives in a guardrail file, so the review sees it:
+
+| Escape hatch                           | Where it lives                       |
+| -------------------------------------- | ------------------------------------ |
+| An override that turns a lint rule off | `oxlint.config.ts`                   |
+| A raised file-size budget              | `tools/file-size-budgets.json`       |
+| A knip ignore or entry                 | `knip.jsonc`                         |
+| An import exception                    | `primitives.yaml`, `exceptions`      |
+| A transaction-safe service             | `primitives.yaml`, `transactionSafe` |
+| A dependency override                  | `tools/dependency-overrides.yaml`    |
+
 <!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS. -->
 
 ## Working agreements

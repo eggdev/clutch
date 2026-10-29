@@ -119,6 +119,20 @@ Only the sync engine, `packages/sync`, uses the network and device storage.
 Test files may import Effect, because they run Test Layers. The effect-hook ban
 holds in tests too. See [local first](../../principles/local-first.md).
 
+## Escape hatches
+
+A type assertion tells the compiler to trust a value, so a wrong shape gets
+through. `typescript/consistent-type-assertions` rejects `as` and angle
+casts in apps, features and packages. `as const` stays allowed.
+
+- A repo mapping in `repo/`, a helper in `testing/` and a test file may
+  assert a type. A repo maps database rows to records, and a test builds
+  what it needs.
+- Product code narrows instead. It decodes with a schema at the boundary, or
+  checks a record against its model's `fields`, or types the source.
+- Each other escape hatch lives in a guardrail file, so a person reviews it.
+  See [guardrail files](../harness-engineering.md#guardrail-files).
+
 ## Effect code
 
 The `repo-effect` plugin,

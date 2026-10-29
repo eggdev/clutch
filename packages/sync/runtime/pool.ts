@@ -3,6 +3,7 @@ import {
   draftOver,
   keepUnchanged,
   listenerMap,
+  readAs,
   recordKey,
   sameJson,
   sortedIds,
@@ -14,11 +15,10 @@ import type { Change, Delta, Outcome, Transaction } from '@repo/sync/types/proto
 import type {
   Command,
   Model,
-  Order,
   ReadablePool,
   RecordRow,
   Rejection,
-  Where,
+  Replayable,
 } from '@repo/sync/types/records';
 
 type Pending = { readonly transaction: Transaction; sent: boolean; acceptedAt: number | null };
@@ -67,7 +67,7 @@ export type Pool = ReadablePool & {
  * wakes only the watchers of the models and records that changed. A rename of
  * one record re-renders the one component that reads it.
  */
-export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
+export function createPool(commands: ReadonlyArray<Replayable>): Pool {
   const byName = new Map(commands.map((command) => [command.name, command]));
   let confirmed: Tables = new Map();
   let visible: Tables = new Map();
@@ -94,7 +94,7 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
     for (const { transaction } of pending) {
       const command = byName.get(transaction.command);
       if (command?.waits === 'local') {
-        command.apply(draft, transaction.input as never);
+        command.replay(draft, transaction.input);
       }
     }
     const changed = keepUnchanged(visible, next);
@@ -161,19 +161,14 @@ export function createPool(commands: ReadonlyArray<Command<never>>): Pool {
   }
 
   return {
-    get: <Row extends RecordRow>(model: Model<Row>, id: string) =>
-      visible.get(model.name)?.get(id) as Row | undefined,
+    get: <Row extends RecordRow>(model: Model<Row>, id: string) => readAs(model, visible, id),
     ids(model, order, where) {
       const key = `${model.name}\u0000${order ? `${order.by}:${order.direction}` : ''}\u0000${where ? `${where.field}=${where.equals}` : ''}`;
       const cached = idLists.get(key);
       if (cached && !cached.stale) {
         return cached.ids;
       }
-      const ids = sortedIds(
-        visible.get(model.name),
-        order as Order<RecordRow> | undefined,
-        where as Where<RecordRow> | undefined,
-      );
+      const ids = sortedIds(visible.get(model.name), order, where);
       const kept = cached && sameJson(cached.ids, ids) ? cached.ids : ids;
       idLists.set(key, { ids: kept, stale: false });
       return kept;

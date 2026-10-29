@@ -41,6 +41,11 @@ rollback undoes all of its work.
 
 - A transaction-safe service has `[transactionSafe]: true` in its shape. The
   mark is in `packages/sync/service/transaction-safe.ts`.
+- The registry grants the mark. List the service key under `transactionSafe`
+  of its package in
+  [`primitives.yaml`](./primitives.yaml). `check-transaction-safe` rejects a
+  marked service that the registry does not list, so a person reviews each
+  grant.
 - `defineServerChange` accepts only marked services. A vendor service has no
   mark, so a server change that uses one fails the typecheck.
   `packages/sync/commands/define.server.test.ts` proves both cases.

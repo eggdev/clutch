@@ -1,16 +1,24 @@
+import { matches } from '@repo/sync/models/shape';
+import type { Shape } from '@repo/sync/models/shape';
 import type { GroupScope, Load, Model, RecordRow } from '@repo/sync/types/records';
 
 /**
  * Defines one kind of record. The name is the model name in each change.
- * `groupsOf` names the sync groups of a record, such as `space:<id>`.
+ * `fields` gives the JSON kind of each field, and the compiler checks it
+ * against the record type. `groupsOf` names the sync groups of a record, such
+ * as `space:<id>`.
  */
 export function defineModel<Row extends RecordRow>(
   name: string,
-  options: { readonly groupsOf: (record: Row, scope: GroupScope) => ReadonlyArray<string> },
+  options: {
+    readonly fields: Shape<Row>;
+    readonly groupsOf: (record: Row, scope: GroupScope) => ReadonlyArray<string>;
+  },
 ): Model<Row> {
   return {
     name,
     groupsOf: (record, scope) => options.groupsOf(record, scope),
+    is: (record): record is Row => matches(options.fields, record),
   };
 }
 
