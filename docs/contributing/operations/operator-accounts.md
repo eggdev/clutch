@@ -16,15 +16,6 @@ For each vendor, record:
 | Configured in | The file, workflow or dashboard page that sets it               |
 | Recovery      | How to get access back: login, recovery codes, support contact  |
 
-### Cloudflare
-
-| Field         | Content                                                                                                                                                                                                                                                              |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Owns          | The Nx cache worker in `apps/nx-cache` and its R2 bucket                                                                                                                                                                                                             |
-| Secret names  | CI: `CLOUDFLARE_API_TOKEN` (the deploy token, with Workers and R2 edit), `CLOUDFLARE_ACCOUNT_ID`, `NX_CACHE_URL`, `NX_CACHE_WRITE_TOKEN`, `NX_CACHE_READ_TOKEN`. Runtime: `CACHE_WRITE_TOKEN` and `CACHE_READ_TOKEN` on the worker, the same values as the CI tokens |
-| Configured in | [`nx-cache.yml`](../../../.github/workflows/nx-cache.yml), [`ci.yml`](../../../.github/workflows/ci.yml), `apps/nx-cache/wrangler.jsonc`. See [Nx: remote cache](../setup/nx.md#remote-cache)                                                                        |
-| Recovery      | Password manager: the Cloudflare login, its recovery codes, and both cache tokens                                                                                                                                                                                    |
-
 <!-- kickoff: One section for each vendor account, with the four fields above. Include the domain registrar, the host, the source host, email, payments and the error tracker. -->
 
 ## Password manager coverage

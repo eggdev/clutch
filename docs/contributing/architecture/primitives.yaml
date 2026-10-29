@@ -72,17 +72,6 @@ primitives:
     docs:
       - apps/cli/README.md
 
-  - id: nx-cache
-    group: repository
-    name: Nx remote cache
-    kind: app
-    summary: A Cloudflare Worker that stores Nx task results in R2 for local and CI runs.
-    code:
-      - apps/nx-cache/
-    docs:
-      - apps/nx-cache/README.md
-      - docs/contributing/setup/nx.md
-
   - id: sync
     group: product
     name: Sync engine

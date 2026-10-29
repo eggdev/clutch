@@ -65,5 +65,3 @@ files:
     rule: merge
   - path: .codex/hooks.json
     rule: merge
-  - path: apps/nx-cache/
-    rule: add

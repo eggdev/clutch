@@ -220,18 +220,6 @@ accepted security risks, support access, recovery and alert recipients.
 Sections 4 and 5 of the question bank are prompts for gaps. They are not a
 script. A known fact or a default that applies is work for you, not a question.
 
-Set up the project's own Nx remote cache. Each project has its own worker and
-R2 bucket, so one repository never reads another's cache:
-
-1. Use the configured Cloudflare account, or ask when the account is unknown
-   or ambiguous.
-2. Rename the worker and its bucket to `<project>-nx-cache` in
-   `apps/nx-cache/wrangler.jsonc` and `docs/contributing/setup/nx.md`.
-3. Walk the owner through "Set up the cache" in `docs/contributing/setup/nx.md`.
-   The owner runs the steps that need their account.
-4. Confirm that a CI run reports remote cache hits. Until it does, the cache is
-   not set up.
-
 Set up the guardrails for agents:
 
 1. Replace the owner handle in `.github/CODEOWNERS` with the project's owner
