@@ -62,12 +62,12 @@ Claude Code and Codex run the same hook scripts while an agent works. The
 scripts are in `.agents/hooks/`, and their logic is in `tools/agent-hooks/`.
 `.claude/settings.json` and `.codex/hooks.json` call them.
 
-| Hook                | Runs                         | Does                                                                     |
-| ------------------- | ---------------------------- | ------------------------------------------------------------------------ |
-| `guard-guardrails`  | Before an edit               | Asks a person before an edit to a guardrail file                         |
-| `guard-dev-servers` | Before a shell command       | Refuses a command that starts a dev server or a simulator directly       |
-| `after-edit`        | After an edit                | Lints the edited files, and sends each problem back to the agent         |
-| `end-of-turn`       | When the agent ends its turn | Runs the typecheck, the lint and the repository checks on a changed tree |
+| Hook                | Runs                                            | Does                                                                               |
+| ------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `guard-guardrails`  | Before an edit                                  | Asks a person before an edit to a guardrail file                                   |
+| `guard-dev-servers` | Before a shell command or a simulator tool call | Refuses a command that starts a dev server, a simulator or a native build directly |
+| `after-edit`        | After an edit                                   | Lints the edited files, and sends each problem back to the agent                   |
+| `end-of-turn`       | When the agent ends its turn                    | Runs the typecheck, the lint and the repository checks on a changed tree           |
 
 A guardrail file configures a check, a lint rule, a budget or an agent hook.
 [`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them.

@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import { guardrailList, guardrailPatterns } from '@tools/agent-hooks/guard-guardrails';
+import { simulatorTools } from '@tools/agent-hooks/simulator-tools';
 
 /**
  * Claude Code and Codex run the same agent hooks. Each tool has its own
@@ -14,7 +15,9 @@ const scripts = '.agents/hooks';
 const codeowners = '.github/CODEOWNERS';
 const script = /\.agents\/hooks\/([\w-]+)\.ts\s+(\w+)/u;
 
-type Config = { hooks?: Record<string, Array<{ hooks?: Array<{ command?: string }> }>> };
+type Config = {
+  hooks?: Record<string, Array<{ matcher?: string; hooks?: Array<{ command?: string }> }>>;
+};
 
 /** Each `<event> <script>` pair that a config file registers, and each command with the wrong agent. */
 function registrations(config: Config, agent: string) {
@@ -35,6 +38,27 @@ function registrations(config: Config, agent: string) {
     }
   }
   return { pairs, problems };
+}
+
+/**
+ * Claude Code alone has the iOS Simulator tools, so only its config sends them
+ * to `guard-dev-servers`. Its matcher must name each one.
+ */
+function simulatorProblems(config: Config): Array<string> {
+  const matchers = (config.hooks?.PreToolUse ?? [])
+    .filter((group) =>
+      group.hooks?.some((handler) => handler.command?.includes('/guard-dev-servers.ts')),
+    )
+    .map((group) => new RegExp(`^(?:${group.matcher ?? '.*'})$`, 'u'));
+  if (matchers.length === 0) {
+    return [];
+  }
+  return Object.values(simulatorTools)
+    .filter((tool) => !matchers.some((matcher) => matcher.test(tool)))
+    .map(
+      (tool) =>
+        `the PreToolUse matcher of guard-dev-servers misses \`${tool}\`. Add it, so the hook sees each simulator call.`,
+    );
 }
 
 /** The CODEOWNERS pattern for a guardrail glob: `tools/lint/**` becomes `/tools/lint/`. */
@@ -75,7 +99,11 @@ export async function checkAgentHooks(root: string): Promise<Array<string>> {
       problems.push(`${file}: the file is missing. Restore it from the project template.`);
       continue;
     }
-    const result = registrations(await Bun.file(path.join(root, file)).json(), agent);
+    const config: Config = await Bun.file(path.join(root, file)).json();
+    const result = registrations(config, agent);
+    if (agent === 'claude') {
+      result.problems.push(...simulatorProblems(config));
+    }
     problems.push(...result.problems.map((problem) => `${file}: ${problem}`));
     found[agent] = result.pairs;
   }

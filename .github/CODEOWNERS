@@ -52,6 +52,7 @@
 /tools/accepted-advisories.yaml @eggdev
 /tools/test-budget.ts @eggdev
 /tools/dev.ts @eggdev
+/tools/native/ @eggdev
 /tools/test-integrity-allow.json @eggdev
 /packages/sync/service/transaction-safe.ts @eggdev
 /docs/contributing/review.md @eggdev

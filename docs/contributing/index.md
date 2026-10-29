@@ -72,6 +72,11 @@ on those pages; this list only points at them.
 1. [Migrations](./setup/migrations.md): only drizzle-kit writes one.
 2. [Two-way and one-way doors](../principles/two-way-doors.md).
 
+**Build or run a native app**
+
+1. [Native builds and devices](./setup/native.md): reuse the booted device,
+   and build only through `native:build`.
+
 ## Setup and workflow
 
 - [Agent workflow](./agent-workflow.md): lifecycle phases, exit conditions and
