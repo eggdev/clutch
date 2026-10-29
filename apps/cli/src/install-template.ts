@@ -4,6 +4,7 @@ import path from 'node:path';
 import { isMap, isSeq, parseDocument } from 'yaml';
 
 import type { Detection } from '@/detect-project';
+import { formatFile } from '@/format';
 import { gitOrThrow } from '@/git';
 import { mergePackageJson } from '@/merge-package-json';
 import type { Conflict } from '@/merge-package-json';
@@ -38,25 +39,6 @@ const mergers: Record<string, (project: string, template: string) => Merged> = {
     return { content, conflicts: [] };
   },
 };
-
-/** The clone that this CLI runs from. Its formatter writes the merged files. */
-const cliRoot = path.resolve(import.meta.dir, '../../..');
-
-/** Writes `file` in the template's format, so that the format check passes after the install. */
-async function format(root: string, file: string) {
-  const oxfmt = Bun.spawn(
-    [
-      path.join(cliRoot, 'node_modules/.bin/oxfmt'),
-      '--config',
-      path.join(cliRoot, '.oxfmtrc.json'),
-      file,
-    ],
-    { cwd: root, stdout: 'ignore', stderr: 'pipe' },
-  );
-  if ((await oxfmt.exited) !== 0) {
-    throw new Error(`Could not format ${file}: ${await new Response(oxfmt.stderr).text()}`);
-  }
-}
 
 const registryPath = 'docs/contributing/architecture/primitives.yaml';
 
@@ -180,7 +162,7 @@ export async function installTemplate(options: {
     );
     await writeFile(path.join(root, name), merged.content);
     if (path.basename(name) === 'package.json') {
-      await format(root, name);
+      await formatFile(root, name);
     }
     conflicts.push(...merged.conflicts.map((conflict) => ({ file: name, ...conflict })));
   }

@@ -60,6 +60,30 @@ preflight. Reconcile them explicitly and retry. Existing project verify skills
 are always preserved. Full template installation also excludes this template's
 verify; kickoff uses setup-verification for the receiving project.
 
+## Issues
+
+`clutch issues` reads the tracker in `.clutch/issues/`. Each issue is one
+Markdown file with a frontmatter block. See `.clutch/README.md` for the fields.
+
+```sh
+mise exec -- bun run clutch issues
+mise exec -- bun run clutch issues next --stack
+mise exec -- bun run clutch issues set CL-003 review --pr <url>
+mise exec -- bun run clutch issues --write
+mise exec -- bun run clutch issues --check
+```
+
+- `next` prints the first `todo` issue for an agent whose dependencies are
+  done. With `--stack`, a dependency in review also counts, up to 3 stacked
+  PRs. A `later` issue never comes next.
+- `set` changes the frontmatter of one issue, then rewrites
+  `.clutch/TRACKER.md`.
+- `--write` renders `.clutch/TRACKER.md` in the format that `format-check`
+  expects. Never edit that file by hand.
+- `--check` exits 2 when `.clutch/TRACKER.md` is stale, and 1 when an issue
+  file has a bad value. The message names the file and the field.
+- `--json` prints the issues and the errors as JSON.
+
 ## Test it
 
 ```sh
