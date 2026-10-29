@@ -84,6 +84,36 @@ mise exec -- bun run clutch issues --check
   file has a bad value. The message names the file and the field.
 - `--json` prints the issues and the errors as JSON.
 
+## clutch.yaml
+
+Each repository that uses Clutch has a `clutch.yaml` at its root. It pins the
+template commit and records the state of each capability. A repository without
+the file has not adopted Clutch.
+
+```yaml
+schemaVersion: 1
+project: shop # a short name for reports
+template:
+  repo: eggdev/clutch # the template repository
+  commit: <40-character SHA> # the template commit that the project matches
+  mode: sync # sync: clutch sync manages the files. doctor: checks only.
+capabilities: # keys are capability ids from the registry
+  root_agents_md: adopted # the short form
+  codeql_sast:
+    status: waived # adopted, waived or n/a
+    reason: Lands in CL-102. # required for waived and n/a
+    issue: CL-102 # optional: the waiver ends when this issue is done
+    until: 2027-01-31 # optional: after this date, the waiver fails the check
+worktree: # optional
+  root: ../shop.worktrees
+  copy: [.env.local]
+  setup: ['mise exec -- bun install']
+```
+
+The loader rejects unknown keys. Each error names its YAML path, such as
+`template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
+guardrail file, so a person reviews each change to it.
+
 ## Test it
 
 ```sh

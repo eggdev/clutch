@@ -1,0 +1,8 @@
+# How this repository adopts Clutch. See apps/cli/README.md#clutchyaml.
+schemaVersion: 1
+project: clutch
+template:
+  repo: eggdev/project-template
+  commit: 37e824f2d552163f18e5c91b126fc6655de435f9
+  mode: sync
+capabilities: {}
