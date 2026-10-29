@@ -4,7 +4,15 @@ This folder is the task tracker for Clutch work. It holds one Markdown file per 
 
 ## One issue per PR
 
-Each issue gets one branch (`clutch/cl-NNN-<slug>`) and one draft PR. Do not mix issues. When you find unrelated work, add a new issue file with the next free id in its range, set `status: todo`, and keep going.
+Each issue gets one branch (`clutch/cl-NNN-<slug>`) and one PR, opened ready for review, not as a draft. Do not mix issues. When you find unrelated work, add a new issue file with the next free id in its range, set `status: todo`, and keep going.
+
+## Stacks
+
+When an issue builds on another issue that is still in review, put both PRs in one GitHub stack. A stack is a straight line: each branch sits on the one below it, and each PR's base is that branch. Two PRs never share a parent, even when the issues do not depend on each other. That keeps `TRACKER.md` free of conflicts.
+
+- Branch from the top of the open stack, open the PR, then add it: `gh stack link <bottom PR> ... <new PR> --open`.
+- After a merge, run `gh stack sync --prune`, then `clutch issues set` for each merged issue.
+- Install the tool once with `gh extension install github/gh-stack`.
 
 ## Frontmatter
 
@@ -31,7 +39,7 @@ The body follows the frontmatter: `# CL-NNN: <title>`, then Goal, Context, Steps
 | `todo`        | Not started.                                                                                            | Created.                                                             |
 | `in_progress` | An agent owns it now. One per agent.                                                                    | Work starts. Commit this change with the first commit on the branch. |
 | `blocked`     | Waiting on a person or another issue. The reason goes in a `## Blocked` section at the end of the file. | A stop condition hits.                                               |
-| `review`      | A draft PR exists, validate is green locally and in CI, and `pr:` holds the URL.                        | After the green push.                                                |
+| `review`      | A PR exists, validate is green locally and in CI, and `pr:` holds the URL.                              | After the green push.                                                |
 | `done`        | The PR is merged into `main`.                                                                           | At session start, when `gh pr view` shows `MERGED`.                  |
 
 ## Id ranges
