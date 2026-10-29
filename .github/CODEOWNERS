@@ -60,3 +60,4 @@
 /tools/journeys/ @eggdev
 /.agents/skills/verify/verification.json @eggdev
 /clutch.yaml @eggdev
+/tools/github/ @eggdev

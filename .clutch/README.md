@@ -6,13 +6,9 @@ This folder is the task tracker for Clutch work. It holds one Markdown file per 
 
 Each issue gets one branch (`clutch/cl-NNN-<slug>`) and one PR, opened ready for review, not as a draft. Do not mix issues. When you find unrelated work, add a new issue file with the next free id in its range, set `status: todo`, and keep going.
 
-## Stacks
+## Pull requests and stacks
 
-When an issue builds on another issue that is still in review, put both PRs in one GitHub stack. A stack is a straight line: each branch sits on the one below it, and each PR's base is that branch. Two PRs never share a parent, even when the issues do not depend on each other. That keeps `TRACKER.md` free of conflicts.
-
-- Branch from the top of the open stack, open the PR, then add it: `gh stack link <bottom PR> ... <new PR> --open`.
-- After a merge, run `gh stack sync --prune`, then `clutch issues set` for each merged issue.
-- Install the tool once with `gh extension install github/gh-stack`.
+Follow `.agents/skills/deliver/references/pull-requests.md`. Open, stack and merge each PR with `mise exec -- bun run pr`. After a merge, run `clutch issues set` for each merged issue.
 
 ## Frontmatter
 

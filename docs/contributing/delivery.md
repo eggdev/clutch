@@ -60,6 +60,13 @@ execution stages. Todo authorizes build, verification and a PR. A
 are required before declaring the PR ready.
 Merging and release need a separate grant and their own gates.
 
+## Pull requests
+
+The [pull request procedure](../../.agents/skills/deliver/references/pull-requests.md)
+owns how a PR opens, stacks and merges. `mise exec -- bun run pr` runs each
+GitHub step, so every session does the same thing. Each PR opens ready for
+review. A PR that builds on another open PR joins its linear GitHub stack.
+
 ## Evidence before handoff
 
 [Verification setup](./setup/verification.md) defines how to run the project
