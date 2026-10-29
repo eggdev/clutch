@@ -19,8 +19,8 @@ This page applies
 ## Rules
 
 - **Every live read leaves out deleted records.** Each query on a table with
-  `deleted_at` goes through one helper that adds the filter. A check rejects a
-  query on such a table that skips the helper. Only the owner repo may read
+  `deleted_at` goes through one helper that adds the filter. No check covers
+  this rule, so review each query on such a table. Only the owner repo may read
   deleted records, because it owns restore and purge. No file opts out.
 - **A delete reaches every client.** The server change returns a `delete`
   change, so the delta removes the record from each object pool.

@@ -8,10 +8,18 @@ distinguishes delivery, authoring, execution, audit and recap.
 
 ## Reach the actual surface
 
-Project Template exposes the template installer CLI, a session-queue library and review helpers.
-The mapped tests use real SQLite and disposable subprocesses. There is no app
-server, authentication flow or browser preview to launch for those assertions.
-Bun dependencies must be installed; Python 3.11+, Git, ps and pgrep are required.
+Project Template has two kinds of surface.
+
+- **The starter app.** `apps/web` and `apps/api` run together through
+  `mise exec -- bun run dev`. It reuses running servers and prints the
+  portless URLs. Open the web URL in a browser to check a screen or a sync
+  flow. See [local development](./local-development.md).
+- **The template tooling.** The installer CLI, the session-queue library and
+  the review helpers. Their tests use real SQLite and disposable subprocesses.
+  They need no app server or browser.
+
+The starter has no sign-in flow. Install the Bun dependencies. The review
+helpers also need Python 3.11+, Git, `ps` and `pgrep`.
 
 The local gate is `mise exec -- bun run validate`. It includes Python helper
 regressions and skill-discovery contracts as well as runtime tests, lint and types.

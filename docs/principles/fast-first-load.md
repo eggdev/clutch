@@ -29,8 +29,9 @@ network.
   its first line.
 - Use one variable font file for each family. Preload it with
   `crossorigin="anonymous"` and declare it with `font-display: swap`.
-- Each budget in [client performance](../contributing/architecture/client-performance.md)
-  has a check. A change that breaks a budget fails CI.
+- [Client performance](../contributing/architecture/client-performance.md)
+  names what measures each budget. `check-bundle` enforces the first-screen
+  size in CI. Each project adds the trace and lab-run checks at kickoff.
 
 ## Example
 

@@ -55,7 +55,7 @@ migration passes. It runs in `validate`, in the pre-push hook and in CI.
 | CI, PR     | The PR's target branch            |
 | CI, `main` | The commit before the push        |
 
-When the check fails, restore the merged migration and write a new one.
+When `check-migrations` fails, restore the merged migration and write a new one.
 
 ## One-way migrations
 

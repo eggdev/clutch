@@ -33,8 +33,8 @@ Lint-staged hides unstaged changes while the pre-commit commands run. The
 typecheck reads the staged tree, and the formatter changes only staged content.
 Lint fixes run before formatting, because a lint fix can leave code unformatted.
 
-Never skip a hook with `--no-verify`. When a hook fails, fix what it found. When
-a hook is wrong, fix the hook in its own change.
+Never skip a hook with `--no-verify`. When `pre-commit` or `pre-push` fails,
+fix what it found. When a hook is wrong, fix the hook in its own change.
 
 ## Checks
 
@@ -52,6 +52,7 @@ tests the workflow and dependency checks.
 | `check-docs-temporal`        | Changelog phrases in durable docs                                                                                                                                                                               |
 | `check-suppressions`         | A lint or type suppression comment, such as `oxlint-disable` or `@ts-expect-error`. See [lint rules](./lint-rules.md#how-a-rule-is-chosen)                                                                      |
 | `check-terms`                | A word from the [glossary](../glossary.md#rejected-words)'s rejected words table, or an em dash, in contributor docs                                                                                            |
+| `check-docs-claims`          | A doc sentence that says a check, lint rule, test or hook enforces a rule, but names none that exists                                                                                                           |
 | `check-agent-hooks`          | Claude Code and Codex configs that run different hooks, a hook script that no config calls, or a guardrail file with no owner in `.github/CODEOWNERS`. See [agent hooks](../harness-engineering.md#agent-hooks) |
 | `check-sentences`            | A sentence over 25 words in `docs/`. Decision records, skills and `AGENTS.md` are exempt                                                                                                                        |
 | `check-commands`             | A command without its `.server.ts` half, a server half without its command or a registration in `runtime/`, or a command with no `waits`                                                                        |
@@ -99,7 +100,7 @@ A deep module can be the right design: a small interface over a lot of logic,
 where a split would only pass state between files. Such a file gets an entry
 with a line budget and the reason it stays deep. Raise the budget in the same
 change that grows the file, and update the reason when it changes. A review
-reads the reason. The check rejects:
+reads the reason. `check-file-size` rejects:
 
 - A file over the limit with no entry
 - A file over its budget
@@ -158,8 +159,8 @@ test('a retry warns once', async () => {
 ```
 
 The message is the logged arguments as `console` formats them. An Error shows
-as `Name: message`, with no stack. An allowed message that the test does not
-log also fails the test. Never replace `console.error` or `console.warn` with a
+as `Name: message`, with no stack. `tools/testing/console-guard.ts` also fails
+a test that allows a message and does not log it. Never replace `console.error` or `console.warn` with a
 mock to hide output. A blanket mock hides the next regression too.
 
 ## Performance budgets

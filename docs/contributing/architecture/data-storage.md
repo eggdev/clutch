@@ -34,8 +34,9 @@ tenant is denied.
 ## Data inventory
 
 One inventory lists every store that holds tenant data. Deletion and export both
-read it, so they always cover the same data. A test fails when a table that
-grows has no retention rule or a written exemption.
+read it, so they always cover the same data. Each table that grows needs a
+retention rule or a written exemption in the inventory. No check covers this
+rule. Review it in each change that adds a table.
 
 <!-- kickoff: The file that holds the inventory, and a table: Store, What it holds, Retention, Exported. -->
 

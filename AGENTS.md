@@ -6,7 +6,7 @@
 
 This file is a map, not the docs. Open the page that owns the task:
 
-- Not defined yet: read [KICKOFF.md](./KICKOFF.md) first
+- Not defined yet: read [KICKOFF.md](./KICKOFF.md) first. In the template repository, work on the starter and tooling is allowed. In a project, run kickoff first, and ask the owner before product work while `KICKOFF.md` exists.
 - Project intent: [docs/contributing/project-intent.md](./docs/contributing/project-intent.md)
 - Contributor documentation map:
   [docs/contributing/index.md](./docs/contributing/index.md)

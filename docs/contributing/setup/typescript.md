@@ -29,10 +29,10 @@ global type-check in code that cannot use it.
 ## Generated types
 
 Some types come from a generator: platform bindings, route types, database
-schema types. Commit the generated file. Its generator runs as an Nx target,
-and a check runs it again and fails when the output differs from the committed
-file. A stale copy then fails on every machine, not only on the next one that
-regenerates it.
+schema types. Commit the generated file, and give its generator an Nx target.
+Add a check target that runs the generator again and compares the output with
+the committed file. Then a stale copy fails on every machine. The template has
+no generated types, so it has no such target.
 
 <!-- kickoff: Each type generator: the command, the file it writes, and the Nx target and check that keep it current. Delete this slot when the project has no generator. -->
 

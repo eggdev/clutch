@@ -74,8 +74,8 @@ A guardrail file configures a check, a lint rule, a budget or an agent hook.
 The guard starts when kickoff deletes `KICKOFF.md`.
 
 - In Claude Code, the guard shows the user a permission prompt.
-- Codex cannot ask from a hook. The guard refuses the edit, and the agent asks
-  the user.
+- Codex cannot ask from a hook. `guard-guardrails` refuses the edit, and the
+  agent asks the user.
 - A shell command that writes a file does not trigger the guard. CODEOWNERS is
   the control that holds: a person reviews each guardrail file at merge.
 

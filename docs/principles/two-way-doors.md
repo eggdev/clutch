@@ -21,8 +21,9 @@ is one-way by definition.
 
 Before a one-way change merges:
 
-1. Add the `one-way-door` label to the PR. CI blocks the merge until the
-   [owner](../contributing/project-intent.md#owner) approves.
+1. Add the `one-way-door` label to the PR, and wait for the
+   [owner](../contributing/project-intent.md#owner) to approve it. No CI job
+   reads the label, so the approval is a review step.
 2. Add a PR section that lists each copy that outlives the deploy and its
    recovery path.
 3. Tag the owner on the issue.

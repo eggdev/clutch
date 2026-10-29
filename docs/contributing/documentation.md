@@ -40,7 +40,9 @@ topic. See [where guidance goes](../principles/lean-agent-context.md#where-guida
 
 **Prefer a checker over a should-list.** A rule that lint, TypeScript or a check
 can reject belongs in that tool. Docs describe how the system works and point
-at the check. When a rule needs reasoning that a cheap check cannot do,
+at the check by name. When no check covers a rule, say so, so an agent does not
+trust a check that is not there. `check-docs-claims` rejects a claim that names
+no check, lint rule, test or hook that exists. When a rule needs reasoning that a cheap check cannot do,
 describe the failure mode and stop. Do not add a noisy half-rule. See
 [harness engineering](./harness-engineering.md) and [checks](./setup/checks.md).
 
@@ -58,6 +60,7 @@ one meaning and lists the writing rules.
 | File size              | `AGENTS.md` over 20 lines, or a source file over its limit     |
 | Kickoff slots          | A kickoff slot left in a doc after kickoff ends                |
 | Glossary terms         | A word from the glossary's rejected words table, or an em dash |
+| Enforcement claims     | A claim that a check enforces a rule, with no real check named |
 
 ## Related
 

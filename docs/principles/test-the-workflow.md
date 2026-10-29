@@ -39,9 +39,9 @@ use the highest rung that exists:
    `testing/`, with a Test Layer that provides it. It satisfies the same
    service as the Live Layer. Never patch an import.
 
-A shared contract suite runs against each mock and fake on every run, and
-against the real service on a schedule. A test that fails on the real service
-and passes on the stand-in shows that the stand-in drifted.
+Run a shared contract suite against each mock and fake on every run, and
+against the real service on a schedule. When the real service fails the suite
+and the stand-in passes it, the stand-in drifted.
 
 ## Structure
 

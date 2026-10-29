@@ -1,4 +1,4 @@
-import { blankFences, listDocs, readDoc } from '@tools/docs-files';
+import { listDocs, readDoc, unitsOf } from '@tools/docs-files';
 
 /**
  * Sentences in `docs/` have 25 words or fewer, as Simplified Technical English
@@ -8,48 +8,6 @@ import { blankFences, listDocs, readDoc } from '@tools/docs-files';
 export const wordLimit = 25;
 const checked = (file: string) =>
   file.startsWith('docs/') && !file.startsWith('docs/contributing/decisions/');
-
-type Unit = { line: number; text: string };
-
-/** The same text with each character but a newline turned into a space. */
-const blank = (text: string) => text.replaceAll(/[^\n]/gu, ' ');
-
-/** Blanks the frontmatter and HTML comments, and keeps line numbers. */
-function blankMeta(content: string): string {
-  return content.replace(/^---\n[\s\S]*?\n---\n/u, blank).replaceAll(/<!--[\s\S]*?-->/gu, blank);
-}
-
-/** The prose units of a page: each paragraph, list item and table cell, with its first line. */
-function unitsOf(content: string): Array<Unit> {
-  const units: Array<Unit> = [];
-  let current: Unit | null = null;
-  const close = () => {
-    if (current) {
-      units.push(current);
-    }
-    current = null;
-  };
-  for (const [index, raw] of blankMeta(blankFences(content)).split('\n').entries()) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) {
-      close();
-    } else if (line.startsWith('|')) {
-      close();
-      for (const cell of line.split('|')) {
-        if (cell.trim() && !/^[\s:-]+$/u.test(cell)) {
-          units.push({ line: index + 1, text: cell });
-        }
-      }
-    } else if (/^(?:[-*+]|\d+\.)\s/u.test(line) || !current) {
-      close();
-      current = { line: index + 1, text: line };
-    } else {
-      current.text += ` ${line}`;
-    }
-  }
-  close();
-  return units;
-}
 
 /** The words of a sentence. Inline code counts as one word, and a link as its text. */
 export function countWords(sentence: string): number {

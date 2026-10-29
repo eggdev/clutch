@@ -175,6 +175,13 @@
         },
         "cache": false
       },
+      "check-docs-claims": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-docs-claims.ts"
+        },
+        "cache": false
+      },
       "check-decisions": {
         "executor": "nx:run-commands",
         "options": {
@@ -245,6 +252,7 @@
           "check-docs-temporal",
           "check-suppressions",
           "check-terms",
+          "check-docs-claims",
           "check-agent-hooks",
           "check-structure",
           "check-sentences",

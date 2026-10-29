@@ -9,8 +9,10 @@ behind this page are [local first](../../principles/local-first.md),
 ## Budgets
 
 These budgets are the same in every project that starts from the template. A
-project can make a budget stricter. It never makes one looser. Each budget has
-a check in CI.
+project can make a budget stricter. It never makes one looser. The table names
+what measures each budget. `check-bundle`, `renderWarm` and the lint rules run
+in CI. The trace and lab-run rows need the deployed app, so the template has no
+check for them. Each project adds them at kickoff.
 
 | Budget                                       | Limit                       | Measured by                                          |
 | -------------------------------------------- | --------------------------- | ---------------------------------------------------- |

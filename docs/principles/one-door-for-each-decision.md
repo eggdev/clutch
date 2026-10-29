@@ -1,8 +1,8 @@
 # One door for each decision
 
 Some checks are dangerous to forget: who may act, whose data a request
-touches, which plan limit applies, whether a flag is on. A forgotten check of
-this kind fails silently. The route works, and it leaks data or gives away the
+touches, which plan limit applies, whether a flag is on. Code that forgets this
+kind of decision fails silently. The route works, and it leaks data or gives away the
 product. Review misses it, because a missing check looks the same as a route
 that needs none.
 

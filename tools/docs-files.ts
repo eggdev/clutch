@@ -57,3 +57,45 @@ export function blankFences(content: string): string {
 /** Replaces each inline code span with spaces, so columns stay the same. */
 export const maskInlineCode = (line: string) =>
   line.replaceAll(/(`+)(?:(?!\1)[\s\S])*?\1/gu, (span) => ' '.repeat(span.length));
+
+export type Unit = { line: number; text: string };
+
+/** The same text with each character but a newline turned into a space. */
+const blank = (text: string) => text.replaceAll(/[^\n]/gu, ' ');
+
+/** Blanks the frontmatter and HTML comments, and keeps line numbers. */
+function blankMeta(content: string): string {
+  return content.replace(/^---\n[\s\S]*?\n---\n/u, blank).replaceAll(/<!--[\s\S]*?-->/gu, blank);
+}
+
+/** The prose units of a page: each paragraph, list item and table cell, with its first line. */
+export function unitsOf(content: string): Array<Unit> {
+  const units: Array<Unit> = [];
+  let current: Unit | null = null;
+  const close = () => {
+    if (current) {
+      units.push(current);
+    }
+    current = null;
+  };
+  for (const [index, raw] of blankMeta(blankFences(content)).split('\n').entries()) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) {
+      close();
+    } else if (line.startsWith('|')) {
+      close();
+      for (const cell of line.split('|')) {
+        if (cell.trim() && !/^[\s:-]+$/u.test(cell)) {
+          units.push({ line: index + 1, text: cell });
+        }
+      }
+    } else if (/^(?:[-*+]|\d+\.)\s/u.test(line) || !current) {
+      close();
+      current = { line: index + 1, text: line };
+    } else {
+      current.text += ` ${line}`;
+    }
+  }
+  close();
+  return units;
+}

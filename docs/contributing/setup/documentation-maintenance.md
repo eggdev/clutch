@@ -16,7 +16,7 @@ How contributor docs and user copy stay current. See the
 - When a mistake repeats, turn the lesson into a test, a lint rule or a check.
   See [harness engineering](../harness-engineering.md).
 - When a user guide describes a flow that code defines, such as onboarding
-  steps, add a doc-alignment test. The test reads the guide and fails when a
-  step that the code defines is missing from the guide.
+  steps, add a doc-alignment test. It reads the guide and fails when a step
+  that the code defines is missing from the guide.
 - Pages in `docs/principles/` come from the project template. Change them in the
   template first, then copy them here.
