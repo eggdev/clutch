@@ -26,30 +26,6 @@ jobs:
       - name: Check review-helper Python prerequisite
         run: python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11+ is required"'
       - run: bun install --frozen-lockfile
-      # Nx fails the run when its remote cache is unreachable or refuses the
-      # token, so this step turns the cache on only after a probe passes. A
-      # fork PR gets the read token. Every other run gets the write token. See
-      # docs/contributing/setup/nx.md#remote-cache.
-      - name: Turn on the Nx remote cache
-        env:
-          NX_CACHE_URL: ${{ vars.NX_CACHE_URL }}
-          NX_CACHE_TOKEN: ${{ github.event.pull_request.head.repo.fork == true && secrets.NX_CACHE_READ_TOKEN || github.event.pull_request.head.repo.fork != true && secrets.NX_CACHE_WRITE_TOKEN || '' }}
-        run: |
-          server="${NX_CACHE_URL%/}"
-          if [ -z "$server" ] || [ -z "$NX_CACHE_TOKEN" ]; then
-            echo "::warning title=Nx remote cache off::NX_CACHE_URL or the cache token is not set. Validate runs with the local cache only."
-            exit 0
-          fi
-          health="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 10 "$server/health" || true)"
-          read="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 10 \
-            --header "Authorization: Bearer $NX_CACHE_TOKEN" "$server/v1/cache/0000000000000000" || true)"
-          if [ "$health" != 200 ] || { [ "$read" != 200 ] && [ "$read" != 404 ]; }; then
-            echo "::warning title=Nx remote cache off::$server answered $health on /health and $read on a cache read. Validate runs with the local cache only."
-            exit 0
-          fi
-          echo "NX_SELF_HOSTED_REMOTE_CACHE_SERVER=$server" >> "$GITHUB_ENV"
-          echo "NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN=$NX_CACHE_TOKEN" >> "$GITHUB_ENV"
-          echo "The Nx remote cache is on: $server"
       - run: bun run validate
         env:
           # A PR compares with its target branch. A push to main compares with

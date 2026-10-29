@@ -38,18 +38,18 @@ Add these sections only when they have content. Leave out an empty section.
 | Primitive          | Group      | Level    |
 | ------------------ | ---------- | -------- |
 | `repository-tools` | repository | composes |
-| `nx-cache`         | repository | composes |
+| `clutch-cli`       | repository | composes |
 
 ### Change flow
 
-The pre-push hook reads task results from the Nx remote cache.
+The CLI formats the files it merges with the repository tools.
 
 ```mermaid
 sequenceDiagram
+	participant cli as clutch-cli
 	participant tools as repository-tools
-	participant cache as nx-cache
-	tools->>cache: pre-push reads cached task results
-	cache-->>tools: cached results or a miss
+	cli->>tools: format the merged files
+	tools-->>cli: formatted files
 ```
 
 </details>

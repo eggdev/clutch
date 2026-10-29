@@ -11,7 +11,7 @@ import { blankFences, listDocs, readDoc } from '@tools/docs-files';
  * "not" or "without" states an absence and is skipped.
  */
 const roots = ['apps/', 'features/', 'packages/', 'docs/', 'tools/', '.agents/', '.github/'];
-const ignored = /(?:^|\/)(?:\.wrangler\/|\.env(?:\.(?!example$)[^/]+)?$|\.dev\.vars$)|NNNN|\.\.\./u;
+const ignored = /(?:^|\/)\.env(?:\.(?!example$)[^/]+)?$|NNNN|\.\.\./u;
 
 export type Reference = { file: string; line: number; path: string; kind: 'code' | 'link' };
 
