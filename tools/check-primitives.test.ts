@@ -115,6 +115,6 @@ test('the old `layers` key fails with the rename', async () => {
 
 test('a missing registry fails with the fix', async () => {
   expect(await inRepo(projects, checkPrimitives)).toEqual([
-    `${file}: the file is missing. Restore it from the project template.`,
+    `${file}: the file is missing. Restore it from Clutch.`,
   ]);
 });

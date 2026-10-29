@@ -1,6 +1,6 @@
 # Review tooling and runtime
 
-Project-template is the maintained source of shared review tooling. Repositories
+Clutch is the maintained source of shared review tooling. Repositories
 receive skills and helpers through the install CLI, then setup-verification
 authors their own committed verify skill and journey map. The template's own
 verify is excluded from distribution because it proves the template, not its consumer.
@@ -31,8 +31,8 @@ and visible product assertions remain project responsibilities.
 From a clean committed target checkout:
 
 ```sh
-bun ~/dev/project-template/apps/cli/src/main.ts review install --check --json
-bun ~/dev/project-template/apps/cli/src/main.ts review install
+bun <clutch clone>/apps/cli/src/main.ts review install --check --json
+bun <clutch clone>/apps/cli/src/main.ts review install
 ```
 
 Check is read-only; exit 2 means changes are available, exit 1 means a conflict

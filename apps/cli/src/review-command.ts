@@ -14,7 +14,7 @@ export async function reviewCommand(
       options: { check: { type: 'boolean' }, json: { type: 'boolean' } },
     });
     if (positionals.length !== 1 || positionals[0] !== 'install') {
-      throw new Error('Usage: template review install [--check] [--json]');
+      throw new Error('Usage: clutch review install [--check] [--json]');
     }
     const result = await installReview({ root, template, check: values.check });
     if (values.json) {

@@ -1,4 +1,4 @@
-# Install CLI
+# Clutch CLI
 
 Installs this template into an existing project. The CLI checks the project,
 switches its checkout to a new branch `template/install` from the default
@@ -63,5 +63,5 @@ verify; kickoff uses setup-verification for the receiving project.
 ## Test it
 
 ```sh
-mise exec -- bun nx run-many -t test typecheck lint -p cli
+mise exec -- bun nx run-many -t test typecheck lint -p @repo/cli
 ```

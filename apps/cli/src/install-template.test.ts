@@ -73,7 +73,7 @@ test('package.json merges, and the manifest lists each clash for the interview',
   await using template = await gitRepo({
     'template.files.yaml': 'files:\n  - path: package.json\n    rule: merge\n',
     'package.json': JSON.stringify({
-      name: 'project-template',
+      name: 'clutch',
       packageManager: 'bun@1.4.2',
       scripts: { validate: 'nx run-many -t test' },
     }),
@@ -213,7 +213,7 @@ test(".gitignore merges: the project keeps its entries and gains the template's"
   });
 
   expect(await readFile(path.join(project.root, '.gitignore'), 'utf-8')).toBe(
-    'node_modules\n.env\n\n# From the project template\n.nx/cache\n',
+    'node_modules\n.env\n\n# From Clutch\n.nx/cache\n',
   );
   expect(manifest.files).toEqual([{ path: '.gitignore', action: 'merged' }]);
 });
@@ -278,7 +278,7 @@ test('the registry keeps only the primitives whose code the install copies', asy
     '      - tools/',
     '',
     '  # The installer itself.',
-    '  - id: install-cli',
+    '  - id: clutch-cli',
     '    kind: app',
     '    code:',
     '      - apps/cli/',
@@ -331,7 +331,7 @@ test('the registry keeps only the primitives whose code the install copies', asy
 test('the merged package.json is in the format that the template checks', async () => {
   await using template = await gitRepo({
     'template.files.yaml': 'files:\n  - path: package.json\n    rule: merge\n',
-    'package.json': JSON.stringify({ name: 'project-template', workspaces: ['apps/*'] }),
+    'package.json': JSON.stringify({ name: 'clutch', workspaces: ['apps/*'] }),
   });
   await using project = await gitRepo(
     { 'package.json': JSON.stringify({ type: 'module', name: 'shop' }) },

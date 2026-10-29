@@ -11,7 +11,7 @@ test("the project keeps its identity and dependencies, and gains the template's 
     devDependencies: { vite: '^7.0.0' },
   };
   const template = {
-    name: 'project-template',
+    name: 'clutch',
     version: '0.0.0',
     license: 'UNLICENSED',
     scripts: { validate: 'nx run-many -t test' },

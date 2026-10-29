@@ -59,6 +59,6 @@ test('a path that no root owns is unmapped, and a file root owns only that file'
 
 test('a missing registry names the fix', async () => {
   await expect(inRepo({}, (root) => classify(root, ['a.ts']))).rejects.toThrow(
-    'Restore it from the project template.',
+    'Restore it from Clutch.',
   );
 });

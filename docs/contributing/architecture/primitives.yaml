@@ -62,11 +62,11 @@ primitives:
       - docs/contributing/setup/checks.md
       - docs/contributing/import-boundaries.md
 
-  - id: install-cli
+  - id: clutch-cli
     group: repository
-    name: Install CLI
+    name: Clutch CLI
     kind: app
-    summary: Installs the template into an existing project and starts the kickoff stages with an agent.
+    summary: Installs, syncs and checks Clutch in a project, and runs the kickoff stages with an agent.
     code:
       - apps/cli/
     docs:

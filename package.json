@@ -1,5 +1,5 @@
 {
-  "name": "project-template",
+  "name": "clutch",
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
@@ -21,7 +21,8 @@
     "journey": "bun tools/journeys/run.ts",
     "format": "nx run-many -t format",
     "recap:classify": "bun tools/recap/classify-primitives.ts",
-    "recap:upsert": "bun tools/recap/upsert-recap-block.ts"
+    "recap:upsert": "bun tools/recap/upsert-recap-block.ts",
+    "clutch": "bun apps/cli/src/main.ts"
   },
   "devDependencies": {
     "@babel/core": "8.0.9",

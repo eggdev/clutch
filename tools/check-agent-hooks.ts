@@ -67,7 +67,7 @@ export const ownerPattern = (glob: string) => `/${glob.endsWith('/**') ? glob.sl
 async function codeownerProblems(root: string): Promise<Array<string>> {
   const file = path.join(root, codeowners);
   if (!existsSync(file)) {
-    return [`${codeowners}: the file is missing. Restore it from the project template.`];
+    return [`${codeowners}: the file is missing. Restore it from Clutch.`];
   }
   const owned = new Map<string, Array<string>>();
   const text = await Bun.file(file).text();
@@ -96,7 +96,7 @@ export async function checkAgentHooks(root: string): Promise<Array<string>> {
   const found: Record<string, Set<string>> = {};
   for (const [agent, file] of Object.entries(configs)) {
     if (!existsSync(path.join(root, file))) {
-      problems.push(`${file}: the file is missing. Restore it from the project template.`);
+      problems.push(`${file}: the file is missing. Restore it from Clutch.`);
       continue;
     }
     const config: Config = await Bun.file(path.join(root, file)).json();

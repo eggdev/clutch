@@ -25,10 +25,10 @@ This is the only way to start the dev servers. It runs
 target through [portless](https://github.com/vercel-labs/portless). Portless
 gives each app a stable name in place of a port:
 
-| App        | Command                   | URL                                          |
-| ---------- | ------------------------- | -------------------------------------------- |
-| `apps/web` | `vite`                    | `http://project-template.localhost:1355`     |
-| `apps/api` | `bun --watch src/main.ts` | `http://api.project-template.localhost:1355` |
+| App        | Command                   | URL                                |
+| ---------- | ------------------------- | ---------------------------------- |
+| `apps/web` | `vite`                    | `http://clutch.localhost:1355`     |
+| `apps/api` | `bun --watch src/main.ts` | `http://api.clutch.localhost:1355` |
 
 The name comes from the root `package.json` name. The web app gets the bare
 name, and each other app gets `<app>.<name>`. In a linked Git worktree,

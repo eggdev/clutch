@@ -21,7 +21,7 @@ export function versionOf(tree: Tree, name: string): string {
 export function addPrimitive(tree: Tree, entry: Record<string, unknown>) {
   const source = tree.read(registryFile, 'utf-8');
   if (source === null) {
-    throw new Error(`${registryFile} is missing. Restore it from the project template.`);
+    throw new Error(`${registryFile} is missing. Restore it from Clutch.`);
   }
   const document = parseDocument(source);
   const ids = (document.toJS().primitives ?? []).map((primitive: { id: string }) => primitive.id);
