@@ -7,12 +7,14 @@ import type { Tree } from '@nx/devkit';
 import { createTreeWithEmptyWorkspace } from '@nx/devkit/testing';
 import { checkCommands } from '@tools/check-commands';
 import { checkDb } from '@tools/check-db';
+import { checkJourneys } from '@tools/check-journeys';
 import { checkStructure } from '@tools/check-structure';
 import { addCommand } from '@tools/generators/command/generator.ts';
 import { addFeature } from '@tools/generators/feature/generator.ts';
 import { addJob } from '@tools/generators/job/generator.ts';
 import { modelGenerator } from '@tools/generators/model/generator.ts';
 import { addPackage, parseSections } from '@tools/generators/package/generator.ts';
+import { verificationFile } from '@tools/journeys/journeys';
 
 const root = path.resolve(import.meta.dir, '../..');
 
@@ -30,6 +32,7 @@ async function workspace(): Promise<Tree> {
   ]) {
     tree.write(file, await readFile(path.join(root, file), 'utf-8'));
   }
+  tree.write(verificationFile, JSON.stringify({ name: 'acme', flows: {} }));
   for (const name of ['effect', 'react', '@types/react', 'drizzle-orm', 'drizzle-kit']) {
     tree.write(`node_modules/${name}/package.json`, JSON.stringify({ version: '1.0.0' }));
   }
@@ -124,6 +127,9 @@ test('a package, a command and a feature pass lint, the structure check and the 
   expect(tree.exists('packages/billing/repo/invoice.test.ts')).toBe(true);
   expect(tree.children('packages/billing/repo/migrations')).toEqual(['.gitkeep']);
   expect(tree.read('apps/web/src/router.ts', 'utf-8')).toContain('billingRoute]');
+  expect(tree.read('features/billing/journeys/billing-open.pw.ts', 'utf-8')).toContain(
+    "await page.goto('/billing');",
+  );
   expect(tree.read('oxlint.config.ts', 'utf-8')).toContain(
     "'/billing': { gate: 'features/billing/gate.ts', routes: 'apps/web/src/routes/billing' }",
   );
@@ -134,6 +140,7 @@ test('a package, a command and a feature pass lint, the structure check and the 
     expect(lintFolder(folder)).toEqual([]);
     expect(checkStructure(folder)).toEqual([]);
     expect(await checkCommands(folder)).toEqual([]);
+    expect(checkJourneys(folder)).toEqual([]);
   });
 });
 

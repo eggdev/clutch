@@ -19,10 +19,10 @@ names its target.
 the hooks in `.githooks/`. Each hook runs through `mise`, so it uses the pinned
 Bun and Node.
 
-| Hook         | Runs                                                                                                                                           | Skips when                                                                                       |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `pre-commit` | On staged files: `oxlint --fix` and `stylelint --fix`, then `oxfmt`. Then `bun install --frozen-lockfile` and the typecheck of the staged tree | The install check and typecheck skip a docs-only commit                                          |
-| `pre-push`   | `test`, `lint-policy-test` and `checks` (every fast check and `knip`), with `CI=1` so the Nx cache matches `validate`                          | `test` and `lint-policy-test` skip a docs-only push. Nothing runs when the push deletes a branch |
+| Hook         | Runs                                                                                                                                           | Skips when                                                                                                   |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `pre-commit` | On staged files: `oxlint --fix` and `stylelint --fix`, then `oxfmt`. Then `bun install --frozen-lockfile` and the typecheck of the staged tree | The install check and typecheck skip a docs-only commit                                                      |
+| `pre-push`   | `test`, `lint-policy-test`, `checks` (every fast check and `knip`) and `journeys`, with `CI=1` so the Nx cache matches `validate`              | `test`, `lint-policy-test` and `journeys` skip a docs-only push. Nothing runs when the push deletes a branch |
 
 [`tools/hooks/paths.mjs`](../../../tools/hooks/paths.mjs) defines docs-only:
 Markdown anywhere, any file under `docs/`, or a license text. A pushed branch is
@@ -70,6 +70,7 @@ tests the workflow and dependency checks.
 | `check-guardrail-coverage`   | A file that a check, a lint plugin or a hook reads, with no pattern in `tools/guardrail-files.json`. See [guardrail files](../harness-engineering.md#guardrail-files)                                           |
 | `check-transaction-safe`     | A service that marks itself transaction-safe when `primitives.yaml` does not list it. See [server](../architecture/server.md#services-in-a-server-change)                                                       |
 | `check-test-integrity`       | A deleted test file, a test renamed so it does not run, or fewer tests or assertions in a test file. See [test integrity](../testing.md#test-integrity)                                                         |
+| `check-journeys`             | A shipped feature with no journey for its platform, a journey header with missing lines, or an unregistered journey. See [journeys](./verification.md#journeys)                                                 |
 | `check-db`                   | A schema change with no migration, or a migration that drizzle-kit did not write. See [migrations](./migrations.md#only-drizzle-kit-writes-migrations)                                                          |
 | `check-lockfile`             | A `bun.lock` that does not match the manifests                                                                                                                                                                  |
 | `check-dependency-overrides` | An override without a documented reason, a stale reason, or a repeated JSON key                                                                                                                                 |
@@ -202,8 +203,10 @@ mise exec -- bun run format   # write formatting
 
 ## CI
 
-GitHub Actions runs `validate` on each PR. See
-[`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml).
+GitHub Actions runs `validate` on each PR. A second job, `journeys`, runs
+every web journey in Chromium. See
+[`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml) and
+[journeys](./verification.md#where-journeys-run).
 
 - Each workflow sets a top-level `permissions` block. Start from
   `contents: read`, and grant more only in the job that needs it.
@@ -217,4 +220,4 @@ GitHub Actions runs `validate` on each PR. See
   an agent run of `validate` and a CI run share cache keys. See
   [Nx](./nx.md#cache-keys).
 
-<!-- kickoff: Each CI step that the project adds: browser journeys, migration dry runs, preview deploys, the one-way-door label check. -->
+<!-- kickoff: Each CI step that the project adds: native journeys, migration dry runs, preview deploys, the one-way-door label check. -->

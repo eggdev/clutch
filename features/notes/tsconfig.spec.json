@@ -7,7 +7,13 @@
     "lib": ["es2024", "dom", "dom.iterable"],
     "jsx": "react-jsx"
   },
-  "include": ["**/*.test.ts", "**/*.test.tsx", "testing/**/*.ts", "testing/**/*.tsx"],
+  "include": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "testing/**/*.ts",
+    "testing/**/*.tsx",
+    "journeys/**/*.pw.ts"
+  ],
   "exclude": ["out-tsc/**", "node_modules/**"],
   "references": [
     {

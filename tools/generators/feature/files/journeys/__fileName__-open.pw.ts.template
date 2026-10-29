@@ -1,0 +1,23 @@
+/**
+ * <%= fileName %>-open: A user opens the <%= title %> screen.
+ * State: draft. Replace the goal and the steps with the feature's real user goal.
+ * Contract: docs/contributing/project-intent.md#end-to-end-journeys
+ * Actor and platform: the dev actor, web
+ * Entry: the `/<%= fileName %>` route, until a button or link calls the gate
+ * Prerequisites: the dev servers, from `mise exec -- bun run dev`
+ * Isolation and cleanup: it writes nothing
+ * Budget: 30 s
+ *
+ * | User action | Expected observation | Proof |
+ * | --- | --- | --- |
+ * | Open the <%= title %> screen | The screen shows its heading | heading assertion |
+ *
+ * Driver: `mise exec -- bun run journey <%= fileName %>-open`
+ * Limits: it proves only that the screen renders.
+ */
+import { expect, test } from '@playwright/test';
+
+test('the <%= title %> screen opens', async ({ page }) => {
+  await page.goto('/<%= fileName %>');
+  await expect(page.getByRole('heading', { level: 1, name: '<%= heading %>' })).toBeVisible();
+});

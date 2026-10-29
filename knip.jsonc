@@ -12,6 +12,8 @@
         "tools/hooks/paths.mjs",
         // Claude Code and Codex run the agent hooks from .claude/settings.json and .codex/hooks.json.
         ".agents/hooks/*.ts",
+        // tools/journeys/run.ts passes this config to Playwright through --config.
+        "tools/journeys/playwright.config.ts",
       ],
       "project": ["tools/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
       // tools/dev.ts runs node_modules/.bin/portless as a child process, which
@@ -37,8 +39,9 @@
     },
     "features/*": {
       // A gate is the way into its feature. A new feature has no caller yet:
-      // the first button or link that opens it calls the gate.
-      "entry": ["gate.ts", "**/*.test.{ts,tsx}"],
+      // the first button or link that opens it calls the gate. Playwright runs
+      // each journey through tools/journeys/playwright.config.ts.
+      "entry": ["gate.ts", "**/*.test.{ts,tsx}", "journeys/*.pw.ts"],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },
     "packages/*": {

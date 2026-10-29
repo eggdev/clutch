@@ -85,6 +85,26 @@
           "apps/cli"
         ]
       ]
+    },
+    "notes-sync": {
+      "platform": "web",
+      "role": "the dev actor on two browser contexts, against dev servers that the runner reuses or starts and stops",
+      "ownsStack": true,
+      "timeoutSeconds": 300,
+      "artifactPaths": [
+        "test-results/journeys"
+      ],
+      "commands": [
+        [
+          "mise",
+          "exec",
+          "--",
+          "bun",
+          "run",
+          "journey",
+          "notes-sync"
+        ]
+      ]
     }
   }
 }

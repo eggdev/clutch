@@ -44,13 +44,14 @@ export function changedPaths(refs: Array<PushedRef>): Array<string> | null {
 /**
  * The Nx targets for a push. A docs-only push can still break a docs check. A
  * push that changes no path, such as a branch deletion, runs nothing. When Git
- * cannot list the paths (null), everything runs.
+ * cannot list the paths (null), everything runs. `journeys` drives the web app
+ * in a browser, so it runs on a push and in CI, not in `validate`.
  */
 export function pushTargets(paths: Array<string> | null): Array<string> {
   if (paths?.length === 0) {
     return [];
   }
-  return paths?.every(isDocsOnly) ? ['checks'] : ['test', 'lint-policy-test', 'checks'];
+  return paths?.every(isDocsOnly) ? ['checks'] : ['test', 'lint-policy-test', 'checks', 'journeys'];
 }
 
 /** Nested Git fixtures must select their own repository, not the hook's. */

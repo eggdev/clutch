@@ -89,7 +89,9 @@ on those pages; this list only points at them.
 - [Review](./review.md): the review rules that no check catches yet, and how
   agent review runs on each PR
 - [Testing](./testing.md) and [end-to-end testing](./end-to-end-testing.md):
-  which test type to write, console output, journeys
+  journeys first, which test type to write, console output
+- [Journeys](./setup/verification.md#journeys): add a journey, run it, and
+  register it as a verify flow
 - [Security](./security.md): the rules each change keeps, and the risks
   accepted on purpose
 - [Operations](./operations/index.md): rollback, secret rotation, operator

@@ -72,6 +72,8 @@ export function writeProject(tree: Tree, project: Project) {
     lib: ['es2024', 'dom', 'dom.iterable'],
     ...(project.react ? { jsx: 'react-jsx' } : {}),
   };
+  // A feature's journeys run in Playwright, so the spec config checks them.
+  const journeys = project.tag === 'type:feature';
   writeJson(tree, `${project.directory}/tsconfig.json`, {
     extends: '../../tsconfig.base.json',
     // knip reads the JSX runtime here to see that a `.tsx` file uses React.
@@ -88,7 +90,14 @@ export function writeProject(tree: Tree, project: Project) {
       types: [],
     },
     include: ['**/*.ts', '**/*.tsx'],
-    exclude: ['**/*.test.ts', '**/*.test.tsx', 'testing/**', 'out-tsc/**', 'node_modules/**'],
+    exclude: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'testing/**',
+      ...(journeys ? ['journeys/**'] : []),
+      'out-tsc/**',
+      'node_modules/**',
+    ],
     references: project.references.map((reference) => ({ path: `${reference}/tsconfig.lib.json` })),
   });
   writeJson(tree, `${project.directory}/tsconfig.spec.json`, {
@@ -99,7 +108,13 @@ export function writeProject(tree: Tree, project: Project) {
       types: ['bun'],
       ...compilerOptions,
     },
-    include: ['**/*.test.ts', '**/*.test.tsx', 'testing/**/*.ts', 'testing/**/*.tsx'],
+    include: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'testing/**/*.ts',
+      'testing/**/*.tsx',
+      ...(journeys ? ['journeys/**/*.pw.ts'] : []),
+    ],
     exclude: ['out-tsc/**', 'node_modules/**'],
     references: [{ path: './tsconfig.lib.json' }],
   });

@@ -1,9 +1,10 @@
 # End-to-end testing
 
 End-to-end tests drive the real app through its user-facing entry point:
-browser, native app or CLI. They are slow and costly to keep, so the bar to
-add one is high. The browser locator guidance below applies to browser tests;
-use the platform runner for native and CLI journeys.
+browser, native app or CLI. A journey is one end-to-end test. See
+[journeys](./setup/verification.md#journeys) for the files, the runner and the
+check. The locator guidance below applies to browser journeys. Native journeys
+use Maestro.
 
 ## What to test
 
