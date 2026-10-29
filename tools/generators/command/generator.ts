@@ -15,17 +15,24 @@ export type CommandOptions = {
   readonly name: string;
   readonly model: string;
   readonly waits: 'local' | 'server';
+  readonly access: 'organization' | 'group';
 };
 
-/** Creates an empty registration list for one half of the package's commands. */
-function ensureList(tree: Tree, file: string, list: string, half: 'client' | 'server') {
+/** Creates an empty registration list: one half of the package's commands, or its jobs. */
+export function ensureList(
+  tree: Tree,
+  file: string,
+  list: string,
+  half: 'client' | 'server' | 'jobs',
+) {
   if (tree.exists(file)) {
     return;
   }
-  const where =
-    half === 'client'
-      ? 'The client half of each command. The web app gives them to the object pool.'
-      : 'The server change of each command. The server app passes them to `SyncServer`.';
+  const where = {
+    client: 'The client half of each command. The web app gives them to the object pool.',
+    server: 'The server change of each command. The server app passes them to `SyncServer`.',
+    jobs: 'The jobs of this package. The server app passes them to `JobRunner`.',
+  }[half];
   tree.write(file, `/** ${where} */\nexport const ${list} = [];\n`);
 }
 
@@ -53,6 +60,7 @@ export function addCommand(tree: Tree, options: CommandOptions) {
     modelFile: model.fileName,
     modelProperty: model.propertyName,
     waits: options.waits,
+    access: options.access,
   });
   addDependencies(
     tree,

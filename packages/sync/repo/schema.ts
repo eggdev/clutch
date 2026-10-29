@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   index,
+  integer,
   jsonb,
   pgTable,
   primaryKey,
@@ -41,3 +42,29 @@ export const syncEvents = pgTable(
     index('sync_events_groups').using('gin', table.groups),
   ],
 );
+
+/**
+ * The outbox: each job that a server change, a route or a schedule asks for.
+ * A server change writes its jobs in its own transaction, so a rollback drops
+ * them. The job runner claims due jobs after the commit. The ID makes a job
+ * run once, so a repeated request does nothing new.
+ */
+export const outboxJobs = pgTable(
+  'sync_jobs',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id'),
+    name: text('name').notNull(),
+    payload: jsonb('payload').$type<unknown>().notNull(),
+    status: text('status').$type<'pending' | 'running' | 'done' | 'failed'>().notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    runAt: timestamp('run_at', { withTimezone: true, mode: 'date' }).notNull(),
+    lockedUntil: timestamp('locked_until', { withTimezone: true, mode: 'date' }),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true, mode: 'date' }),
+  },
+  (table) => [index('sync_jobs_due').on(table.status, table.runAt)],
+);
+
+export type JobRow = typeof outboxJobs.$inferSelect;

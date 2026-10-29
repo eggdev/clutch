@@ -2,7 +2,12 @@ import path from 'node:path';
 
 import type { Tree } from '@nx/devkit';
 import { generateFiles, names, updateJson } from '@nx/devkit';
-import { addModel, addRecordSchema, addTable } from '@tools/generators/model/generator.ts';
+import {
+  addModel,
+  addRecordSchema,
+  addTable,
+  parseGroup,
+} from '@tools/generators/model/generator.ts';
 import {
   addAppDependency,
   addDependencies,
@@ -20,6 +25,7 @@ export const sections = [
   'commands',
   'repo',
   'service',
+  'jobs',
   'runtime',
   'ui',
   'testing',
@@ -29,6 +35,8 @@ export type PackageOptions = {
   readonly name: string;
   readonly sections: string;
   readonly record?: string;
+  /** The sync group of the first record. Required with `record`. See the model generator. */
+  readonly group?: string;
   readonly summary?: string;
 };
 
@@ -108,7 +116,11 @@ export function addPackage(tree: Tree, options: PackageOptions) {
   const name = names(options.name);
   const directory = `packages/${name.fileName}`;
   const chosen = parseSections(options.sections);
-  const problem = planProblem(chosen, options.record);
+  const problem =
+    planProblem(chosen, options.record) ??
+    (options.record && !options.group
+      ? 'A record needs its sync group. Pass `--group=org`, `--group=user` or `--group=<kind>:<field>`, such as `--group=space:spaceId`.'
+      : null);
   if (problem) {
     throw new Error(problem);
   }
@@ -126,14 +138,15 @@ export function addPackage(tree: Tree, options: PackageOptions) {
     summary: options.summary ?? 'Say what this package owns.',
     sectionList: chosen.map((section) => `\`${section}/\``).join(', '),
   });
-  if (options.record && chosen.includes('models')) {
-    addModel(tree, { package: name.fileName, name: options.record });
-  } else if (options.record) {
-    addRecordSchema(tree, name.fileName, options.record);
+  const group = options.group === undefined ? undefined : parseGroup(options.group);
+  if (options.record && group && chosen.includes('models')) {
+    addModel(tree, { package: name.fileName, name: options.record, group: options.group });
+  } else if (options.record && group) {
+    addRecordSchema(tree, name.fileName, options.record, group);
   }
   if (chosen.includes('repo') && options.record) {
     addRepo(tree, directory, name);
-    addTable(tree, name.fileName, options.record);
+    addTable(tree, name.fileName, options.record, group);
   }
   for (const section of chosen) {
     if (!tree.children(`${directory}/${section}`).length) {

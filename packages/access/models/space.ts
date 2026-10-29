@@ -18,5 +18,9 @@ export const generalSpaceId = 'general';
 /** The sync group of one space. Records of the space, such as notes, name it. */
 export const spaceGroup = (spaceId: string) => `space:${spaceId}`;
 
+/** The space of a space group, or `undefined` for another kind of group. */
+export const spaceOfGroup = (group: string) =>
+  group.startsWith('space:') ? group.slice('space:'.length) : undefined;
+
 /** The longest space name. UI code needs it as a value, so it lives here. */
 export const maxSpaceNameLength = 80;

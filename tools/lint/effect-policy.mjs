@@ -50,13 +50,13 @@ function packageKind(filename) {
 }
 
 /**
- * Server code of a product package: `service/` and `.server` files. It
+ * Server code of a product package: `service/`, `jobs/` and `.server` files. It
  * returns Effects with tagged errors. Template tooling (`type:tool`) is exempt.
  */
 export function isEffectServerCode(filename) {
   return (
     !isTestFile(filename) &&
-    (/\/packages\/[^/]+\/service\//u.test(filename) ||
+    (/\/packages\/[^/]+\/(?:service|jobs)\//u.test(filename) ||
       /\/packages\/[^/]+\/.+\.server\.[cm]?[jt]sx?$/u.test(filename)) &&
     packageKind(filename) !== 'type:tool'
   );

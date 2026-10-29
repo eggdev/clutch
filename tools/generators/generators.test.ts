@@ -10,6 +10,7 @@ import { checkDb } from '@tools/check-db';
 import { checkStructure } from '@tools/check-structure';
 import { addCommand } from '@tools/generators/command/generator.ts';
 import { addFeature } from '@tools/generators/feature/generator.ts';
+import { addJob } from '@tools/generators/job/generator.ts';
 import { modelGenerator } from '@tools/generators/model/generator.ts';
 import { addPackage, parseSections } from '@tools/generators/package/generator.ts';
 
@@ -74,22 +75,45 @@ test('a package, a command and a feature pass lint, the structure check and the 
   const tree = await workspace();
   addPackage(tree, {
     name: 'billing',
-    sections: 'types,models,commands,repo,runtime,ui,testing',
+    sections: 'types,models,commands,repo,jobs,runtime,ui,testing',
     record: 'invoice',
+    group: 'org',
   });
   addCommand(tree, {
     package: 'billing',
     name: 'archive-invoice',
     model: 'invoice',
     waits: 'server',
+    access: 'group',
   });
+  addCommand(tree, {
+    package: 'billing',
+    name: 'open-invoice',
+    model: 'invoice',
+    waits: 'local',
+    access: 'organization',
+  });
+  addJob(tree, { package: 'billing', name: 'send-invoice' });
   addFeature(tree, { name: 'billing' });
   expect(tree.exists('packages/billing/commands/archive-invoice.server.ts')).toBe(true);
+  expect(tree.read('packages/billing/jobs/send-invoice.ts', 'utf-8')).toContain(
+    "name: 'billing/send-invoice',",
+  );
+  expect(tree.read('packages/billing/runtime/jobs.server.ts', 'utf-8')).toContain(
+    'export const billingJobs = [sendInvoice];',
+  );
+  expect(tree.read('apps/api/src/packages.ts', 'utf-8')).toContain('...billingJobs');
   expect(tree.read('packages/billing/commands/archive-invoice.ts', 'utf-8')).toContain(
     "waits: 'server'",
   );
   expect(tree.read('packages/billing/runtime/handlers.server.ts', 'utf-8')).toContain(
-    'export const billingServerChanges = [archiveInvoiceServer];',
+    'export const billingServerChanges = [archiveInvoiceServer, openInvoiceServer];',
+  );
+  expect(tree.read('packages/billing/commands/archive-invoice.server.ts', 'utf-8')).toContain(
+    'access: { group: () => Effect.succeed(null) },',
+  );
+  expect(tree.read('packages/billing/commands/open-invoice.server.ts', 'utf-8')).toContain(
+    "access: 'organization',",
   );
   expect(tree.read('apps/web/src/commands.ts', 'utf-8')).toContain('...billingCommands');
   expect(tree.read('apps/api/src/packages.ts', 'utf-8')).toContain('...billingServerChanges');
@@ -123,7 +147,13 @@ test('a command needs its model, and a name that is taken fails', async () => {
   const tree = await workspace();
   addPackage(tree, { name: 'billing', sections: 'types,models,commands' });
   expect(() =>
-    addCommand(tree, { package: 'billing', name: 'pay', model: 'invoice', waits: 'local' }),
+    addCommand(tree, {
+      package: 'billing',
+      name: 'pay',
+      model: 'invoice',
+      waits: 'local',
+      access: 'organization',
+    }),
   ).toThrow('packages/billing/models/invoice.ts does not exist.');
   expect(() => addPackage(tree, { name: 'billing', sections: 'types' })).toThrow(
     'packages/billing already exists.',
@@ -140,8 +170,11 @@ test('a package owns no record until --record names one, and repo/ needs runtime
   expect(tree.children('packages/email/service')).toEqual(['.gitkeep']);
   expect(tree.exists('packages/email/repo')).toBe(false);
   expect(() =>
-    addPackage(tree, { name: 'ledger', sections: 'types,repo', record: 'entry' }),
+    addPackage(tree, { name: 'ledger', sections: 'types,repo', record: 'entry', group: 'org' }),
   ).toThrow('A package with `repo/` needs `runtime/`.');
+  expect(() =>
+    addPackage(tree, { name: 'ledger', sections: 'types,models', record: 'entry' }),
+  ).toThrow('A record needs its sync group.');
   expect(() => addPackage(tree, { name: 'ledger', sections: 'types,repo,runtime' })).toThrow(
     'Name the first one with `--record=<name>`.',
   );
@@ -150,7 +183,12 @@ test('a package owns no record until --record names one, and repo/ needs runtime
 
 test('a model gets a table only in a package with repo/, and only drizzle-kit writes migrations', async () => {
   const tree = await workspace();
-  addPackage(tree, { name: 'ledger', sections: 'types,models,repo,runtime', record: 'entry' });
+  addPackage(tree, {
+    name: 'ledger',
+    sections: 'types,models,repo,runtime',
+    record: 'entry',
+    group: 'org',
+  });
   addPackage(tree, { name: 'drafts', sections: 'types,models' });
   modelGenerator(tree, { package: 'ledger', name: 'account' });
   modelGenerator(tree, { package: 'drafts', name: 'draft' });

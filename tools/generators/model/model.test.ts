@@ -23,7 +23,12 @@ async function ledger(): Promise<Tree> {
   for (const name of ['effect', 'drizzle-orm', 'drizzle-kit']) {
     tree.write(`node_modules/${name}/package.json`, JSON.stringify({ version: '1.0.0' }));
   }
-  addPackage(tree, { name: 'ledger', sections: 'types,models,repo,runtime', record: 'entry' });
+  addPackage(tree, {
+    name: 'ledger',
+    sections: 'types,models,repo,runtime',
+    record: 'entry',
+    group: 'org',
+  });
   return tree;
 }
 

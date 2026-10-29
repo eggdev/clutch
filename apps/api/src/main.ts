@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 
 import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
 import { ActorsDev } from '@repo/identity/runtime/dev.server';
+import { WebhookSignatureLive } from '@repo/notes/service/webhook-signature';
 import { DatabasePglite, DatabasePostgres } from '@repo/sync/runtime/database.server';
 import { Config, Effect, Layer, Option } from 'effect';
 
@@ -31,4 +32,12 @@ const http = Layer.unwrap(
   ),
 );
 
-BunRuntime.runMain(Layer.launch(api(database).pipe(Layer.provide(ActorsDev), Layer.provide(http))));
+BunRuntime.runMain(
+  Layer.launch(
+    api(database).pipe(
+      Layer.provide(ActorsDev),
+      Layer.provide(WebhookSignatureLive),
+      Layer.provide(http),
+    ),
+  ),
+);

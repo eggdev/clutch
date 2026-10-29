@@ -1,5 +1,6 @@
 import { BunHttpServer } from '@effect/platform-bun';
 import { ActorsTest } from '@repo/identity/testing/actor';
+import { WebhookSignatureTest } from '@repo/notes/testing/webhook';
 import { DatabasePglite } from '@repo/sync/runtime/database.server';
 import type { SyncMessage } from '@repo/sync/types/protocol';
 import { Effect, Layer } from 'effect';
@@ -12,6 +13,7 @@ import { api } from '@/server';
 /** The whole API on a test HTTP server, over a fresh in-memory database. */
 export const testServer = api(DatabasePglite()).pipe(
   Layer.provide(ActorsTest()),
+  Layer.provide(WebhookSignatureTest),
   Layer.provideMerge(BunHttpServer.layerTest),
 );
 

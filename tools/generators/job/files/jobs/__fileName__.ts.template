@@ -1,0 +1,14 @@
+import { defineJob } from '@repo/sync/service/jobs';
+import { Effect, Schema } from 'effect';
+
+/**
+ * The job `<%= packageName %>/<%= fileName %>`. It runs after the commit that asked for
+ * it, so it may use any service, a vendor service too. The job runner tries a
+ * failed job again, so make `run` safe to repeat. Commit records with
+ * `commit`, so each client of their sync groups gets a delta.
+ */
+export const <%= propertyName %> = defineJob({
+  name: '<%= packageName %>/<%= fileName %>',
+  payload: Schema.Struct({}),
+  run: () => Effect.void,
+});

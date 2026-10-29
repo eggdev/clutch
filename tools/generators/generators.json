@@ -19,6 +19,11 @@
       "factory": "./model/generator.ts#modelGenerator",
       "schema": "./model/schema.json",
       "description": "A record schema in types/ and its model in models/."
+    },
+    "job": {
+      "factory": "./job/generator.ts#jobGenerator",
+      "schema": "./job/schema.json",
+      "description": "A job in jobs/, registered in the package and in the server app."
     }
   }
 }

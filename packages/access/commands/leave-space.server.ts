@@ -7,10 +7,10 @@ import { CommandRejected } from '@repo/sync/types/command-rejected';
 import { Effect } from 'effect';
 
 /** Ends the actor's membership of a space. The general space cannot be left. */
-export const leaveSpaceServer = defineServerChange(
-  leaveSpace,
-  LeaveSpaceInput,
-  (input, { db, actor }) =>
+export const leaveSpaceServer = defineServerChange(leaveSpace, {
+  input: LeaveSpaceInput,
+  access: 'organization',
+  run: (input, { db, actor }) =>
     Effect.gen(function* () {
       if (input.spaceId === generalSpaceId) {
         return yield* new CommandRejected({ reason: 'No one can leave the general space.' });
@@ -22,4 +22,4 @@ export const leaveSpaceServer = defineServerChange(
       yield* deleteMembership(db, member);
       return [leftChange(member)];
     }),
-);
+});

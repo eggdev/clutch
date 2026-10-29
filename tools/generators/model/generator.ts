@@ -81,7 +81,12 @@ function chosenGroup(options: ModelOptions): GroupChoice {
 const tableImports = "import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';\n";
 
 /** Writes only the record schema in `types/`, for a package without `models/`. */
-export function addRecordSchema(tree: Tree, packageName: string, record: string) {
+export function addRecordSchema(
+  tree: Tree,
+  packageName: string,
+  record: string,
+  group: GroupChoice = organizationOnly,
+) {
   const directory = `packages/${packageName}`;
   const name = names(record);
   if (tree.exists(`${directory}/types/${name.fileName}.ts`)) {
@@ -89,7 +94,7 @@ export function addRecordSchema(tree: Tree, packageName: string, record: string)
   }
   generateFiles(tree, path.join(import.meta.dirname, 'files', 'types'), `${directory}/types`, {
     ...name,
-    ...groupValues(organizationOnly),
+    ...groupValues(group),
     packageName,
     title: name.fileName.replaceAll('-', ' '),
   });

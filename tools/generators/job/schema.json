@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "job",
+  "title": "Add a job to a package",
+  "type": "object",
+  "properties": {
+    "package": {
+      "type": "string",
+      "description": "The package folder name under packages/.",
+      "$default": { "$source": "argv", "index": 0 }
+    },
+    "name": {
+      "type": "string",
+      "description": "The job name, in kebab case, such as send-invoice.",
+      "$default": { "$source": "argv", "index": 1 }
+    }
+  },
+  "required": ["package", "name"]
+}

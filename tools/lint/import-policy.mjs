@@ -69,12 +69,13 @@ export const sections = {
   commands: 'public',
   repo: 'private',
   service: 'public',
+  jobs: 'public',
   runtime: 'apps',
   ui: 'public',
   testing: 'tests',
 };
 /** Sections that hold server code. Client code never imports them. */
-const serverSections = new Set(['config', 'repo', 'service']);
+const serverSections = new Set(['config', 'repo', 'service', 'jobs']);
 
 /**
  * The repository root, tier, project and section of a linted file. `path` is

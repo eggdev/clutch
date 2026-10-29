@@ -11,6 +11,8 @@ import { Notes } from '@repo/notes/service/notes';
 import { NotesTest } from '@repo/notes/testing/notes';
 import { createPool } from '@repo/sync/runtime/pool';
 import { Database } from '@repo/sync/service/database';
+import type { Outbox } from '@repo/sync/service/jobs';
+import type { SyncGroups } from '@repo/sync/service/sync-groups';
 import { Effect } from 'effect';
 
 const at = '2026-10-28T12:00:00.000Z';
@@ -22,7 +24,7 @@ test('the local changes create and rename a note in the pool at once', () => {
   expect(pool.get(noteModel, 'n1')?.title).toBe('Final');
 });
 
-function server<A, E>(program: Effect.Effect<A, E, Database | Notes>) {
+function server<A, E>(program: Effect.Effect<A, E, Database | Notes | Outbox | SyncGroups>) {
   return Effect.runPromise(program.pipe(Effect.provide(NotesTest())));
 }
 
@@ -60,7 +62,7 @@ test('the server rejects a rename of a missing note and a title that is too long
     }),
   );
   expect(reasons).toMatchObject([
-    { _tag: 'CommandRejected', reason: 'This note does not exist.' },
+    { _tag: 'CommandRejected', reason: 'This record does not exist.' },
     { _tag: 'CommandRejected', reason: 'The input of notes/create is not valid.' },
   ]);
 });
@@ -81,6 +83,6 @@ test('only a member of a space can write a note there, and the note is in its sp
       return [refused, written];
     }),
   );
-  expect(outsider).toMatchObject({ reason: 'You are not a member of this space.' });
+  expect(outsider).toMatchObject({ reason: 'You may not change records here.' });
   expect(Array.isArray(member) && member[0]?.groups).toEqual(['space:design']);
 });

@@ -19,16 +19,18 @@ Make a package, a feature, a command or a model with a generator. Do not copy
 files by hand. A generator writes the shape that the checks expect, then
 registers the result.
 
-| Generator | Example                                                                                                         | Writes and registers                                                                                                                                                   |
-| --------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package` | `mise exec -- bun nx g @tools/generators:package billing --sections=types,models,repo,runtime --record=invoice` | Only the named sections and a primitive. With `--record`: its schema, model and table. With `repo/`: the drizzle-kit config, `db-generate` and the API migration entry |
-| `model`   | `mise exec -- bun nx g @tools/generators:model billing payment`                                                 | The record schema in `types/`, its model in `models/` and, in a package with `repo/`, its table and row mapping                                                        |
-| `command` | `mise exec -- bun nx g @tools/generators:command billing pay-invoice --model=invoice --waits=server`            | The paired command files, the input schema, and both halves in `runtime/` and in the apps                                                                              |
-| `feature` | `mise exec -- bun nx g @tools/generators:feature billing`                                                       | The gate, a screen, `components/`, a route in `apps/web`, the gate in the lint options, and a primitive                                                                |
+| Generator | Example                                                                                                                     | Writes and registers                                                                                                                                                   |
+| --------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package` | `mise exec -- bun nx g @tools/generators:package billing --sections=types,models,repo,runtime --record=invoice --group=org` | Only the named sections and a primitive. With `--record`: its schema, model and table. With `repo/`: the drizzle-kit config, `db-generate` and the API migration entry |
+| `model`   | `mise exec -- bun nx g @tools/generators:model billing payment --group=space:spaceId`                                       | The record schema in `types/`, its model in `models/` and, in a package with `repo/`, its table and row mapping                                                        |
+| `command` | `mise exec -- bun nx g @tools/generators:command billing pay-invoice --model=invoice --waits=server --access=group`         | The paired command files, the input schema, and both halves in `runtime/` and in the apps                                                                              |
+| `job`     | `mise exec -- bun nx g @tools/generators:job billing send-invoice`                                                          | A job in `jobs/`, registered in the package and in the server app                                                                                                      |
+| `feature` | `mise exec -- bun nx g @tools/generators:feature billing`                                                                   | The gate, a screen, `components/`, a route in `apps/web`, the gate in the lint options, and a primitive                                                                |
 
 `--sections` has no default. Choose the sections on purpose. A package owns no
-record until `--record` names one. A package with `repo/` needs `runtime/` and
-a record.
+record until `--record` names one. A record needs `--group`: `org`, `user`, or
+`<kind>:<field>`, such as `space:spaceId`. A package with `repo/` needs
+`runtime/` and a record.
 
 No generator writes a migration. After a schema change, run
 `mise exec -- bun nx run @repo/<package>:db-generate`. See

@@ -7,10 +7,10 @@ import { CommandRejected } from '@repo/sync/types/command-rejected';
 import { Clock, Effect } from 'effect';
 
 /** Writes the space for the actor's organization, and makes the actor its first member. */
-export const createSpaceServer = defineServerChange(
-  createSpace,
-  CreateSpaceInput,
-  (input, { db, actor }) =>
+export const createSpaceServer = defineServerChange(createSpace, {
+  input: CreateSpaceInput,
+  access: 'organization',
+  run: (input, { db, actor }) =>
     Effect.gen(function* () {
       const name = input.name.trim();
       if (!name) {
@@ -36,4 +36,4 @@ export const createSpaceServer = defineServerChange(
       });
       return [spaceChange(space), joinedChange(member)];
     }),
-);
+});

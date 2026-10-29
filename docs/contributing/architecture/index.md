@@ -67,7 +67,8 @@ section is a folder, never a single file.
 | `commands/` | Public     | Commands, as `<name>.ts` and `<name>.server.ts` files        |
 | `repo/`     | Private    | Drizzle tables, queries and `migrations/`                    |
 | `service/`  | Public     | Effect services: invariants, access checks and the event log |
-| `runtime/`  | Apps only  | Live Layers, server change registration and client boot code |
+| `jobs/`     | Public     | Jobs that run after a commit, for slow or outside work       |
+| `runtime/`  | Apps only  | Live Layers, registrations and client boot code              |
 | `ui/`       | Public     | Hooks and components                                         |
 | `testing/`  | Tests only | Fakes and Test Layers                                        |
 
@@ -76,8 +77,8 @@ section is a folder, never a single file.
 - **Private** sections are imported only inside their own package.
 - **`runtime/`** is imported only by an app, by its own package, or by a test.
 - **`testing/`** is imported only by a test or by another `testing/` file.
-- **Server code** is `config/`, `repo/`, `service/`, `testing/` and each
-  `.server.ts` file. Only server code, a server app or a test imports it.
+- **Server code** is `config/`, `repo/`, `service/`, `jobs/`, `testing/` and
+  each `.server.ts` file. Only server code, a server app or a test imports it.
 
 `check-structure` rejects a package folder that is not a section, and a
 feature folder with other parts. The

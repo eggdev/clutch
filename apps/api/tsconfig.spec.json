@@ -13,6 +13,9 @@
     },
     {
       "path": "../../packages/identity/tsconfig.spec.json"
+    },
+    {
+      "path": "../../packages/notes/tsconfig.spec.json"
     }
   ]
 }

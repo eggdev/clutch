@@ -53,3 +53,25 @@ test('no one can leave the general space, and only a member can leave a space', 
     { reason: 'You are not a member of this space.' },
   ]);
 });
+
+test('the group write check passes the actor own groups and its spaces, and fails every other group', async () => {
+  const checks = await Effect.runPromise(
+    Effect.gen(function* () {
+      const db = yield* Database;
+      const access = yield* Access;
+      yield* createSpaceServer.run({ id: 'design', name: 'Design', at }, { db, actor: owner });
+      const can = (actor: typeof owner, group: string) => access.canUseGroup(db, actor, group);
+      return [
+        yield* can(owner, 'org:org-a'),
+        yield* can(owner, 'user:user-a'),
+        yield* can(owner, 'space:general'),
+        yield* can(owner, 'space:design'),
+        yield* can(other, 'space:design'),
+        yield* can(other, 'user:user-a'),
+        yield* can(owner, 'org:org-b'),
+        yield* can(owner, 'team:x'),
+      ];
+    }).pipe(Effect.provide(AccessTest())),
+  );
+  expect(checks).toEqual([true, true, true, true, false, false, false, false]);
+});

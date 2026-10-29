@@ -184,7 +184,7 @@ languages:
     files:
       - /apps/web/
   - imports: ^effect(?:/|$)
-    where: '`types/`, `config/`, `repo/`, `service/`, `runtime/`, `testing/`, `.server` files, tests, `packages/sync` and the API'
+    where: '`types/`, `config/`, `repo/`, `service/`, `jobs/`, `runtime/`, `testing/`, `.server` files, tests, `packages/sync` and the API'
     primitives:
       - sync
     packagePaths:
@@ -192,6 +192,7 @@ languages:
       - config/
       - repo/
       - service/
+      - jobs/
       - runtime/
       - testing/
     files:

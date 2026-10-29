@@ -157,11 +157,12 @@ it. `check-commands` rejects a command without `waits`.
 ## Add a command
 
 1. Run `mise exec -- bun nx g @tools/generators:command <package> <name>
-   --model=<model> --waits=local`. It writes `<name>.ts` and
+   --model=<model> --waits=local --access=group`. It writes `<name>.ts` and
    `<name>.server.ts`, and registers both halves.
 2. Write the local change in `<name>.ts`, in plain TypeScript.
-3. Write the server change in `<name>.server.ts`, in Effect. It checks access
-   and returns the changes it wrote.
+3. Write the server change in `<name>.server.ts`, in Effect. Its `access`
+   rule runs first, so `run` only writes and returns the changes it wrote. See
+   [one door for each write](./authorization.md#one-door-for-each-write).
 4. Write one test for the accepted path and one for the rejected path, through
    the Test Layers. See `packages/notes/commands/notes-commands.test.ts`.
 

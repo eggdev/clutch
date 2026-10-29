@@ -7,12 +7,18 @@
     "package": {
       "type": "string",
       "description": "The package folder name under packages/.",
-      "$default": { "$source": "argv", "index": 0 }
+      "$default": {
+        "$source": "argv",
+        "index": 0
+      }
     },
     "name": {
       "type": "string",
       "description": "The command name, in kebab case, such as archive-invoice.",
-      "$default": { "$source": "argv", "index": 1 }
+      "$default": {
+        "$source": "argv",
+        "index": 1
+      }
     },
     "model": {
       "type": "string",
@@ -22,7 +28,12 @@
       "type": "string",
       "enum": ["local", "server"],
       "description": "local: the screen shows the change at once. server: the screen waits for the server."
+    },
+    "access": {
+      "type": "string",
+      "enum": ["organization", "group"],
+      "description": "organization: any actor of the organization may run it. group: the actor must be allowed the sync group of the record it writes."
     }
   },
-  "required": ["package", "name", "model", "waits"]
+  "required": ["package", "name", "model", "waits", "access"]
 }

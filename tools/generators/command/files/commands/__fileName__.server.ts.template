@@ -6,11 +6,17 @@ import { Effect } from 'effect';
 
 /**
  * The server half of `<%= packageName %>/<%= fileName %>`. Until you write it, each run is
- * rejected. Write the owner records with `db`, check access with `actor`, and
- * return each record it changed.
- */
-export const <%= propertyName %>Server = defineServerChange(<%= propertyName %>, <%= className %>Input, () =>
-  Effect.fail(
-    new CommandRejected({ reason: 'The <%= packageName %>/<%= fileName %> command has no server change yet.' }),
-  ),
-);
+ * rejected. Write the owner records with `db`, and return each record it
+ * changed. The access rule runs before `run`, so `run` never checks access.
+<% if (access === 'group') { %> * `group` names the sync group of the record that the change writes. It
+ * returns `null` until you write it, so every run is rejected.
+<% } %> */
+export const <%= propertyName %>Server = defineServerChange(<%= propertyName %>, {
+  input: <%= className %>Input,
+<% if (access === 'group') { %>  access: { group: () => Effect.succeed(null) },
+<% } else { %>  access: 'organization',
+<% } %>  run: () =>
+    Effect.fail(
+      new CommandRejected({ reason: 'The <%= packageName %>/<%= fileName %> command has no server change yet.' }),
+    ),
+});

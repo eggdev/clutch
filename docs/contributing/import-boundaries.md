@@ -120,13 +120,15 @@ import, and `check-bundle` rejects Effect code in the first screen.
 
 ## Server code
 
-`config/`, `repo/`, `service/`, `testing/` and each `.server.ts` file hold
-server code. The `repo-imports/server-only` rule lets only server code import
+`config/`, `repo/`, `service/`, `jobs/`, `testing/` and each `.server.ts` file
+hold server code. The `repo-imports/server-only` rule lets only server code import
 them. Server code is a `.server.ts` file, a file in a server section, a test,
 `tools/`, or an app with the Nx tag `platform:server`.
 
-A server change registers in `packages/<name>/runtime/handlers.server.ts`. A
-server app loads that file through `apps/api/src/packages.ts`. Only an edge runs
+A server change registers in `packages/<name>/runtime/handlers.server.ts`. Jobs
+and schedules register in `runtime/jobs.server.ts`, and HTTP routes in
+`runtime/routes.server.ts`. A server app loads these files through
+`apps/api/src/packages.ts`. Only an edge runs
 an Effect: `runtime/`, an app or a test. See
 [lint rules for Effect code](./setup/lint-rules.md#effect-code).
 

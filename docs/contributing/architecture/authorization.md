@@ -33,23 +33,45 @@ for what to do when the check gets slow.
 - `Access.groupsFor(actor)` names the sync groups the actor may load. Every
   actor loads its organization and its user groups at once. Each space of the
   actor loads when a gate asks for it.
-- `canUseSpace(db, actor, spaceId)` is the check that a server change runs in
-  its own transaction. A note command calls it before it writes.
+- `Access.canUseGroup(db, actor, group)` decides if the actor may write a
+  record of one sync group. The organization and the user's own group pass. A
+  space group passes for a member of the space.
 - Every actor is in the general space, which has no record, and no one can
   leave it.
 - A membership is a record in the user's own group. A change to it makes the
   sync server ask `groupsFor` again.
 
-`runtime/sync-groups.server.ts` gives `groupsFor` to the sync server through
-the `SyncGroups` seam. See [local-first sync](./local-first-sync.md#sync-groups).
+`SyncGroupsFromAccess` in `service/access.ts` gives both to the sync engine
+through the `SyncGroups` seam. See [local-first sync](./local-first-sync.md#sync-groups).
+
+## One door for each write
+
+Each server change declares its access rule in a required `access` field.
+`defineServerChange` runs the rule before the change, so a server change never
+checks access by hand. A server change without the field does not compile.
+
+| Rule                                | Who may run the change                                    |
+| ----------------------------------- | --------------------------------------------------------- |
+| `'organization'`                    | Any actor of the organization                             |
+| `{ group: (input, { db, actor }) }` | An actor that `canUseGroup` allows for the returned group |
+
+The `group` function returns the sync group of the record that the change
+writes. It returns `null` when the record does not exist, and the change is
+rejected. `packages/notes/commands/rename-note.server.ts` reads the note's
+space this way.
 
 ## Every surface declares its permission
 
 This page applies [one door for each decision](../../principles/one-door-for-each-decision.md).
-Each route, API operation and tool declares the permission it needs. The
-declaration is a required field, so a surface without one does not compile.
-`'none'` is an explicit value: the surface touches no tenant data. A test walks
-the route table and fails on a route that declares nothing.
+Each route, API operation and tool declares the permission it needs.
+`'none'` is an explicit value: the surface touches no tenant data.
+
+- A server change declares its access rule in a required field, so one
+  without it does not compile. `packages/sync/commands/define.server.test.ts`
+  proves it.
+- An HTTP route from `defineRoute` has no permission field yet, and no check
+  covers it. A route checks its caller itself, such as a webhook that checks
+  a signature.
 
 Handlers that touch a concrete resource also call the check with that
 resource, so a later grant model narrows them with no new code.
@@ -69,5 +91,5 @@ A surface declares the requirement once, and the dispatch path checks it.
 
 <!-- kickoff: The files that define permissions, the access check and the route table test. -->
 
-- `packages/access/service/access.ts` and `packages/access/runtime/sync-groups.server.ts`
+- `packages/access/service/access.ts` and `packages/sync/commands/define.server.ts`
 - [Request context](./request-context.md)

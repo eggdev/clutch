@@ -8,10 +8,10 @@ import { CommandRejected } from '@repo/sync/types/command-rejected';
 import { Clock, Effect } from 'effect';
 
 /** Makes the actor a member of a space in its organization. Joining twice changes nothing. */
-export const joinSpaceServer = defineServerChange(
-  joinSpace,
-  JoinSpaceInput,
-  (input, { db, actor }) =>
+export const joinSpaceServer = defineServerChange(joinSpace, {
+  input: JoinSpaceInput,
+  access: 'organization',
+  run: (input, { db, actor }) =>
     Effect.gen(function* () {
       if (input.spaceId === generalSpaceId) {
         return yield* new CommandRejected({ reason: 'Everyone is in the general space.' });
@@ -33,4 +33,4 @@ export const joinSpaceServer = defineServerChange(
       });
       return [joinedChange(member)];
     }),
-);
+});

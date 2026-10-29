@@ -1,7 +1,7 @@
 import { Actors } from '@repo/identity/service/actors';
 import type { ServerChange } from '@repo/sync/commands/define.server';
 import { originAllowed, syncOrigins } from '@repo/sync/config/origins';
-import { EventLog, EventLogLive } from '@repo/sync/service/event-log';
+import { EventLog } from '@repo/sync/service/event-log';
 import { feed } from '@repo/sync/service/feed';
 import { Sessions } from '@repo/sync/service/sessions';
 import { SyncGroups } from '@repo/sync/service/sync-groups';
@@ -62,15 +62,19 @@ const trackedWebsocket = Layer.effect(RpcServer.Protocol)(
 /**
  * The sync server: `Push`, `Pull` and `Load` over one WebSocket. `changes`
  * lists the server change of every command, from each package's
- * `runtime/handlers.server.ts`. The actor of each call comes from `Actors`,
+ * `runtime/handlers.server.ts`. The layer needs the services of every
+ * change, and the one `EventLog` of the server app. The actor of each call comes from `Actors`,
  * and the groups it may load come from `SyncGroups`. A server app adds this
  * layer to its router.
  */
-export function SyncServer(changes: ReadonlyArray<ServerChange>) {
+export function SyncServer<R>(changes: ReadonlyArray<ServerChange<R>>) {
   const byName = new Map(changes.map((change) => [change.name, change]));
   const handlers = SyncRpcs.toLayer(
     Effect.gen(function* () {
       const log = yield* EventLog;
+      // The services of every server change. The composition root provides
+      // them, so a missing service fails the typecheck of the server app.
+      const services = yield* Effect.context<R>();
       const actors = yield* Actors;
       const syncGroups = yield* SyncGroups;
       // The `Load` queue of each open `Pull` stream, by RPC client. A `Load`
@@ -95,7 +99,7 @@ export function SyncServer(changes: ReadonlyArray<ServerChange>) {
           }
           return yield* log
             .commit(actor.organizationId, transaction.id, (db) =>
-              change.run(transaction.input, { db, actor }),
+              change.run(transaction.input, { db, actor }).pipe(Effect.provideContext(services)),
             )
             .pipe(
               Effect.matchEffect({
@@ -158,9 +162,7 @@ export function SyncServer(changes: ReadonlyArray<ServerChange>) {
       };
     }),
   );
-  return RpcServer.layer(SyncRpcs).pipe(
-    Layer.provide(trackedWebsocket),
-    Layer.provide(handlers),
-    Layer.provide(EventLogLive),
-  );
+  // The server app provides one `EventLog` for the sync server, the job
+  // runner and the routes, so a commit from any of them reaches each client.
+  return RpcServer.layer(SyncRpcs).pipe(Layer.provide(trackedWebsocket), Layer.provide(handlers));
 }

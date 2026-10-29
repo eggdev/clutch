@@ -83,16 +83,22 @@ These terms come from the
 
 ## Server
 
-| Term         | Meaning                                                                                       | Do not use             |
-| ------------ | --------------------------------------------------------------------------------------------- | ---------------------- |
-| Effect       | The server language and standard library. See [server](./architecture/server.md).             |                        |
-| Service      | An Effect `Context.Service` and the operations that it declares. It lives in `service/`.      | manager, helper        |
-| Layer        | An Effect value that builds a service. Write it with a capital L, and use it only for Effect. | module, tier, section  |
-| Live Layer   | The Layer that uses the real vendor.                                                          | prod adapter           |
-| Test Layer   | The Layer that uses a fake.                                                                   | mock layer             |
-| Edge         | The code that runs an Effect: `runtime/`, an app or a test.                                   | entry point (for this) |
-| Repo         | The private section with the Drizzle tables, queries and migrations of one package.           | DAO, db folder         |
-| Tagged error | An error class from `Schema.TaggedError`. Server code fails with one and never throws.        | exception              |
+| Term                     | Meaning                                                                                                           | Do not use                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| Effect                   | The server language and standard library. See [server](./architecture/server.md).                                 |                             |
+| Service                  | An Effect `Context.Service` and the operations that it declares. It lives in `service/`.                          | manager, helper             |
+| Layer                    | An Effect value that builds a service. Write it with a capital L, and use it only for Effect.                     | module, tier, section       |
+| Live Layer               | The Layer that uses the real vendor.                                                                              | prod adapter                |
+| Test Layer               | The Layer that uses a fake.                                                                                       | mock layer                  |
+| Edge                     | The code that runs an Effect: `runtime/`, an app or a test.                                                       | entry point (for this)      |
+| Repo                     | The private section with the Drizzle tables, queries and migrations of one package.                               | DAO, db folder              |
+| Tagged error             | An error class from `Schema.TaggedError`. Server code fails with one and never throws.                            | exception                   |
+| Transaction-safe service | A service that reads and writes only the transaction it is given. Only such a service may run in a server change. | pure service                |
+| Job                      | Work that runs after a commit, such as a vendor call. A server change asks for one through the outbox.            | background task, worker     |
+| Outbox                   | The `sync_jobs` table. A server change writes its jobs there in its own transaction.                              | queue (for this)            |
+| Schedule                 | A job that the job runner asks for at each interval.                                                              | cron                        |
+| System actor             | The actor of a write that no person makes, such as a job or a webhook. No access rule runs for it.                | admin, root                 |
+| Access rule              | The required `access` field of a server change. It decides who may run the change, before the change runs.        | permission check (for this) |
 
 ## Checks and process
 
