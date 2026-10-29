@@ -85,7 +85,7 @@ or replace product configuration. See [the CLI](./apps/cli/README.md) and
 | `docs/contributing/import-boundaries.md`   | `docs/contributing/decisions/0001-*` and later                        |
 | `tools/`                                   | `docs/contributing/setup/local-development.md`                        |
 | `.agents/skills/kickoff/`                  | `AGENTS.md`, `README.md`                                              |
-| `.agents/skills/deliver/`                  | Delivery records in the project's tracker or `.delivery/`             |
+| `.agents/skills/deliver/`                  | Delivery records in the project's tracker or `.clutch/issues/`        |
 
 A universal page never states a fact about one product. It links to the
 project page that owns the fact: the owner, the issue tracker, the journeys,
