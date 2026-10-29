@@ -1,6 +1,6 @@
 <!-- kickoff: Rewrite this file for the product. Keep "Start from a fresh clone" and "Documentation". Delete the template sections. -->
 
-# Project template
+# Clutch
 
 The starting point for a new project. It holds the parts that stay the same in
 every project: the engineering principles, the doc structure, the checks, the
@@ -28,10 +28,10 @@ mise exec -- bun install
 mise exec -- bun run dev
 ```
 
-- `http://project-template.localhost:1355` opens the web app: Vite, React and
+- `http://clutch.localhost:1355` opens the web app: Vite, React and
   TanStack Router. The notes example shows the sync engine. Open it in two
   tabs, and an edit in one shows in the other.
-- `http://api.project-template.localhost:1355` is the API: Bun and Effect, with
+- `http://api.clutch.localhost:1355` is the API: Bun and Effect, with
   Postgres in the process through PGlite. It needs no database server.
 - `bun run dev` uses servers that already run and starts only the missing ones.
   `bun run dev --check` shows which run.
@@ -65,8 +65,8 @@ the code and leaves unknowns open.
 From the receiving project's root, use a current committed template clone:
 
 ```sh
-bun ~/dev/project-template/apps/cli/src/main.ts review install --check --json
-bun ~/dev/project-template/apps/cli/src/main.ts review install
+bun <clutch clone>/apps/cli/src/main.ts review install --check --json
+bun <clutch clone>/apps/cli/src/main.ts review install
 ```
 
 Then ask the agent to use setup-verification to author the project's committed

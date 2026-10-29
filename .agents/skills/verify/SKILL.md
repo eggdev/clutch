@@ -1,9 +1,9 @@
 ---
 name: verify
-description: Execute Project Template's installer, SQLite session-queue, review-tool and web app journeys with real subprocesses, retained transcripts and owned cleanup. Use for verifying changes in this repository; use setup-verification to add or maintain journeys.
+description: Execute Clutch's installer, SQLite session-queue, review-tool and web app journeys with real subprocesses, retained transcripts and owned cleanup. Use for verifying changes in this repository; use setup-verification to add or maintain journeys.
 ---
 
-# Verify Project Template
+# Verify Clutch
 
 <!-- generated-by: setup-verification -->
 

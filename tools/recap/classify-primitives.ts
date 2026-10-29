@@ -44,7 +44,7 @@ function ownerOf(file: string, primitives: Array<Primitive>): Primitive | null {
 export function classify(root: string, paths: Array<string>): Classification {
   const registry: Registry | null = readRegistry(root);
   if (!registry) {
-    throw new Error(`${registryFile} is missing. Restore it from the project template.`);
+    throw new Error(`${registryFile} is missing. Restore it from Clutch.`);
   }
   const primitives = registry.primitives ?? [];
   const touched = new Map<string, Touched>();

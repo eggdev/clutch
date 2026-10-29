@@ -148,7 +148,7 @@ function registryProblems(root: string, registry: Registry): Array<string> {
 export function checkPrimitives(root: string): Array<string> {
   const registry: Registry | null = readRegistry(root);
   if (!registry) {
-    return [`${registryFile}: the file is missing. Restore it from the project template.`];
+    return [`${registryFile}: the file is missing. Restore it from Clutch.`];
   }
   const errors: Array<string> = [];
   try {

@@ -78,7 +78,7 @@ test('CODEOWNERS must name an owner for each guardrail pattern', async () => {
   ]);
   const { '.github/CODEOWNERS': _, ...withoutOwners } = valid;
   expect(await inRepo(withoutOwners, checkAgentHooks)).toEqual([
-    '.github/CODEOWNERS: the file is missing. Restore it from the project template.',
+    '.github/CODEOWNERS: the file is missing. Restore it from Clutch.',
   ]);
 });
 

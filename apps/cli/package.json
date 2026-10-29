@@ -1,8 +1,8 @@
 {
-  "name": "cli",
+  "name": "@repo/cli",
   "private": true,
   "bin": {
-    "template": "src/main.ts"
+    "clutch": "src/main.ts"
   },
   "type": "module",
   "dependencies": {

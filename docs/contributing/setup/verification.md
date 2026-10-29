@@ -1,14 +1,14 @@
 # Verification setup
 
 Use the committed [verify skill](../../../.agents/skills/verify/SKILL.md) for
-Project Template's real commands, flow selection, evidence and cleanup. Only
+Clutch's real commands, flow selection, evidence and cleanup. Only
 [setup-verification](../../../.agents/skills/setup-verification/SKILL.md) creates
 or maintains that executor. The [skill index](../../../.agents/skills/README.md)
 distinguishes delivery, authoring, execution, audit and recap.
 
 ## Reach the actual surface
 
-Project Template has two kinds of surface.
+Clutch has two kinds of surface.
 
 - **The starter app.** `apps/web` and `apps/api` run together through
   `mise exec -- bun run dev`. It reuses running servers and prints the

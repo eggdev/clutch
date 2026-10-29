@@ -24,7 +24,7 @@ if (process.argv[2] === 'review') {
 }
 if (process.argv.includes('--help')) {
   console.log(
-    'template [--yes] [--agent NAME]\ntemplate review install [--check] [--json]\n\nRun from the project receiving the tooling. Review install preserves project-specific verify and custom files.',
+    'clutch [--yes] [--agent NAME]\nclutch review install [--check] [--json]\n\nRun from the project receiving the tooling. Review install preserves project-specific verify and custom files.',
   );
   process.exit(0);
 }
@@ -108,7 +108,7 @@ const { values } = parseArgs({
   options: { agent: { type: 'string' }, yes: { type: 'boolean', default: false } },
 });
 
-prompts.intro('Project template');
+prompts.intro('Clutch');
 
 const project = await detectProject(process.cwd());
 if (project.kind === 'refused') {

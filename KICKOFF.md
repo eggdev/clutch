@@ -1,6 +1,6 @@
 # Kickoff
 
-This repository comes from the project template. It has the principles, the
+This repository comes from Clutch. It has the principles, the
 checks and the doc structure. It does not have a product yet.
 
 Open the project in any agent and run the kickoff skill with the owner:

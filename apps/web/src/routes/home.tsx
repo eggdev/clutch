@@ -10,7 +10,7 @@ function Home() {
   const load = useLoad();
   return (
     <main className="mx-auto flex max-w-xl flex-col gap-4 p-4">
-      <h1 className="text-heading text-fg">Project template</h1>
+      <h1 className="text-heading text-fg">Clutch</h1>
       <p className="text-body text-fg-muted">
         A local-first app. Each change shows at once and syncs in the background.
       </p>

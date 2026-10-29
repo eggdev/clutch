@@ -33,7 +33,7 @@ const mergers: Record<string, (project: string, template: string) => Merged> = {
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith('#') && !own.has(line));
     const content = missing.length
-      ? `${project}\n\n# From the project template\n${missing.join('\n')}\n`
+      ? `${project}\n\n# From Clutch\n${missing.join('\n')}\n`
       : `${project}\n`;
     return { content, conflicts: [] };
   },

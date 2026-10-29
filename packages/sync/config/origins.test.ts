@@ -6,7 +6,7 @@ import { Option } from 'effect';
 test('with no SYNC_ORIGINS, only loopback origins may open the socket', () => {
   const none = Option.none<ReadonlyArray<string>>();
   expect(originAllowed('http://localhost:5173', none)).toBe(true);
-  expect(originAllowed('http://project-template.localhost:1355', none)).toBe(true);
+  expect(originAllowed('http://clutch.localhost:1355', none)).toBe(true);
   expect(originAllowed('http://127.0.0.1:4000', none)).toBe(true);
   expect(originAllowed('https://evil.example', none)).toBe(false);
   expect(originAllowed('http://localhost.evil.example', none)).toBe(false);
