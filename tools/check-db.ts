@@ -35,7 +35,9 @@ export function layoutProblems(root: string, folder: string): Array<string> {
     return [`${folder}/repo/migrations/ is missing. Restore it with a \`.gitkeep\`.`];
   }
   const problems: Array<string> = [];
-  for (const entry of readdirSync(migrations, { withFileTypes: true })) {
+  for (const entry of readdirSync(migrations, { withFileTypes: true }).toSorted((a, b) =>
+    a.name.localeCompare(b.name),
+  )) {
     const where = `${folder}/repo/migrations/${entry.name}`;
     if (entry.name === '.gitkeep') {
       continue;
