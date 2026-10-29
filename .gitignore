@@ -36,9 +36,6 @@ test-results/
 # Python skill helpers
 __pycache__/
 
-# Wrangler local state
-.wrangler
-
 # Local review state
 .state/
 

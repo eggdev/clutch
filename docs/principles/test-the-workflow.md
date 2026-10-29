@@ -33,8 +33,8 @@ Our own code always runs for real in a test. Only an upstream vendor gets a
 stand-in, and only at the edge where our code calls the vendor. For a vendor,
 use the highest rung that exists:
 
-1. **The real service, run locally.** For example PGlite for Postgres, workerd
-   and Miniflare for Cloudflare, or `stripe-mock`. The template's tests run the
+1. **The real service, run locally.** For example PGlite for Postgres, or
+   `stripe-mock`. The template's tests run the
    real event log on PGlite.
 2. **A mock API server, when the vendor speaks HTTP and has no local
    runtime.** It answers the vendor's API on a local port. Our code calls
