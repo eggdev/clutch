@@ -42,7 +42,9 @@
     "tools/test-budget.ts",
     "tools/dev.ts",
     "tools/test-integrity-allow.json",
-    "packages/sync/service/transaction-safe.ts"
+    "packages/sync/service/transaction-safe.ts",
+    "docs/contributing/review.md",
+    ".cursor/BUGBOT.md"
   ],
   "exempt": {
     "AGENTS.md": "check-file-size measures its length, and the doc checks read it as a doc. It sets no rule.",

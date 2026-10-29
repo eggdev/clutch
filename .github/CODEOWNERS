@@ -9,7 +9,8 @@
 # that turns a lint rule off (oxlint.config.ts), a raised file-size budget
 # (tools/file-size-budgets.json), a knip ignore (knip.jsonc), a registry
 # exception or a transaction-safe service (primitives.yaml), and an allowed
-# test removal (tools/test-integrity-allow.json).
+# test removal (tools/test-integrity-allow.json). The review rules
+# (docs/contributing/review.md) decide what agent review blocks.
 
 /oxlint.config.ts @eggdev
 /stylelint.config.ts @eggdev
@@ -53,3 +54,5 @@
 /tools/dev.ts @eggdev
 /tools/test-integrity-allow.json @eggdev
 /packages/sync/service/transaction-safe.ts @eggdev
+/docs/contributing/review.md @eggdev
+/.cursor/BUGBOT.md @eggdev

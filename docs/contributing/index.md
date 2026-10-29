@@ -61,6 +61,12 @@ on those pages; this list only points at them.
 2. [System writes, routes and webhooks](./architecture/server.md#system-writes-routes-and-webhooks).
 3. [Generators](./setup/nx.md#generators): the `job` generator.
 
+**Review a pull request**
+
+1. [Review](./review.md): the rules and the finding levels.
+2. [Harness engineering](./harness-engineering.md#guardrail-files): the
+   guardrail files and the escape hatches.
+
 **Add a migration**
 
 1. [Migrations](./setup/migrations.md): only drizzle-kit writes one.
@@ -74,7 +80,9 @@ on those pages; this list only points at them.
   verification and its authorized destination; resume from its task record
 - [Setup](./setup/index.md): local services, configuration, checks
 - [Harness engineering](./harness-engineering.md): the agent-first loop, agent hooks, how to
-  turn a repeated lesson into a check, and PR review
+  turn a repeated lesson into a check, and weekly gardening
+- [Review](./review.md): the review rules that no check catches yet, and how
+  agent review runs on each PR
 - [Testing](./testing.md) and [end-to-end testing](./end-to-end-testing.md):
   which test type to write, console output, journeys
 - [Security](./security.md): the rules each change keeps, and the risks

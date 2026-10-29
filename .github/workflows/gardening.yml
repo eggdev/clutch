@@ -1,0 +1,125 @@
+name: Gardening
+
+# Once a week, an agent does the gardening pass in
+# docs/contributing/harness-engineering.md#weekly-gardening. The agent edits
+# files only. The steps after it commit to a gardening/<date> branch and open
+# one pull request. Nothing here pushes to the default branch.
+
+on:
+  schedule:
+    # Kickoff sets the day. See the kickoff slot in harness-engineering.md.
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+
+# Least privilege. The gardening job grants what it needs in its own block.
+permissions:
+  contents: read
+
+concurrency:
+  group: gardening
+  cancel-in-progress: false
+
+jobs:
+  gardening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - name: Find the Anthropic credential
+        id: credential
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::notice title=Gardening off::Add the ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret to turn on the weekly gardening pass."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      # One gardening PR at a time. A person reviews the open one first.
+      - name: Find an open gardening pull request
+        id: open
+        if: steps.credential.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("gardening/"))] | length')"
+          if [ "$open" != 0 ]; then
+            echo "::notice title=Gardening skipped::A gardening pull request is still open. Review and merge or close it first."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.open.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Do the gardening pass
+        id: garden
+        if: steps.open.outputs.run == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+
+            Do the weekly gardening pass. Follow the steps in
+            docs/contributing/harness-engineering.md, section "Weekly
+            gardening". The default branch is checked out.
+
+            - Read the pull requests merged in the last 7 days with
+              `gh pr list --state merged` and `gh pr view --comments`.
+            - Read open cleanup issues with `gh issue list` and
+              `gh issue view`.
+            - Make small edits to files only. Do not run git, and do not
+              push. A later step commits your edits and opens one pull request.
+            - A guardrail that needs a person's decision goes in the pull
+              request body as a proposal, not as an edit.
+            - Each cleanup issue that your edits close gets a "Closes #N" line
+              in the body.
+
+            Return a pull request title and a body in Markdown. The body lists
+            each edit and its reason, and each proposal. When the week needs
+            no edit, return an empty title.
+          claude_args: |
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*)"
+            --json-schema '{"type":"object","properties":{"title":{"type":"string"},"body":{"type":"string"}},"required":["title","body"]}'
+      - name: Open the gardening pull request
+        if: steps.open.outputs.run == 'true'
+        env:
+          RESULT: ${{ steps.garden.outputs.structured_output }}
+          # The action's token comes from the Claude GitHub App when it is
+          # installed. A PR that the default token opens starts no workflows,
+          # so CI and agent review would not run on it.
+          GH_TOKEN: ${{ steps.garden.outputs.github_token || github.token }}
+          # Kickoff sets this repository variable to the person who reviews.
+          REVIEWER: ${{ vars.GARDENING_REVIEWER }}
+        run: |
+          if [ -z "$RESULT" ]; then
+            echo "::error title=Gardening gave no result::The gardening step returned no structured output. Read its log."
+            exit 1
+          fi
+          title="$(printf '%s' "$RESULT" | jq -r '.title')"
+          if [ -z "$title" ] || [ -z "$(git status --porcelain)" ]; then
+            echo "::notice title=Gardening found nothing::The pass made no edits this week."
+            exit 0
+          fi
+          printf '%s' "$RESULT" | jq -r '.body' > "$RUNNER_TEMP/gardening-body.md"
+          branch="gardening/$(date -u +%Y-%m-%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$branch"
+          git add --all
+          git commit --message "$title"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base "${{ github.event.repository.default_branch }}" \
+            --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/gardening-body.md" \
+            ${REVIEWER:+--reviewer "$REVIEWER"}

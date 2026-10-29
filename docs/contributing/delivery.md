@@ -55,8 +55,9 @@ the authoring skill. Each repository has one verify entry point, including
 monorepos; platform and flow are selections inside it. For signed Linear Todo
 events, follow [`deliver-linear`](../../.agents/skills/deliver-linear/SKILL.md).
 Linear holds the authoritative task, and its actual status UUIDs map to the
-execution stages. Todo authorizes build, verification and a PR. Bugbot review
-and retained visual evidence are required before declaring the PR ready.
+execution stages. Todo authorizes build, verification and a PR. A
+[review](./review.md) with no blocking finding and retained visual evidence
+are required before declaring the PR ready.
 Merging and release need a separate grant and their own gates.
 
 ## Evidence before handoff

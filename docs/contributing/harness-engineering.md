@@ -142,9 +142,10 @@ The checks in `tools/` catch most drift on each change. They find:
 - workflow references
 - undocumented dependency overrides
 
-Cursor Bugbot reviews each PR against `.cursor/BUGBOT.md`. That file holds only
-the rules that a check cannot catch yet. When a check covers a rule, delete the
-rule from `BUGBOT.md`.
+[Review](./review.md) holds the rules that no check catches yet. An agent
+reviews each PR against it in `.github/workflows/agent-review.yml`. Cursor
+Bugbot reads the same page through `.cursor/BUGBOT.md`. When a check covers a
+rule, delete the rule from `review.md`.
 
 Record follow-up work as an issue. Leftovers from a migration follow
 [delete what is off the common path](../principles/delete-off-the-common-path.md).
@@ -156,23 +157,26 @@ never the only record of a leftover. Report a bug with the
 
 ## Weekly gardening
 
-Once a week, a scheduled agent does one short pass. It opens small pull
-requests, and a person reviews them:
+Once a week, `.github/workflows/gardening.yml` runs an agent for one short
+pass. The agent edits files only. The workflow commits the edits to a
+`gardening/<date>` branch and opens one pull request. It never pushes to the
+default branch, and it skips the week while a gardening PR is open. A person
+reviews the PR. The pass:
 
 1. Read the review comments of the week's merged PRs. Find a comment that
    repeats. Read delivery records for repeated owner interventions and rework.
 2. When a comment or an intervention repeats and a guardrail would stop it for
-   real, propose one, as an issue or a PR. Use the strongest cheap kind from
+   real, propose one in the PR body. Use the strongest cheap kind from
    [promote learning into enforcement](#promote-learning-into-enforcement).
    A week with no such repeat needs no guardrail.
 3. Delete stale guidance from `docs/contributing/`, and tighten unclear steps.
-4. Delete each rule from `.cursor/BUGBOT.md` that a check covers.
+4. Delete each rule from [`review.md`](./review.md) that a check covers.
 5. Close each cleanup issue whose "Ready when" criterion is true, in the PR
    that removes the leftover.
 
 Many small cleanups cost less than one large rewrite.
 
-<!-- kickoff: The scheduled agent that runs the weekly gardening pass, its day, and the person who reviews its pull requests. -->
+<!-- kickoff: The day of the gardening pass, as the cron line in .github/workflows/gardening.yml, and the person who reviews its pull requests, as the GARDENING_REVIEWER repository variable. -->
 
 ## References
 
