@@ -14,9 +14,38 @@ import {
 export type FeatureOptions = { readonly name: string };
 
 /**
- * Writes a feature with its gate, a screen and an empty `components/`, then
- * registers it: a primitive, the gate in the `one-gate` lint options, and a
- * route in the web app.
+ * The verify config, and the flow command that runs a journey. Nx loads a
+ * generator on its own, so these repeat `tools/journeys/journeys.ts`. The
+ * generator test runs `check-journeys` on the result.
+ */
+const verificationFile = '.agents/skills/verify/verification.json';
+const journeyCommand = (id: string) => ['mise', 'exec', '--', 'bun', 'run', 'journey', id];
+
+/** Registers a web journey as a flow in the verify config. A project without one is skipped. */
+function addJourneyFlow(tree: Tree, id: string) {
+  const source = tree.read(verificationFile, 'utf-8');
+  if (source === null) {
+    return;
+  }
+  const config = JSON.parse(source);
+  config.flows = {
+    ...config.flows,
+    [id]: {
+      platform: 'web',
+      role: 'the dev actor in one browser context, against the dev servers',
+      ownsStack: true,
+      timeoutSeconds: 300,
+      artifactPaths: ['test-results/journeys'],
+      commands: [journeyCommand(id)],
+    },
+  };
+  tree.write(verificationFile, `${JSON.stringify(config, null, 2)}\n`);
+}
+
+/**
+ * Writes a feature with its gate, a screen, an empty `components/` and a
+ * draft journey, then registers it: a primitive, the gate in the `one-gate`
+ * lint options, a route in the web app, and the journey as a verify flow.
  */
 export function addFeature(tree: Tree, options: FeatureOptions) {
   const name = names(options.name);
@@ -46,6 +75,7 @@ export function addFeature(tree: Tree, options: FeatureOptions) {
     code: [`${directory}/`],
     docs: ['docs/principles/one-gate-per-feature.md'],
   });
+  addJourneyFlow(tree, `${name.fileName}-open`);
   const routes = `apps/web/src/routes/${name.fileName}`;
   addGate(tree, `/${name.fileName}`, `${directory}/gate.ts`, routes);
   if (tree.exists('apps/web/src/router.ts')) {

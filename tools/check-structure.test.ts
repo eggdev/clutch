@@ -20,6 +20,7 @@ test('a package with only sections and config files, and a feature with its gate
         'features/billing/gate.ts': '',
         'features/billing/screens/billing-screen.tsx': '',
         'features/billing/components/.gitkeep': '',
+        'features/billing/journeys/billing-open.pw.ts': '',
       },
       checkStructure,
     ),
@@ -42,8 +43,8 @@ test('a folder that is not a section, a loose file, and a feature without its ga
       checkStructure,
     ),
   ).toEqual([
-    'features/billing/hooks/: a feature has only `gate.ts`, `screens/` and `components/`. Move shared code into a package.',
-    'features/billing/utils.ts: a feature has only `gate.ts`, `screens/` and `components/`. Move shared code into a package.',
+    'features/billing/hooks/: a feature has only `gate.ts`, `screens/`, `components/` and `journeys/`. Move shared code into a package.',
+    'features/billing/utils.ts: a feature has only `gate.ts`, `screens/`, `components/` and `journeys/`. Move shared code into a package.',
     'features/billing: has no `gate.ts`. Each feature has one gate. See docs/principles/one-gate-per-feature.md.',
     'packages/billing/index.ts: a package keeps code in sections. Move the file into the section that owns it.',
     'packages/billing/lib/: not a section. Move the code into one of: types, config, models, commands, repo, service, jobs, runtime, ui, testing.',

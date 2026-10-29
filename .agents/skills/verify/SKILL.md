@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Execute Project Template's installer, SQLite session-queue and review-tool journeys with real subprocesses, retained transcripts and owned cleanup. Use for verifying changes in this repository; use setup-verification to add or maintain journeys.
+description: Execute Project Template's installer, SQLite session-queue, review-tool and web app journeys with real subprocesses, retained transcripts and owned cleanup. Use for verifying changes in this repository; use setup-verification to add or maintain journeys.
 ---
 
 # Verify Project Template
@@ -9,13 +9,16 @@ description: Execute Project Template's installer, SQLite session-queue and revi
 
 This executor was authored through setup-verification. It is committed with its
 configuration and feature map; the runner lives in tools and works without the
-authoring skill. No service, browser, simulator or account sign-in is needed.
+authoring skill. The tooling flows need no service, browser or sign-in. Web
+journeys need Chromium and the dev servers; no simulator or account sign-in is
+needed.
 
 ## Select
 
 Read [features](./features/README.md). Changes to the queue use session-queue;
 changes to skill helpers use review-tools; installer changes use installer.
-Run each affected suite once.
+Changes to a feature, its packages or the web app use that feature's journeys,
+such as notes-sync. Run each affected suite once.
 For a missing assertion invoke setup-verification's authoring operation, then
 return here. Do not create another verify skill or run an unrelated passing flow.
 
@@ -30,6 +33,9 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
 Doctor checks Git identity, pinned Bun/SQLite availability and Python. Missing
 dependencies are prerequisites; do not install or start a machine service as a
 verification side effect. Tests create and dispose their own temporary runtimes.
+A journey flow reuses running dev servers. When one is down, the journey runner
+starts the missing ones through `tools/dev.ts` and stops only those. Missing
+Chromium is a prerequisite: `bunx playwright install chromium`.
 
 ## Drive and retain proof
 
@@ -37,6 +43,7 @@ verification side effect. Tests create and dispose their own temporary runtimes.
 python3 tools/verification/verify.py --config .agents/skills/verify/verification.json run session-queue
 python3 tools/verification/verify.py --config .agents/skills/verify/verification.json run review-tools
 python3 tools/verification/verify.py --config .agents/skills/verify/verification.json run installer
+python3 tools/verification/verify.py --config .agents/skills/verify/verification.json run notes-sync
 mise exec -- bun run validate
 ```
 

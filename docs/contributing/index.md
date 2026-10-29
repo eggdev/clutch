@@ -76,7 +76,9 @@ on those pages; this list only points at them.
 - [Harness engineering](./harness-engineering.md): the agent-first loop, agent hooks, how to
   turn a repeated lesson into a check, and PR review
 - [Testing](./testing.md) and [end-to-end testing](./end-to-end-testing.md):
-  which test type to write, console output, journeys
+  journeys first, which test type to write, console output
+- [Journeys](./setup/verification.md#journeys): add a journey, run it, and
+  register it as a verify flow
 - [Security](./security.md): the rules each change keeps, and the risks
   accepted on purpose
 - [Operations](./operations/index.md): rollback, secret rotation, operator

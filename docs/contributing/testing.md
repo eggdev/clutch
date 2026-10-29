@@ -4,15 +4,27 @@ How to choose a test type and run tests in this repository. The durable rules
 are in [test the workflow](../principles/test-the-workflow.md) and
 [no invasive test-only code](../principles/no-invasive-test-only-code.md).
 
+## Journeys first
+
+A [journey](./glossary.md#checks-and-process) is the main behavioral test. It
+drives the real app the way a user does, so it fails when the product fails.
+Each feature that an app ships has at least one journey for that platform.
+`check-journeys` rejects a shipped feature with no journey. See
+[journeys](./setup/verification.md#journeys) for the files and the commands.
+
+Add an integration test when a vendor runtime decides the behavior, such as a
+query or a socket. Add a unit test only for logic with many cases that a
+journey would run slowly.
+
 ## Choose the lightest test type
 
-Pick the lightest type that can prove the behavior wrong.
+After the journey, pick the lightest type that can prove the behavior wrong.
 
-| Type        | Use when                                                                                        | Avoid when                                                               |
-| ----------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Unit        | Pure logic, or a module that a Test Layer from `testing/` covers honestly                       | The assertion needs a real vendor runtime, such as a database or a queue |
-| Integration | The behavior depends on the real local runtime of a vendor: queries, storage, sockets           | The code under test never touches the runtime                            |
-| End-to-end  | A user-critical journey through the real app. See [end-to-end testing](./end-to-end-testing.md) | An edge case, copy, or anything a faster test covers                     |
+| Type        | Use when                                                                              | Avoid when                                                               |
+| ----------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Unit        | Pure logic, or a module that a Test Layer from `testing/` covers honestly             | The assertion needs a real vendor runtime, such as a database or a queue |
+| Integration | The behavior depends on the real local runtime of a vendor: queries, storage, sockets | The code under test never touches the runtime                            |
+| End-to-end  | A journey through the real app. See [end-to-end testing](./end-to-end-testing.md)     | An edge case, copy, or anything a faster test covers                     |
 
 <!-- kickoff: The test runner and the file suffix for each type, and the command that runs one file of each type. -->
 

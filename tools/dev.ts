@@ -128,7 +128,7 @@ const portlessEnv = () => ({
 });
 
 /** The URL that portless gives a name, with the worktree prefix it adds in a linked worktree. */
-function urlOf(root: string, name: string): string {
+export function urlOf(root: string, name: string): string {
   const run = Bun.spawnSync([portless(root), 'get', name], {
     cwd: root,
     env: { ...process.env, ...portlessEnv() },

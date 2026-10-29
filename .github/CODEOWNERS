@@ -53,3 +53,5 @@
 /tools/dev.ts @eggdev
 /tools/test-integrity-allow.json @eggdev
 /packages/sync/service/transaction-safe.ts @eggdev
+/tools/journeys/ @eggdev
+/.agents/skills/verify/verification.json @eggdev

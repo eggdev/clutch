@@ -11,6 +11,7 @@
   "exclude": [
     "**/*.test.ts",
     "**/*.test.tsx",
+    "journeys/**",
     "testing/**",
     "out-tsc/**",
     "node_modules/**",

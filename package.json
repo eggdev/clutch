@@ -17,6 +17,7 @@
     "validate": "CI=1 nx run-many -t typecheck test lint format-check lint-policy-test skill-tests audit-prod checks",
     "check": "nx run-many -t typecheck lint format-check",
     "dev": "bun tools/dev.ts",
+    "journey": "bun tools/journeys/run.ts",
     "format": "nx run-many -t format",
     "recap:classify": "bun tools/recap/classify-primitives.ts",
     "recap:upsert": "bun tools/recap/upsert-recap-block.ts"
@@ -26,6 +27,7 @@
     "@cloudflare/workers-types": "5.20261001.1",
     "@nx/js": "23.3.0",
     "@nx/oxlint": "23.3.0",
+    "@playwright/test": "1.64.1",
     "@types/bun": "1.4.3",
     "@types/node": "22.20.5",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
@@ -274,8 +276,23 @@
           "skill-tests",
           "check-guardrail-coverage",
           "check-transaction-safe",
-          "check-test-integrity"
+          "check-test-integrity",
+          "check-journeys"
         ]
+      },
+      "check-journeys": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-journeys.ts"
+        },
+        "cache": false
+      },
+      "journeys": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/journeys/run.ts --all"
+        },
+        "cache": false
       },
       "check-guardrail-coverage": {
         "executor": "nx:run-commands",

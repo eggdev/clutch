@@ -42,9 +42,10 @@ test('pre-push reads one ref per line and ignores blank lines', () => {
   ]);
 });
 
-test('pre-push runs the fast checks on each push that changes a path, and the tests only when code changed', () => {
+test('pre-push runs the fast checks on each push that changes a path, and the tests and journeys only when code changed', () => {
+  const code = ['test', 'lint-policy-test', 'checks', 'journeys'];
   expect(pushTargets(['docs/a.md', 'README.md'])).toEqual(['checks']);
-  expect(pushTargets(['docs/a.md', 'tools/a.ts'])).toEqual(['test', 'lint-policy-test', 'checks']);
-  expect(pushTargets(null)).toEqual(['test', 'lint-policy-test', 'checks']);
+  expect(pushTargets(['docs/a.md', 'tools/a.ts'])).toEqual(code);
+  expect(pushTargets(null)).toEqual(code);
   expect(pushTargets([])).toEqual([]);
 });

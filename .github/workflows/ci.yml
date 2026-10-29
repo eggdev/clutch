@@ -55,3 +55,38 @@ jobs:
           # A PR compares with its target branch. A push to main compares with
           # the commit before the push.
           CHECK_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+
+  # Journeys drive the web app in a browser against the dev servers, so they
+  # run in their own job and not in validate. See
+  # docs/contributing/setup/verification.md#journeys.
+  journeys:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v2
+      - run: bun install --frozen-lockfile
+      # Chromium is about 150 MB, so the cache keeps it for each Playwright version.
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+      - name: Install the Chromium system libraries
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+      - run: bun run journey --all
+      - name: Keep the traces of a failed journey
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-traces
+          path: test-results/journeys
+          if-no-files-found: ignore

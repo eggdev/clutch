@@ -42,13 +42,16 @@
     "tools/test-budget.ts",
     "tools/dev.ts",
     "tools/test-integrity-allow.json",
-    "packages/sync/service/transaction-safe.ts"
+    "packages/sync/service/transaction-safe.ts",
+    "tools/journeys/**",
+    ".agents/skills/verify/verification.json"
   ],
   "exempt": {
     "AGENTS.md": "check-file-size measures its length, and the doc checks read it as a doc. It sets no rule.",
     "README.md": "check-structure allows it in a package, and the doc checks read it as a doc. It sets no rule.",
     "docs/contributing/documentation.md": "check-docs-temporal skips it because it quotes the changelog phrases. It sets no rule.",
     "tools/recap/classify-primitives.ts": "It writes the PR recap block. It enforces no rule.",
-    "tools/recap/upsert-recap-block.ts": "It writes the PR recap block. It enforces no rule."
+    "tools/recap/upsert-recap-block.ts": "It writes the PR recap block. It enforces no rule.",
+    ".agents/skills/setup-verification/references/journey-specification.md": "A journey header follows its format, and check-journeys quotes its path in a fix. It sets no rule."
   }
 }

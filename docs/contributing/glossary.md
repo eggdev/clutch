@@ -102,17 +102,19 @@ These terms come from the
 
 ## Checks and process
 
-| Term            | Meaning                                                                                                                | Do not use                 |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| Check           | A script in `tools/check-*.ts` that rejects a problem in the repository.                                               | validator                  |
-| Lint rule       | A rule that oxlint or Stylelint runs on one file.                                                                      | check (for a lint rule)    |
-| Validate        | The one command that runs every check: `mise exec -- bun run validate`.                                                | gate (for this command)    |
-| Generator       | An Nx generator in `tools/generators/` that makes a package, feature, command or model in its one shape.               | scaffold script            |
-| Agent hook      | A script in `.agents/hooks/` that Claude Code and Codex run before or after a tool call, or at the end of a turn.      | plugin (for this)          |
-| Guardrail file  | A file that configures a check, a lint rule, a hook or a budget. `tools/guardrail-files.json` lists them.              | config (alone)             |
-| Decision record | A short page in `decisions/` that states one project decision, its reason and when to revisit it.                      | ADR (in prose), design doc |
-| One-way door    | A change that a later change cannot undo, such as a stored shape. See [two-way doors](../principles/two-way-doors.md). | irreversible change        |
-| Kickoff slot    | An HTML comment that kickoff replaces with a fact about one project.                                                   | placeholder, TODO          |
+| Term            | Meaning                                                                                                                                             | Do not use                               |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Check           | A script in `tools/check-*.ts` that rejects a problem in the repository.                                                                            | validator                                |
+| Lint rule       | A rule that oxlint or Stylelint runs on one file.                                                                                                   | check (for a lint rule)                  |
+| Validate        | The one command that runs every check: `mise exec -- bun run validate`.                                                                             | gate (for this command)                  |
+| Generator       | An Nx generator in `tools/generators/` that makes a package, feature, command or model in its one shape.                                            | scaffold script                          |
+| Journey         | A test that proves one user goal through the real app: a Playwright `.pw.ts` file or a Maestro `.maestro.yaml` file in `features/<name>/journeys/`. | end-to-end test (for one file), scenario |
+| Verify flow     | A flow in `.agents/skills/verify/verification.json` that `verify.py` runs and keeps evidence for. Each journey is one.                              | test suite (for this)                    |
+| Agent hook      | A script in `.agents/hooks/` that Claude Code and Codex run before or after a tool call, or at the end of a turn.                                   | plugin (for this)                        |
+| Guardrail file  | A file that configures a check, a lint rule, a hook or a budget. `tools/guardrail-files.json` lists them.                                           | config (alone)                           |
+| Decision record | A short page in `decisions/` that states one project decision, its reason and when to revisit it.                                                   | ADR (in prose), design doc               |
+| One-way door    | A change that a later change cannot undo, such as a stored shape. See [two-way doors](../principles/two-way-doors.md).                              | irreversible change                      |
+| Kickoff slot    | An HTML comment that kickoff replaces with a fact about one project.                                                                                | placeholder, TODO                        |
 
 ## Words with one meaning only
 
