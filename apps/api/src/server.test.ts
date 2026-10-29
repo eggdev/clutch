@@ -125,17 +125,32 @@ test('a socket request from an origin that SYNC_ORIGINS does not list gets 403',
         'sec-websocket-version': '13',
       };
       const key = { 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==' };
-      const status = (origin: string) =>
-        Effect.promise(() =>
-          fetch(url, { headers: { ...upgrade, ...key, origin } }).then(
-            (response) => response.status,
-          ),
-        );
-      return [yield* status('https://evil.example'), yield* status('http://localhost:5173')];
+      // A refused origin gets a plain 403 response, so `fetch` returns.
+      const refused = yield* Effect.promise(() =>
+        fetch(url, { headers: { ...upgrade, ...key, origin: 'https://evil.example' } }).then(
+          (response) => response.status,
+        ),
+      );
+      // An allowed origin upgrades, and an upgraded connection never ends a
+      // `fetch`. A real socket shows the upgrade, then closes.
+      const opened = yield* Effect.promise(
+        () =>
+          new Promise<boolean>((resolve) => {
+            const socket = new WebSocket(url.replace('http', 'ws'), {
+              headers: { origin: 'http://localhost:5173' },
+            });
+            socket.addEventListener('open', () => {
+              socket.close();
+              resolve(true);
+            });
+            socket.addEventListener('error', () => resolve(false));
+          }),
+      );
+      return [refused, opened] as const;
     }).pipe(Effect.provide(server)),
   );
   expect(statuses[0]).toBe(403);
-  expect(statuses[1]).not.toBe(403);
+  expect(statuses[1]).toBe(true);
 });
 
 test('a pull from a sync ID past the log end fails with ServerBehind, as after a restore', async () => {
