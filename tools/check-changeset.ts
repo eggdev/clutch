@@ -1,5 +1,5 @@
 import { findBase } from '@tools/check-migrations';
-import { changesetDir, parseChangeset } from '@tools/release/changeset';
+import { changesetDir, packageName, parseChangeset } from '@tools/release/changeset';
 
 /**
  * Every merge to main is a release, so each change carries a changeset that
@@ -26,13 +26,14 @@ export async function checkChangeset(root: string, base: string | null): Promise
   if (!files.some((file) => !exempt(file))) {
     return [];
   }
+  const name = await packageName(root);
   for (const file of files.filter(
     (item) => item.startsWith(`${changesetDir}/`) && item.endsWith('.md'),
   )) {
     const text = await Bun.file(`${root}/${file}`)
       .text()
       .catch(() => '');
-    if (parseChangeset(file, text)) {
+    if (parseChangeset(file, text, name)) {
       return [];
     }
   }

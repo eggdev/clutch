@@ -11,7 +11,7 @@ import {
 } from '@tools/github/stack';
 import type { Run } from '@tools/github/stack';
 import { conventionalProblem } from '@tools/hooks/commit-msg';
-import { bumpOf, changesetDir, changesetText } from '@tools/release/changeset';
+import { bumpOf, changesetDir, changesetText, packageName } from '@tools/release/changeset';
 
 /**
  * The pull request commands that every project uses. They open each PR ready
@@ -161,7 +161,7 @@ async function ensureChangeset(
   }
   const file = `${changesetDir}/${branch.replaceAll(/[^\w-]+/gu, '-')}.md`;
   const bump = bumpOf(title);
-  await write(file, changesetText(bump, title));
+  await write(file, changesetText(await packageName(root), bump, title));
   await must(run, ['git', 'add', file]);
   await must(run, [
     'git',

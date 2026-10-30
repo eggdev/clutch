@@ -23,14 +23,14 @@ test('a conventional title decides the bump', () => {
 });
 
 test('a changeset round-trips, and a file for another package is ignored', () => {
-  const text = changesetText('minor', 'feat: add clutch init');
-  expect(parseChangeset('.changeset/a.md', text)).toEqual({
+  const text = changesetText('clutch', 'minor', 'feat: add clutch init');
+  expect(parseChangeset('.changeset/a.md', text, 'clutch')).toEqual({
     file: '.changeset/a.md',
     bump: 'minor',
     summary: 'feat: add clutch init',
   });
   expect(
-    parseChangeset('.changeset/b.md', '---\n"@repo/cli": patch\n---\n\nfix: x\n'),
+    parseChangeset('.changeset/b.md', '---\n"@repo/cli": patch\n---\n\nfix: x\n', 'clutch'),
   ).toBeUndefined();
 });
 
@@ -68,7 +68,10 @@ test('a release bumps package.json, writes the changelog and removes the changes
       JSON.stringify({ name: 'clutch', version: '0.1.0' }),
     );
     await mkdir(path.join(root, '.changeset'));
-    await writeFile(path.join(root, '.changeset/a.md'), changesetText('minor', 'feat: add init'));
+    await writeFile(
+      path.join(root, '.changeset/a.md'),
+      changesetText('clutch', 'minor', 'feat: add init'),
+    );
     await writeFile(path.join(root, '.changeset/README.md'), '# Changesets\n');
     expect(await applyRelease(root, '2026-10-30')).toMatchObject({ version: '0.2.0' });
     expect(JSON.parse(await readFile(path.join(root, 'package.json'), 'utf-8')).version).toBe(

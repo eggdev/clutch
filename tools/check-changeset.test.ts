@@ -18,6 +18,10 @@ async function repo() {
   git(root, 'config', 'user.email', 't@t');
   git(root, 'config', 'user.name', 't');
   await writeFile(path.join(root, 'README.md'), '# r\n');
+  await writeFile(
+    path.join(root, 'package.json'),
+    JSON.stringify({ name: 'shop', version: '0.0.0' }),
+  );
   git(root, 'add', '--all');
   git(root, 'commit', '--quiet', '--no-verify', '-m', 'base');
   return { root, base: git(root, 'rev-parse', 'HEAD') };
@@ -29,7 +33,7 @@ test('a change without a changeset fails, and one with a changeset passes', asyn
     await writeFile(path.join(root, 'tool.ts'), 'export {};\n');
     expect(await checkChangeset(root, base)).toHaveLength(1);
     await mkdir(path.join(root, '.changeset'));
-    await writeFile(path.join(root, '.changeset/x.md'), changesetText('patch', 'fix: x'));
+    await writeFile(path.join(root, '.changeset/x.md'), changesetText('shop', 'patch', 'fix: x'));
     expect(await checkChangeset(root, base)).toEqual([]);
   } finally {
     await rm(root, { recursive: true, force: true });

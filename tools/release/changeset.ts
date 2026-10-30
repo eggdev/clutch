@@ -2,13 +2,13 @@ import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /**
- * Changesets for Clutch. Each PR adds one file in `.changeset/` with the
- * changesets frontmatter, `"clutch": patch | minor | major`, and a one-line
+ * Changesets for a repository that releases as one package: Clutch or a project
+ * made from it. Each PR adds one file in `.changeset/` with the changesets
+ * frontmatter, `"<root package name>": patch | minor | major`, and a one-line
  * summary. A release folds every pending changeset into one version and one
  * CHANGELOG.md section. See docs/contributing/setup/releases.md.
  */
 export const changesetDir = '.changeset';
-const releasePackage = 'clutch';
 
 export type Bump = 'patch' | 'minor' | 'major';
 export type Changeset = { file: string; bump: Bump; summary: string };
@@ -25,32 +25,40 @@ export function bumpOf(title: string): Bump {
   return match?.[1] === 'feat' ? 'minor' : 'patch';
 }
 
-export function changesetText(bump: Bump, summary: string) {
-  return `---\n"${releasePackage}": ${bump}\n---\n\n${summary}\n`;
+/** The name of the root package, which each changeset names. */
+export async function packageName(root: string): Promise<string> {
+  const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf-8'));
+  return manifest.name;
 }
 
-/** Reads one changeset file. Returns nothing when it does not hold a bump for Clutch. */
-export function parseChangeset(file: string, text: string): Changeset | undefined {
+const quote = (name: string) => name.replaceAll(/[.*+?^${}()|[\]\\/]/gu, String.raw`\$&`);
+
+export function changesetText(name: string, bump: Bump, summary: string) {
+  return `---\n"${name}": ${bump}\n---\n\n${summary}\n`;
+}
+
+/** Reads one changeset file. Returns nothing when it holds no bump for the package `name`. */
+export function parseChangeset(file: string, text: string, name: string): Changeset | undefined {
   const match = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/u.exec(text);
   const bump =
     match &&
-    new RegExp(`^["']?${releasePackage}["']?:\\s*(patch|minor|major)\\s*$`, 'mu').exec(match[1]);
+    new RegExp(`^["']?${quote(name)}["']?:\\s*(patch|minor|major)\\s*$`, 'mu').exec(match[1]);
   return match && bump ? { file, bump: bump[1] as Bump, summary: match[2].trim() } : undefined;
 }
 
-async function readChangesets(root: string) {
-  let names: Array<string>;
+async function readChangesets(root: string, name: string) {
+  let entries: Array<string>;
   try {
-    names = await readdir(path.join(root, changesetDir));
+    entries = await readdir(path.join(root, changesetDir));
   } catch {
     return [];
   }
   const changesets: Array<Changeset> = [];
-  for (const name of names
+  for (const entry of entries
     .filter((item) => item.endsWith('.md') && item !== 'README.md')
     .toSorted()) {
-    const file = `${changesetDir}/${name}`;
-    const parsed = parseChangeset(file, await readFile(path.join(root, file), 'utf-8'));
+    const file = `${changesetDir}/${entry}`;
+    const parsed = parseChangeset(file, await readFile(path.join(root, file), 'utf-8'), name);
     if (parsed) {
       changesets.push(parsed);
     }
@@ -102,12 +110,12 @@ export function prependSection(changelog: string, section: string) {
 
 /** Writes the release: the version in package.json, the CHANGELOG.md section, and no pending changesets. */
 export async function applyRelease(root: string, date: string) {
-  const changesets = await readChangesets(root);
+  const manifestPath = path.join(root, 'package.json');
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf-8'));
+  const changesets = await readChangesets(root, manifest.name);
   if (changesets.length === 0) {
     return;
   }
-  const manifestPath = path.join(root, 'package.json');
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf-8'));
   const version = nextVersion(manifest.version, changesets);
   manifest.version = version;
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

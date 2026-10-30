@@ -11,6 +11,7 @@ import { loadRegistry } from '@/doctor/registry';
 import { cliRoot, formatText } from '@/format';
 import { git, gitOrThrow } from '@/git';
 import { adoptedLineage } from '@/init/adopt';
+import { freshChangelog } from '@/install-template';
 import { renderTracker } from '@/issues/render';
 import { lineagePath, loadClutchSource } from '@/sync/source';
 
@@ -116,6 +117,10 @@ async function run(args: Array<string>, cwd: string, template: string): Promise<
     };
     await write(root, lineagePath, `${JSON.stringify(lineage, null, 2)}\n`);
     written.push(lineagePath);
+  }
+  if (!(await Bun.file(path.join(root, freshChangelog.path)).exists())) {
+    await write(root, freshChangelog.path, freshChangelog.text);
+    written.push(freshChangelog.path);
   }
   await write(root, '.clutch/README.md', trackerReadme);
   await mkdir(path.join(root, '.clutch/issues'), { recursive: true });
