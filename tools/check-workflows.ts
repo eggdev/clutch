@@ -2,13 +2,14 @@
  * GitHub Actions workflows in .github/workflows/. GitHub resolves a
  * `steps.<id>` or `needs.<id>` reference that names no step or job to an empty
  * string, so the run does not fail. This check rejects those references, a
- * workflow without a top-level `permissions` block, and the
- * `pull_request_target` trigger. See docs/contributing/setup/checks.md#ci.
+ * workflow without a top-level `permissions` block, the `pull_request_target`
+ * trigger, and a `uses:` that pins no commit SHA. See
+ * docs/contributing/setup/checks.md#ci.
  */
 const folder = '.github/workflows';
 
-type Step = { id?: unknown };
-type Job = { needs?: unknown; steps?: Array<Step> };
+type Step = { id?: unknown; uses?: unknown };
+type Job = { needs?: unknown; steps?: Array<Step>; uses?: unknown };
 type Workflow = { on?: unknown; permissions?: unknown; jobs?: Record<string, Job> };
 
 /** The expressions in a parsed YAML value: each `${{ … }}`, and each `if:` value, which may omit the braces. */
@@ -37,6 +38,29 @@ const references = (texts: Array<string>, context: string) => [
     ),
   ),
 ];
+
+/**
+ * A tag or branch can move to other code, so a `uses:` ref names a full commit
+ * SHA. A local `./` path runs this commit's own code. A Docker image pins a
+ * `sha256` digest.
+ */
+function isPinned(uses: string): boolean {
+  if (uses.startsWith('./')) {
+    return true;
+  }
+  if (uses.startsWith('docker://')) {
+    return /@sha256:[0-9a-f]{64}$/u.test(uses);
+  }
+  return /@[0-9a-f]{40}$/u.test(uses);
+}
+
+function pinError(file: string, job: string, uses: string): string {
+  const [path, tag = '<tag>'] = uses.split('@');
+  const repository = path.split('/').slice(0, 2).join('/');
+  return uses.startsWith('docker://')
+    ? `${file}: job \`${job}\` uses \`${uses}\`. Pin the image to its digest: \`<image>@sha256:<digest>\`.`
+    : `${file}: job \`${job}\` uses \`${uses}\`. Pin a full commit SHA with the tag in a comment: \`${path}@<sha> # ${tag}\`. \`gh api repos/${repository}/git/ref/tags/${tag}\` prints the SHA, and an annotated tag needs \`gh api repos/${repository}/git/tags/<object sha>\` too.`;
+}
 
 function names(value: unknown): Array<string> {
   if (typeof value === 'string') {
@@ -76,6 +100,11 @@ export function findWorkflowErrors(file: string, source: string): Array<string> 
   const jobs = workflow.jobs ?? {};
   for (const [job, definition] of Object.entries(jobs)) {
     const steps = new Set((definition.steps ?? []).map((step) => step.id).filter(Boolean));
+    for (const uses of [definition.uses, ...(definition.steps ?? []).map((step) => step.uses)]) {
+      if (typeof uses === 'string' && !isPinned(uses)) {
+        errors.push(pinError(file, job, uses));
+      }
+    }
     const needs = new Set(names(definition.needs));
     for (const need of needs) {
       if (!Object.hasOwn(jobs, need)) {
@@ -130,7 +159,7 @@ if (import.meta.main) {
     console.error(
       [
         `Workflow check failed (${errors.length}).`,
-        'Fix each reference, trigger or permissions block below. See docs/contributing/setup/checks.md#ci.',
+        'Fix each reference, trigger, permissions block or pin below. See docs/contributing/setup/checks.md#ci.',
         '',
         ...errors,
       ].join('\n'),
@@ -138,7 +167,7 @@ if (import.meta.main) {
     process.exitCode = 1;
   } else {
     console.log(
-      'Workflows name real steps and jobs, set permissions and avoid pull_request_target.',
+      'Workflows name real steps and jobs, set permissions, avoid pull_request_target and pin each action to a commit SHA.',
     );
   }
 }

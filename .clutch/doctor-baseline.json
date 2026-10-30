@@ -4,7 +4,7 @@
   "canonical_check": "present",
   "changed_scope_check": "partial",
   "ci_failure_explainer": "missing",
-  "ci_security_lint": "partial",
+  "ci_security_lint": "present",
   "cloud_agent_vm": "partial",
   "codeowners": "present",
   "codeql_sast": "missing",

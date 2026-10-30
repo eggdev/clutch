@@ -65,7 +65,7 @@ tests the workflow and dependency checks.
 | `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                                                                                                                               |
 | `check-kickoff-slots`        | A kickoff slot left in a doc after `KICKOFF.md` is deleted                                                                                                                                                      |
 | `check-primitives`           | A broken [registry](../architecture/primitives.yaml) entry, or an Nx project with no primitive                                                                                                                  |
-| `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target`                                                                                                                |
+| `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target`, an unpinned `uses:`                                                                                           |
 | `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)                                                                                                                            |
 | `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md)                                                                                                              |
 | `check-guardrail-coverage`   | A file that a check, a lint plugin or a hook reads, with no pattern in `tools/guardrail-files.json`. See [guardrail files](../harness-engineering.md#guardrail-files)                                           |
@@ -92,7 +92,7 @@ and a link to the page that owns the rule above the list of problems. See
 
 `check-workflows` reads each workflow with `Bun.YAML`. GitHub turns a
 `steps.<id>` or `needs.<id>` reference to a missing step or job into an empty
-string, and the run continues. See [CI](#ci) for the other two rules.
+string, and the run continues. See [CI](#ci) for the other three rules.
 
 [Dependencies](./dependencies.md) explains `check-dependency-overrides` and
 `audit-prod`. `audit-prod` needs network access.
@@ -221,6 +221,12 @@ with the `commit-msg` rule in [Git hooks](#git-hooks).
   new image then arrives in a reviewed PR, not on GitHub's schedule.
 - Each action runs on the Node.js 24 runtime. GitHub ends Node.js 20 for
   actions, and no action offers Node.js 26 yet.
+- Each `uses:` pins a full commit SHA, with the release tag in a comment, such
+  as `actions/checkout@<sha> # v7.0.1`. A tag or branch can move to other code
+  after review. A reusable workflow from another repository, such as the Clutch
+  doctor workflow, pins a SHA too. Only a local `./` path needs no pin.
+  `check-workflows` rejects any other `uses:`, and its message names the
+  `gh api` command that prints the SHA.
 - Each workflow sets a top-level `permissions` block. Start from
   `contents: read`, and grant more only in the job that needs it.
 - A PR from a fork never gets a token that writes, such as a cache write token
