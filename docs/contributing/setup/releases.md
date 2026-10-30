@@ -24,6 +24,10 @@ feat(cli): add clutch init
   and `!` gives `major`.
 - The gardening workflow writes its PR's changeset the same way, from the
   title the agent returns.
+- Self-hosted Renovate writes a `patch` changeset for each of its PRs, from
+  the PR title. A post-upgrade task runs
+  `tools/release/renovate-changeset.mjs`. See
+  [Renovate](./dependencies.md#renovate).
 - `check-changeset` fails a change outside `.clutch/` that has no changeset.
   A release needs none. Its range may touch only the release output: deleted
   changesets, `CHANGELOG.md` and the root `package.json`. It passes when it
