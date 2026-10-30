@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1 (2026-10-30)
+
+### Fixes and maintenance
+
+- fix(release): pass check-changeset on a release commit (CL-116)
+
 ## 0.11.0 (2026-10-30)
 
 ### Features
