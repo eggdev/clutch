@@ -22,7 +22,7 @@ its options, and so does `bun run pr --help`.
 | `bun run clutch doctor [--remote]`       | You want each capability's state, or GitHub's. | Reading workflows and settings by hand.      |
 | `bun run clutch doctor --check`          | You changed `clutch.yaml` or a capability.     | Guessing whether a waiver still holds.       |
 | `bun run clutch risk [--base <ref>]`     | You want a change's risk tier before a PR.     | Judging the tier from the file list.         |
-| `bun run clutch labels [--title <title>]` | You want a change's kind and area labels before a PR. | Choosing `kind/` and `area/` labels by hand. |
+| `bun run clutch labels [--title <title>]` | You want a change's kind, area and size labels, or its size warning, before a PR. | Choosing `kind/`, `area/` and `size/` labels by hand. |
 
 `validate` prints the output of each failed task inline, so read it there.
 
