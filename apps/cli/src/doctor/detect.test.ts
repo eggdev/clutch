@@ -54,9 +54,10 @@ test('on the template tree the seed entries are present, present and missing', a
   const started = performance.now();
   const found = await detect(root, registry.capabilities ?? []);
   expect(performance.now() - started).toBeLessThan(1000);
-  expect(found.map((item) => [item.id, item.status])).toEqual([
-    ['root_agents_md', 'present'],
-    ['codeowners', 'present'],
-    ['codeql_sast', 'missing'],
+  const status = Object.fromEntries(found.map((item) => [item.id, item.status]));
+  expect([status.root_agents_md, status.codeowners, status.codeql_sast]).toEqual([
+    'present',
+    'present',
+    'missing',
   ]);
 });

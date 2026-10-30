@@ -9,34 +9,588 @@ capabilities:
     phase: P0
     level: core
     effort: S
-    research: { rank: 1, priority: 61.4, adoption_top: 0.89 }
+    research:
+      rank: 1
+      priority: 61.4
+      adoption_top: 0.89
     doc: docs/contributing/capabilities/root-agents-md.md
     detect:
       - file: AGENTS.md
-
+  - id: nested_agent_rules
+    name: Nested / scoped agent rules
+    category: Agent context
+    phase: P3
+    level: core
+    effort: S
+    research:
+      rank: 12
+      priority: 45.9
+      adoption_top: 0.93
+    doc: docs/contributing/capabilities/nested-agent-rules.md
+    detect:
+      - file: '*/**/AGENTS.md'
+        exclude:
+          - .agents/**
+          - node_modules/**
+  - id: skills_dir
+    name: Agent skills directory
+    category: Agent context
+    phase: P0
+    level: core
+    effort: S
+    research:
+      rank: 8
+      priority: 47.8
+      adoption_top: 0.81
+    doc: docs/contributing/capabilities/skills-dir.md
+    detect:
+      - any:
+          - file: .agents/skills/*/SKILL.md
+          - file: .claude/skills/*/SKILL.md
+  - id: friction_log
+    name: Friction logs / agent learnings file
+    category: Scale loops
+    phase: P3
+    level: core
+    effort: S
+    research:
+      rank: 9
+      priority: 47.2
+      adoption_top: 0.26
+    doc: docs/contributing/capabilities/friction-log.md
+    detect:
+      - any:
+          - file: .clutch/friction.jsonl
+          - file: '**/learnings.md'
   - id: codeowners
     name: CODEOWNERS / ownership registry
     category: Review & merge
     phase: P0
     level: core
     effort: S
-    research: { rank: 5, priority: 49.6, adoption_top: 0.85 }
+    research:
+      rank: 5
+      priority: 49.6
+      adoption_top: 0.85
     doc: docs/contributing/capabilities/codeowners.md
     detect:
       - any:
           - file: .github/CODEOWNERS
           - file: CODEOWNERS
           - file: docs/CODEOWNERS
-
+  - id: pr_template
+    name: PR template
+    category: Review & merge
+    phase: P0
+    level: core
+    effort: S
+    research:
+      rank: 2
+      priority: 59.9
+      adoption_top: 0.93
+    doc: docs/contributing/capabilities/pr-template.md
+    detect:
+      - any:
+          - file: .github/pull_request_template.md
+          - file: .github/PULL_REQUEST_TEMPLATE/*.md
+  - id: git_hooks
+    name: Git hooks (pre-commit / lefthook / husky / prek)
+    category: Verification
+    phase: P0
+    level: core
+    effort: S
+    research:
+      rank: 13
+      priority: 45.7
+      adoption_top: 0.67
+    doc: docs/contributing/capabilities/git-hooks.md
+    detect:
+      - any:
+          - file: .githooks/*
+          - file: .husky/*
+          - file: lefthook.y*ml
+  - id: canonical_check
+    name: Single canonical check command
+    category: Verification
+    phase: P0
+    level: core
+    effort: S
+    research:
+      rank: 20
+      priority: 42.3
+      adoption_top: 0.89
+    doc: docs/contributing/capabilities/canonical-check.md
+    detect:
+      - script: validate
+  - id: dev_bootstrap
+    name: One-command local setup
+    category: Verification
+    phase: P0
+    level: core
+    effort: S
+    research:
+      rank: 14
+      priority: 45.6
+      adoption_top: 0.96
+    doc: docs/contributing/capabilities/dev-bootstrap.md
+    detect:
+      - script: dev
+      - any:
+          - file: mise.toml
+          - file: .tool-versions
+  - id: project_cli
+    name: Project task runner / CLI (just, make, mise, xtask, hogli, dda)
+    category: Verification
+    phase: P0
+    level: core
+    effort: M
+    research:
+      rank: 39
+      priority: 32.1
+      adoption_top: 0.48
+    doc: docs/contributing/capabilities/project-cli.md
+    detect:
+      - any:
+          - grep:
+              files: apps/*/package.json
+              pattern: '"bin"'
+          - file: justfile
+          - file: Makefile
+  - id: verification_cli
+    name: Repo-owned agent verification CLI (drives the running app)
+    category: Verification
+    phase: P0
+    level: core
+    effort: L
+    research:
+      rank: 42
+      priority: 30.6
+      adoption_top: 0.48
+    doc: docs/contributing/capabilities/verification-cli.md
+    detect:
+      - any:
+          - file: .agents/skills/verify/verification.json
+          - file: tools/verification/verify.py
+      - file: .agents/skills/verify/features/*.md
+  - id: custom_lint_plugin
+    name: In-repo custom lint plugin / rules
+    category: Lint & guardrails
+    phase: P0
+    level: extra
+    effort: M
+    research:
+      rank: 55
+      priority: 27.6
+      adoption_top: 0.63
+    doc: docs/contributing/capabilities/custom-lint-plugin.md
+    detect:
+      - file: tools/lint/*.mjs
+      - file: tools/lint/**/*.test.*
+  - id: suppression_discipline
+    name: Lint-suppression discipline (reason required / no-disable)
+    category: Lint & guardrails
+    phase: P0
+    level: core
+    effort: S
+    research:
+      rank: 19
+      priority: 42.4
+      adoption_top: 0.63
+    doc: docs/contributing/capabilities/suppression-discipline.md
+    detect:
+      - any:
+          - target: check-suppressions
+          - file: .github/scripts/check-lint-suppressions.*
+  - id: ratchets
+    name: Ratchets / shrink-only baselines
+    category: Lint & guardrails
+    phase: P3
+    level: core
+    effort: M
+    research:
+      rank: 27
+      priority: 36.5
+      adoption_top: 0.63
+    doc: docs/contributing/capabilities/ratchets.md
+    detect:
+      - yaml:
+          file: .clutch/ratchets.json
+          path: ratchets
+      - target: check-ratchets
+    partial_if:
+      - grep:
+          files: packages/lint-rules/**
+          pattern: shrink-only|ratchet
+  - id: file_size_caps
+    name: File-size / blob-size caps
+    category: Lint & guardrails
+    phase: P0
+    level: core
+    effort: S
+    research:
+      rank: 47
+      priority: 29.1
+      adoption_top: 0.37
+    doc: docs/contributing/capabilities/file-size-caps.md
+    detect:
+      - any:
+          - target: check-file-size
+          - file: tools/file-size-budgets.json
+  - id: changed_scope_check
+    name: Changed-files / affected-scope check
+    category: Verification
+    phase: P3
+    level: core
+    effort: M
+    research:
+      rank: 17
+      priority: 44.5
+      adoption_top: 0.85
+    doc: docs/contributing/capabilities/changed-scope-check.md
+    detect:
+      - workflow:
+          run: nx affected|affected -t|nx-set-shas
+      - grep:
+          files: tools/hooks/**
+          pattern: CHECK_BASE|merge-base
+  - id: protected_main
+    name: Protected default branch (PR-only, required checks)
+    category: Trust
+    phase: P1
+    level: core
+    effort: S
+    research:
+      rank: null
+      note: Clutch addition; not in the research dataset
+    doc: docs/contributing/capabilities/protected-main.md
+    detect:
+      - remote: protected_main
+  - id: secret_scanning
+    name: Secret scanning
+    category: Trust
+    phase: P1
+    level: core
+    effort: S
+    research:
+      rank: 91
+      priority: 14.5
+      adoption_top: 0.19
+    doc: docs/contributing/capabilities/secret-scanning.md
+    detect:
+      - any:
+          - file: .gitleaks.toml
+          - grep:
+              files: .githooks/*
+              pattern: gitleaks
+          - workflow:
+              run: gitleaks
+      - all:
+          - remote: secret_scanning
+          - remote: push_protection
   - id: codeql_sast
     name: CodeQL / SAST
     category: Trust
     phase: P1
     level: core
     effort: S
-    research: { rank: 16, priority: 44.6, adoption_top: 0.67 }
+    research:
+      rank: 16
+      priority: 44.6
+      adoption_top: 0.67
     doc: docs/contributing/capabilities/codeql-sast.md
     detect:
       - any:
-          - workflow: { uses: github/codeql-action/ }
+          - workflow:
+              uses: github/codeql-action/
           - remote: code_scanning_default_setup
+  - id: dep_automation
+    name: Dependency update bots (Renovate / Dependabot)
+    category: Trust
+    phase: P1
+    level: core
+    effort: S
+    research:
+      rank: 50
+      priority: 28.8
+      adoption_top: 0.78
+    doc: docs/contributing/capabilities/dep-automation.md
+    detect:
+      - any:
+          - file: renovate.json*
+          - file: .github/renovate.json*
+          - file: .github/dependabot.y*ml
+  - id: dep_min_age
+    name: Dependency minimum release age / update cooldown
+    category: Trust
+    phase: P1
+    level: core
+    effort: S
+    research:
+      rank: 30
+      priority: 34.4
+      adoption_top: 0.7
+    doc: docs/contributing/capabilities/dep-min-age.md
+    detect:
+      - any:
+          - grep:
+              files: bunfig.toml
+              pattern: minimumReleaseAge
+          - grep:
+              files: renovate.json*
+              pattern: minimumReleaseAge
+          - grep:
+              files: .npmrc
+              pattern: minimum-release-age
+  - id: ci_security_lint
+    name: GitHub Actions security lint (zizmor / actionlint / pinned actions)
+    category: Trust
+    phase: P1
+    level: core
+    effort: S
+    research:
+      rank: 34
+      priority: 33.4
+      adoption_top: 0.59
+    doc: docs/contributing/capabilities/ci-security-lint.md
+    detect:
+      - any:
+          - target: check-workflows
+          - workflow:
+              run: actionlint|zizmor
+      - workflow:
+          pinned: true
+  - id: oidc_ci
+    name: OIDC / keyless credentials in CI (id-token)
+    category: Trust
+    phase: P1
+    level: extra
+    effort: S
+    research:
+      rank: 38
+      priority: 32.2
+      adoption_top: 0.78
+    doc: docs/contributing/capabilities/oidc-ci.md
+    detect:
+      - grep:
+          files: .github/workflows/*.y*ml
+          pattern: role-to-assume|workload_identity_provider|azure/login
+  - id: worktree_parallel
+    name: Worktree / parallel-agent workspace setup
+    category: Parallel work
+    phase: P2
+    level: core
+    effort: M
+    research:
+      rank: 3
+      priority: 53.7
+      adoption_top: 0.78
+    doc: docs/contributing/capabilities/worktree-parallel.md
+    detect:
+      - grep:
+          files: docs/**/*.md
+          pattern: worktree
+      - yaml:
+          file: clutch.yaml
+          path: worktree.root
+  - id: cloud_agent_vm
+    name: Cloud-agent VM / sandbox setup in repo
+    category: Parallel work
+    phase: P2
+    level: core
+    effort: M
+    research:
+      rank: 79
+      priority: 19.4
+      adoption_top: 0.37
+    doc: docs/contributing/capabilities/cloud-agent-vm.md
+    detect:
+      - any:
+          - file: .cursor/environment.json
+          - file: .devcontainer/devcontainer.json
+    partial_if:
+      - file: mise.toml
+  - id: mcp_config
+    name: Repo MCP config for agents
+    category: Parallel work
+    phase: P2
+    level: extra
+    effort: S
+    research:
+      rank: 31
+      priority: 34.2
+      adoption_top: 0.41
+    doc: docs/contributing/capabilities/mcp-config.md
+    detect:
+      - any:
+          - file: .mcp.json
+          - file: .cursor/mcp.json
+    partial_if:
+      - file: .mcp.example.json
+  - id: ai_review_bot
+    name: AI review bot configured in repo
+    category: Review & merge
+    phase: P0
+    level: core
+    effort: S
+    research:
+      rank: 18
+      priority: 43.5
+      adoption_top: 0.59
+    doc: docs/contributing/capabilities/ai-review-bot.md
+    detect:
+      - any:
+          - file: .cursor/BUGBOT.md
+          - workflow:
+              uses: anthropics/claude-code-action
+          - file: .coderabbit.y*ml
+  - id: ai_review_blocking
+    name: AI review findings gate merge (severity / triage)
+    category: Review & merge
+    phase: P3
+    level: core
+    effort: M
+    research:
+      rank: 62
+      priority: 23.7
+      adoption_top: 0.15
+    doc: docs/contributing/capabilities/ai-review-blocking.md
+    detect:
+      - grep:
+          files: .github/workflows/*review*.y*ml
+          pattern: blocking
+      - remote: required_check:agent-review
+  - id: ci_failure_explainer
+    name: CI failure explainer / investigation agent
+    category: Review & merge
+    phase: P3
+    level: extra
+    effort: M
+    research:
+      rank: 63
+      priority: 23.7
+      adoption_top: 0.37
+    doc: docs/contributing/capabilities/ci-failure-explainer.md
+    detect:
+      - workflow:
+          'on': workflow_run
+      - grep:
+          files: .github/workflows/*.y*ml
+          pattern: log-failed|conclusion == .failure.
+  - id: flaky_quarantine
+    name: Flaky-test quarantine / registry
+    category: Verification
+    phase: P3
+    level: core
+    effort: M
+    research:
+      rank: 46
+      priority: 29.4
+      adoption_top: 0.52
+    doc: docs/contributing/capabilities/flaky-quarantine.md
+    detect:
+      - any:
+          - file: tools/flaky-tests.json
+          - file: .clutch/flaky.json
+  - id: flake_hunter
+    name: Flake hunters / test audit loops
+    category: Scale loops
+    phase: P5
+    level: extra
+    effort: M
+    research:
+      rank: 26
+      priority: 36.5
+      adoption_top: 0.33
+    doc: docs/contributing/capabilities/flake-hunter.md
+    detect:
+      # One scheduled workflow that reruns tests. A schedule alone is gardening, not a flake hunt.
+      - workflow:
+          'on': schedule
+          run: rerun-each|repeat-each|flake
+  - id: pr_size_limits
+    name: PR size limits / size labels
+    category: Review & merge
+    phase: P4
+    level: core
+    effort: S
+    research:
+      rank: 69
+      priority: 22.5
+      adoption_top: 0.19
+    doc: docs/contributing/capabilities/pr-size-limits.md
+    detect:
+      - any:
+          - grep:
+              files: .github/workflows/*.y*ml
+              pattern: pr-size|size/XL
+          - yaml:
+              file: clutch.yaml
+              path: pr_size
+  - id: merge_queue
+    name: Merge queue / merge trains
+    category: Review & merge
+    phase: P4
+    level: core
+    effort: S
+    research:
+      rank: 73
+      priority: 21.3
+      adoption_top: 0.48
+    doc: docs/contributing/capabilities/merge-queue.md
+    detect:
+      - workflow:
+          'on': merge_group
+      - remote: merge_queue
+  - id: risk_tier_automerge
+    name: Risk-tiered / scoped auto-merge or auto-approve
+    category: Review & merge
+    phase: P4
+    level: core
+    effort: L
+    research:
+      rank: 7
+      priority: 48.3
+      adoption_top: 0.7
+    doc: docs/contributing/capabilities/risk-tier-automerge.md
+    detect:
+      - file: .clutch/risk.yaml
+      - grep:
+          files: .github/workflows/*.y*ml
+          pattern: gh pr merge --auto
+      - remote: allow_auto_merge
+  - id: gardener_bots
+    name: Scheduled gardener / maintenance agents
+    category: Scale loops
+    phase: P5
+    level: extra
+    effort: M
+    research:
+      rank: 51
+      priority: 28.7
+      adoption_top: 0.33
+    doc: docs/contributing/capabilities/gardener-bots.md
+    detect:
+      - any:
+          - file: .github/workflows/gardening.y*ml
+          - all:
+              - workflow:
+                  'on': schedule
+              - workflow:
+                  uses: anthropics/claude-code-action
+  - id: factory_observability
+    name: Factory telemetry (agent spend, CI timing, quality signals)
+    category: Scale loops
+    phase: P5
+    level: extra
+    effort: M
+    research:
+      rank: 28
+      priority: 36.2
+      adoption_top: 0.44
+    doc: docs/contributing/capabilities/factory-observability.md
+    detect:
+      - any:
+          - grep:
+              files: .github/workflows/*.y*ml
+              pattern: clutch metrics
+          - file: .clutch/metrics.yaml
