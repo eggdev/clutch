@@ -156,7 +156,9 @@ async function ensureChangeset(
     '--',
     changesetDir,
   ]);
-  if (added.split('\n').some((file) => file.endsWith('.md') && !file.endsWith('/README.md'))) {
+  if (
+    added.split('\n').some((file) => file.endsWith('.md') && path.basename(file) !== 'README.md')
+  ) {
     return;
   }
   const file = `${changesetDir}/${branch.replaceAll(/[^\w-]+/gu, '-')}.md`;
