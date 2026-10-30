@@ -26,6 +26,6 @@ test("the template's own clutch.yaml loads", async () => {
   const root = path.resolve(import.meta.dir, '../../../..');
   expect(await loadClutchConfig(root)).toMatchObject({
     kind: 'loaded',
-    config: { project: 'clutch', template: { mode: 'doctor' }, sast: 'auto' },
+    config: { project: 'clutch', template: { mode: 'doctor' }, sast: 'semgrep' },
   });
 });

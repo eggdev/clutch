@@ -56,4 +56,4 @@ automerge:
 # The static analysis engine that .github/workflows/sast.yml runs. auto runs CodeQL where
 # code scanning takes results and Semgrep elsewhere. This repository is public, so auto runs
 # CodeQL. Kickoff asks each project. See docs/contributing/capabilities/codeql-sast.md.
-sast: auto
+sast: semgrep
