@@ -207,7 +207,12 @@ mise exec -- bun run clutch doctor --phase P1
 - Each line shows the detected state, the declared state and the evidence or
   the waiver reason. A summary line follows.
 - A repository without `clutch.yaml` reports each capability as undeclared.
-- `--category` and `--phase` narrow the report. `--remote` is for remote probes.
+- `--category` and `--phase` narrow the report.
+- `--remote` reads GitHub settings for the `remote:` rules: branch rules and
+  protection, secret scanning, push protection, the merge queue, auto-merge and
+  CodeQL default setup. It sends only `gh api` GET requests, for the origin
+  repository or `--repo OWNER/NAME`. A setting that the token cannot read is
+  unknown, and an unknown result never fails `--check`.
 - It exits 0 after a report, and 1 when the registry or `clutch.yaml` is bad.
 
 `clutch doctor --check` is the gate. It fails, and exits 1, in these cases:

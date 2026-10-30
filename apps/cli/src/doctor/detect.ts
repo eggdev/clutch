@@ -1,6 +1,6 @@
 import type { CapabilityEntry, Rule } from '@/doctor/registry';
 import { context, evaluate } from '@/doctor/rules';
-import type { Context } from '@/doctor/rules';
+import type { Context, RuleResult } from '@/doctor/rules';
 import { gitOrThrow } from '@/git';
 
 export type Status = 'present' | 'partial' | 'missing' | 'unknown';
@@ -45,9 +45,13 @@ async function detectOne(entry: CapabilityEntry, ctx: Context): Promise<Detectio
 export async function detect(
   root: string,
   capabilities: Array<CapabilityEntry>,
-  options: { remote?: boolean; listFiles?: (root: string) => Promise<Array<string>> } = {},
+  options: {
+    remote?: boolean;
+    probe?: (name: string) => Promise<RuleResult>;
+    listFiles?: (root: string) => Promise<Array<string>>;
+  } = {},
 ) {
   const files = await (options.listFiles ?? trackedFiles)(root);
-  const ctx = context(root, files, options.remote ?? false);
+  const ctx = { ...context(root, files, options.remote ?? false), probe: options.probe };
   return Promise.all(capabilities.map((entry) => detectOne(entry, ctx)));
 }

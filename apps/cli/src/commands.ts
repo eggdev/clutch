@@ -19,7 +19,7 @@ export const commands: Record<string, Command> = {
   },
   doctor: {
     usage:
-      'clutch doctor [--root DIR] [--json] [--remote] [--category C] [--phase P]\nclutch doctor --check\nclutch doctor --write-baseline [--allow-downgrade]',
+      'clutch doctor [--root DIR] [--json] [--remote [--repo OWNER/NAME]] [--category C] [--phase P]\nclutch doctor --check\nclutch doctor --write-baseline [--allow-downgrade]',
     summary: 'Report which capabilities a repository has, next to what its clutch.yaml declares.',
     run: doctorCommand,
   },
