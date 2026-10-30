@@ -54,33 +54,13 @@ If one is false, use Path B. Migrations only move forward. See
 
 ## 4. Path B: forward fix
 
-1. Open a revert PR or a fix PR against the main branch. To revert a merged
-   PR, add the `revert` label to it. See
-   [revert a merged pull request](#revert-a-merged-pull-request).
+1. Open a revert PR or a fix PR against the main branch.
 2. Merge it when CI passes.
 3. Watch the deploy workflow until it ends.
 4. Check that health reports the new SHA.
 
 To put a known-good commit live, make it the head of the main branch. Do not
 deploy an old SHA by hand.
-
-### Revert a merged pull request
-
-Add the `revert` label to a merged PR. The
-[Revert workflow](../../../.github/workflows/revert.yml) then:
-
-1. Reverts its merge commit on a `revert/<number>` branch, with `-m 1` for a
-   merge commit.
-2. Commits it as `revert: <original title>`, cut to one 72-character line, with
-   a patch changeset.
-3. Pushes the branch and opens the revert PR with the release bot token, so CI
-   runs on it. The PR links the original.
-4. Comments on the original PR, and asks for the reason for the revert.
-
-Merge the revert PR like any other, once its checks pass. When a later change
-touches the same lines, the revert conflicts. The workflow then comments on the
-original PR and opens nothing, so revert it by hand or fix forward. Without the
-release bot, the default token opens the PR, and CI does not start on it.
 
 ## 5. After any rollback
 

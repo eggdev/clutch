@@ -57,7 +57,6 @@ changeset from the PR title, and the release workflow does the rest. See
 | -------------------------------------- | -------------------------------------------- | ------------------------------------ |
 | `bun run clutch sync --check`          | You want to know if a project is behind.     | Comparing files with the template.   |
 | `bun run clutch sync`                  | You move a project to the latest release.    | Copying template files by hand.      |
-| The `revert` label on a merged PR      | A merged PR must come out.                   | A hand-made `git revert` and PR.     |
 
 ## Do not hand-roll
 
