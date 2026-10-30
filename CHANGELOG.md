@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.3 (2026-10-30)
+
+### Fixes and maintenance
+
+- fix(verify): start no flow before its owner record (CL-107)
+
 ## 0.14.2 (2026-10-30)
 
 ### Fixes and maintenance
