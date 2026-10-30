@@ -106,24 +106,25 @@ change to one.
 
 Each escape hatch lives in a guardrail file, so the review sees it:
 
-| Escape hatch                                 | Where it lives                                                                  |
-| -------------------------------------------- | ------------------------------------------------------------------------------- |
-| An override that turns a lint rule off       | `oxlint.config.ts`                                                              |
-| A raised file-size budget                    | `tools/file-size-budgets.json`                                                  |
-| A knip ignore or entry                       | `knip.jsonc`                                                                    |
-| An import exception                          | `primitives.yaml`, `exceptions`                                                 |
-| A transaction-safe service                   | `primitives.yaml`, `transactionSafe`                                            |
-| A test file that a change may delete or thin | `tools/test-integrity-allow.json`                                               |
-| A dependency override                        | `tools/dependency-overrides.yaml`                                               |
-| Agent review of a PR that a bot opened       | `agent-review.yml`, `allowed_bots`                                              |
-| A path kept out of a risk tier               | `.clutch/risk.yaml`, a rule's `except`                                          |
-| A zizmor finding the owner accepted          | `# zizmor: ignore[<audit>]` in the workflow                                     |
-| A Semgrep false positive                     | `nosemgrep: rule-id -- reason` on the line, which `check-suppressions` enforces |
-| A Semgrep rule off for the whole repository  | `sast.yml`, `--exclude-rule`                                                    |
-| A file that tooling reads but sets no rule   | `tools/guardrail-files.json`, `exempt`                                          |
-| A release range that needs no changeset      | `tools/check-changeset.ts`, `onlyReleases`                                      |
-| A changeset written for a Renovate PR        | `renovate.json`, `postUpgradeTasks`                                             |
-| Files kept out of the PR size count          | `clutch.yaml`, `pr_size.exclude`                                                |
+| Escape hatch                                              | Where it lives                                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| An override that turns a lint rule off                    | `oxlint.config.ts`                                                              |
+| A raised file-size budget                                 | `tools/file-size-budgets.json`                                                  |
+| A knip ignore or entry                                    | `knip.jsonc`                                                                    |
+| An import exception                                       | `primitives.yaml`, `exceptions`                                                 |
+| A transaction-safe service                                | `primitives.yaml`, `transactionSafe`                                            |
+| A test file that a change may delete or thin              | `tools/test-integrity-allow.json`                                               |
+| A dependency override                                     | `tools/dependency-overrides.yaml`                                               |
+| Agent review of a PR that a bot opened                    | `agent-review.yml`, `allowed_bots`                                              |
+| A path kept out of a risk tier                            | `.clutch/risk.yaml`, a rule's `except`                                          |
+| A zizmor finding the owner accepted                       | `# zizmor: ignore[<audit>]` in the workflow                                     |
+| A Semgrep false positive                                  | `nosemgrep: rule-id -- reason` on the line, which `check-suppressions` enforces |
+| A Semgrep rule off for the whole repository               | `sast.yml`, `--exclude-rule`                                                    |
+| A file that tooling reads but sets no rule                | `tools/guardrail-files.json`, `exempt`                                          |
+| A release range that needs no changeset                   | `tools/check-changeset.ts`, `onlyReleases`                                      |
+| A changeset written for a Renovate PR                     | `renovate.json`, `postUpgradeTasks`                                             |
+| Files kept out of the PR size count                       | `clutch.yaml`, `pr_size.exclude`                                                |
+| Lockfiles, snapshots and `.clutch/` out of the size count | `apps/cli/src/labels/compute.ts`, `sizeExcluded`                                |
 
 <!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS. -->
 

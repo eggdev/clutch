@@ -235,8 +235,10 @@ migrations. It also holds two lists that each project fills: its billing code,
 and its infra, deploy and secrets paths.
 
 The [Labels workflow](../../../.github/workflows/labels.yml) labels each PR
-`kind/<type>` from its title and `area/<part>` for each workspace package or
-top folder it touches, with `clutch labels`. See
+`kind/<type>` from its title, `area/<part>` for each workspace package or
+top folder it touches, and `size/S` to `size/XL` by its changed lines, with
+`clutch labels`. Above `pr_size.warn` in `clutch.yaml` the run warns. Size
+never fails a PR. See
 [labels](../review.md#labels).
 
 <!-- kickoff: The globs of the project's payment and billing code, as the paths of the billing rule in .clutch/risk.yaml. Leave the list empty when the product bills nothing. -->
