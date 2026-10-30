@@ -116,8 +116,10 @@ test('merge uses gh stack for a PR in a stack, and gh pr merge for a lone PR', a
     ['git show', { out: '{"version":"1.0.0"}' }],
   ]);
   await runPr(['merge', '12'], lone.run, noWrite, clock);
-  expect(lone.calls).toContain('gh pr merge 12 --merge');
-  expect(lone.calls).toContain('git fetch --prune origin');
+  // The fetch runs right after the merge, before the release wait.
+  const merged = lone.calls.indexOf('gh pr merge 12 --merge');
+  expect(merged).not.toBe(-1);
+  expect(lone.calls[merged + 1]).toBe('git fetch --prune origin');
   expect(lone.calls.at(-1)).toBe('git show origin/main:package.json');
 });
 
