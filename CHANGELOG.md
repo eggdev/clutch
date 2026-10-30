@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.8 (2026-10-30)
+
+### Fixes and maintenance
+
+- ci: run actions on Node 24 and pin ubuntu-26.04 (CL-042)
+
 ## 0.6.7 (2026-10-30)
 
 ### Fixes and maintenance
