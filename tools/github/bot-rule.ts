@@ -20,7 +20,7 @@ export function botKind(headRefName: string) {
 
 /**
  * The files that skip the line-by-line version check in `renovateProblems`.
- * `bun.lock` is generated: CI's `bun install --frozen-lockfile` fails unless
+ * The lockfile is generated: CI's `bun install --frozen-lockfile` fails unless
  * it matches the package.json versions, which this rule does check. Renovate's
  * own changeset, `.changeset/renovate-*.md`, is release-note text that runs no
  * code.
