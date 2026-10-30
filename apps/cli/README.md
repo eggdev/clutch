@@ -199,6 +199,7 @@ worktree: # optional
 automerge: # optional
   mode: dry-run # off (the default), dry-run or on
   step: low # bots (the default), low or medium: how far auto-merge reaches
+  owner: eggdev # optional: the login whose reactions grade the dry-run verdicts
 pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 sast: auto # optional: auto (the default), codeql or semgrep

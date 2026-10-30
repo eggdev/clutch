@@ -6,12 +6,12 @@ OIDC. Change a secret only with the owner. `clutch.yaml` records the
 
 ## Secrets and variables
 
-| Name                      | Kind                                | Read by                                                                        | Provider                    | GitHub OIDC                               |
-| ------------------------- | ----------------------------------- | ------------------------------------------------------------------------------ | --------------------------- | ----------------------------------------- |
-| `CLAUDE_CODE_OAUTH_TOKEN` | secret                              | `agent-review.yml`, `gardening.yml`                                            | Anthropic, Claude plan      | No. A plan token has no OIDC exchange     |
-| `ANTHROPIC_API_KEY`       | secret                              | `agent-review.yml`, `gardening.yml`                                            | Anthropic, Claude API       | Yes, through workload identity federation |
-| `CLUTCH_APP_PRIVATE_KEY`  | secret in the `release` environment | `release.yml`, `gardening.yml`, `renovate.yml`, `revert.yml`, `auto-merge.yml` | GitHub App, the release bot | No. The key signs the app's own login     |
-| `CLUTCH_APP_ID`           | variable                            | the same workflows                                                             | GitHub App, the release bot | Not a secret                              |
+| Name                      | Kind                                | Read by                                                                                              | Provider                    | GitHub OIDC                               |
+| ------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------- | ----------------------------------------- |
+| `CLAUDE_CODE_OAUTH_TOKEN` | secret                              | `agent-review.yml`, `gardening.yml`                                                                  | Anthropic, Claude plan      | No. A plan token has no OIDC exchange     |
+| `ANTHROPIC_API_KEY`       | secret                              | `agent-review.yml`, `gardening.yml`                                                                  | Anthropic, Claude API       | Yes, through workload identity federation |
+| `CLUTCH_APP_PRIVATE_KEY`  | secret in the `release` environment | `release.yml`, `gardening.yml`, `renovate.yml`, `revert.yml`, `auto-merge.yml`, `grade-verdicts.yml` | GitHub App, the release bot | No. The key signs the app's own login     |
+| `CLUTCH_APP_ID`           | variable                            | the same workflows                                                                                   | GitHub App, the release bot | Not a secret                              |
 
 The default `github.token` is not in the table. GitHub mints it for each job,
 and it ends with the job. Each job's `permissions` block sets its scope.

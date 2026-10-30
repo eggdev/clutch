@@ -67,7 +67,8 @@ that list. So the release pushes with a GitHub App token, the release bot. The
 gardening workflow opens its pull request with the same token, so CI runs on
 that PR. The Auto-merge workflow merges with it, so the release runs after an
 auto-merge. The Revert workflow pushes and opens each revert PR with it, for the
-same reason. Self-hosted Renovate signs in with it too. See
+same reason. The Grade verdicts workflow adds the owner's grades as the bot.
+Self-hosted Renovate signs in with it too. See
 [Renovate](./dependencies.md#renovate).
 
 Without the app, these workflows use the default token. Once `main` has a
