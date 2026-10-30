@@ -55,7 +55,7 @@ test('present, partial, missing and unknown follow the status rules, and git run
   expect(lists).toBe(1);
 });
 
-test('on the template tree the seed entries are present, present and missing', async () => {
+test('on the template tree the sample entries are present, present and missing', async () => {
   const root = path.resolve(import.meta.dir, '../../../..');
   const registry = await loadRegistry(root);
   expect(registry.errors).toEqual([]);
@@ -63,7 +63,7 @@ test('on the template tree the seed entries are present, present and missing', a
   const found = await detect(root, registry.capabilities ?? []);
   expect(performance.now() - started).toBeLessThan(1000);
   const status = Object.fromEntries(found.map((item) => [item.id, item.status]));
-  expect([status.root_agents_md, status.codeowners, status.codeql_sast]).toEqual([
+  expect([status.root_agents_md, status.codeowners, status.merge_queue]).toEqual([
     'present',
     'present',
     'missing',
