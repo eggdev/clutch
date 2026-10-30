@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.0 (2026-10-30)
+
+### Features
+
+- feat(ci): label each PR with its kind and areas (CL-109)
+
 ## 0.16.0 (2026-10-30)
 
 ### Features
