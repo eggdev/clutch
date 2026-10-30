@@ -16,7 +16,8 @@ const formattable = /\.(?:[cm]?[jt]sx?|jsonc?|md|ya?ml|css)$/u;
 const quote = (paths) => paths.map((file) => JSON.stringify(file)).join(' ');
 
 /**
- * The pre-commit commands for the staged files, in order. Lint fixes come
+ * The pre-commit commands for the staged files, in order. The secret scan
+ * comes first and runs on every commit, docs too. Lint fixes come
  * before formatting, because a lint fix can leave code unformatted. The
  * install check and the typecheck run only when a staged file is not docs.
  * Lint-staged hides unstaged changes while these run, so the typecheck reads
@@ -24,7 +25,7 @@ const quote = (paths) => paths.map((file) => JSON.stringify(file)).join(' ');
  */
 export function stagedCommands(files, root = process.cwd()) {
   const paths = files.map((file) => path.relative(root, file));
-  const commands = [];
+  const commands = ['gitleaks git --staged --redact --no-banner'];
   const lint = files.filter((file) => lintable.test(file));
   const css = files.filter((file) => styles.test(file));
   const format = files.filter((file) => formattable.test(file));

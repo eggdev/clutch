@@ -1,0 +1,6 @@
+# Approved gitleaks false positives, one fingerprint per line. Each needs a reason.
+# The RFC 6455 sample WebSocket key ("the sample nonce") in an old server test.
+d6c2c5aed79f74c05f52d4aae00b6278323803f0:apps/api/src/server.test.ts:generic-api-key:100
+# The local-write and local-read placeholder tokens of the removed Nx cache README.
+349d77f4c6e5b78e0ff6a560d5259a123a04eef4:apps/nx-cache/README.md:curl-auth-header:31
+349d77f4c6e5b78e0ff6a560d5259a123a04eef4:apps/nx-cache/README.md:curl-auth-header:33

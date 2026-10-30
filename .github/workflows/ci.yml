@@ -32,6 +32,29 @@ jobs:
           # the commit before the push.
           CHECK_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
 
+  # Scans the commits of the change for secrets. Pre-commit scans each commit
+  # too, but a commit made with --no-verify or on another machine skips it.
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: jdx/mise-action@v2
+        with:
+          install_args: gitleaks
+      - name: gitleaks
+        env:
+          CHECK_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          # A new branch or a force push has no usable base, so scan the whole history.
+          if git rev-parse --verify --quiet "$CHECK_BASE^{commit}" >/dev/null; then
+            gitleaks git --redact --no-banner --log-opts="$CHECK_BASE..HEAD"
+          else
+            gitleaks git --redact --no-banner
+          fi
+
   # Journeys drive the web app in a browser against the dev servers, so they
   # run in their own job and not in validate. See
   # docs/contributing/setup/verification.md#journeys.
