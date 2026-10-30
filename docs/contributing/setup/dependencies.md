@@ -17,9 +17,37 @@ upgrade is a reviewed change. These are the template's core pins:
 | `@tanstack/react-router`                                                 | 1.170.46   |
 | `tailwindcss`, `@tailwindcss/vite`                                       | 4.3.3      |
 
+[Renovate](#renovate) opens the upgrade PRs.
+
 Drizzle 1.0 is a release candidate. Its Effect drivers need Effect 4, and the
 older `@effect/sql-drizzle` package works only with Effect 3. An Effect major
 version is a planned upgrade for every package at once.
+
+## Renovate
+
+The Renovate GitHub app reads [`renovate.json`](../../../renovate.json) and
+opens update PRs. Install the app on the repository once. The config keeps the
+PR count low:
+
+- Renovate runs before 06:00 UTC each Monday, with at most 3 open PRs.
+- One PR holds every minor and patch update. A major update gets its own PR.
+  Nx, oxlint and oxfmt have their own group, since they move together.
+- No version younger than 3 days is proposed. A security fix waits 3 days too,
+  but skips the weekly schedule. This matches `minimumReleaseAge` in
+  `bunfig.toml`, so `bun install` accepts each update.
+- `rangeStrategy: pin` keeps exact versions. Each GitHub Action keeps a full
+  commit SHA, and Renovate updates the SHA and the version comment together.
+- Each PR has the `dependencies` label and a `chore(deps):` commit.
+
+Dependabot security updates stay off, so updates come only from Renovate. The
+GitHub vulnerability alerts stay on, because Renovate reads them.
+
+Each PR needs a changeset, and the app cannot write one.
+[`renovate-changeset.yml`](../../../.github/workflows/renovate-changeset.yml)
+commits a patch changeset to each Renovate PR with the release bot token. A
+push with the default token would start no workflows. Without the
+[release bot](./releases.md#the-release-bot), the job skips, and a person runs
+`mise exec -- bun run pr open` on the branch instead.
 
 ## Production audit
 

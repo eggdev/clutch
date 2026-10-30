@@ -61,7 +61,8 @@ A protected `main` refuses a direct push. Only an actor on the ruleset's bypass
 list can push the release commit, and the default Actions token cannot be on
 that list. So the release pushes with a GitHub App token, the release bot. The
 gardening workflow opens its pull request with the same token, so CI runs on
-that PR.
+that PR. The Renovate changeset job pushes with it too. See
+[Renovate](./dependencies.md#renovate).
 
 Without the app, both workflows use the default token. Once `main` has a
 ruleset, the release push then fails, so set the bot up before the ruleset. Set the bot up once per repository:

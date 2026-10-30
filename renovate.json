@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "group:allNonMajor"],
+  "minimumReleaseAge": "3 days",
+  "rangeStrategy": "pin",
+  "schedule": ["before 6am on monday"],
+  "timezone": "UTC",
+  "prConcurrentLimit": 3,
+  "labels": ["dependencies"],
+  "semanticCommits": "enabled",
+  "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
+  "vulnerabilityAlerts": {
+    "minimumReleaseAge": "3 days",
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
+    },
+    {
+      "groupName": "Nx, oxlint and oxfmt",
+      "matchPackageNames": ["nx", "@nx/**", "oxlint", "oxfmt"]
+    }
+  ]
+}

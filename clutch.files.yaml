@@ -124,6 +124,9 @@ files:
     rule: seed
   - path: .github/CODEOWNERS
     rule: seed
+  - path: renovate.json
+    rule: seed
+    capability: dep_automation
   - path: SECURITY.md
     rule: seed
     capability: secret_scanning
