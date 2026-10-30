@@ -167,3 +167,16 @@ test('pr_size is optional, defaults its fields and takes no fail threshold', () 
     'pr_size.exclude',
   ]);
 });
+
+test('agentReview is optional and takes missingCredential notice or fail', () => {
+  expect(validateClutchConfig(valid).config?.agentReview).toBeUndefined();
+  expect(
+    validateClutchConfig({ ...valid, agentReview: { missingCredential: 'fail' } }).config
+      ?.agentReview,
+  ).toEqual({ missingCredential: 'fail' });
+  expect(paths({ ...valid, agentReview: { missingCredential: 'skip', model: 'x' } })).toEqual([
+    'agentReview.model',
+    'agentReview.missingCredential',
+  ]);
+  expect(paths({ ...valid, agentReview: 'fail' })).toEqual(['agentReview']);
+});

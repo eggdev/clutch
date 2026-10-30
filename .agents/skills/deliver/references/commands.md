@@ -23,6 +23,7 @@ its options, and so does `bun run pr --help`.
 | `bun run clutch doctor --check`          | You changed `clutch.yaml` or a capability.     | Guessing whether a waiver still holds.       |
 | `bun run clutch risk [--base <ref>]`     | You want a change's risk tier before a PR.     | Judging the tier from the file list.         |
 | `bun run clutch labels [--title <title>]` | You want a change's kind, area and size labels, or its size warning, before a PR. | Choosing `kind/`, `area/` and `size/` labels by hand. |
+| `bun run clutch ruleset [--apply]`       | A file in `.github/rulesets/` changed, or you want to know if GitHub matches it. | `gh api` POST or PUT on the rulesets endpoint. |
 
 `validate` prints the output of each failed task inline, so read it there.
 
@@ -68,6 +69,7 @@ changeset from the PR title, and the release workflow does the rest. See
 - Digging in `gh run view --log`. Use `pr failures`.
 - `gh pr merge` or `gh stack merge`. Use `pr merge`, which handles stacks.
 - Fixing `TRACKER.md` conflicts by hand. Use `pr sync`, or `clutch issues --write`.
+- `gh api` writes to a ruleset. Use `clutch ruleset --apply`.
 - Guessing the next issue id. Use `clutch issues new`.
 
 The agent shell hook prints a hint when a session runs one of these `gh`

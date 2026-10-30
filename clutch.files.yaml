@@ -28,6 +28,11 @@ files:
     capability: dep_automation
   - path: .github/actionlint.yaml
     rule: managed
+  # The main ruleset. Managed, so a new required check reaches each project.
+  # `clutch ruleset --apply` sends it to GitHub. See docs/contributing/capabilities/protected-main.md.
+  - path: .github/rulesets/
+    rule: managed
+    capability: protected_main
   - path: .github/ISSUE_TEMPLATE/
     rule: managed
   - path: .github/pull_request_template.md

@@ -80,7 +80,10 @@ ruleset, the release push then fails, so set the bot up before the ruleset. Set 
 3. Set the `CLUTCH_APP_ID` repository variable to the app id.
 4. Generate a private key for the app. Store it as the
    `CLUTCH_APP_PRIVATE_KEY` repository secret.
-5. Add the app to the bypass list of the `main` ruleset.
+5. Run `mise exec -- bun run clutch ruleset --apply`. The `main` ruleset in
+   `.github/rulesets/main.json` names the bot's bypass with
+   `"actor_id": "vars.CLUTCH_APP_ID"`, and the command puts in the variable's
+   value.
 
 <!-- kickoff: Whether this project has its own release bot app, and who holds its private key. -->
 

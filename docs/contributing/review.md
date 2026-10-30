@@ -24,11 +24,17 @@ gardening workflow reads the same variable.
 
 When the repository has no `ANTHROPIC_API_KEY` secret and no
 `CLAUDE_CODE_OAUTH_TOKEN` secret, the job writes a notice and passes. A pull
-request from a fork gets no secrets, so the same notice applies.
+request from a fork gets no secrets, so the same notice applies. Set
+`agentReview.missingCredential: fail` in `clutch.yaml` to fail the job
+instead, so a green `agent-review` check proves that a review ran. The job
+reads the setting from the base branch, so a pull request cannot change it.
+Clutch sets `fail`. A fork pull request then fails agent review, and the owner
+reviews it.
 
-The workflow does not decide what blocks a merge. Each project sets its
-branch rules. To block a merge on agent review, make the `agent-review` job a
-required status check.
+The main ruleset in `.github/rulesets/main.json` makes `agent-review` a
+required status check, so a blocking finding blocks the merge. A project that
+has not set up the credential keeps the default, `notice`, and the check
+passes with a notice until the project adopts it.
 
 <!-- kickoff: Whether the agent-review job is a required status check on the main branch, and who reviews when the agent finds a blocking problem. -->
 

@@ -6,13 +6,15 @@ import { loadClutchConfig } from '@/clutch-config/load';
 import { baselineFile, nextBaseline, readBaseline, writeBaseline } from '@/doctor/baseline';
 import { detect } from '@/doctor/detect';
 import { gate } from '@/doctor/gate';
-import { remoteProber, runGh } from '@/doctor/remote';
+import { originRepo, remoteProber, runGh } from '@/doctor/remote';
 import { buildReport, renderReport } from '@/doctor/report';
 import { renderSast, sastPath } from '@/doctor/sast';
 import { cliRoot } from '@/format';
 import { git } from '@/git';
 import { readIssues } from '@/issues/parse';
 import { localFile } from '@/review-source';
+import { compareRulesets, renderRulesets } from '@/ruleset/ruleset';
+import type { RulesetState } from '@/ruleset/ruleset';
 import { lineagePath } from '@/sync/source';
 
 async function headCommit(root: string) {
@@ -40,6 +42,35 @@ async function issueStatuses(root: string) {
     }
     throw error;
   }
+}
+
+/**
+ * With `--remote`, how each file in .github/rulesets compares with GitHub, or
+ * why doctor cannot tell. Only GET requests.
+ */
+async function rulesetStates(root: string, repo: string | undefined) {
+  const name = repo ?? (await originRepo(root));
+  if (!name) {
+    return 'no GitHub origin remote';
+  }
+  try {
+    return await compareRulesets(root, name, runGh);
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+function rulesetFindings(states: Array<RulesetState> | string) {
+  if (typeof states === 'string') {
+    return [];
+  }
+  return states
+    .filter((item) => item.state !== 'matches')
+    .map((item) => ({
+      id: 'ruleset',
+      kind: 'ruleset drift',
+      message: `ruleset drift: GitHub's ruleset ${item.name} ${item.state === 'missing' ? 'does not exist' : 'differs from'} ${item.file}. Run: mise exec -- bun run clutch ruleset --apply`,
+    }));
 }
 
 async function run(args: Array<string>, cwd: string): Promise<number> {
@@ -83,6 +114,7 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
   const detections = await detect(root, entries, { remote: values.remote, probe });
   const report = buildReport(entries, detections, config);
   const sast = await sastPath(config, probe);
+  const rulesets = values.remote ? await rulesetStates(root, values.repo) : null;
   if (values['write-baseline']) {
     const next = nextBaseline(detections, await readBaseline(root), values['allow-downgrade']);
     await writeBaseline(root, next);
@@ -96,6 +128,11 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
       today: new Date().toISOString().slice(0, 10),
       baseline: await readBaseline(root),
     });
+    const drift = rulesets ? rulesetFindings(rulesets) : [];
+    if (drift.length > 0) {
+      result.failures.push(...drift);
+      result.code = 1;
+    }
     if (sast.problem) {
       result.failures.push({
         id: 'sast',
@@ -130,11 +167,17 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
         registryCommit: await headCommit(cliRoot),
         ...report,
         sast,
+        rulesets,
       }),
     );
   } else {
     console.log(renderReport(report));
     console.log(renderSast(sast));
+    if (typeof rulesets === 'string') {
+      console.log(`Rulesets: unknown (${rulesets})`);
+    } else if (rulesets) {
+      console.log(renderRulesets(rulesets));
+    }
   }
   return 0;
 }

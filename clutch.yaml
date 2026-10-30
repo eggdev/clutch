@@ -39,7 +39,7 @@ capabilities:
   cloud_agent_vm: { status: waived, reason: Lands in CL-203., issue: CL-203 }
   mcp_config: { status: waived, reason: Lands in CL-205., issue: CL-205 }
   ai_review_bot: adopted
-  ai_review_blocking: { status: waived, reason: Lands in CL-308., issue: CL-308 }
+  ai_review_blocking: adopted
   ci_failure_explainer: { status: waived, reason: Lands in CL-305., issue: CL-305 }
   flaky_quarantine: { status: waived, reason: Lands in CL-304., issue: CL-304 }
   flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
@@ -61,3 +61,8 @@ sast: auto
 pr_size:
   warn: 300
   exclude: []
+# agent-review is a required check here, so a run without the Anthropic credential fails it
+# (decision 5 in .clutch/PLAN.md). A project keeps notice, the default, until it adopts the
+# check. See docs/contributing/review.md.
+agentReview:
+  missingCredential: fail

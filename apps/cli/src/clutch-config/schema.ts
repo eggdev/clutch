@@ -2,6 +2,7 @@ const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
 const modes = ['sync', 'doctor'] as const;
 const automergeModes = ['off', 'dry-run', 'on'] as const;
 const sastEngines = ['auto', 'codeql', 'semgrep'] as const;
+const missingCredentials = ['notice', 'fail'] as const;
 
 type CapabilityStatus = (typeof capabilityStatuses)[number];
 
@@ -32,6 +33,11 @@ export type ClutchConfig = {
   sast?: (typeof sastEngines)[number];
   /** When `clutch labels` warns about a large PR. It never fails one. */
   pr_size?: { warn: number; exclude: Array<string> };
+  /**
+   * What agent-review.yml does without an Anthropic credential: pass with a
+   * notice (the default), or fail, once agent review is a required check.
+   */
+  agentReview?: { missingCredential: (typeof missingCredentials)[number] };
 };
 
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
@@ -50,6 +56,7 @@ const topKeys = [
   'pr',
   'sast',
   'pr_size',
+  'agentReview',
 ];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
 const capabilityId = /^[a-z][a-z0-9_]*$/u;
@@ -243,6 +250,22 @@ function readPrSize(value: unknown, errors: Errors) {
     : undefined;
 }
 
+function readAgentReview(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'agentReview', message: 'Expected a map with missingCredential.' });
+    return;
+  }
+  unknownKeys(value, ['missingCredential'], 'agentReview', errors);
+  if (!oneOf(missingCredentials, value.missingCredential)) {
+    errors.push({
+      path: 'agentReview.missingCredential',
+      message: `Expected ${missingCredentials.join(' or ')}.`,
+    });
+    return;
+  }
+  return { missingCredential: value.missingCredential };
+}
+
 /** Checks parsed `clutch.yaml` data. Returns the typed config only when there is no error. */
 export function validateClutchConfig(data: unknown): { config?: ClutchConfig; errors: Errors } {
   const errors: Errors = [];
@@ -262,6 +285,8 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   const automerge =
     data.automerge === undefined ? undefined : readAutomerge(data.automerge, errors);
   const pr = data.pr === undefined ? undefined : readPr(data.pr, errors);
+  const agentReview =
+    data.agentReview === undefined ? undefined : readAgentReview(data.agentReview, errors);
   if (data.sast !== undefined && !oneOf(sastEngines, data.sast)) {
     errors.push({ path: 'sast', message: `Expected ${sastEngines.join(', ')}.` });
   }
@@ -283,6 +308,9 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   }
   if (pr) {
     config.pr = pr;
+  }
+  if (agentReview) {
+    config.agentReview = agentReview;
   }
   if (oneOf(sastEngines, data.sast)) {
     config.sast = data.sast;

@@ -25,8 +25,18 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      # The base branch's clutch.yaml, so a pull request cannot change how it is judged.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+          sparse-checkout: clutch.yaml
+          sparse-checkout-cone-mode: false
       # GitHub gives no secrets to a fork PR, and a project may have none. The
-      # review then passes with a notice, so the job never fails for setup.
+      # review then passes with a notice, unless agentReview.missingCredential
+      # in clutch.yaml is fail: a required agent-review check then proves that
+      # a review ran.
       - name: Find the Anthropic credential
         id: credential
         env:
@@ -34,6 +44,14 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            missing=notice
+            if [ -f base/clutch.yaml ]; then
+              missing="$(yq -r '.agentReview.missingCredential // "notice"' base/clutch.yaml)"
+            fi
+            if [ "$missing" = fail ]; then
+              echo "::error title=Agent review did not run::No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret reached this run, and agentReview.missingCredential in clutch.yaml is fail. A fork PR gets no secrets. See docs/contributing/review.md."
+              exit 1
+            fi
             echo "::notice title=Agent review off::Add the ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret to turn on agent review. See docs/contributing/review.md."
             echo "present=false" >> "$GITHUB_OUTPUT"
           else

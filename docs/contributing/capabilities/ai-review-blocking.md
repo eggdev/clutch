@@ -15,9 +15,10 @@ Rank 62 of the researched practices. About one in seven of the leading repositor
 1. Define the finding levels in the review rules. See [finding levels](../review.md#finding-levels).
 2. Make the review job fail when the agent returns a blocking finding. See [`.github/workflows/agent-review.yml`](../../../.github/workflows/agent-review.yml).
 3. Confirm that the review passed on several recent pull requests.
-4. On GitHub, add `agent-review` to the required status checks of the default branch ruleset.
-5. Run `mise exec -- bun run clutch doctor --remote` to confirm the result.
-6. Set `ai_review_blocking` to `adopted` in `clutch.yaml`.
+4. Set `agentReview.missingCredential: fail` in `clutch.yaml`, so a run without the credential fails instead of passing with a notice.
+5. Make `agent-review` a required status check. The main ruleset in `.github/rulesets/main.json` requires it; run `mise exec -- bun run clutch ruleset --apply` to send it to GitHub.
+6. Run `mise exec -- bun run clutch doctor --remote` to confirm the result.
+7. Set `ai_review_blocking` to `adopted` in `clutch.yaml`.
 
 ## Waive
 

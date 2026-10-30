@@ -5,6 +5,7 @@ import { issuesCommand } from '@/issues-command';
 import { labelsCommand } from '@/labels-command';
 import { metricsCommand } from '@/metrics-command';
 import { riskCommand } from '@/risk-command';
+import { rulesetCommand } from '@/ruleset-command';
 import { syncCommand } from '@/sync-command';
 
 type Command = {
@@ -64,6 +65,12 @@ export const commands: Record<string, Command> = {
     summary:
       'Print the risk tier of the change from the merge base of --base to --head, by the paths in .clutch/risk.yaml.',
     run: riskCommand,
+  },
+  ruleset: {
+    usage: 'clutch ruleset [--apply] [--root DIR] [--repo OWNER/NAME] [--json]',
+    summary:
+      'Compare .github/rulesets with GitHub. --apply creates each ruleset, or updates it by name.',
+    run: rulesetCommand,
   },
 };
 
