@@ -32,7 +32,8 @@ below onto it; do not change a team's workflow configuration for this skill.
 In `.clutch/issues`, the `status` field holds the state. Idea and Ready are
 both `todo`, and Active is `in_progress`. Blocked, Review and Done keep their
 names. An idea that is not ready has the owner's handle in `owner`, so no agent
-picks it.
+picks it. For a task that ends in a PR, `review` means the PR is open with
+green checks and its URL in `pr`, and `done` means the PR is merged.
 
 A preview task can be done when the working preview is verified. A release
 task is not done at preview or PR. A required device check that cannot run
@@ -41,8 +42,9 @@ leaves the task blocked; a check reserved for the owner leaves it in review.
 is the agreed destination and no decision remains, mark done and hand it over.
 
 List ready tasks through the tracker, or run
-`mise exec -- bun run clutch issues next`. Use the owner's priority order, and
-skip tasks whose dependencies are unmet. Confirm
+`mise exec -- bun run clutch issues next`. It picks the first `todo` task with
+`owner: agent`, outside `later`, whose dependencies are done, in phase and id
+order. Follow the owner's order when it differs. Confirm
 that no other session owns a task before claiming it. A recorded owner is a
 coordination signal, not an atomic lock: use the host's claim facility when
 available and do not run competing queue dispatchers over local Markdown.
