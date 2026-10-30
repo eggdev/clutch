@@ -134,6 +134,10 @@ test('automerge is optional and takes off, dry-run or on', () => {
     'automerge.mode',
   ]);
   expect(paths({ ...valid, automerge: 'on' })).toEqual(['automerge']);
+  expect(
+    validateClutchConfig({ ...valid, automerge: { mode: 'on', step: 'bots' } }).config?.automerge,
+  ).toEqual({ mode: 'on', step: 'bots' });
+  expect(paths({ ...valid, automerge: { mode: 'on', step: 'high' } })).toEqual(['automerge.step']);
 });
 
 test('pr is optional and takes a branch prefix', () => {

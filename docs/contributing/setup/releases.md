@@ -65,7 +65,8 @@ A protected `main` refuses a direct push. Only an actor on the ruleset's bypass
 list can push the release commit, and the default Actions token cannot be on
 that list. So the release pushes with a GitHub App token, the release bot. The
 gardening workflow opens its pull request with the same token, so CI runs on
-that PR. The Revert workflow pushes and opens each revert PR with it, for the
+that PR. The Auto-merge workflow merges with it, so the release runs after an
+auto-merge. The Revert workflow pushes and opens each revert PR with it, for the
 same reason. Self-hosted Renovate signs in with it too. See
 [Renovate](./dependencies.md#renovate).
 

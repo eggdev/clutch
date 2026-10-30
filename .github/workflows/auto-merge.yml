@@ -1,9 +1,12 @@
 name: Auto-merge
 
-# Decides whether a low-risk agent pull request may merge without a person, and
-# acts on automerge.mode in clutch.yaml. dry-run comments its verdict, would or
-# would not auto-merge, once for each head commit. on queues the merge. tools/github/auto-merge.ts
-# holds the rules. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
+# Decides whether an agent or bot pull request may merge without a person, and
+# acts on automerge in clutch.yaml. automerge.step sets the reach: bots, low or
+# medium. on runs `gh pr merge --auto --merge` with the release bot token, so
+# the release and CI run after the merge, and never while main is red. dry-run
+# and on comment a verdict on each agent PR for the owner to grade.
+# tools/github/auto-merge.ts holds the rules. See
+# .agents/skills/deliver/references/pull-requests.md#auto-merge.
 #
 # A check suite that GitHub Actions creates starts no check_suite workflow, so
 # this runs when CI or agent review completes. The run that sees every required
@@ -32,18 +35,24 @@ concurrency:
 
 jobs:
   decide:
-    # Only an agent opens a clutch/cl- branch. A push to main also completes CI, and is no pull request.
+    # Only an agent opens a clutch/cl- branch, and only a bot opens renovate/ or
+    # gardening/ (the script checks the author too). A push to main also
+    # completes CI, and is no pull request.
     if: >-
-      (github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'clutch/cl-')) ||
+      (github.event_name == 'pull_request' && (startsWith(github.event.pull_request.head.ref, 'clutch/cl-') ||
+      startsWith(github.event.pull_request.head.ref, 'renovate/') ||
+      startsWith(github.event.pull_request.head.ref, 'gardening/'))) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
-      startsWith(github.event.workflow_run.head_branch, 'clutch/cl-'))
+      (startsWith(github.event.workflow_run.head_branch, 'clutch/cl-') ||
+      startsWith(github.event.workflow_run.head_branch, 'renovate/') ||
+      startsWith(github.event.workflow_run.head_branch, 'gardening/')))
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
-      contents: read
+      # gh pr merge --auto needs contents: write. The comments need pull-requests: write.
+      contents: write
       checks: read
-      # The dry-run comment. CL-405 adds contents: write for gh pr merge --auto.
       pull-requests: write
     steps:
       - name: Find the pull request
@@ -85,10 +94,23 @@ jobs:
         uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
       - if: steps.base.outputs.present == 'true'
         run: bun install --frozen-lockfile
+      # A merge made with the default token starts no workflow, so the release
+      # and CI on main would not run after an auto-merge. The release bot's token does.
+      - name: Get the release bot token
+        id: bot
+        if: steps.base.outputs.present == 'true' && vars.CLUTCH_APP_ID != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          # Only the merge, the comments and the check reads. The app has more permissions.
+          permission-contents: write
+          permission-pull-requests: write
+          permission-checks: read
       - name: Decide
         if: steps.base.outputs.present == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
           PR: ${{ steps.pr.outputs.number }}
           HEAD_SHA: ${{ steps.pr.outputs.head }}
         run: |

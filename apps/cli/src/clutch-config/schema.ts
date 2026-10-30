@@ -1,6 +1,7 @@
 const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
 const modes = ['sync', 'doctor'] as const;
 const automergeModes = ['off', 'dry-run', 'on'] as const;
+const automergeSteps = ['bots', 'low', 'medium'] as const;
 const sastEngines = ['auto', 'codeql', 'semgrep'] as const;
 const missingCredentials = ['notice', 'fail'] as const;
 
@@ -23,7 +24,8 @@ export type ClutchConfig = {
   capabilities: Record<string, Capability>;
   worktree?: { root: string; copy: Array<string>; setup: Array<string> };
   /** What the Auto-merge workflow does with a low-risk agent PR. */
-  automerge?: { mode: (typeof automergeModes)[number] };
+  /** `step` is how far auto-merge reaches: bot PRs, then low-risk agent PRs, then medium-risk ones. */
+  automerge?: { mode: (typeof automergeModes)[number]; step?: (typeof automergeSteps)[number] };
   /** How `bun run pr` finds an agent's branch: its prefix, `clutch/cl-` by default. */
   pr?: { branchPrefix: string };
   /**
@@ -207,12 +209,16 @@ function readAutomerge(value: unknown, errors: Errors) {
     errors.push({ path: 'automerge', message: 'Expected a map with mode.' });
     return;
   }
-  unknownKeys(value, ['mode'], 'automerge', errors);
+  unknownKeys(value, ['mode', 'step'], 'automerge', errors);
   if (!oneOf(automergeModes, value.mode)) {
     errors.push({ path: 'automerge.mode', message: `Expected ${automergeModes.join(', ')}.` });
     return;
   }
-  return { mode: value.mode };
+  if (value.step !== undefined && !oneOf(automergeSteps, value.step)) {
+    errors.push({ path: 'automerge.step', message: `Expected ${automergeSteps.join(', ')}.` });
+    return;
+  }
+  return value.step === undefined ? { mode: value.mode } : { mode: value.mode, step: value.step };
 }
 
 function readPr(value: unknown, errors: Errors) {

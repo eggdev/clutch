@@ -198,6 +198,7 @@ worktree: # optional
   setup: ['mise exec -- bun install']
 automerge: # optional
   mode: dry-run # off (the default), dry-run or on
+  step: low # bots (the default), low or medium: how far auto-merge reaches
 pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 sast: auto # optional: auto (the default), codeql or semgrep
@@ -208,8 +209,8 @@ agentReview: # optional
   missingCredential: notice # notice (the default) or fail
 ```
 
-`automerge.mode` tells the Auto-merge workflow what to do with a low-risk agent
-PR. See
+`automerge.mode` tells the Auto-merge workflow what to do, and `automerge.step`
+how far it reaches: bot PRs, then low-risk agent PRs, then medium-risk ones. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
 
 `agentReview.missingCredential` tells `agent-review.yml` what to do without an
