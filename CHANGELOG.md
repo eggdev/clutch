@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.0 (2026-10-30)
+
+### Features
+
+- feat(ci): require agent review and SAST via a synced ruleset (CL-308)
+
 ## 0.19.0 (2026-10-30)
 
 ### Features
