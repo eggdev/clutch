@@ -1,3 +1,4 @@
+import { appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -29,7 +30,10 @@ import type { Run } from '@tools/github/stack';
  * workflow runs it from the base branch, so a pull request cannot change the
  * rules that judge it. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
-const usage = 'Usage: bun tools/github/auto-merge.ts --pr <number> --head <sha>';
+const usage = [
+  'Usage: bun tools/github/auto-merge.ts --pr <number> --head <sha>',
+  '       bun tools/github/auto-merge.ts --enable --pr <number> --head <sha> --step <step>',
+].join('\n');
 
 const root = path.resolve(import.meta.dir, '../..');
 
@@ -161,12 +165,32 @@ async function redOn(run: Run, repo: string, branch: string, names: Array<string
   return names.filter((name) => red.has(checks[name]));
 }
 
+/**
+ * Enables GitHub's auto-merge for `sha`, the commit that was judged, and says
+ * so once in a comment with the step. `--match-head-commit` makes GitHub
+ * refuse when the head moved since the decision.
+ */
+export async function enableAutoMerge(run: Run, repo: string, pr: string, sha: string, step: Step) {
+  await gh(run, 'pr', 'merge', pr, '--auto', '--merge', '--match-head-commit', sha);
+  if (!(await hasMarker(run, repo, pr, enabledMarker(step, sha)))) {
+    const body = `${enabledMarker(step, sha)}\n**Auto-merge:** queued at ${sha.slice(0, 7)}, at the step \`${step}\`. GitHub merges it with a merge commit once the required checks pass. To stop it, run \`gh pr merge --disable-auto ${pr}\`.`;
+    await gh(run, 'pr', 'comment', pr, '--body', body);
+  }
+}
+
+/**
+ * Hands a merge to the workflow's merge job, which alone may use the release
+ * bot's key. Without it, the run enables auto-merge itself.
+ */
+export type Handoff = (step: Step) => Promise<void>;
+
 /** Runs the auto-merge decision for one pull request. Returns the exit code. */
 export async function runAutoMerge(
   args: Array<string>,
   run: Run,
   config: Config,
   log: (line: string) => void = console.log,
+  handoff?: Handoff,
 ): Promise<number> {
   const { mode, step } = config;
   const { values } = parseArgs({
@@ -230,12 +254,13 @@ export async function runAutoMerge(
       ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
       : `Would auto-merge at the step ${step}.`;
   if (mode === 'on' && reasons.length === 0) {
-    await gh(run, 'pr', 'merge', values.pr, '--auto', '--merge');
-    if (!(await hasMarker(run, repo, values.pr, enabledMarker(step, pr.headRefOid)))) {
-      const body = `${enabledMarker(step, pr.headRefOid)}\n**Auto-merge:** queued at ${pr.headRefOid.slice(0, 7)}, at the step \`${step}\`. GitHub merges it with a merge commit once the required checks pass. To stop it, run \`gh pr merge --disable-auto ${values.pr}\`.`;
-      await gh(run, 'pr', 'comment', values.pr, '--body', body);
+    if (handoff) {
+      await handoff(step);
+      log(`${verdict}\nHanded the merge to the merge job.`);
+    } else {
+      await enableAutoMerge(run, repo, values.pr, pr.headRefOid, step);
+      log(`${verdict}\nQueued the merge.`);
     }
-    log(`${verdict}\nQueued the merge.`);
     return 0;
   }
   if (mode === 'off' || bot) {
@@ -268,9 +293,41 @@ const spawn: Run = async (command) => {
   return { ok: code === 0, out, err };
 };
 
+/** The command line: a decision, or `--enable` from the merge job. */
+async function main(args: Array<string>) {
+  if (!args.includes('--enable')) {
+    // In the workflow, the decide job holds no bot key, so it hands the merge on.
+    const output = process.env.GITHUB_OUTPUT;
+    const handoff: Handoff | undefined =
+      output && process.env.AUTOMERGE_HANDOFF === '1'
+        ? async (step) => {
+            await appendFile(output, `merge=true\nstep=${step}\n`);
+          }
+        : undefined;
+    return runAutoMerge(args, spawn, await readConfig(), console.log, handoff);
+  }
+  const { values } = parseArgs({
+    args,
+    options: {
+      enable: { type: 'boolean' },
+      pr: { type: 'string' },
+      head: { type: 'string' },
+      step: { type: 'string' },
+    },
+  });
+  const step = values.step as Step;
+  if (!values.pr || !values.head || !(steps as ReadonlyArray<string>).includes(step)) {
+    throw new Error(usage);
+  }
+  const repo = await gh(spawn, 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner');
+  await enableAutoMerge(spawn, repo, values.pr, values.head, step);
+  console.log(`Enabled auto-merge for #${values.pr} at ${values.head.slice(0, 7)}, step ${step}.`);
+  return 0;
+}
+
 if (import.meta.main) {
   try {
-    process.exit(await runAutoMerge(process.argv.slice(2), spawn, await readConfig()));
+    process.exit(await main(process.argv.slice(2)));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

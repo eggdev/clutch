@@ -176,7 +176,7 @@ test('on at the step bots queues a Renovate PR with a version-only diff, and say
   expect(await decide(gh, { mode: 'on', step: 'bots' })).toEqual([
     'Would auto-merge at the step bots.\nQueued the merge.',
   ]);
-  expect(merges(gh.calls)).toEqual(['gh pr merge 7 --auto --merge']);
+  expect(merges(gh.calls)).toEqual([`gh pr merge 7 --auto --merge --match-head-commit ${head}`]);
   expect(comments(gh.calls)).toHaveLength(1);
   expect(comments(gh.calls)[0]).toContain(enabledMarker('bots', head));
   const again = fake(
@@ -244,12 +244,14 @@ test('on at the step bots leaves an agent PR to a person, and comments the low v
 test('on at the step low queues a low-risk agent PR, and medium takes a medium one', async () => {
   const low = fake();
   await decide(low, { mode: 'on', step: 'low' });
-  expect(merges(low.calls)).toEqual(['gh pr merge 7 --auto --merge']);
+  expect(merges(low.calls)).toEqual([`gh pr merge 7 --auto --merge --match-head-commit ${head}`]);
   const medium = fake([['bun tools/clutch.ts risk', { out: '{"tier":"medium"}' }]]);
   await decide(medium, { mode: 'on', step: 'low' });
   expect(merges(medium.calls)).toEqual([]);
   await decide(medium, { mode: 'on', step: 'medium' });
-  expect(merges(medium.calls)).toEqual(['gh pr merge 7 --auto --merge']);
+  expect(merges(medium.calls)).toEqual([
+    `gh pr merge 7 --auto --merge --match-head-commit ${head}`,
+  ]);
 });
 
 test('dry-run comments the verdict at its step, once per head, and merges nothing', async () => {
@@ -280,4 +282,35 @@ test('a person branch, a moved head or off mode acts on nothing', async () => {
     'Would auto-merge at the step medium.',
   ]);
   expect([...merges(off.calls), ...comments(off.calls)]).toEqual([]);
+});
+
+test('with a handoff, on passes the step to the merge job and merges nothing itself', async () => {
+  const gh = fake([], { headRefName: 'renovate/all-minor', author: app });
+  const handed: Array<string> = [];
+  const lines: Array<string> = [];
+  const handoff = (step: string) => {
+    handed.push(step);
+    return Promise.resolve();
+  };
+  expect(
+    await runAutoMerge(
+      args,
+      gh.run,
+      { mode: 'on', step: 'bots' },
+      (line) => lines.push(line),
+      handoff,
+    ),
+  ).toBe(0);
+  expect(handed).toEqual(['bots']);
+  expect(lines).toEqual(['Would auto-merge at the step bots.\nHanded the merge to the merge job.']);
+  expect([...merges(gh.calls), ...comments(gh.calls)]).toEqual([]);
+});
+
+test('the enabled marker keeps the form that clutch metrics reads', () => {
+  // apps/cli/src/metrics/pulls.ts matches this form to count merges by step. Change both together.
+  for (const step of ['bots', 'low', 'medium'] as const) {
+    expect(enabledMarker(step, 'a1b2c3d4e5f6')).toMatch(
+      /^<!-- automerge-enabled:(bots|low|medium):[0-9a-f]+ -->$/u,
+    );
+  }
 });

@@ -50,10 +50,16 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
-      # gh pr merge --auto needs contents: write. The comments need pull-requests: write.
-      contents: write
+      contents: read
       checks: read
+      # The verdict comments.
       pull-requests: write
+    # The merge job takes over when a PR may merge at the step.
+    outputs:
+      merge: ${{ steps.decide.outputs.merge }}
+      step: ${{ steps.decide.outputs.step }}
+      pr: ${{ steps.pr.outputs.number }}
+      head: ${{ steps.pr.outputs.head }}
     steps:
       - name: Find the pull request
         id: pr
@@ -94,25 +100,58 @@ jobs:
         uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
       - if: steps.base.outputs.present == 'true'
         run: bun install --frozen-lockfile
-      # A merge made with the default token starts no workflow, so the release
-      # and CI on main would not run after an auto-merge. The release bot's token does.
-      - name: Get the release bot token
-        id: bot
-        if: steps.base.outputs.present == 'true' && vars.CLUTCH_APP_ID != ''
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ vars.CLUTCH_APP_ID }}
-          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
-          # Only the merge, the comments and the check reads. The app has more permissions.
-          permission-contents: write
-          permission-pull-requests: write
-          permission-checks: read
       - name: Decide
+        id: decide
         if: steps.base.outputs.present == 'true'
         env:
-          GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
+          GH_TOKEN: ${{ github.token }}
+          # Write merge=true and the step for the merge job, never merge here.
+          AUTOMERGE_HANDOFF: '1'
           PR: ${{ steps.pr.outputs.number }}
           HEAD_SHA: ${{ steps.pr.outputs.head }}
         run: |
           set -o pipefail
           bun tools/github/auto-merge.ts --pr "$PR" --head "$HEAD_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # Enables GitHub's auto-merge, `gh pr merge --auto --merge`, with the release
+  # bot's token. A merge made with the default token starts no workflow, so the
+  # release and CI on main would not run after it. The bot's key lives in the
+  # release environment, which only the default branch may use, so only a
+  # workflow_run run merges. A pull_request run waits for the next one.
+  merge:
+    needs: decide
+    if: github.event_name == 'workflow_run' && needs.decide.outputs.merge == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      # gh pr merge --auto needs contents: write. The comment needs pull-requests: write.
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Get the release bot token
+        id: bot
+        if: vars.CLUTCH_APP_ID != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          # Only the merge and its comment. The app has more permissions.
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Warn without the release bot
+        if: vars.CLUTCH_APP_ID == ''
+        run: echo "::warning title=No release bot::The default token enables the merge, so the release and CI on main do not run after it. See docs/contributing/setup/releases.md#the-release-bot."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      # Without scripts, so the repository's git hooks stay off.
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Enable auto-merge for the judged head
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
+          PR: ${{ needs.decide.outputs.pr }}
+          HEAD_SHA: ${{ needs.decide.outputs.head }}
+          STEP: ${{ needs.decide.outputs.step }}
+        run: bun tools/github/auto-merge.ts --enable --pr "$PR" --head "$HEAD_SHA" --step "$STEP"
