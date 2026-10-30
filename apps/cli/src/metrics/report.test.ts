@@ -96,6 +96,21 @@ const routes = {
     ],
   },
   [`repos/${repo}`]: { default_branch: 'main' },
+  [`repos/${repo}/issues/comments`]: [
+    {
+      body: '<!-- automerge-dry-run:head1 -->\n**Auto-merge dry run:** this pull request would auto-merge at head1.',
+      created_at: '2026-10-10T00:40:00Z',
+      issue_url: `https://api.github.com/repos/${repo}/issues/1`,
+      reactions: { '+1': 1, '-1': 0 },
+    },
+    {
+      body: '<!-- automerge-dry-run:head2 -->\n**Auto-merge dry run:** this pull request would not auto-merge at head2.',
+      created_at: '2026-10-10T01:40:00Z',
+      issue_url: `https://api.github.com/repos/${repo}/issues/2`,
+      reactions: { '+1': 0, '-1': 0 },
+    },
+    { body: 'LGTM', created_at: '2026-10-10T01:50:00Z', issue_url: 'x/2', reactions: {} },
+  ],
 };
 
 test('the report reads only gh api GET routes and fills every field', async () => {
@@ -121,10 +136,11 @@ test('the report reads only gh api GET routes and fills every field', async () =
     ci: { runs: 1, failureRate: 0 },
     issuesDone: 1,
     prSize: null,
-    dryRunAgreement: null,
+    dryRunAgreement: { verdicts: 2, wouldMerge: 1, agreed: 1, unanswered: 1, streak: 1 },
   });
-  expect(Object.keys(report.unavailable).toSorted()).toEqual(['dryRunAgreement', 'prSize']);
+  expect(Object.keys(report.unavailable)).toEqual(['prSize']);
   expect(renderMetrics(report)).toContain('Main red');
+  expect(renderMetrics(report)).toContain('1 agreed, 0 disagreed, 1 unanswered of 2; streak 1');
 });
 
 test('another repository has no issues count, and an unreadable section names its reason', async () => {

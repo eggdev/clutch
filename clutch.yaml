@@ -49,7 +49,7 @@ capabilities:
   gardener_bots: adopted
   factory_observability: adopted
 # What the Auto-merge workflow does with a low-risk agent PR: off, dry-run or on.
-# dry-run comments "would auto-merge" and asks the owner for a reaction. CL-405
+# dry-run comments would or would not auto-merge and asks the owner for a reaction. CL-405
 # turns it on. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
 automerge:
   mode: dry-run

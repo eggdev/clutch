@@ -1,13 +1,13 @@
 name: Auto-merge
 
 # Decides whether a low-risk agent pull request may merge without a person, and
-# acts on automerge.mode in clutch.yaml. dry-run comments "would auto-merge"
-# once for each head commit. on queues the merge. tools/github/auto-merge.ts
+# acts on automerge.mode in clutch.yaml. dry-run comments its verdict, would or
+# would not auto-merge, once for each head commit. on queues the merge. tools/github/auto-merge.ts
 # holds the rules. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
 #
 # A check suite that GitHub Actions creates starts no check_suite workflow, so
 # this runs when CI or agent review completes. The run that sees every required
-# check green decides. It reads no label, because a label set with
+# check finished decides. It reads no label, because a label set with
 # GITHUB_TOKEN starts no workflow. It runs the base branch's code, so a pull
 # request cannot change the rules that judge it.
 

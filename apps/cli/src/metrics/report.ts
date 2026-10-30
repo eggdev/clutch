@@ -1,6 +1,12 @@
 import type { Gh } from '@/doctor/remote';
 import { githubReader } from '@/metrics/collect';
-import { ciMetrics, flowMetrics, isRevert, mainRedMinutes } from '@/metrics/compute';
+import {
+  ciMetrics,
+  dryRunAgreement,
+  flowMetrics,
+  isRevert,
+  mainRedMinutes,
+} from '@/metrics/compute';
 
 /** The issues that the checkout tracks, for the issues-done count. */
 type LocalIssue = { status: string; pr: string };
@@ -31,7 +37,6 @@ export async function metricsReport(options: Options) {
   const since = new Date(now.getTime() - days * 86_400_000).toISOString();
   const unavailable: Unavailable = {
     prSize: 'Lands in CL-503b.',
-    dryRunAgreement: 'Lands in CL-503b.',
   };
 
   const numbers = await reader.mergedNumbers(since.slice(0, 10));
@@ -66,6 +71,13 @@ export async function metricsReport(options: Options) {
     unavailable.ci = reason(error);
   }
 
+  let agreement: ReturnType<typeof dryRunAgreement> | null = null;
+  try {
+    agreement = dryRunAgreement(await reader.dryRunVerdicts(since));
+  } catch (error) {
+    unavailable.dryRunAgreement = reason(error);
+  }
+
   let issuesDone: number | null = null;
   if (options.issues) {
     const merged = new Set(pulls.map((pull) => `https://github.com/${repo}/pull/${pull.number}`));
@@ -93,7 +105,7 @@ export async function metricsReport(options: Options) {
     ci,
     issuesDone,
     prSize: null,
-    dryRunAgreement: null,
+    dryRunAgreement: agreement,
     unavailable,
   };
 }
@@ -146,6 +158,12 @@ export function renderMetrics(report: MetricsReport) {
         : 'n/a',
     ],
     ['Issues done', show(report.issuesDone)],
+    [
+      'Dry-run agreement',
+      report.dryRunAgreement
+        ? `${report.dryRunAgreement.agreed} agreed, ${report.dryRunAgreement.disagreed} disagreed, ${report.dryRunAgreement.unanswered} unanswered of ${report.dryRunAgreement.verdicts}; streak ${report.dryRunAgreement.streak}`
+        : 'n/a',
+    ],
   ];
   const width = Math.max(...rows.map(([label]) => label.length));
   const lines = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`);

@@ -314,7 +314,8 @@ owner's review, because the baseline is a guardrail file.
 `clutch metrics` reports how pull requests flow through a repository over a
 window: merges per day, the share merged with no human action, the hours from
 open to merge, main-red minutes, reverts, the agent share from
-`Co-authored-by` trailers, CI run times and the issues done. It sends only
+`Co-authored-by` trailers, CI run times, the issues done and the owner's
+agreement with the auto-merge dry run. It sends only
 `gh api` GET requests, for the origin repository or `--repo OWNER/NAME`, so it
 works from a clone and from the release binary in any project.
 

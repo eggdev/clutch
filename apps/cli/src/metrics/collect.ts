@@ -1,5 +1,14 @@
 import type { Gh } from '@/doctor/remote';
-import type { CheckRun, MainCommit, MergedPull, WorkflowRun } from '@/metrics/compute';
+import type {
+  CheckRun,
+  DryRunVerdict,
+  MainCommit,
+  MergedPull,
+  WorkflowRun,
+} from '@/metrics/compute';
+
+/** The marker that starts each dry-run comment of `tools/github/auto-merge.ts`. */
+const dryRunMarker = '<!-- automerge-dry-run:';
 
 /** A person or a bot, as the GitHub API reports one. */
 type Account = { login?: string; type?: string } | null | undefined;
@@ -186,6 +195,25 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
         ),
       );
       return withChecks.toReversed();
+    },
+
+    /** The dry-run verdicts commented on or after `since`, an ISO time. */
+    async dryRunVerdicts(since: string): Promise<Array<DryRunVerdict>> {
+      const comments = await list<{
+        body?: string;
+        created_at: string;
+        issue_url: string;
+        reactions?: Record<string, number>;
+      }>(`repos/${repo}/issues/comments?since=${encodeURIComponent(since)}`);
+      return comments
+        .filter((comment) => comment.body?.startsWith(dryRunMarker) && comment.created_at >= since)
+        .map((comment) => ({
+          pull: Number(comment.issue_url.split('/').at(-1)),
+          createdAt: comment.created_at,
+          wouldMerge: !comment.body?.includes('would not auto-merge'),
+          thumbsUp: comment.reactions?.['+1'] ?? 0,
+          thumbsDown: comment.reactions?.['-1'] ?? 0,
+        }));
     },
 
     /** The workflow runs created on or after `since`, a date. */

@@ -186,3 +186,42 @@ export function ciMetrics(runs: Array<WorkflowRun>) {
     ),
   };
 }
+
+/** One dry-run verdict that the Auto-merge workflow commented, with the reactions on it. */
+export type DryRunVerdict = {
+  pull: number;
+  createdAt: string;
+  wouldMerge: boolean;
+  thumbsUp: number;
+  thumbsDown: number;
+};
+
+/**
+ * How often the owner agrees with the auto-merge dry run. A 👎 is a
+ * disagreement, a 👍 alone is an agreement, and no reaction is unanswered.
+ * `streak` counts the agreements since the latest disagreement, newest first,
+ * and skips unanswered verdicts. P1 ends at a streak of 20.
+ */
+export function dryRunAgreement(verdicts: Array<DryRunVerdict>) {
+  const sorted = verdicts.toSorted((a, b) => time(a.createdAt) - time(b.createdAt));
+  const agreed = sorted.filter((verdict) => verdict.thumbsDown === 0 && verdict.thumbsUp > 0);
+  const disagreed = sorted.filter((verdict) => verdict.thumbsDown > 0);
+  let streak = 0;
+  for (const verdict of sorted.toReversed()) {
+    if (verdict.thumbsDown > 0) {
+      break;
+    }
+    if (verdict.thumbsUp > 0) {
+      streak += 1;
+    }
+  }
+  return {
+    verdicts: sorted.length,
+    wouldMerge: sorted.filter((verdict) => verdict.wouldMerge).length,
+    agreed: agreed.length,
+    disagreed: disagreed.length,
+    unanswered: sorted.length - agreed.length - disagreed.length,
+    streak,
+    disagreedPulls: disagreed.map((verdict) => verdict.pull),
+  };
+}

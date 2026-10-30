@@ -5,8 +5,9 @@ import type { Run } from '@tools/github/stack';
 
 /**
  * Decides whether a pull request may merge without a person, and acts on the
- * `automerge.mode` in clutch.yaml. `dry-run` comments once for each head
- * commit, `on` queues the merge, and `off` only prints. The Auto-merge
+ * `automerge.mode` in clutch.yaml. `dry-run` comments its verdict, would or
+ * would not auto-merge, once for each head commit of an agent PR. `on` queues
+ * the merge, and `off` only prints. The Auto-merge
  * workflow runs it from the base branch, so a pull request cannot change the
  * rules that judge it. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
@@ -36,7 +37,7 @@ export type Facts = {
   pr: Pr;
   defaultBranch: string;
   tier: string;
-  /** Each required check, with the conclusion of its latest run, or `missing`. */
+  /** Each required check, with the conclusion of its latest run, `pending` or `missing`. */
   checks: Record<string, string>;
 };
 
@@ -69,21 +70,48 @@ export function blockers({ pr, defaultBranch, tier, checks }: Facts): Array<stri
 /** Marks the dry-run comment for one head commit, so a rerun does not repeat it. */
 export const marker = (sha: string) => `<!-- automerge-dry-run:${sha} -->`;
 
-/** The dry-run comment. Its last line asks the owner for a reaction that metrics count. */
-export function dryRunComment(facts: Facts) {
-  const sha = facts.pr.headRefOid;
+/** The line that asks the owner for the reaction that `clutch metrics` counts. */
+export const reactionRequest = 'Owner: react 👍 if you agree with this verdict, or 👎 if not.';
+
+/**
+ * The dry-run comment: the verdict, the facts or the reasons behind it, and
+ * the reaction request. `reasons` is empty when the PR would auto-merge.
+ */
+export function dryRunComment(facts: Facts, reasons: Array<string>) {
+  const sha = facts.pr.headRefOid.slice(0, 7);
+  const details =
+    reasons.length > 0
+      ? reasons.map((reason) => `- ${reason}`)
+      : [
+          `- Risk tier: \`${facts.tier}\``,
+          `- Branch: \`${facts.pr.headRefName}\` into \`${facts.defaultBranch}\``,
+          `- Required checks green: ${Object.keys(facts.checks)
+            .map((name) => `\`${name}\``)
+            .join(', ')}`,
+        ];
   return [
-    marker(sha),
-    `**Auto-merge dry run:** this pull request would auto-merge at ${sha.slice(0, 7)}.`,
+    marker(facts.pr.headRefOid),
+    `**Auto-merge dry run:** this pull request ${reasons.length > 0 ? 'would not' : 'would'} auto-merge at ${sha}.`,
     '',
-    `- Risk tier: \`${facts.tier}\``,
-    `- Branch: \`${facts.pr.headRefName}\` into \`${facts.defaultBranch}\``,
-    `- Required checks green: ${Object.keys(facts.checks)
-      .map((name) => `\`${name}\``)
-      .join(', ')}`,
+    ...details,
     '',
-    'Owner: react 👍 if you agree that this could merge without you, or 👎 if not.',
+    reactionRequest,
   ].join('\n');
+}
+
+/**
+ * Why the dry run gives no verdict yet, or nothing when it can give one. A
+ * verdict needs an open, ready agent PR whose required checks have all
+ * finished, since the marker allows one verdict for each head commit.
+ */
+export function noVerdictYet({ pr, checks }: Facts) {
+  if (pr.state !== 'OPEN' || pr.isDraft || !pr.headRefName.startsWith(agentBranch)) {
+    return 'The pull request is not an open, ready agent PR.';
+  }
+  const waiting = Object.entries(checks)
+    .filter(([, conclusion]) => conclusion === 'pending' || conclusion === 'missing')
+    .map(([name]) => name);
+  return waiting.length > 0 ? `Waiting for ${waiting.join(', ')} to finish.` : undefined;
 }
 
 async function must(run: Run, command: Array<string>) {
@@ -146,7 +174,10 @@ async function checkConclusions(run: Run, repo: string, sha: string, names: Arra
   return Object.fromEntries(
     names.map((name) => {
       const found = latest.get(name);
-      return [name, found ? (found.conclusion ?? found.status) : 'missing'];
+      if (!found) {
+        return [name, 'missing'];
+      }
+      return [name, found.status === 'completed' ? (found.conclusion ?? 'pending') : 'pending'];
     }),
   );
 }
@@ -225,25 +256,30 @@ export async function runAutoMerge(
     checks: await checkConclusions(run, repo, pr.headRefOid, names),
   };
   const reasons = blockers(facts);
-  if (reasons.length > 0) {
-    log(`Would not auto-merge:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`);
-    return 0;
-  }
-  if (mode === 'off') {
-    log('Would auto-merge, but automerge.mode is off.');
-    return 0;
-  }
-  if (mode === 'on') {
+  const verdict =
+    reasons.length > 0
+      ? `Would not auto-merge:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
+      : 'Would auto-merge.';
+  if (mode === 'on' && reasons.length === 0) {
     await gh(run, 'pr', 'merge', values.pr, '--auto', '--merge');
     log('Queued the merge.');
     return 0;
   }
-  if (await hasMarker(run, repo, values.pr, pr.headRefOid)) {
-    log('Would auto-merge. The dry-run comment for this head is already there.');
+  if (mode !== 'dry-run') {
+    log(verdict);
     return 0;
   }
-  await gh(run, 'pr', 'comment', values.pr, '--body', dryRunComment(facts));
-  log('Would auto-merge. Posted the dry-run comment.');
+  const wait = noVerdictYet(facts);
+  if (wait) {
+    log(`${verdict}\nNo dry-run comment: ${wait}`);
+    return 0;
+  }
+  if (await hasMarker(run, repo, values.pr, pr.headRefOid)) {
+    log(`${verdict}\nThe dry-run comment for this head is already there.`);
+    return 0;
+  }
+  await gh(run, 'pr', 'comment', values.pr, '--body', dryRunComment(facts, reasons));
+  log(`${verdict}\nPosted the dry-run comment.`);
   return 0;
 }
 

@@ -99,8 +99,11 @@ branch's rules. It skips a run whose branch lives in a fork, even one named
 `clutch/cl-`, because that run gets this repository's token. `automerge.mode` in `clutch.yaml` decides what it does:
 
 - `off` prints the verdict in the job summary.
-- `dry-run` comments "would auto-merge" once for each head commit. The comment
-  asks the owner to react 👍 when they agree and 👎 when they do not. A PR
-  that may not merge gets no comment, and the job summary lists the reasons.
+- `dry-run` comments its verdict once for each head commit of an open, ready
+  agent PR: "would auto-merge", or "would not auto-merge" with the reasons. It
+  waits until every required check has finished, so a check that is still
+  running never decides the verdict. The comment asks the owner to react 👍
+  when they agree and 👎 when they do not. `clutch metrics` counts those
+  reactions as `dryRunAgreement`.
 - `on` runs `gh pr merge --auto --merge`, so the PR merges with a merge commit
   once its checks pass.

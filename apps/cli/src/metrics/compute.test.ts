@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import {
   agentsIn,
   ciMetrics,
+  dryRunAgreement,
   flowMetrics,
   isRevert,
   mainRedMinutes,
@@ -142,4 +143,33 @@ test('CI metrics skip unfinished and skipped runs', () => {
     { conclusion: 'skipped', runStartedAt: at(0), updatedAt: at(0) },
   ]);
   expect(ci).toMatchObject({ runs: 2, failureRate: 0.5, durationMinutes: { p50: 3, count: 2 } });
+});
+
+const verdict = (number: number, day: number, thumbsUp: number, thumbsDown: number) => ({
+  pull: number,
+  createdAt: `2026-10-${String(day).padStart(2, '0')}T00:00:00Z`,
+  wouldMerge: number % 2 === 0,
+  thumbsUp,
+  thumbsDown,
+});
+
+test('dry-run agreement counts reactions, and the streak runs back to the latest 👎', () => {
+  expect(
+    dryRunAgreement([
+      verdict(5, 5, 1, 0),
+      verdict(1, 1, 1, 0),
+      verdict(2, 2, 0, 1),
+      verdict(3, 3, 1, 0),
+      verdict(4, 4, 0, 0),
+    ]),
+  ).toEqual({
+    verdicts: 5,
+    wouldMerge: 2,
+    agreed: 3,
+    disagreed: 1,
+    unanswered: 1,
+    streak: 2,
+    disagreedPulls: [2],
+  });
+  expect(dryRunAgreement([]).streak).toBe(0);
 });
