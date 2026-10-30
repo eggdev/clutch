@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.0 (2026-10-30)
+
+### Features
+
+- feat(skills): add a command index and nudge raw gh calls (CL-120)
+
 ## 0.13.3 (2026-10-30)
 
 ### Fixes and maintenance
