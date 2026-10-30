@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.1 (2026-10-30)
+
+### Fixes and maintenance
+
+- ci(release): keep the bot key in a main-only environment (CL-136)
+
 ## 0.20.0 (2026-10-30)
 
 ### Features
