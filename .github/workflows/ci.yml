@@ -15,14 +15,14 @@ env:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           # check-migrations compares with the base commit, so it needs history.
           fetch-depth: 0
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v5
       - name: Check review-helper Python prerequisite
         run: python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11+ is required"'
       - run: bun install --frozen-lockfile
@@ -36,13 +36,13 @@ jobs:
   # commit-msg hook checks them too, but --no-verify or another machine skips it.
   commits:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v5
         with:
           install_args: bun
       - name: Conventional commit subjects
@@ -60,13 +60,13 @@ jobs:
   # Scans the commits of the change for secrets. Pre-commit scans each commit
   # too, but a commit made with --no-verify or on another machine skips it.
   secrets:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v5
         with:
           install_args: gitleaks
       - name: gitleaks
@@ -84,18 +84,18 @@ jobs:
   # run in their own job and not in validate. See
   # docs/contributing/setup/verification.md#journeys.
   journeys:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v5
       - run: bun install --frozen-lockfile
       # Chromium is about 150 MB, so the cache keeps it for each Playwright version.
       - name: Read the Playwright version
         id: playwright
         run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: browsers
         with:
           path: ~/.cache/ms-playwright
@@ -109,7 +109,7 @@ jobs:
       - run: bun run journey --all
       - name: Keep the traces of a failed journey
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: journey-traces
           path: test-results/journeys

@@ -217,6 +217,10 @@ Two more jobs repeat checks that a local hook also runs, because
 PR's commits with gitleaks. The `commits` job checks each PR commit message
 with the `commit-msg` rule in [Git hooks](#git-hooks).
 
+- Each job names its runner image, `ubuntu-26.04`, not `ubuntu-latest`. A
+  new image then arrives in a reviewed PR, not on GitHub's schedule.
+- Each action runs on the Node.js 24 runtime. GitHub ends Node.js 20 for
+  actions, and no action offers Node.js 26 yet.
 - Each workflow sets a top-level `permissions` block. Start from
   `contents: read`, and grant more only in the job that needs it.
 - A PR from a fork never gets a token that writes, such as a cache write token
