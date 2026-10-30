@@ -6,13 +6,16 @@ import { loadConfig, saveConfig } from '@/config';
 import { describeEvent } from '@/describe-event';
 import { detectProject } from '@/detect-project';
 import { cliRoot } from '@/format';
+import { gitOrThrow } from '@/git';
 import { branch, installTemplate, manifestPath } from '@/install-template';
+import type { InstallAnswers } from '@/install-template';
 import { nextStep } from '@/next-step';
 import type { Stage } from '@/next-step';
 import { notify } from '@/notify';
 import { chooseProvider, findProviders } from '@/providers';
 import type { Provider } from '@/providers';
 import { runStage } from '@/run-stage';
+import { askDecisions } from '@/sync/ask';
 
 function stop(message: string, code = 1): never {
   prompts.cancel(message);
@@ -89,11 +92,63 @@ async function runUnattended(provider: Provider, stage: 'survey' | 'migrate', ro
   await notify(done);
 }
 
+/**
+ * Installs Clutch, and settles each file the project already has with other
+ * content. A person answers in a terminal. Otherwise the install stops before
+ * it changes anything, and lists the files for the owner to decide.
+ */
+async function installWithDecisions(
+  project: Extract<Awaited<ReturnType<typeof detectProject>>, { kind: 'existing' }>,
+  answers: InstallAnswers,
+) {
+  let result = await installTemplate({ project, template: cliRoot, answers });
+  if (result.status === 'decisions' && process.stdin.isTTY && process.stdout.isTTY) {
+    const more = await askDecisions({
+      root: project.root,
+      template: cliRoot,
+      commit: await gitOrThrow(cliRoot, 'rev-parse', 'HEAD'),
+      files: result.decisions.map((item) => item.path),
+      mergeable: new Set(
+        result.decisions.filter((item) => item.rule === 'seed').map((item) => item.path),
+      ),
+    });
+    if (!more) {
+      stop('Nothing changed.', 0);
+    }
+    result = await installTemplate({
+      project,
+      template: cliRoot,
+      answers: {
+        keep: [...answers.keep, ...more.keep],
+        take: [...answers.take, ...more.take],
+        merge: [...answers.merge, ...more.merge],
+      },
+    });
+  }
+  if (result.status === 'decisions') {
+    stop(
+      [
+        'The project already has these files with other content. Nothing changed:',
+        ...result.decisions.map((item) => `  ${item.path} (${item.rule})`),
+        'Ask the owner about each one, then run install again with --keep <file>, --take <file>, or --merge <file> for a seed file.',
+      ].join('\n'),
+      2,
+    );
+  }
+  return result.manifest;
+}
+
 /** Installs Clutch into the project at `cwd`, then runs or hands off the kickoff stages. */
 export async function installCommand(args: Array<string>, cwd: string): Promise<number> {
   const { values } = parseArgs({
     args,
-    options: { agent: { type: 'string' }, yes: { type: 'boolean', default: false } },
+    options: {
+      agent: { type: 'string' },
+      yes: { type: 'boolean', default: false },
+      keep: { type: 'string', multiple: true },
+      take: { type: 'string', multiple: true },
+      merge: { type: 'string', multiple: true },
+    },
   });
 
   prompts.intro('Clutch');
@@ -115,7 +170,11 @@ export async function installCommand(args: Array<string>, cwd: string): Promise<
     if (!install) {
       stop('Nothing changed.', 0);
     }
-    const { manifest } = await installTemplate({ project, template: cliRoot });
+    const manifest = await installWithDecisions(project, {
+      keep: values.keep ?? [],
+      take: values.take ?? [],
+      merge: values.merge ?? [],
+    });
     const count = (action: string) =>
       manifest.files.filter((file) => file.action === action).length;
     prompts.log.success(
@@ -123,6 +182,9 @@ export async function installCommand(args: Array<string>, cwd: string): Promise<
         `Installed on the new branch ${branch}, from ${project.defaultBranch}. The checkout is on that branch now.`,
         `Files: ${count('added')} added, ${count('replaced')} replaced, ${count('merged')} merged. Conflicts: ${manifest.conflicts.length}.`,
         `The manifest is ${manifestPath}.`,
+        ...('markers' in manifest
+          ? [`Resolve the conflict markers in: ${(manifest.markers as Array<string>).join(', ')}.`]
+          : []),
       ].join('\n'),
     );
     step = { step: 'survey' };

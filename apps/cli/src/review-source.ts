@@ -10,7 +10,7 @@ export type ReviewSource = {
   roots: Array<string>;
 };
 
-function fingerprint(mode: string, content: Buffer): string {
+export function fingerprint(mode: string, content: Buffer): string {
   return createHash('sha256').update(mode).update('\0').update(content).digest('hex');
 }
 

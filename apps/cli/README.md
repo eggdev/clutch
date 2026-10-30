@@ -2,7 +2,7 @@
 
 Installs this template into an existing project. The CLI checks the project,
 switches its checkout to a new branch `template/install` from the default
-branch, copies the files that [`template.files.yaml`](../../template.files.yaml)
+branch, copies the files that [`clutch.files.yaml`](../../clutch.files.yaml)
 names, and writes `.template-install/manifest.json`. The kickoff skill then works
 through the manifest with the owner in their chosen agent interface. The
 installer does not launch an agent by default.
@@ -34,6 +34,19 @@ when an agent runs the installer. It does not approve product decisions.
 To opt into the CLI-driven stages instead, pass `--agent claude` or
 `--agent codex`. This requires that CLI on PATH and launches its terminal
 interview. A saved provider preference never enables this mode implicitly.
+
+## Files the project already has
+
+Install reads `clutch.files.yaml`. A file that the project already has with
+other content needs a decision before install changes anything:
+
+- A `managed` file: keep the project copy, or take the Clutch copy.
+- A `seed` file: keep, take, or merge. Merge writes both copies with conflict
+  markers, and the manifest lists the file under `markers`.
+
+In a terminal, install asks. Otherwise it lists the files and stops. Run it
+again with `--keep <file>`, `--take <file>` or `--merge <file>` for each one.
+Install also writes `.clutch/lineage.json`, so `clutch sync` can continue.
 
 ## Review tooling only
 

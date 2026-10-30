@@ -2,30 +2,14 @@ import { expect, test } from 'bun:test';
 import { mkdir, readFile, readlink, symlink } from 'node:fs/promises';
 import path from 'node:path';
 
-import { detectProject } from '@/detect-project';
 import { gitOrThrow as git } from '@/git';
 import { installTemplate } from '@/install-template';
 import { gitRepo } from '@/testing/git-repo';
-
-const copyList = `
-files:
-  - path: AGENTS.md
-    rule: replace
-  - path: tools/
-    rule: add
-`;
-
-async function existing(root: string) {
-  const detection = await detectProject(root);
-  if (detection.kind !== 'existing') {
-    throw new Error(detection.reason);
-  }
-  return detection;
-}
+import { copyList, existing, install } from '@/testing/install';
 
 test('the install switches the checkout to a new branch from the default branch, and copies the files there', async () => {
   await using template = await gitRepo({
-    'template.files.yaml': copyList,
+    'clutch.files.yaml': copyList,
     'AGENTS.md': '# Template agents\n',
     'tools/check.ts': 'export {};\n',
     'README.md': '# The template itself\n',
@@ -39,17 +23,20 @@ test('the install switches the checkout to a new branch from the default branch,
   await git(project.root, 'add', '--all');
   await git(project.root, 'commit', '--quiet', '--message', 'Feature work');
 
-  const result = await installTemplate({
-    project: await existing(project.root),
-    template: template.root,
-  });
+  const result = await install(project.root, template.root, { take: ['AGENTS.md'] });
 
   expect(await git(project.root, 'branch', '--show-current')).toBe('template/install');
   expect(await git(project.root, 'log', '--format=%s')).toBe(
     'Install template: copy files\nInitial commit',
   );
   expect(await git(project.root, 'ls-files')).toBe(
-    ['.template-install/manifest.json', 'AGENTS.md', 'package.json', 'tools/check.ts'].join('\n'),
+    [
+      '.clutch/lineage.json',
+      '.template-install/manifest.json',
+      'AGENTS.md',
+      'package.json',
+      'tools/check.ts',
+    ].join('\n'),
   );
   expect(await readFile(path.join(project.root, 'AGENTS.md'), 'utf-8')).toBe('# Template agents\n');
   expect(
@@ -59,8 +46,8 @@ test('the install switches the checkout to a new branch from the default branch,
     base: { branch: 'main', commit: await git(project.root, 'rev-parse', 'main') },
     stage: 'survey',
     files: [
-      { path: 'AGENTS.md', action: 'replaced' },
       { path: 'tools/check.ts', action: 'added' },
+      { path: 'AGENTS.md', action: 'replaced' },
     ],
     conflicts: [],
   });
@@ -71,7 +58,7 @@ test('the install switches the checkout to a new branch from the default branch,
 
 test('package.json merges, and the manifest lists each clash for the interview', async () => {
   await using template = await gitRepo({
-    'template.files.yaml': 'files:\n  - path: package.json\n    rule: merge\n',
+    'clutch.files.yaml': 'version: 1\nfiles:\n  - path: package.json\n    rule: merge\n',
     'package.json': JSON.stringify({
       name: 'clutch',
       packageManager: 'bun@1.4.2',
@@ -83,10 +70,7 @@ test('package.json merges, and the manifest lists each clash for the interview',
     { name: 'shop' },
   );
 
-  await installTemplate({
-    project: await existing(project.root),
-    template: template.root,
-  });
+  await install(project.root, template.root);
 
   expect(JSON.parse(await readFile(path.join(project.root, 'package.json'), 'utf-8'))).toEqual({
     name: 'shop',
@@ -108,9 +92,9 @@ test('package.json merges, and the manifest lists each clash for the interview',
   });
 });
 
-test('a project file in an add path stops the install before any branch exists', async () => {
+test('a project file that differs from a managed file waits for a decision before any branch exists', async () => {
   await using template = await gitRepo({
-    'template.files.yaml': copyList,
+    'clutch.files.yaml': copyList,
     'AGENTS.md': '# Template agents\n',
     'tools/check.ts': 'export {};\n',
     'tools/hooks/install.ts': 'export {};\n',
@@ -124,23 +108,25 @@ test('a project file in an add path stops the install before any branch exists',
     { name: 'shop' },
   );
 
-  await expect(
-    installTemplate({ project: await existing(project.root), template: template.root }),
-  ).rejects.toThrow(
-    [
-      'The template adds files that the project already has. Move or rename them, commit, then run this again:',
-      '  tools/check.ts',
-      '  tools/hooks/install.ts',
-    ].join('\n'),
-  );
+  const result = await installTemplate({
+    project: await existing(project.root),
+    template: template.root,
+  });
+  expect(result).toEqual({
+    status: 'decisions',
+    decisions: [
+      { path: 'tools/check.ts', rule: 'managed' },
+      { path: 'tools/hooks/install.ts', rule: 'managed' },
+    ],
+  });
   expect(await git(project.root, 'branch', '--list', 'template/install')).toBe('');
   expect(await git(project.root, 'branch', '--show-current')).toBe('main');
 });
 
 test('skill symlinks stay symlinks, so Claude finds the skills that live in .agents', async () => {
   await using template = await gitRepo({
-    'template.files.yaml':
-      'files:\n  - path: .agents/\n    rule: add\n  - path: .claude/\n    rule: add\n',
+    'clutch.files.yaml':
+      'version: 1\nfiles:\n  - path: .agents/\n    rule: managed\n  - path: .claude/\n    rule: managed\n',
     '.agents/skills/kickoff/SKILL.md': '# Kickoff\n',
   });
   await mkdir(path.join(template.root, '.claude/skills'), { recursive: true });
@@ -149,10 +135,7 @@ test('skill symlinks stay symlinks, so Claude finds the skills that live in .age
   await git(template.root, 'commit', '--quiet', '--message', 'Link the skill');
   await using project = await gitRepo({ 'package.json': '{}' }, { name: 'shop' });
 
-  await installTemplate({
-    project: await existing(project.root),
-    template: template.root,
-  });
+  await install(project.root, template.root);
 
   expect(await readlink(path.join(project.root, '.claude/skills/kickoff'))).toBe(
     '../../.agents/skills/kickoff',
@@ -164,8 +147,8 @@ test('skill symlinks stay symlinks, so Claude finds the skills that live in .age
 
 test('full template install excludes source verify and preserves an existing project executor', async () => {
   await using template = await gitRepo({
-    'template.files.yaml':
-      'exclude:\n  - .agents/skills/verify/\nfiles:\n  - path: .agents/skills/\n    rule: add\n',
+    'clutch.files.yaml':
+      'version: 1\nexclude:\n  - .agents/skills/verify/\nfiles:\n  - path: .agents/skills/\n    rule: managed\n',
     '.agents/skills/verify/SKILL.md': 'Template-source proof\n',
     '.agents/skills/setup-verification/SKILL.md': 'Author project proof\n',
   });
@@ -173,10 +156,7 @@ test('full template install excludes source verify and preserves an existing pro
     'package.json': '{}',
     '.agents/skills/verify/SKILL.md': 'Project assertions\n',
   });
-  const { manifest } = await installTemplate({
-    project: await existing(project.root),
-    template: template.root,
-  });
+  const { manifest } = await install(project.root, template.root);
   expect(await readFile(path.join(project.root, '.agents/skills/verify/SKILL.md'), 'utf-8')).toBe(
     'Project assertions\n',
   );
@@ -188,18 +168,18 @@ test('full template install excludes source verify and preserves an existing pro
 
 test('a copy list entry that matches no template file stops the install', async () => {
   await using template = await gitRepo({
-    'template.files.yaml': copyList,
+    'clutch.files.yaml': copyList,
     'AGENTS.md': '# Template agents\n',
   });
   await using project = await gitRepo({ 'package.json': '{}' }, { name: 'shop' });
   await expect(
     installTemplate({ project: await existing(project.root), template: template.root }),
-  ).rejects.toThrow('template.files.yaml: tools/ matches no file in the template');
+  ).rejects.toThrow('clutch.files.yaml: tools/ matches no committed file.');
 });
 
 test(".gitignore merges: the project keeps its entries and gains the template's", async () => {
   await using template = await gitRepo({
-    'template.files.yaml': 'files:\n  - path: .gitignore\n    rule: merge\n',
+    'clutch.files.yaml': 'version: 1\nfiles:\n  - path: .gitignore\n    rule: merge\n',
     '.gitignore': '# Dependencies\nnode_modules\n\n# Nx\n.nx/cache\n',
   });
   await using project = await gitRepo(
@@ -207,10 +187,7 @@ test(".gitignore merges: the project keeps its entries and gains the template's"
     { name: 'shop' },
   );
 
-  const { manifest } = await installTemplate({
-    project: await existing(project.root),
-    template: template.root,
-  });
+  const { manifest } = await install(project.root, template.root);
 
   expect(await readFile(path.join(project.root, '.gitignore'), 'utf-8')).toBe(
     'node_modules\n.env\n\n# From Clutch\n.nx/cache\n',
@@ -223,7 +200,7 @@ const hook = (command: string) => ({ hooks: [{ type: 'command', command }] });
 
 test("a project's Claude Code settings merge: it keeps its hooks and gains the template's", async () => {
   await using template = await gitRepo({
-    'template.files.yaml': 'files:\n  - path: .claude/settings.json\n    rule: merge\n',
+    'clutch.files.yaml': 'version: 1\nfiles:\n  - path: .claude/settings.json\n    rule: merge\n',
     '.claude/settings.json': JSON.stringify({ hooks: { Stop: [hook('template stop')] } }),
   });
   await using project = await gitRepo(
@@ -237,10 +214,7 @@ test("a project's Claude Code settings merge: it keeps its hooks and gains the t
     { name: 'shop' },
   );
 
-  const { manifest } = await installTemplate({
-    project: await existing(project.root),
-    template: template.root,
-  });
+  const { manifest } = await install(project.root, template.root);
 
   const settings = JSON.parse(
     await readFile(path.join(project.root, '.claude/settings.json'), 'utf-8'),
@@ -254,7 +228,7 @@ test("a project's Claude Code settings merge: it keeps its hooks and gains the t
 
 test("each entry in this template's copy list names tracked files", async () => {
   const root = path.resolve(import.meta.dir, '../../..');
-  const list = Bun.YAML.parse(await readFile(path.join(root, 'template.files.yaml'), 'utf-8')) as {
+  const list = Bun.YAML.parse(await readFile(path.join(root, 'clutch.files.yaml'), 'utf-8')) as {
     files: Array<{ path: string }>;
   };
   const untracked = [];
@@ -290,7 +264,7 @@ test('the registry keeps only the primitives whose code the install copies', asy
     '',
   ].join('\n');
   await using template = await gitRepo({
-    'template.files.yaml': `${copyList}  - path: docs/\n    rule: replace\n`,
+    'clutch.files.yaml': `${copyList}  - path: docs/\n    rule: seed\n`,
     'AGENTS.md': '# Template agents\n',
     'tools/check.ts': 'export {};\n',
     'apps/cli/main.ts': 'export {};\n',
@@ -301,7 +275,7 @@ test('the registry keeps only the primitives whose code the install copies', asy
     { name: 'shop' },
   );
 
-  await installTemplate({ project: await existing(project.root), template: template.root });
+  await install(project.root, template.root);
 
   expect(
     await readFile(
@@ -330,7 +304,7 @@ test('the registry keeps only the primitives whose code the install copies', asy
 
 test('the merged package.json is in the format that the template checks', async () => {
   await using template = await gitRepo({
-    'template.files.yaml': 'files:\n  - path: package.json\n    rule: merge\n',
+    'clutch.files.yaml': 'version: 1\nfiles:\n  - path: package.json\n    rule: merge\n',
     'package.json': JSON.stringify({ name: 'clutch', workspaces: ['apps/*'] }),
   });
   await using project = await gitRepo(
@@ -338,7 +312,7 @@ test('the merged package.json is in the format that the template checks', async 
     { name: 'shop' },
   );
 
-  await installTemplate({ project: await existing(project.root), template: template.root });
+  await install(project.root, template.root);
 
   expect(await readFile(path.join(project.root, 'package.json'), 'utf-8')).toBe(
     '{\n  "name": "shop",\n  "workspaces": [\n    "apps/*"\n  ],\n  "type": "module"\n}\n',

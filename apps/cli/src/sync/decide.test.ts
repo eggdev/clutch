@@ -4,7 +4,8 @@ import path from 'node:path';
 
 import { gitOrThrow } from '@/git';
 import { syncCommand } from '@/sync-command';
-import { lineagePath, runSync } from '@/sync/run';
+import { runSync } from '@/sync/run';
+import { lineagePath } from '@/sync/source';
 import { gitRepo } from '@/testing/git-repo';
 
 const list = 'version: 1\nfiles:\n  - path: tools/\n    rule: managed\n';

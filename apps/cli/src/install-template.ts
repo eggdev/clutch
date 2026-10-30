@@ -8,10 +8,16 @@ import { formatFile } from '@/format';
 import { gitOrThrow } from '@/git';
 import { mergePackageJson } from '@/merge-package-json';
 import type { Conflict } from '@/merge-package-json';
+import { fingerprint, gitBytes } from '@/review-source';
+import { writeEntry } from '@/sync/engine';
+import type { SyncFile } from '@/sync/engine';
+import { lineagePath, loadClutchSource } from '@/sync/source';
 
-type Rule = 'replace' | 'merge' | 'add';
-type CopyList = { files: Array<{ path: string; rule: Rule }>; exclude?: Array<string> };
 type FileAction = { path: string; action: 'added' | 'replaced' | 'merged' };
+
+/** A file that the project already has with other content. A person keeps, takes or merges it. */
+export type InstallDecision = { path: string; rule: 'managed' | 'seed' };
+export type InstallAnswers = { keep: Array<string>; take: Array<string>; merge: Array<string> };
 
 type Merged = { content: string; conflicts: Array<Conflict> };
 
@@ -65,100 +71,163 @@ async function pruneRegistry(root: string, files: Array<string>) {
 export const branch = 'template/install';
 export const manifestPath = '.template-install/manifest.json';
 
-/** The files that `rev` tracks, under `prefix` when given. */
-async function listFiles(cwd: string, rev: string, prefix?: string) {
-  const out = await gitOrThrow(
-    cwd,
-    'ls-tree',
-    '-r',
-    '--name-only',
-    rev,
-    '--',
-    ...(prefix ? [prefix] : []),
-  );
+/** The files that `rev` tracks. */
+async function listFiles(cwd: string, rev: string) {
+  const out = await gitOrThrow(cwd, 'ls-tree', '-r', '--name-only', rev);
   return out.split('\n').filter(Boolean);
 }
 
-/** Copies `paths` from `commit` in the template into `dir`, with their modes and symlinks. */
-async function extract(template: string, commit: string, paths: Array<string>, dir: string) {
-  const archive = Bun.spawn(['git', 'archive', '--format=tar', commit, '--', ...paths], {
-    cwd: template,
-    stdout: 'pipe',
-  });
-  const tar = Bun.spawn(['tar', '-x', '-C', dir], { stdin: archive.stdout });
-  if ((await archive.exited) !== 0 || (await tar.exited) !== 0) {
-    throw new Error(`Could not copy ${paths.join(', ')} from the template at ${commit}`);
+/** The project's copy of each file at `rev`, with the same fingerprint as Clutch's copy. */
+async function projectFiles(root: string, rev: string) {
+  const listing = await gitBytes(root, ['ls-tree', '-rz', rev]);
+  const modes = new Map<string, string>();
+  for (const record of listing.toString().split('\0').filter(Boolean)) {
+    const [header, file] = record.split('\t');
+    const [mode, type] = header.split(' ');
+    if (type === 'blob') {
+      modes.set(file, mode);
+    }
+  }
+  return {
+    has: (file: string) => modes.has(file),
+    read: async (file: string) => {
+      const mode = modes.get(file);
+      if (!mode) {
+        return null;
+      }
+      const content = await gitBytes(root, ['show', `${rev}:${file}`]);
+      return { content, hash: fingerprint(mode, content) };
+    },
+  };
+}
+
+const end = (text: string) => (text.endsWith('\n') ? text : `${text}\n`);
+
+/** Clutch's copy and the project's copy of a seed file, between conflict markers, for a person to resolve. */
+function withMarkers(mine: Buffer, theirs: Buffer) {
+  return `<<<<<<< project\n${end(mine.toString())}=======\n${end(theirs.toString())}>>>>>>> clutch\n`;
+}
+
+type Planned = {
+  writes: Map<string, SyncFile>;
+  merges: Array<string>;
+  marked: Map<string, string>;
+  kept: Record<string, string>;
+  files: Array<FileAction>;
+  decisions: Array<InstallDecision>;
+};
+
+async function planInstall(
+  source: Awaited<ReturnType<typeof loadClutchSource>>,
+  project: Awaited<ReturnType<typeof projectFiles>>,
+  answers: InstallAnswers,
+): Promise<Planned> {
+  const planned: Planned = {
+    writes: new Map(),
+    merges: [],
+    marked: new Map(),
+    kept: {},
+    files: [],
+    decisions: [],
+  };
+  for (const [file] of source.merge) {
+    if (project.has(file)) {
+      planned.merges.push(file);
+      planned.files.push({ path: file, action: 'merged' });
+    } else {
+      planned.writes.set(file, source.merge.get(file) as SyncFile);
+      planned.files.push({ path: file, action: 'added' });
+    }
+  }
+  for (const rule of ['managed', 'seed'] as const) {
+    const files = rule === 'managed' ? source.managed.files : source.seed;
+    for (const [file, theirs] of files) {
+      const mine = await project.read(file);
+      if (!mine) {
+        planned.writes.set(file, theirs);
+        planned.files.push({ path: file, action: 'added' });
+      } else if (mine.hash === theirs.hash) {
+        continue;
+      } else if (answers.take.includes(file)) {
+        planned.writes.set(file, theirs);
+        planned.files.push({ path: file, action: 'replaced' });
+      } else if (answers.merge.includes(file) && rule === 'seed') {
+        planned.marked.set(file, withMarkers(mine.content, theirs.content));
+        planned.files.push({ path: file, action: 'merged' });
+      } else if (answers.keep.includes(file)) {
+        if (rule === 'managed') {
+          planned.kept[file] = theirs.hash;
+        }
+      } else {
+        planned.decisions.push({ path: file, rule });
+      }
+    }
+  }
+  return planned;
+}
+
+function checkAnswers(
+  answers: InstallAnswers,
+  decisions: Array<InstallDecision>,
+  planned: Planned,
+) {
+  const asked = new Set([
+    ...decisions.map((item) => item.path),
+    ...planned.files.map((item) => item.path),
+    ...Object.keys(planned.kept),
+  ]);
+  for (const file of [...answers.keep, ...answers.take, ...answers.merge]) {
+    if (!asked.has(file)) {
+      throw new Error(
+        `${file} needs no decision. Pass --keep, --take or --merge only for the files that install lists.`,
+      );
+    }
   }
 }
 
 /**
- * Switches the project's checkout to a new branch from its default branch,
- * copies the template files named in `template.files.yaml`, writes the install
- * manifest and commits.
+ * Plans the install of Clutch into an existing project from its default
+ * branch. A file the project already has with other content needs a person's
+ * answer. Until each one has an answer, nothing changes and no branch exists.
+ * With every answer, it switches to a new branch, writes the files, the
+ * manifest and the lineage, and commits.
  */
 export async function installTemplate(options: {
   project: Extract<Detection, { kind: 'existing' }>;
   template: string;
+  answers?: Partial<InstallAnswers>;
 }) {
   const { project, template } = options;
+  const answers: InstallAnswers = { keep: [], take: [], merge: [], ...options.answers };
   const commit = await gitOrThrow(template, 'rev-parse', 'HEAD');
-  const list: CopyList = Bun.YAML.parse(
-    await gitOrThrow(template, 'show', `${commit}:template.files.yaml`),
-  ) as CopyList;
-  const existing = new Set(await listFiles(project.root, project.defaultBranch));
-
-  const files: Array<FileAction> = [];
-  const merges: Array<string> = [];
-  const collisions: Array<string> = [];
-  for (const entry of list.files) {
-    const tracked = await listFiles(template, commit, entry.path);
-    const names = tracked.filter(
-      (name) =>
-        !(list.exclude ?? []).some((excluded) =>
-          excluded.endsWith('/') ? name.startsWith(excluded) : name === excluded,
-        ),
-    );
-    if (!names.length) {
-      throw new Error(`template.files.yaml: ${entry.path} matches no file in the template`);
-    }
-    for (const name of names) {
-      if (entry.rule === 'merge' && existing.has(name)) {
-        if (!Object.hasOwn(mergers, path.basename(name))) {
-          throw new Error(
-            `template.files.yaml: the merge rule supports ${Object.keys(mergers).join(' and ')}, not ${name}`,
-          );
-        }
-        merges.push(name);
-        files.push({ path: name, action: 'merged' });
-      } else if (entry.rule === 'add' && existing.has(name)) {
-        collisions.push(name);
-      } else {
-        files.push({ path: name, action: existing.has(name) ? 'replaced' : 'added' });
-      }
-    }
+  const source = await loadClutchSource(template, commit);
+  const mine = await projectFiles(project.root, project.defaultBranch);
+  const planned = await planInstall(source, mine, answers);
+  checkAnswers(answers, planned.decisions, planned);
+  if (planned.decisions.length > 0) {
+    return { status: 'decisions' as const, decisions: planned.decisions };
   }
-
-  if (collisions.length) {
-    throw new Error(
-      [
-        'The template adds files that the project already has. Move or rename them, commit, then run this again:',
-        ...collisions.map((name) => `  ${name}`),
-      ].join('\n'),
-    );
+  for (const name of planned.merges) {
+    if (!Object.hasOwn(mergers, path.basename(name))) {
+      throw new Error(
+        `clutch.files.yaml: the merge rule supports ${Object.keys(mergers).join(' and ')}, not ${name}`,
+      );
+    }
   }
 
   const { root } = project;
   await gitOrThrow(root, 'switch', '--quiet', '--create', branch, project.defaultBranch);
-  const copies = files.filter((file) => file.action !== 'merged').map((file) => file.path);
-  if (copies.length) {
-    await extract(template, commit, copies, root);
+  for (const [name, file] of planned.writes) {
+    await writeEntry(root, name, file);
   }
-
+  for (const [name, content] of planned.marked) {
+    await writeFile(path.join(root, name), content);
+  }
   const conflicts: Array<Conflict & { file: string }> = [];
-  for (const name of merges) {
+  for (const name of planned.merges) {
     const merged = mergers[path.basename(name)](
       await gitOrThrow(root, 'show', `${project.defaultBranch}:${name}`),
-      await gitOrThrow(template, 'show', `${commit}:${name}`),
+      (source.merge.get(name) as SyncFile).content.toString(),
     );
     await writeFile(path.join(root, name), merged.content);
     if (path.basename(name) === 'package.json') {
@@ -167,18 +236,37 @@ export async function installTemplate(options: {
     conflicts.push(...merged.conflicts.map((conflict) => ({ file: name, ...conflict })));
   }
 
-  if (copies.includes(registryPath)) {
-    await pruneRegistry(root, [...existing, ...files.map((file) => file.path)]);
+  const copied = [...planned.writes.keys()];
+  if (copied.includes(registryPath)) {
+    const existing = await listFiles(root, project.defaultBranch);
+    await pruneRegistry(root, [...existing, ...copied]);
   }
 
   const base = {
     branch: project.defaultBranch,
     commit: await gitOrThrow(root, 'rev-parse', project.defaultBranch),
   };
-  const manifest = { template: { commit }, base, stage: 'survey', files, conflicts };
+  const markers = [...planned.marked.keys()];
+  const manifest = {
+    template: { commit },
+    base,
+    stage: 'survey',
+    files: planned.files,
+    conflicts,
+    ...(markers.length > 0 ? { markers } : {}),
+  };
   await mkdir(path.join(root, path.dirname(manifestPath)), { recursive: true });
   await writeFile(path.join(root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
+  const lineage = {
+    schemaVersion: 1,
+    templateRepo: '',
+    templateCommit: commit,
+    files: Object.fromEntries([...source.managed.files].map(([name, file]) => [name, file.hash])),
+    ...(Object.keys(planned.kept).length > 0 ? { kept: planned.kept } : {}),
+  };
+  await mkdir(path.join(root, path.dirname(lineagePath)), { recursive: true });
+  await writeFile(path.join(root, lineagePath), `${JSON.stringify(lineage, null, 2)}\n`);
   await gitOrThrow(root, 'add', '--all');
   await gitOrThrow(root, 'commit', '--quiet', '--message', 'Install template: copy files');
-  return { manifest };
+  return { status: 'installed' as const, manifest };
 }

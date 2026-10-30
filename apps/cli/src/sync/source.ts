@@ -4,6 +4,8 @@ import { gitBytes, safeRelative, tree } from '@/review-source';
 import type { SyncFile, SyncSource } from '@/sync/engine';
 
 const filesList = 'clutch.files.yaml';
+/** The record of what the last sync or install wrote, in each project. */
+export const lineagePath = '.clutch/lineage.json';
 const rules = new Set(['managed', 'merge', 'seed']);
 
 type Entry = { path: string; rule: 'managed' | 'merge' | 'seed'; capability?: string };

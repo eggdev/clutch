@@ -30,16 +30,19 @@ async function showDiff(root: string, template: string, commit: string, file: st
 
 /**
  * Asks a person, file by file, whether to keep the project's edit or take
- * Clutch's copy. Returns nothing when they cancel.
+ * Clutch's copy. A file in `mergeable` also offers a merge with conflict
+ * markers. Returns null when they cancel.
  */
 export async function askDecisions(options: {
   root: string;
   template: string;
   commit: string;
   files: Array<string>;
+  mergeable?: Set<string>;
 }) {
   const keep: Array<string> = [];
   const take: Array<string> = [];
+  const merge: Array<string> = [];
   for (const file of options.files) {
     let answer: string | symbol = 'diff';
     while (answer === 'diff') {
@@ -52,6 +55,9 @@ export async function askDecisions(options: {
             hint: 'asks again when Clutch changes it',
           },
           { value: 'take', label: "Take Clutch's copy" },
+          ...(options.mergeable?.has(file)
+            ? [{ value: 'merge', label: 'Merge both', hint: 'writes conflict markers to resolve' }]
+            : []),
           { value: 'diff', label: 'Show the difference first' },
         ],
       });
@@ -62,7 +68,7 @@ export async function askDecisions(options: {
     if (prompts.isCancel(answer)) {
       return null;
     }
-    (answer === 'keep' ? keep : take).push(file);
+    ({ keep, take, merge })[answer as 'keep' | 'take' | 'merge'].push(file);
   }
-  return { keep, take };
+  return { keep, take, merge };
 }

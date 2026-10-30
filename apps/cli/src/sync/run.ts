@@ -10,9 +10,8 @@ import { mergers } from '@/install-template';
 import { localFile } from '@/review-source';
 import { apply, plan, writeEntry } from '@/sync/engine';
 import type { Change, SyncFile } from '@/sync/engine';
-import { loadClutchSource } from '@/sync/source';
+import { lineagePath, loadClutchSource } from '@/sync/source';
 
-export const lineagePath = '.clutch/lineage.json';
 const reviewRecord = '.review/tooling.json';
 
 type Lineage = {
