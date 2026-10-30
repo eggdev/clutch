@@ -68,6 +68,8 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The job's own token, so the pass needs no Claude GitHub App install.
+          github_token: ${{ github.token }}
           prompt: |
             REPO: ${{ github.repository }}
 
@@ -89,7 +91,9 @@ jobs:
             Return a pull request title and a body in Markdown. The body lists
             each edit and its reason, and each proposal. When the week needs
             no edit, return an empty title.
+          # The cheapest model unless the CLUTCH_AGENT_MODEL repository variable names another one.
           claude_args: |
+            --model ${{ vars.CLUTCH_AGENT_MODEL || 'claude-haiku-5-5' }}
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*)"
             --json-schema '{"type":"object","properties":{"title":{"type":"string"},"body":{"type":"string"}},"required":["title","body"]}'
       - name: Open the gardening pull request

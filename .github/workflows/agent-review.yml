@@ -52,6 +52,8 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The job's own token, so the review needs no Claude GitHub App install.
+          github_token: ${{ github.token }}
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -72,7 +74,9 @@ jobs:
             5. Return the number of blocking findings and a one-line summary.
 
             Report a problem only when the diff shows it. Do not post praise.
+          # The cheapest model unless the CLUTCH_AGENT_MODEL repository variable names another one.
           claude_args: |
+            --model ${{ vars.CLUTCH_AGENT_MODEL || 'claude-haiku-5-5' }}
             --allowedTools "Read,Glob,Grep,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
             --json-schema '{"type":"object","properties":{"blocking":{"type":"integer","minimum":0},"summary":{"type":"string"}},"required":["blocking","summary"]}'
       - name: Fail on a blocking finding
