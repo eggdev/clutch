@@ -1,3 +1,4 @@
+import { commandNudge } from '@tools/agent-hooks/command-nudges';
 import type { HookContext, Outcome, Payload } from '@tools/agent-hooks/payload';
 import { simulatorToolRefusal } from '@tools/agent-hooks/simulator-tools';
 
@@ -104,7 +105,9 @@ const deny = (reason: string): Outcome => ({
  * Before a tool call, refuse a shell command that starts a dev server, a
  * device or a native build directly. Both Claude Code and Codex send the shell
  * line in `tool_input.command`, and both read a `deny` decision. Claude Code
- * also sends its iOS Simulator tools here; see `simulator-tools.ts`.
+ * also sends its iOS Simulator tools here; see `simulator-tools.ts`. A raw `gh`
+ * call that a `bun run pr` command replaces runs, with a hint; see
+ * `command-nudges.ts`.
  */
 export function guardDevServers(payload: Payload, _context: HookContext): Outcome {
   const refusal = simulatorToolRefusal(payload);
@@ -114,7 +117,7 @@ export function guardDevServers(payload: Payload, _context: HookContext): Outcom
   const line = payload.tool_input?.command;
   const hit = typeof line === 'string' ? directStart(line) : null;
   if (!hit) {
-    return { exitCode: 0 };
+    return (typeof line === 'string' && commandNudge(line)) || { exitCode: 0 };
   }
   const where = hit.kind === 'server' ? ', next to any server that already runs' : '';
   return deny(`This command starts ${hit.label} directly${where}. ${fixes[hit.kind]}`);

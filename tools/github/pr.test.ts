@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { runPr } from '@tools/github/pr';
+import { runPr, usage } from '@tools/github/pr';
 import type { Result, Run } from '@tools/github/stack';
 import { allowConsole } from '@tools/testing/console-guard';
 
@@ -145,6 +145,13 @@ test('doctor reports a gh that does not match mise.toml, and --fix installs the 
   expect(await runPr(['doctor', '--fix'], fixable.run, noWrite)).toBe(0);
   expect(fixable.calls).toContain('gh extension remove gh-stack');
   expect(fixable.calls).toContain('gh extension install github/gh-stack --pin v0.3.0');
+});
+
+test('--help prints the usage, runs no command and exits 0', async () => {
+  const gh = fake([]);
+  expect(await runPr(['--help'], gh.run, noWrite)).toBe(0);
+  expect(gh.calls).toEqual([]);
+  expect(usage).toContain('bun run pr merge <number>');
 });
 
 test('a wrong command or missing flag gives the usage', async () => {

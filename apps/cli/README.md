@@ -10,6 +10,9 @@ installer does not launch an agent by default.
 The CLI copies from the last commit of this clone. Commit template changes
 before you install them.
 
+Agents find every repeatable command, `clutch` and `bun run pr`, by stage in
+the [command index](../../.agents/skills/deliver/references/commands.md).
+
 ## Run it
 
 From the root of the project that gets the template, run the CLI from your

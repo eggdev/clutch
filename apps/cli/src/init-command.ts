@@ -20,6 +20,8 @@ const trackerReadme = `# Tracker
 
 One Markdown file per issue lives in \`issues/\`. \`TRACKER.md\` is generated from
 them by \`clutch issues --write\`. Edit the issue files, never \`TRACKER.md\`.
+File a new issue with \`clutch issues new\`. See
+\`.agents/skills/deliver/references/commands.md\` for every repeatable command.
 `;
 
 /** The owner/name of the Clutch checkout's origin remote. */
