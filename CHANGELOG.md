@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 (2026-10-30)
+
+### Fixes and maintenance
+
+- ci(review): run agent workflows on the cheapest model (CL-037)
+
 ## 0.6.0 (2026-10-30)
 
 ### Features
