@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.2 (2026-10-30)
+
+### Fixes and maintenance
+
+- docs(skills): add the run-lanes skill (CL-119)
+
 ## 0.12.1 (2026-10-30)
 
 ### Fixes and maintenance
