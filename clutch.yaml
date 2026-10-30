@@ -26,7 +26,7 @@ capabilities:
   changed_scope_check: { status: waived, reason: Lands in CL-303., issue: CL-303 }
   protected_main: adopted
   secret_scanning: adopted
-  codeql_sast: { status: waived, reason: Lands in CL-102., issue: CL-102 }
+  codeql_sast: adopted
   dep_automation: { status: waived, reason: Lands in CL-104., issue: CL-104 }
   dep_min_age: adopted
   ci_security_lint: adopted

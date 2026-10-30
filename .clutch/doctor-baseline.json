@@ -7,7 +7,7 @@
   "ci_security_lint": "present",
   "cloud_agent_vm": "partial",
   "codeowners": "present",
-  "codeql_sast": "missing",
+  "codeql_sast": "present",
   "custom_lint_plugin": "present",
   "dep_automation": "missing",
   "dep_min_age": "present",
