@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.0 (2026-10-30)
+
+### Features
+
+- feat(cli): add PR size, agent branches and steps to metrics (CL-503b)
+
 ## 0.20.3 (2026-10-30)
 
 ### Fixes and maintenance
