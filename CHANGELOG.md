@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0 (2026-10-30)
+
+### Features
+
+- feat(cli): add risk tiers by path (CL-403)
+
 ## 0.7.0 (2026-10-30)
 
 ### Features
