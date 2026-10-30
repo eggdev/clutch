@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.3 (2026-10-30)
+
+### Fixes and maintenance
+
+- fix(pr): fix three gaps in the pr commands (CL-121)
+
 ## 0.20.2 (2026-10-30)
 
 ### Fixes and maintenance
