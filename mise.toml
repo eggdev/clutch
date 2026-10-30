@@ -3,3 +3,6 @@
 gh = "2.103.3"
 bun = "1.4.2"
 node = "24.15.0"
+# The clutch CLI from the latest Clutch release. tools/clutch.ts runs it in a project.
+# Clutch releases on each merge, so its own releases skip mise's 24-hour minimum age.
+"github:eggdev/clutch" = { version = "latest", minimum_release_age = "0s" }
