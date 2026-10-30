@@ -114,6 +114,29 @@ The loader rejects unknown keys. Each error names its YAML path, such as
 `template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
 guardrail file, so a person reviews each change to it.
 
+## Capability registry
+
+`docs/contributing/capabilities/registry.yaml` lists each capability that a
+repository can adopt, and the rules that detect it. `clutch doctor` reads it.
+
+Each rule checks the files that git tracks. An untracked file never counts.
+
+| Rule                                  | Passes when                                                            |
+| ------------------------------------- | ---------------------------------------------------------------------- |
+| `file: <glob>`                        | A tracked file matches. `min` raises the count. `exclude` skips globs. |
+| `grep: { files, pattern }`            | A matching tracked file contains the regex.                            |
+| `script: <name>`                      | The root `package.json` has the script.                                |
+| `target: <name>`                      | A `package.json` or `project.json` defines the Nx target.              |
+| `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                           |
+| `yaml: { file, path }`                | The dotted path exists in the YAML or JSON file.                       |
+| `remote: <probe>`                     | It is always unknown for now.                                          |
+| `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.           |
+
+A capability is present when every `detect` rule passes. It is partial when
+some pass, or when only `partial_if` rules pass. It is missing when none pass.
+It is unknown when every `detect` rule is unknown. The registry is a guardrail
+file, so a person reviews each change to it.
+
 ## Test it
 
 ```sh

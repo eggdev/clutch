@@ -1,0 +1,42 @@
+# The capability registry. Each entry is one capability that a repository can
+# adopt, and the rules that detect it. `clutch doctor` reads this file. See
+# apps/cli/README.md#capability-registry.
+version: 1
+capabilities:
+  - id: root_agents_md
+    name: Root AGENTS.md
+    category: Agent context
+    phase: P0
+    level: core
+    effort: S
+    research: { rank: 1, priority: 61.4, adoption_top: 0.89 }
+    doc: docs/contributing/capabilities/root-agents-md.md
+    detect:
+      - file: AGENTS.md
+
+  - id: codeowners
+    name: CODEOWNERS / ownership registry
+    category: Review & merge
+    phase: P0
+    level: core
+    effort: S
+    research: { rank: 5, priority: 49.6, adoption_top: 0.85 }
+    doc: docs/contributing/capabilities/codeowners.md
+    detect:
+      - any:
+          - file: .github/CODEOWNERS
+          - file: CODEOWNERS
+          - file: docs/CODEOWNERS
+
+  - id: codeql_sast
+    name: CodeQL / SAST
+    category: Trust
+    phase: P1
+    level: core
+    effort: S
+    research: { rank: 16, priority: 44.6, adoption_top: 0.67 }
+    doc: docs/contributing/capabilities/codeql-sast.md
+    detect:
+      - any:
+          - workflow: { uses: github/codeql-action/ }
+          - remote: code_scanning_default_setup
