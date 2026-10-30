@@ -14,7 +14,10 @@ name: Auto-merge
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  workflow_run:
+  # workflow_run runs with this repository's token, so the decide job admits
+  # only runs from branches of this repository, never a fork, and it runs the
+  # default branch's code. No other trigger sees a completed Actions check.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [CI, Agent review]
     types: [completed]
 
@@ -33,6 +36,7 @@ jobs:
     if: >-
       (github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'clutch/cl-')) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
       startsWith(github.event.workflow_run.head_branch, 'clutch/cl-'))
     runs-on: ubuntu-26.04
     timeout-minutes: 10
