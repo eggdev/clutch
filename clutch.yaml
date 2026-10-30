@@ -24,13 +24,8 @@ capabilities:
   ratchets: { status: waived, reason: Lands in CL-302b., issue: CL-302b }
   file_size_caps: adopted
   changed_scope_check: { status: waived, reason: Lands in CL-303., issue: CL-303 }
-  protected_main: { status: waived, reason: Lands in CL-106., issue: CL-106 }
-  secret_scanning:
-    {
-      status: waived,
-      reason: Local gitleaks adopted in CL-101. Push protection pending the owner in CL-106.,
-      issue: CL-106,
-    }
+  protected_main: adopted
+  secret_scanning: adopted
   codeql_sast: { status: waived, reason: Lands in CL-102., issue: CL-102 }
   dep_automation: { status: waived, reason: Lands in CL-104., issue: CL-104 }
   dep_min_age: adopted
