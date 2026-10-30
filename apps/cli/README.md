@@ -244,7 +244,7 @@ Each rule checks the files that git tracks. An untracked file never counts.
 | `target: <name>`                      | A `package.json` or `project.json` defines the Nx target.              |
 | `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                           |
 | `yaml: { file, path }`                | The dotted path exists in the YAML or JSON file.                       |
-| `remote: <probe>`                     | It is always unknown for now.                                          |
+| `remote: <probe>`                     | The GitHub setting holds. It is unknown without `--remote`.            |
 | `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.           |
 
 A capability is present when every `detect` rule passes. It is partial when
