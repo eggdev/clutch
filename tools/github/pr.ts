@@ -10,6 +10,7 @@ import {
   stackExtensionVersion,
 } from '@tools/github/stack';
 import type { Run } from '@tools/github/stack';
+import { conventionalProblem } from '@tools/hooks/commit-msg';
 
 /**
  * The pull request commands that every project uses. They open each PR ready
@@ -134,6 +135,10 @@ async function open(
   const { title, 'body-file': bodyFile } = options;
   if (!title || !bodyFile) {
     throw new Error(`open needs --title and --body-file.\n${usage}`);
+  }
+  const problem = conventionalProblem(title);
+  if (problem) {
+    throw new Error(`The PR title must be a conventional commit. ${problem}`);
   }
   const trunk = await defaultBranch(run);
   const branch = await must(run, ['git', 'branch', '--show-current']);

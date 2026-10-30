@@ -23,6 +23,10 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 ```
 
 - Open each PR ready for review. Never open a draft.
+- Write each commit and the PR title as a Conventional Commit:
+  `type(scope)!: subject`, such as `fix(cli): keep the project value`. The
+  `commit-msg` hook checks each commit, and `open` checks the title. `fix` is a
+  patch release, `feat` is a minor one, and `!` marks a breaking change.
 - Fill every section of `.github/pull_request_template.md` in the body file.
 - `open` pushes the branch first, so the pre-push checks run.
 - When the branch already has an open PR, `open` replaces its body.
