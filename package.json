@@ -22,7 +22,8 @@
     "format": "nx run-many -t format",
     "recap:classify": "bun tools/recap/classify-primitives.ts",
     "recap:upsert": "bun tools/recap/upsert-recap-block.ts",
-    "clutch": "bun apps/cli/src/main.ts"
+    "clutch": "bun apps/cli/src/main.ts",
+    "pr": "bun tools/github/pr.ts"
   },
   "devDependencies": {
     "@babel/core": "8.0.9",

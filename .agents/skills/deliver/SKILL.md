@@ -81,6 +81,9 @@ policy. A working preview deployment is not permission to retain a local server.
 ## Complete the destination
 
 Continue through already authorized commit, PR, merge and release actions.
+Open, stack and merge PRs with the commands in
+[pull requests](./references/pull-requests.md): ready for review, never a draft,
+and in one linear stack when a PR builds on another open PR.
 Verify the actual destination, not only submission or a build job. In T3,
 register relevant PRs and use supported watchers; delegated children return
 their result to the parent rather than watching independently.
