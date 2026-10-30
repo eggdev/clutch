@@ -278,7 +278,9 @@
           "check-guardrail-coverage",
           "check-transaction-safe",
           "check-test-integrity",
-          "check-journeys"
+          "check-journeys",
+          "check-clutch",
+          "check-clutch-issues"
         ]
       },
       "check-journeys": {
@@ -341,6 +343,20 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/check-skills.ts"
+        },
+        "cache": false
+      },
+      "check-clutch": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun apps/cli/src/main.ts doctor --check"
+        },
+        "cache": false
+      },
+      "check-clutch-issues": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun apps/cli/src/main.ts issues --check"
         },
         "cache": false
       }
