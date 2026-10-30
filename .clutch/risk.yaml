@@ -4,40 +4,48 @@
 # does not match that rule. Auto-merge reads the tier, so this file is a
 # guardrail file. See apps/cli/README.md#risk.
 #   low:          docs, tests and tracker files. Auto-merge may take it.
-#   medium:       code, auth, agent steering and the lockfile. Agent review reads it.
-#   high:         migrations, and any path that no rule names.
-#   one-way-door: what runs or gates the factory, and billing. A person reviews it.
-# Brendan's rule (2026-10-30, .clutch/PLAN.md#decisions): trust the agents,
-# except for the automation itself and anything that changes billing.
+#   medium:       product code and the lockfile. Agent review reads it.
+#   high:         any path that no rule names.
+#   one-way-door: the automation and its gates, agent steering, auth,
+#                 migrations, billing, and infra and secrets. A person reviews it.
+# The tiers follow Brendan's rule and the published risk policies that
+# .clutch/PLAN.md#decisions cites.
 schemaVersion: 1
 unmatched: high
 rules:
   - tier: one-way-door
-    # Automation-critical: each file that runs or gates the factory. A change
-    # here can weaken the gate that auto-merge relies on. Every pattern in the
-    # guardrail list counts, so the two cannot drift. The list holds this file.
+    # The automation and its gates. Every pattern in the guardrail list counts,
+    # so the two cannot drift. The list holds this file.
     guardrails: tools/guardrail-files.json
     paths:
       # The main ruleset as applied on GitHub.
       - .github/rulesets/**
-  - tier: one-way-door
-    # Billing: the project's payment and billing code. Empty in the template.
-    # Kickoff names it. See docs/contributing/setup/checks.md#ci.
-    paths: []
-  - tier: high
-    paths:
-      # Migrations, the paths tools/check-migrations.ts matches. A deployed
-      # migration in a project can lose data.
-      - '{apps,features,packages}/**/migrations/**'
-  - tier: medium
-    paths:
-      # Agent steering. Agent review reads each change, and its docs stay medium.
+      # Agent steering. Every agent reads these.
       - AGENTS.md
       - CLAUDE.md
       - '**/AGENTS.md'
       - .agents/skills/**
       - .claude/skills/**
-      # A lockfile change alone can pull in new code.
+      # Auth: who an actor is and what it may see.
+      - '**/auth/**'
+      - packages/access/**
+      - packages/identity/**
+      # Migrations, the paths tools/check-migrations.ts matches. A deployed
+      # migration can lose data.
+      - '{apps,features,packages}/**/migrations/**'
+  - tier: one-way-door
+    # Billing: the project's payment and billing code. Empty in the template.
+    # Kickoff names it. See docs/contributing/setup/checks.md#ci.
+    paths: []
+  - tier: one-way-door
+    # Infra, deploy and secrets: the project's deploy config, infrastructure
+    # code and secret handling. Empty in the template. Kickoff names it. See
+    # docs/contributing/setup/checks.md#ci.
+    paths: []
+  - tier: medium
+    paths:
+      # A lockfile change alone can pull in new code. CL-405's bot rule merges
+      # a Renovate PR that changes only versions, lockfiles and changesets.
       - bun.lock
   - tier: medium
     paths:

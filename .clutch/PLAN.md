@@ -111,11 +111,17 @@ Brendan, 2026-10-30:
    (CL-906). PR size is a label and a warning, never a failure (CL-401).
 5. Once agent review is a required check, a missing credential fails it in
    Clutch. Projects keep pass-with-notice until they adopt it (CL-308).
-6. Risk tiers trust the agents. Only the files that run or gate the
-   automation, and billing code, are `one-way-door`. Migrations are `high`, and
-   auth and agent steering are `medium` (CL-114). In Brendan's words: "This
-   repository is like a template so I'm not wildly concerned about much of
-   anything. But things that are particularly critical to the execution of the
-   automation is important, and anything that will change a billing operation
-   probably. Otherwise for the most part the agents are doing the work so I
-   should be trusting them a lot of the way."
+6. Risk tiers trust the agents with product code, and keep a person on what
+   other teams gate (CL-114). In Brendan's words: "This repository is like a
+   template so I'm not wildly concerned about much of anything. But things
+   that are particularly critical to the execution of the automation is
+   important, and anything that will change a billing operation probably.
+   Otherwise for the most part the agents are doing the work so I should be
+   trusting them a lot of the way." The template follows the three published
+   risk policies in the 75-repo dataset: PostHog `.stamphog/policy.yml`, kody
+   `ship-pr` and openclaw `security-review-policy.yml`. Each holds auth,
+   billing, secrets and infra, migrations, CI config and agent steering for a
+   person. So `one-way-door` holds the automation and its gates, agent
+   steering, auth, migrations, billing, and infra and secrets. Product code
+   and the lockfile are `medium`, and a dependency-only bot PR follows the
+   bot rule (CL-405).

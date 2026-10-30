@@ -130,15 +130,16 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
 - `--json` prints the tier and each file with its tier and the pattern that
   set it. Text output prints the tier and the files at that tier.
 
-Clutch's own rules follow Brendan's rule from the
-[plan decisions](../../.clutch/PLAN.md#decisions): trust the agents, except for
-the automation itself and billing. `one-way-door` holds the files that run or
-gate the factory (the guardrail list, `.github/rulesets` and
-`.clutch/risk.yaml`) and a billing rule, which is empty until a project names
-its payment code. Migrations are `high`. Code in `apps`, `features`, `packages`
-and `tools`, auth, agent steering (`AGENTS.md`, `CLAUDE.md` and the skills) and
-`bun.lock` are `medium`. Docs, tests, changesets and tracker files are `low`.
-Any other path is `high`.
+Clutch's own rules follow the [plan decisions](../../.clutch/PLAN.md#decisions):
+Brendan's rule, held against the published risk policies of other teams.
+`one-way-door` holds the automation and its gates (the guardrail list,
+`.github/rulesets` and `.clutch/risk.yaml`), agent steering (`AGENTS.md`,
+`CLAUDE.md` and the skills), auth (`packages/access`, `packages/identity` and
+any `auth` folder) and migrations. It also holds a billing rule and an infra,
+deploy and secrets rule, both empty until a project names its paths. Product
+code in `apps`, `features`, `packages` and `tools`, including `packages/sync`,
+and `bun.lock` are `medium`. Docs, tests, changesets and tracker files are
+`low`. Any other path is `high`.
 
 ## clutch.yaml
 
