@@ -8,7 +8,7 @@ Each issue gets one branch (`clutch/cl-NNN-<slug>`) and one PR, opened ready for
 
 ## Pull requests and stacks
 
-Follow `.agents/skills/deliver/references/pull-requests.md`. Open, stack and merge each PR with `mise exec -- bun run pr`. When the PR is green and ready to merge, its last commit sets the issue to `done` with `clutch issues set <id> done --pr <url>`. The merge makes that true, so `main` never lags behind GitHub. When a PR closes without a merge, set its issue back to `todo` in the next branch.
+Follow `.agents/skills/deliver/references/pull-requests.md`. Open, follow, stack and merge each PR with `mise exec -- bun run pr`. When the PR is green and ready to merge, `bun run pr ready <id> <number>` makes its last commit, which sets the issue to `done` with the PR link. The merge makes that true, so `main` never lags behind GitHub. When a PR closes without a merge, set its issue back to `todo` in the next branch.
 
 ## Frontmatter
 
