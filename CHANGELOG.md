@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.0 (2026-10-30)
+
+### Features
+
+- feat(skills): add the babysit-pr skill (CL-111)
+
 ## 0.15.0 (2026-10-30)
 
 ### Features
