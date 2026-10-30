@@ -1,6 +1,13 @@
 import { expect, test } from 'bun:test';
 
-import { blockers, dryRunComment, marker, runAutoMerge } from '@tools/github/auto-merge';
+import {
+  blockers,
+  dryRunComment,
+  marker,
+  noVerdictYet,
+  reactionRequest,
+  runAutoMerge,
+} from '@tools/github/auto-merge';
 import type { Facts } from '@tools/github/auto-merge';
 import type { Result, Run } from '@tools/github/stack';
 
@@ -43,12 +50,32 @@ test('each failed condition gives its own reason', () => {
   ]);
 });
 
-test('the dry-run comment carries the head marker and ends with the reaction request', () => {
-  const comment = dryRunComment(facts());
-  expect(comment.startsWith(marker(head))).toBe(true);
-  expect(comment).toContain('would auto-merge at a1b2c3d');
-  expect(comment.split('\n').at(-1)).toBe(
-    'Owner: react 👍 if you agree that this could merge without you, or 👎 if not.',
+test('each dry-run comment carries the head marker, its verdict and the reaction request', () => {
+  const would = dryRunComment(facts(), []);
+  expect(would.startsWith(marker(head))).toBe(true);
+  expect(would).toContain('this pull request would auto-merge at a1b2c3d');
+  expect(would.split('\n').at(-1)).toBe(reactionRequest);
+  const wouldNot = dryRunComment(facts(), ['The risk tier is medium, not low.']);
+  expect(wouldNot.startsWith(marker(head))).toBe(true);
+  expect(wouldNot).toContain(
+    'would not auto-merge at a1b2c3d.\n\n- The risk tier is medium, not low.',
+  );
+  expect(wouldNot.split('\n').at(-1)).toBe(reactionRequest);
+});
+
+test('no verdict while a required check runs or for a draft or a non-agent branch', () => {
+  expect(noVerdictYet(facts())).toBeUndefined();
+  expect(
+    noVerdictYet(facts({ checks: { validate: 'failure', 'agent-review': 'skipped' } })),
+  ).toBeUndefined();
+  expect(noVerdictYet(facts({ checks: { validate: 'pending', 'agent-review': 'missing' } }))).toBe(
+    'Waiting for validate, agent-review to finish.',
+  );
+  expect(noVerdictYet(facts({}, { isDraft: true }))).toBe(
+    'The pull request is not an open, ready agent PR.',
+  );
+  expect(noVerdictYet(facts({}, { headRefName: 'fix/typo' }))).toBe(
+    'The pull request is not an open, ready agent PR.',
   );
 });
 
@@ -97,7 +124,7 @@ async function decide(gh: ReturnType<typeof fake>, mode: 'off' | 'dry-run' | 'on
 
 test('dry-run comments once, with the latest run of each required check', async () => {
   const gh = fake();
-  expect(await decide(gh, 'dry-run')).toEqual(['Would auto-merge. Posted the dry-run comment.']);
+  expect(await decide(gh, 'dry-run')).toEqual(['Would auto-merge.\nPosted the dry-run comment.']);
   expect(acts(gh.calls)).toHaveLength(1);
   expect(acts(gh.calls)[0]).toStartWith(`gh pr comment 7 --body ${marker(head)}`);
 });
@@ -107,17 +134,36 @@ test('dry-run skips the comment when this head already has one', async () => {
     ['gh api --paginate repos/eggdev/clutch/issues/7/comments', { out: `${marker(head)}\n` }],
   ]);
   expect(await decide(gh, 'dry-run')).toEqual([
-    'Would auto-merge. The dry-run comment for this head is already there.',
+    'Would auto-merge.\nThe dry-run comment for this head is already there.',
   ]);
   expect(acts(gh.calls)).toEqual([]);
 });
 
-test('a medium-risk PR or a moved head gets no comment', async () => {
+test('a medium-risk agent PR gets a would-not verdict with its reasons', async () => {
   const medium = fake([['bun tools/clutch.ts risk', { out: '{"tier":"medium"}' }]]);
   expect(await decide(medium, 'dry-run')).toEqual([
-    'Would not auto-merge:\n- The risk tier is medium, not low.',
+    'Would not auto-merge:\n- The risk tier is medium, not low.\nPosted the dry-run comment.',
   ]);
-  expect(acts(medium.calls)).toEqual([]);
+  expect(acts(medium.calls)).toHaveLength(1);
+  expect(acts(medium.calls)[0]).toContain('would not auto-merge');
+});
+
+test('a running check, a non-agent branch or a moved head gets no comment', async () => {
+  const running = fake([
+    [
+      'gh api --paginate repos/eggdev/clutch/commits',
+      { out: JSON.stringify({ id: 1, name: 'validate', status: 'in_progress', conclusion: null }) },
+    ],
+  ]);
+  expect(await decide(running, 'dry-run')).toEqual([
+    'Would not auto-merge:\n- The required check validate is pending.\n- The required check agent-review is missing.\nNo dry-run comment: Waiting for validate, agent-review to finish.',
+  ]);
+  expect(acts(running.calls)).toEqual([]);
+  const person = fake([
+    ['gh pr view', { out: JSON.stringify(facts({}, { headRefName: 'fix/typo' }).pr) }],
+  ]);
+  await decide(person, 'dry-run');
+  expect(acts(person.calls)).toEqual([]);
   const moved = fake([
     ['gh pr view', { out: JSON.stringify(facts({}, { headRefOid: 'ffff' }).pr) }],
   ]);
@@ -127,11 +173,16 @@ test('a medium-risk PR or a moved head gets no comment', async () => {
   expect(moved.calls.some((call) => call.startsWith('bun tools/clutch.ts risk'))).toBe(false);
 });
 
-test('on queues a merge commit, and off acts on nothing', async () => {
+test('on queues a merge commit only for a green low-risk PR, and off acts on nothing', async () => {
   const on = fake();
   expect(await decide(on, 'on')).toEqual(['Queued the merge.']);
   expect(acts(on.calls)).toEqual(['gh pr merge 7 --auto --merge']);
+  const onMedium = fake([['bun tools/clutch.ts risk', { out: '{"tier":"medium"}' }]]);
+  expect(await decide(onMedium, 'on')).toEqual([
+    'Would not auto-merge:\n- The risk tier is medium, not low.',
+  ]);
+  expect(acts(onMedium.calls)).toEqual([]);
   const off = fake();
-  expect(await decide(off, 'off')).toEqual(['Would auto-merge, but automerge.mode is off.']);
+  expect(await decide(off, 'off')).toEqual(['Would auto-merge.']);
   expect(acts(off.calls)).toEqual([]);
 });
