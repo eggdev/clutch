@@ -33,12 +33,12 @@ Each capability is core or extra. `clutch doctor --check` fails on a core capabi
 
 Run `mise exec -- bun run clutch doctor` to see the report. It groups the capabilities by category. Each line shows the capability, the detected state, the declared state and the evidence or the waiver reason.
 
-| Icon | State     | Meaning                                                     |
-| ---- | --------- | ----------------------------------------------------------- |
-| ✓    | `present` | Every detect rule passes.                                   |
-| ~    | `partial` | Some detect rules pass, or only a `partial_if` rule passes. |
-| ✗    | `missing` | No detect rule passes.                                      |
-| ?    | `unknown` | Every detect rule is unknown, such as a remote rule.        |
+| Icon | State     | Meaning                                                                                                                |
+| ---- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| ✓    | `present` | Every detect rule passes.                                                                                              |
+| ~    | `partial` | Some detect rules pass and one fails, or only a `partial_if` rule passes.                                              |
+| ✗    | `missing` | No detect rule passes.                                                                                                 |
+| ?    | `unknown` | Every detect rule is unknown, or the rules that did not pass are all unknown, such as remote rules without `--remote`. |
 
 A summary line follows the list. It counts the capabilities in each detected state, then in each declared state:
 

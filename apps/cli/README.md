@@ -236,12 +236,16 @@ mise exec -- bun run clutch doctor --phase P1
 
 - Each line shows the detected state, the declared state and the evidence or
   the waiver reason. A summary line follows.
+- A capability is present when every detect rule passes, and partial when
+  some pass and one fails. It is unknown when the rules that did not pass are
+  all unknown, such as remote rules without `--remote`.
 - A repository without `clutch.yaml` reports each capability as undeclared.
 - `--category` and `--phase` narrow the report.
 - `--remote` reads GitHub settings for the `remote:` rules: branch rules and
   protection, secret scanning, push protection, the merge queue, auto-merge,
-  CodeQL default setup, Actions secret names and recent review bot comments. It sends only `gh api` GET requests, for the origin
-  repository or `--repo OWNER/NAME`. A setting that the token cannot read is
+  CodeQL default setup, Actions secret names and recent review bot comments.
+  It sends only `gh api` GET requests, for the origin repository or
+  `--repo OWNER/NAME`. A setting that the token cannot read is
   unknown, and an unknown result never fails `--check`.
 - It exits 0 after a report, and 1 when the registry or `clutch.yaml` is bad.
 
