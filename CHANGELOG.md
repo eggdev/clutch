@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.1 (2026-10-30)
+
+### Fixes and maintenance
+
+- build(validate): print failing task output inline (CL-125)
+
 ## 0.12.0 (2026-10-30)
 
 ### Features
