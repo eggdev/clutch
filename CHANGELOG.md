@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.4 (2026-10-30)
+
+### Fixes and maintenance
+
+- fix(doctor): prove review and gardening agents can run (CL-038)
+
 ## 0.6.3 (2026-10-30)
 
 ### Fixes and maintenance
