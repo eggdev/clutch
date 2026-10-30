@@ -31,8 +31,9 @@ const versionOnly: Array<[RegExp, RegExp]> = [
     /^\.github\/workflows\/[\w.-]+\.ya?ml$/u,
     /^\s*(?:-\s+)?uses:\s+\S+@[0-9a-f]{40}(?:\s+#\s*\S+)?$/u,
   ],
-  // tool = "1.2.3" in mise.toml.
-  [/^mise\.toml$/u, /^\s*["\w./:@-]+\s*=\s*"[^"]*"$/u],
+  // tool = "1.2.3" in mise.toml, or "latest" or "lts". A task's run = "..."
+  // is not a version, so it fails.
+  [/^mise\.toml$/u, /^\s*["\w./:@-]+\s*=\s*"(?:[~^]?v?\d[\w.+-]*|latest|lts)"$/u],
 ];
 
 /** The added and removed lines of a unified diff, without their `+` or `-`. */

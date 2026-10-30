@@ -126,6 +126,9 @@ test('no verdict while a required check runs or for a draft or a non-agent branc
   expect(noVerdictYet(facts({}, { isDraft: true }))).toBe(
     'The pull request is not an open, ready agent PR.',
   );
+  expect(noVerdictYet(facts({}, { headRefName: 'fix/typo' }))).toBe(
+    'The pull request is not an open, ready agent PR.',
+  );
 });
 
 /** Check runs of the head: a failed validate, then a newer one with `conclusion`. */
@@ -281,6 +284,7 @@ test('a person branch, a moved head or off mode acts on nothing', async () => {
   expect(await decide(moved, { mode: 'on', step: 'medium' })).toEqual([
     `The head moved from ${head} to ffff. The run for the new head decides.`,
   ]);
+  expect(moved.calls.some((call) => call.startsWith('bun tools/clutch.ts risk'))).toBe(false);
   const off = fake();
   expect(await decide(off, { mode: 'off', step: 'medium' })).toEqual([
     'Would auto-merge at the step medium.',
