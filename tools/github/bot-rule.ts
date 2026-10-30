@@ -18,8 +18,14 @@ export function botKind(headRefName: string) {
   return headRefName.startsWith('gardening/') ? 'gardening' : null;
 }
 
-/** A file that may change in any way: a lockfile or a changeset. */
-const free = [/^bun\.lock$/u, /(?:^|\/)package-lock\.json$/u, /^\.changeset\/[\w.-]+\.md$/u];
+/**
+ * The files that skip the line-by-line version check in `renovateProblems`.
+ * `bun.lock` is generated: CI's `bun install --frozen-lockfile` fails unless
+ * it matches the package.json versions, which this rule does check. Renovate's
+ * own changeset, `.changeset/renovate-*.md`, is release-note text that runs no
+ * code.
+ */
+const free = [/^bun\.lock$/u, /^\.changeset\/renovate-[\w.-]+\.md$/u];
 
 /** A file that may change only on lines that each set a version, and how such a line looks. */
 const versionOnly: Array<[RegExp, RegExp]> = [

