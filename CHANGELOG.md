@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.2 (2026-10-30)
+
+### Fixes and maintenance
+
+- test(sync): migrate the PGlite test database once (CL-903)
+
 ## 0.14.1 (2026-10-30)
 
 ### Fixes and maintenance
