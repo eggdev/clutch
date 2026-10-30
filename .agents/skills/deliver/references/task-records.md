@@ -5,10 +5,12 @@ read and update it within the owner's authorization. Keep the delivery brief
 and evidence in that issue, or its linked task document. Do not create a second
 status list in the repository.
 
-When no writable tracker is available, use one Markdown file per task under
-`.delivery/` at the repository root. Use a stable descriptive ID such as
-`capture-retry`. Keep these files outside durable architecture docs: task state
-changes as work proceeds. Never store credentials, personal data or private
+When no writable tracker is available, use one Markdown file per task in
+`.clutch/issues/<id>.md`. The id is `CL-` and three digits. Take the next free
+id in the phase range that `.clutch/README.md` gives. Run
+`mise exec -- bun run clutch issues --write` after each change, so
+`.clutch/TRACKER.md` stays current. Keep these files outside durable
+architecture docs: task state changes as work proceeds. Never store credentials, personal data or private
 logs in the record. Local artifacts can be referenced by path.
 
 If moving a local task to a tracker, transfer the record, replace the local
@@ -27,14 +29,20 @@ below onto it; do not change a team's workflow configuration for this skill.
 | Review | The next step requires owner judgment or approval; preparatory work is complete | The owner responds or the task is returned for correction |
 | Done | Required criteria and the agreed destination have evidence | New evidence requires follow-up or reopening |
 
+In `.clutch/issues`, the `status` field holds the state. Idea and Ready are
+both `todo`, and Active is `in_progress`. Blocked, Review and Done keep their
+names. An idea that is not ready has the owner's handle in `owner`, so no agent
+picks it.
+
 A preview task can be done when the working preview is verified. A release
 task is not done at preview or PR. A required device check that cannot run
 leaves the task blocked; a check reserved for the owner leaves it in review.
 "Ready for you to inspect" does not add an approval gate. If the local result
 is the agreed destination and no decision remains, mark done and hand it over.
 
-List ready tasks through the tracker, or inspect `.delivery/*.md`. Use the
-owner's priority order, and skip tasks whose dependencies are unmet. Confirm
+List ready tasks through the tracker, or run
+`mise exec -- bun run clutch issues next`. Use the owner's priority order, and
+skip tasks whose dependencies are unmet. Confirm
 that no other session owns a task before claiming it. A recorded owner is a
 coordination signal, not an atomic lock: use the host's claim facility when
 available and do not run competing queue dispatchers over local Markdown.
@@ -51,12 +59,24 @@ Create only the sections the task needs. Keep criterion IDs stable so a review
 can refer to C1 without repeating the brief. The example is a shape to fill,
 not a request to ask the owner about each field.
 
+In `.clutch/issues`, the record starts with the frontmatter that
+`.clutch/README.md` describes. In an external tracker, the issue fields hold
+these values.
+
 ```md
+---
+id: <CL-NNN>
+title: '<outcome>'
+phase: <P0 | P1 | P2 | P3 | P4 | P5 | RN | RB | later>
+status: <todo | in_progress | blocked | review | done>
+depends_on: [<ids of issues that must be done first>]
+pr: '<pull request URL, or empty>'
+owner: <agent | the owner's handle>
+---
+
 # <ID>: <outcome>
 
-State: <idea | ready | active | blocked | review | done>
-Priority: <owner's order>
-Owner: <session link or identifier>
+Session: <session link or identifier>
 Checkout: <path, branch and Sprig task ID when used>
 Requested: <timestamp>
 Destination: <working preview | PR | merge | release; name the target>

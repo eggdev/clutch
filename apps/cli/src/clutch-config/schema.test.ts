@@ -1,0 +1,118 @@
+import { expect, test } from 'bun:test';
+
+import { validateClutchConfig } from '@/clutch-config/schema';
+
+const commit = '37e824f2d552163f18e5c91b126fc6655de435f9';
+const valid = {
+  schemaVersion: 1,
+  project: 'shop',
+  template: { repo: 'eggdev/clutch', commit, mode: 'sync' },
+  capabilities: {
+    root_agents_md: 'adopted',
+    codeql_sast: {
+      status: 'waived',
+      reason: 'Lands in CL-102.',
+      issue: 'CL-102',
+      until: '2027-01-31',
+    },
+    native_builds: { status: 'n/a', reason: 'The project has no native app.' },
+  },
+  worktree: {
+    root: '../shop.worktrees',
+    copy: ['.env.local'],
+    setup: ['mise exec -- bun install'],
+  },
+};
+
+test('a valid file gives the typed config, with the short form expanded', () => {
+  expect(validateClutchConfig(valid)).toEqual({
+    config: {
+      ...valid,
+      schemaVersion: 1,
+      template: { repo: 'eggdev/clutch', commit, mode: 'sync' },
+      capabilities: {
+        root_agents_md: { status: 'adopted' },
+        codeql_sast: {
+          status: 'waived',
+          reason: 'Lands in CL-102.',
+          issue: 'CL-102',
+          until: '2027-01-31',
+        },
+        native_builds: { status: 'n/a', reason: 'The project has no native app.' },
+      },
+    },
+    errors: [],
+  });
+});
+
+test('worktree is optional, and copy and setup default to empty lists', () => {
+  const { worktree: _, ...noWorktree } = valid;
+  expect(validateClutchConfig(noWorktree).config?.worktree).toBeUndefined();
+  expect(validateClutchConfig({ ...valid, worktree: { root: '../w' } }).config?.worktree).toEqual({
+    root: '../w',
+    copy: [],
+    setup: [],
+  });
+});
+
+const paths = (data: unknown) => validateClutchConfig(data).errors.map((error) => error.path);
+
+test('each top-level and template problem names its YAML path', () => {
+  expect(
+    paths({
+      ...valid,
+      schemaVersion: 2,
+      project: '',
+      fleet: [],
+      template: { repo: 'clutch', commit: 'abc123', mode: 'copy', branch: 'main' },
+    }),
+  ).toEqual([
+    'fleet',
+    'schemaVersion',
+    'project',
+    'template.branch',
+    'template.repo',
+    'template.commit',
+    'template.mode',
+  ]);
+  expect(paths({ ...valid, template: 'eggdev/clutch' })).toEqual(['template']);
+  expect(paths([1])).toEqual(['']);
+});
+
+test('each capability problem names its YAML path', () => {
+  expect(
+    paths({
+      ...valid,
+      capabilities: {
+        'Bad-Id': 'adopted',
+        short_waiver: 'waived',
+        unknown_status: 'maybe',
+        bad_fields: {
+          status: 'waived',
+          reason: 'Later.',
+          issue: 'ISSUE-1',
+          until: '2027-02-30',
+          owner: 'x',
+        },
+        no_reason: { status: 'n/a' },
+      },
+    }),
+  ).toEqual([
+    'capabilities.Bad-Id',
+    'capabilities.short_waiver.reason',
+    'capabilities.unknown_status',
+    'capabilities.bad_fields.owner',
+    'capabilities.bad_fields.issue',
+    'capabilities.bad_fields.until',
+    'capabilities.no_reason.reason',
+  ]);
+});
+
+test('each worktree problem names its YAML path', () => {
+  expect(paths({ ...valid, worktree: { copy: '.env', setup: [1], extra: true } })).toEqual([
+    'worktree.extra',
+    'worktree.root',
+    'worktree.copy',
+    'worktree.setup',
+  ]);
+});

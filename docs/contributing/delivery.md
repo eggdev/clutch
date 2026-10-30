@@ -26,7 +26,7 @@ Follow [one-way doors](../principles/two-way-doors.md) at the affected action.
 
 The [task-record procedure](../../.agents/skills/deliver/references/task-records.md)
 owns the brief, states, ready queue, evidence and resume format. Keep status in
-the existing tracker, with `.delivery/` as the fallback when no writable
+the existing tracker, with `.clutch/issues/` as the fallback when no writable
 tracker is available. Architecture docs describe the system, not task progress.
 
 The brief records the outcome, exclusions, criteria, references, dependencies

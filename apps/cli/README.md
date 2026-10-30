@@ -60,6 +60,60 @@ preflight. Reconcile them explicitly and retry. Existing project verify skills
 are always preserved. Full template installation also excludes this template's
 verify; kickoff uses setup-verification for the receiving project.
 
+## Issues
+
+`clutch issues` reads the tracker in `.clutch/issues/`. Each issue is one
+Markdown file with a frontmatter block. See `.clutch/README.md` for the fields.
+
+```sh
+mise exec -- bun run clutch issues
+mise exec -- bun run clutch issues next --stack
+mise exec -- bun run clutch issues set CL-003 review --pr <url>
+mise exec -- bun run clutch issues --write
+mise exec -- bun run clutch issues --check
+```
+
+- `next` prints the first `todo` issue for an agent whose dependencies are
+  done. With `--stack`, a dependency in review also counts, up to 3 stacked
+  PRs. A `later` issue never comes next.
+- `set` changes the frontmatter of one issue, then rewrites
+  `.clutch/TRACKER.md`.
+- `--write` renders `.clutch/TRACKER.md` in the format that `format-check`
+  expects. Never edit that file by hand.
+- `--check` exits 2 when `.clutch/TRACKER.md` is stale, and 1 when an issue
+  file has a bad value. The message names the file and the field.
+- `--json` prints the issues and the errors as JSON.
+
+## clutch.yaml
+
+Each repository that uses Clutch has a `clutch.yaml` at its root. It pins the
+template commit and records the state of each capability. A repository without
+the file has not adopted Clutch.
+
+```yaml
+schemaVersion: 1
+project: shop # a short name for reports
+template:
+  repo: eggdev/clutch # the template repository
+  commit: <40-character SHA> # the template commit that the project matches
+  mode: sync # sync: clutch sync manages the files. doctor: checks only.
+capabilities: # keys are capability ids from the registry
+  root_agents_md: adopted # the short form
+  codeql_sast:
+    status: waived # adopted, waived or n/a
+    reason: Lands in CL-102. # required for waived and n/a
+    issue: CL-102 # optional: the waiver ends when this issue is done
+    until: 2027-01-31 # optional: after this date, the waiver fails the check
+worktree: # optional
+  root: ../shop.worktrees
+  copy: [.env.local]
+  setup: ['mise exec -- bun install']
+```
+
+The loader rejects unknown keys. Each error names its YAML path, such as
+`template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
+guardrail file, so a person reviews each change to it.
+
 ## Test it
 
 ```sh
