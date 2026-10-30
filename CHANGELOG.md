@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.1 (2026-10-30)
+
+### Fixes and maintenance
+
+- build(validate): run validate from tools/validate.ts (CL-126)
+
 ## 0.13.0 (2026-10-30)
 
 ### Features
