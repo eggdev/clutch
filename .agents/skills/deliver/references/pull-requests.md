@@ -2,8 +2,8 @@
 
 Every pull request in a project follows these rules. The commands below do the
 GitHub steps. Use these commands. Do not hand-write `gh` calls or polling
-loops, so each session and each project does the same thing. The command
-index, `commands.md` next to this page, lists every command once CL-120 adds it.
+loops, so each session and each project does the same thing. The
+[command index](./commands.md) lists every command.
 
 ## Set up once per machine
 
