@@ -55,6 +55,10 @@ numbers that set the order:
 
 ### P1: measure, and prepare delegated merge
 
+`clutch issues next` takes P1 in id order, so the small security items come
+first, and CL-106 needs them. Metrics, labels and risk tiers follow. They have
+no dependency on each other, so parallel lanes can take them in any order.
+
 - Measure: CL-503 (flow metrics, from trailers and the GitHub API).
 - Route: CL-109 (labels), CL-403 (risk tiers by path), CL-401 (size label and warning).
 - Delegate: CL-404 (auto-merge dry-run), CL-110 (revert by label), CL-111 (PR babysitter skill).
