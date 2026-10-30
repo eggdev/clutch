@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import type { SyncMessage } from '@repo/sync/types/protocol';
-import { Effect, Fiber, Stream } from 'effect';
+import { Deferred, Effect, Fiber, Stream } from 'effect';
 import type { Scope } from 'effect';
 import { RpcClient } from 'effect/rpc';
 
@@ -15,6 +15,10 @@ const note = (id: string, spaceId: string) => ({
   command: 'notes/create',
   input: { id, spaceId, title: id, at },
 });
+
+/** The changes in one message. A Groups message holds none outside its backfill. */
+const changesOf = (message: SyncMessage) =>
+  message._tag === 'Deltas' ? message.deltas.flatMap((delta) => delta.changes) : [];
 
 /** A short form of each message: the records it adds, or the loaded groups and the backfill. */
 function summary(message: SyncMessage) {
@@ -44,30 +48,66 @@ test('two users in different spaces get only the records of their groups', async
         command: 'access/create-space',
         input: { id: 'design', name: 'Design', at },
       });
+      // The note count is a job that runs after each note. Wait until user A, a
+      // member of design, sees the design count, so it is in B's backfill every time.
+      const countWritten = asUser(
+        'user-a',
+        Effect.gen(function* () {
+          const rpc = yield* RpcClient.make(SyncRpcs);
+          yield* rpc.Pull({ lastSyncId: 0, groups: ['space:design'] }).pipe(
+            Stream.takeUntil((message) =>
+              changesOf(message).some(
+                (change) => change.model === 'SpaceNoteCount' && change.id === 'design',
+              ),
+            ),
+            Stream.runDrain,
+            Effect.timeout('3 seconds'),
+          );
+        }),
+      );
       return yield* asUser(
         'user-b',
         Effect.gen(function* () {
           const rpc = yield* RpcClient.make(SyncRpcs);
+          const connected = yield* Deferred.make<boolean>();
+          const sawHello = yield* Deferred.make<boolean>();
+          const sawJoin = yield* Deferred.make<boolean>();
           const reading = yield* rpc
             .Pull({ lastSyncId: 0, groups: ['space:general', 'space:design'] })
             .pipe(
+              Stream.tap((message) =>
+                Effect.gen(function* () {
+                  yield* Deferred.succeed(connected, true);
+                  const changes = changesOf(message);
+                  if (changes.some((change) => change.id === 'hello')) {
+                    yield* Deferred.succeed(sawHello, true);
+                  }
+                  if (changes.some((change) => change.model === 'Membership')) {
+                    yield* Deferred.succeed(sawJoin, true);
+                  }
+                }),
+              ),
               Stream.takeUntil(
                 (message) => message._tag === 'Groups' && message.loaded.includes('space:design'),
               ),
               Stream.runCollect,
               Effect.forkChild,
             );
-          yield* Effect.sleep('100 millis');
+          // The first message comes after the subscription, so no later push can be missed.
+          yield* Deferred.await(connected);
           yield* push('user-a', note('secret', 'design'));
           yield* push('user-a', note('hello', 'general'));
-          yield* Effect.sleep('100 millis');
+          // Events arrive in order, so B has seen the secret note's event once hello arrives.
+          yield* Deferred.await(sawHello);
+          yield* countWritten;
           const refused = yield* rpc.Load({ group: 'space:design' }).pipe(Effect.flip);
           yield* push('user-b', {
             id: 't-join',
             command: 'access/join-space',
             input: { spaceId: 'design', at },
           });
-          yield* Effect.sleep('100 millis');
+          // The membership change makes the server ask access again, so B may load design.
+          yield* Deferred.await(sawJoin);
           yield* rpc.Load({ group: 'space:design' });
           const messages = yield* Fiber.join(reading).pipe(Effect.timeout('3 seconds'));
           return { refused, messages };
@@ -88,8 +128,9 @@ test('two users in different spaces get only the records of their groups', async
   expect(seen).toContain('design');
   expect(seen).toContain('hello');
   expect(seen).not.toContain('secret');
-  // After B joins, loading design sends its past notes as the backfill.
+  // After B joins, loading design sends the group's past changes as the backfill:
+  // the secret note, then the design note count that the job wrote after it.
   expect(summaries.at(-1)).toBe(
-    'groups org:org-test,space:design,space:general,user:user-b backfill secret',
+    'groups org:org-test,space:design,space:general,user:user-b backfill secret,design',
   );
 });
