@@ -234,13 +234,13 @@ touches. It runs `clutch risk` from the base branch, with the rules in
   `check-workflows` rejects any other `uses:`, and its message names the
   `gh api` command that prints the SHA.
 - `check-workflow-lint` runs actionlint and zizmor, at the versions in
-  `mise.toml`. actionlint finds broken expressions and shell mistakes. zizmor
-  finds unsafe patterns, such as an expression inside a `run:` script, a
-  checkout that keeps its token, or an app token with every permission of the
-  app. Pass an expression to a script through `env:`. Fix a finding, or narrow
-  a permission. Do not add an ignore without the owner's approval.
-  [`.github/actionlint.yaml`](../../../.github/actionlint.yaml) names the
-  runner images that actionlint does not know yet.
+  `mise.toml`. The first finds broken expressions and shell mistakes. The
+  second finds unsafe patterns. Examples are an expression inside a `run:`
+  script, a checkout that keeps its token, and an app token with every
+  permission of the app. Pass an expression to a script through `env:`. Fix a
+  finding, or narrow a permission. Do not add an ignore without the owner's
+  approval. [`.github/actionlint.yaml`](../../../.github/actionlint.yaml)
+  names the runner images that actionlint does not know yet.
 - Each workflow sets a top-level `permissions` block. Start from
   `contents: read`, and grant more only in the job that needs it.
 - A PR from a fork never gets a token that writes, such as a cache write token
