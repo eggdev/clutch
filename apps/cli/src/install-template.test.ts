@@ -34,6 +34,7 @@ test('the install switches the checkout to a new branch from the default branch,
       '.clutch/lineage.json',
       '.template-install/manifest.json',
       'AGENTS.md',
+      'CHANGELOG.md',
       'package.json',
       'tools/check.ts',
     ].join('\n'),
@@ -48,6 +49,7 @@ test('the install switches the checkout to a new branch from the default branch,
     files: [
       { path: 'tools/check.ts', action: 'added' },
       { path: 'AGENTS.md', action: 'replaced' },
+      { path: 'CHANGELOG.md', action: 'added' },
     ],
     conflicts: [],
   });
@@ -80,7 +82,10 @@ test('package.json merges, and the manifest lists each clash for the interview',
   expect(
     JSON.parse(await readFile(path.join(project.root, '.template-install/manifest.json'), 'utf-8')),
   ).toMatchObject({
-    files: [{ path: 'package.json', action: 'merged' }],
+    files: [
+      { path: 'package.json', action: 'merged' },
+      { path: 'CHANGELOG.md', action: 'added' },
+    ],
     conflicts: [
       {
         file: 'package.json',
@@ -192,7 +197,10 @@ test(".gitignore merges: the project keeps its entries and gains the template's"
   expect(await readFile(path.join(project.root, '.gitignore'), 'utf-8')).toBe(
     'node_modules\n.env\n\n# From Clutch\n.nx/cache\n',
   );
-  expect(manifest.files).toEqual([{ path: '.gitignore', action: 'merged' }]);
+  expect(manifest.files).toEqual([
+    { path: '.gitignore', action: 'merged' },
+    { path: 'CHANGELOG.md', action: 'added' },
+  ]);
 });
 
 /** A hook group that runs one command. */
@@ -223,7 +231,10 @@ test("a project's Claude Code settings merge: it keeps its hooks and gains the t
     model: 'opus',
     hooks: { Stop: [hook('project stop'), hook('template stop')] },
   });
-  expect(manifest.files).toEqual([{ path: '.claude/settings.json', action: 'merged' }]);
+  expect(manifest.files).toEqual([
+    { path: '.claude/settings.json', action: 'merged' },
+    { path: 'CHANGELOG.md', action: 'added' },
+  ]);
 });
 
 test("each entry in this template's copy list names tracked files", async () => {
@@ -316,5 +327,26 @@ test('the merged package.json is in the format that the template checks', async 
 
   expect(await readFile(path.join(project.root, 'package.json'), 'utf-8')).toBe(
     '{\n  "name": "shop",\n  "workspaces": [\n    "apps/*"\n  ],\n  "type": "module"\n}\n',
+  );
+});
+
+test('a project starts a fresh changelog, and keeps its own when it has one', async () => {
+  await using template = await gitRepo({
+    'clutch.files.yaml':
+      'version: 1\nfiles:\n  - path: AGENTS.md\n    rule: seed\nexclude:\n  - CHANGELOG.md\n',
+    'AGENTS.md': '# Agents\n',
+    'CHANGELOG.md': '# Changelog\n\n## 1.4.0\n\n- Clutch history\n',
+  });
+  await using fresh = await gitRepo({ 'package.json': '{}' }, { name: 'shop' });
+  await install(fresh.root, template.root);
+  expect(await readFile(path.join(fresh.root, 'CHANGELOG.md'), 'utf-8')).toBe('# Changelog\n');
+
+  await using owned = await gitRepo(
+    { 'package.json': '{}', 'CHANGELOG.md': '# Changelog\n\n## 2.0.0\n' },
+    { name: 'own' },
+  );
+  await install(owned.root, template.root);
+  expect(await readFile(path.join(owned.root, 'CHANGELOG.md'), 'utf-8')).toBe(
+    '# Changelog\n\n## 2.0.0\n',
   );
 });

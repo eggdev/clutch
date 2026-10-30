@@ -71,6 +71,9 @@ async function pruneRegistry(root: string, files: Array<string>) {
   await writeFile(file, doc.toString());
 }
 
+/** The changelog that a new project starts with: a title and no entries. */
+export const freshChangelog = { path: 'CHANGELOG.md', text: '# Changelog\n' };
+
 export const branch = 'template/install';
 export const manifestPath = '.template-install/manifest.json';
 
@@ -239,6 +242,11 @@ export async function installTemplate(options: {
     conflicts.push(...merged.conflicts.map((conflict) => ({ file: name, ...conflict })));
   }
 
+  // A project keeps its own release history, so it starts a fresh changelog.
+  if (!mine.has(freshChangelog.path)) {
+    await writeFile(path.join(root, freshChangelog.path), freshChangelog.text);
+    planned.files.push({ path: freshChangelog.path, action: 'added' });
+  }
   const copied = [...planned.writes.keys()];
   if (copied.includes(registryPath)) {
     const existing = await listFiles(root, project.defaultBranch);

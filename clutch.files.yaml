@@ -115,6 +115,9 @@ files:
     rule: seed
   - path: .github/CODEOWNERS
     rule: seed
+  # How a project writes changesets. Clutch's own pending changesets stay here.
+  - path: .changeset/README.md
+    rule: seed
     capability: codeowners
 retired:
   - .agents/skills/audit/
@@ -126,6 +129,8 @@ retired:
   - .claude/skills/verify-repo
   - .claude/skills/visual-recap
 exclude:
+  # Clutch's release history. A project starts its own changelog.
+  - CHANGELOG.md
   # Each project generates its own verify skill.
   - .agents/skills/verify/
   - .claude/skills/verify

@@ -64,3 +64,4 @@
 /docs/contributing/capabilities/registry.yaml @eggdev
 /.clutch/doctor-baseline.json @eggdev
 /clutch.files.yaml @eggdev
+/tools/release/ @eggdev
