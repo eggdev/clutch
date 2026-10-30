@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 (2026-10-30)
+
+### Fixes and maintenance
+
+- ci(release): push releases with a GitHub App token (CL-039)
+
 ## 0.6.1 (2026-10-30)
 
 ### Fixes and maintenance
