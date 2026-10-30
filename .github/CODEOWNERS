@@ -73,3 +73,6 @@
 /AGENTS.md @eggdev
 /CLAUDE.md @eggdev
 /.agents/skills/ @eggdev
+
+# The main ruleset as applied on GitHub. A change here is a change to branch protection.
+/.github/rulesets/ @eggdev
