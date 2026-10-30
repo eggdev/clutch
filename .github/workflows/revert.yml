@@ -10,28 +10,71 @@ name: Revert
 on:
   pull_request:
     types: [labeled]
+  # The labeled run starts this, so the revert runs from the default branch,
+  # the only ref that may use the release environment and its bot key.
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: The number of the merged pull request to revert.
+        type: number
+        required: true
 
-# Least privilege. The revert job grants what it needs in its own block.
+# Least privilege. Each job grants what it needs in its own block.
 permissions:
   contents: read
 
 concurrency:
-  group: revert-${{ github.event.pull_request.number }}
+  group: revert-${{ github.event.pull_request.number || inputs.pr }}-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
-  revert:
-    # Only a merged PR from this repository. A fork's run gets no bot token.
+  # A pull_request run's ref is refs/pull/N/merge, which the release
+  # environment refuses. So this job only starts a run on the default branch.
+  dispatch:
+    # Only a merged PR from this repository.
     if: >-
+      github.event_name == 'pull_request' &&
       github.event.label.name == 'revert' &&
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Start the revert on the default branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: gh workflow run revert.yml --repo "$GITHUB_REPOSITORY" --ref "$BASE" -f pr="$PR"
+
+  revert:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
+    # The bot's key lives in the release environment, which only main may
+    # deploy to. See docs/contributing/setup/releases.md#the-release-bot.
+    environment: release
     permissions:
       contents: write
       pull-requests: write
     steps:
+      # The dispatch carries only a number, so read the rest from GitHub, and
+      # revert only a merged PR from this repository.
+      - name: Find the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq '
+            if .merged and .head.repo.full_name == .base.repo.full_name then
+              "sha=\(.merge_commit_sha)\nbase=\(.base.ref)"
+            else error("#\(.number) is not a merged pull request from this repository.") end' \
+            >> "$GITHUB_OUTPUT"
+          # A title can hold any character, so it goes through a file, not an output line.
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq .title > "$RUNNER_TEMP/title.txt"
       # A push or a PR made with the default token starts no workflow, so CI
       # would not run on the revert. The release bot's token does start it.
       - name: Get the release bot token
@@ -50,7 +93,7 @@ jobs:
       # The default branch, with history, so the merge commit is there to revert.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ steps.pr.outputs.base }}
           fetch-depth: 0
           persist-credentials: false
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
@@ -60,11 +103,10 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
           PUSH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
-          PR: ${{ github.event.pull_request.number }}
-          SHA: ${{ github.event.pull_request.merge_commit_sha }}
-          TITLE: ${{ github.event.pull_request.title }}
-          BASE: ${{ github.event.pull_request.base.ref }}
+          PR: ${{ inputs.pr }}
+          SHA: ${{ steps.pr.outputs.sha }}
+          BASE: ${{ steps.pr.outputs.base }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          bun tools/github/revert.ts --pr "$PR" --sha "$SHA" --title "$TITLE" --base "$BASE"
+          bun tools/github/revert.ts --pr "$PR" --sha "$SHA" --title "$(cat "$RUNNER_TEMP/title.txt")" --base "$BASE"

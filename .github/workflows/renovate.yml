@@ -29,6 +29,9 @@ concurrency:
 jobs:
   renovate:
     runs-on: ubuntu-26.04
+    # The bot's key lives in the release environment, which only main may
+    # deploy to. See docs/contributing/setup/releases.md#the-release-bot.
+    environment: release
     timeout-minutes: 30
     # Renovate uses the release bot token, not this one.
     permissions:
