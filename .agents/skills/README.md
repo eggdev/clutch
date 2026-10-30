@@ -12,6 +12,8 @@ global skills or other repositories when maintaining this suite.
   committed verify executor and its journeys. This is the only authoring entry point.
 - [verify](./verify/SKILL.md): execute this project's existing proof and cleanup.
 - [audit-codebase](./audit-codebase/SKILL.md): investigate code risks and report findings.
+- [run-lanes](./run-lanes/SKILL.md): coordinate agent lanes that deliver issues in
+  parallel: split by file ownership, brief, reserve ids, merge in a train.
 - [pr-recap](./pr-recap/SKILL.md): on explicit request, explain a PR diff. It adds
   no correctness gate or publication permission.
 - kickoff (when installed): define or resume project setup; use recorded

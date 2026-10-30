@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -90,4 +90,23 @@ test('kickoff exposes unresolved items while its manifest is still pending', () 
     line: 1,
     text: 'Need one owner decision',
   });
+});
+
+test('the run-lanes skill keeps its contract and covers each part of a lane launch', () => {
+  const root = path.resolve(import.meta.dir, '..');
+  expect(checkSkills(root).filter((error) => error.startsWith('run-lanes'))).toEqual([]);
+  const text = readFileSync(path.join(root, '.agents/skills/run-lanes/SKILL.md'), 'utf-8');
+  for (const heading of [
+    '## 1. Split the work by file ownership',
+    '## 2. Reserve issue ids',
+    '## 3. Write each brief',
+    '## 4. Delegate the merge',
+    '## 5. Merge in a train',
+    '## 6. Steer the lanes',
+    "## 7. Relay the owner's questions",
+  ]) {
+    expect(text).toContain(heading);
+  }
+  expect(text).toContain('clutch issues new --phase P1');
+  expect(text).toContain('T3 Code threads are one way');
 });
