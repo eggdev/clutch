@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0 (2026-10-30)
+
+### Features
+
+- feat(ci): add the low-risk auto-merge workflow in dry-run mode (CL-404)
+
 ## 0.8.0 (2026-10-30)
 
 ### Features
