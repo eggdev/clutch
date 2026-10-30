@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { cliRoot } from '@/format';
+import { clutchCheckout, projectTemplateRepo } from '@/clutch-checkout';
 import { askDecisions } from '@/sync/ask';
 import { runSync } from '@/sync/run';
 import type { SyncResult } from '@/sync/run';
@@ -48,7 +48,7 @@ function print(result: SyncResult) {
 export async function syncCommand(
   args: Array<string>,
   cwd: string,
-  template = cliRoot,
+  checkout?: string,
 ): Promise<number> {
   try {
     const { values } = parseArgs({
@@ -63,8 +63,10 @@ export async function syncCommand(
         only: { type: 'string' },
       },
     });
+    const root = path.resolve(cwd, values.root ?? '.');
+    const template = checkout ?? (await clutchCheckout(await projectTemplateRepo(root)));
     const request = {
-      root: path.resolve(cwd, values.root ?? '.'),
+      root,
       template,
       to: values.to,
       check: values.check,

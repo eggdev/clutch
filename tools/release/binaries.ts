@@ -27,6 +27,14 @@ export async function buildBinaries(
   only: ReadonlyArray<string> = targets,
 ) {
   await mkdir(out, { recursive: true });
+  // The binary has no clone, so it carries Clutch's version and capability registry.
+  const built = {
+    version: ((await Bun.file(path.join(root, 'package.json')).json()) as { version: string })
+      .version,
+    registry: await Bun.file(
+      path.join(root, 'docs/contributing/capabilities/registry.yaml'),
+    ).text(),
+  };
   const archives: Array<string> = [];
   for (const target of only) {
     const dir = await mkdtemp(path.join(tmpdir(), `clutch-${target}-`));
@@ -37,6 +45,8 @@ export async function buildBinaries(
           'build',
           '--compile',
           `--target=bun-${target}`,
+          '--define',
+          `globalThis.CLUTCH_BUILD=${JSON.stringify(built)}`,
           path.join(root, 'apps/cli/src/main.ts'),
           '--outfile',
           path.join(dir, 'clutch'),

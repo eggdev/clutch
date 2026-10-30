@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { capabilityRegistry } from '@/clutch-checkout';
 import { loadClutchConfig } from '@/clutch-config/load';
 import { baselineFile, nextBaseline, readBaseline, writeBaseline } from '@/doctor/baseline';
 import { detect } from '@/doctor/detect';
 import { gate } from '@/doctor/gate';
-import { loadRegistry } from '@/doctor/registry';
 import { remoteProber } from '@/doctor/remote';
 import { buildReport, renderReport } from '@/doctor/report';
 import { cliRoot } from '@/format';
@@ -68,8 +68,8 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
     },
   });
   const root = path.resolve(cwd, values.root ?? '.');
-  // The registry comes from the Clutch checkout that runs, so a project gets the registry of its Clutch commit.
-  const registry = await loadRegistry(cliRoot);
+  // The registry of the Clutch that runs: a clone's, or the one built into the release binary.
+  const registry = await capabilityRegistry();
   if (!registry.capabilities) {
     throw new Error(
       registry.errors
