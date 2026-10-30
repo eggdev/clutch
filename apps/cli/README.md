@@ -130,11 +130,15 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
 - `--json` prints the tier and each file with its tier and the pattern that
   set it. Text output prints the tier and the files at that tier.
 
-Clutch's own rules put guardrails, agent steering, migrations and auth
-(`packages/access`, `packages/identity` and any `auth` folder) in
-`one-way-door`, the lockfile and `packages/sync` in `high`, other code in
-`apps`, `features`, `packages` and `tools` in `medium`, and docs, tests,
-changesets and tracker files in `low`. Any other path is `high`.
+Clutch's own rules follow Brendan's rule from the
+[plan decisions](../../.clutch/PLAN.md#decisions): trust the agents, except for
+the automation itself and billing. `one-way-door` holds the files that run or
+gate the factory (the guardrail list, `.github/rulesets` and
+`.clutch/risk.yaml`) and a billing rule, which is empty until a project names
+its payment code. Migrations are `high`. Code in `apps`, `features`, `packages`
+and `tools`, auth, agent steering (`AGENTS.md`, `CLAUDE.md` and the skills) and
+`bun.lock` are `medium`. Docs, tests, changesets and tracker files are `low`.
+Any other path is `high`.
 
 ## clutch.yaml
 

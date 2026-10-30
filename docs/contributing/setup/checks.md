@@ -221,7 +221,12 @@ with the `commit-msg` rule in [Git hooks](#git-hooks).
 The [Risk workflow](../../../.github/workflows/risk.yml) labels each PR
 `risk/low`, `risk/medium`, `risk/high` or `risk/one-way-door` from the paths it
 touches. It runs `clutch risk` from the base branch, with the rules in
-`.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk).
+`.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk). The
+`one-way-door` tier holds the files that run or gate the factory, and the
+project's billing code, which the empty billing rule in `.clutch/risk.yaml`
+lists.
+
+<!-- kickoff: The globs of the project's payment and billing code, as the paths of the billing rule in .clutch/risk.yaml. Leave the list empty when the product bills nothing. -->
 
 The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
 CI or agent review completes on a `clutch/cl-` branch of this repository,

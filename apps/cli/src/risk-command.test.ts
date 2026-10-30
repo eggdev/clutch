@@ -59,22 +59,38 @@ test('tests alone are low, and app code is medium', async () => {
   expect(await tierOf(['apps/cli/src/risk/tiers.ts', 'docs/a.md'])).toBe('medium');
 });
 
-test('a workflow, agent steering, a migration or auth code is a one-way door', async () => {
+test('the files that run or gate the factory are a one-way door', async () => {
   for (const file of [
     '.github/workflows/ci.yml',
-    'AGENTS.md',
-    '.agents/skills/deliver/SKILL.md',
-    'packages/access/repo/migrations/20261030000000_x/migration.sql',
-    'packages/identity/service/actors.ts',
     '.github/CODEOWNERS',
+    '.github/rulesets/main.json',
+    'tools/check-workflows.ts',
+    'clutch.yaml',
+    'package.json',
   ]) {
     expect(await tierOf([file, 'docs/a.md'])).toBe('one-way-door');
   }
 });
 
-test('the lockfile, the sync engine and an unlisted path are high', async () => {
-  expect(await tierOf(['bun.lock'])).toBe('high');
-  expect(await tierOf(['packages/sync/service/push.ts'])).toBe('high');
+test('auth, agent steering, the sync engine and the lockfile are medium', async () => {
+  for (const file of [
+    'packages/identity/service/actors.ts',
+    'packages/access/service/access.ts',
+    'apps/api/src/auth/session.ts',
+    'AGENTS.md',
+    'CLAUDE.md',
+    '.agents/skills/deliver/SKILL.md',
+    'packages/sync/service/push.ts',
+    'bun.lock',
+  ]) {
+    expect(await tierOf([file, 'docs/a.md'])).toBe('medium');
+  }
+});
+
+test('a migration and an unlisted path are high', async () => {
+  expect(await tierOf(['packages/access/repo/migrations/20261030000000_x/migration.sql'])).toBe(
+    'high',
+  );
   expect(await tierOf(['vite.config.ts'])).toBe('high');
 });
 
