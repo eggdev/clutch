@@ -23,7 +23,7 @@
     "format": "nx run-many -t format",
     "recap:classify": "bun tools/recap/classify-primitives.ts",
     "recap:upsert": "bun tools/recap/upsert-recap-block.ts",
-    "clutch": "bun apps/cli/src/main.ts",
+    "clutch": "bun tools/clutch.ts",
     "pr": "bun tools/github/pr.ts"
   },
   "devDependencies": {
@@ -351,14 +351,14 @@
       "check-clutch": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "bun apps/cli/src/main.ts doctor --check"
+          "command": "bun tools/clutch.ts doctor --check"
         },
         "cache": false
       },
       "check-clutch-issues": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "bun apps/cli/src/main.ts issues --check"
+          "command": "bun tools/clutch.ts issues --check"
         },
         "cache": false
       },

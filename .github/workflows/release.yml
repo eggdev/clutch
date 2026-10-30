@@ -1,6 +1,6 @@
 # Each merge to main with pending changesets is a release: a bot commit bumps the
 # version and writes CHANGELOG.md, then the job tags vX.Y.Z and publishes the
-# GitHub release. See docs/contributing/setup/releases.md.
+# GitHub release with the clutch binaries. See docs/contributing/setup/releases.md.
 name: Release
 
 on:
@@ -34,6 +34,11 @@ jobs:
       - name: Version and changelog
         id: release
         run: bun tools/release/release.ts "$RUNNER_TEMP/release-notes.md"
+      # Before the tag, so a failed build publishes no release. Only Clutch has the CLI
+      # source; a project's release has no binaries. See tools/release/binaries.ts.
+      - name: Build the clutch binaries
+        if: steps.release.outputs.released == 'true' && hashFiles('apps/cli/src/main.ts') != ''
+        run: bun tools/release/binaries.ts "$RUNNER_TEMP/dist"
       - name: Commit, tag and publish the release
         if: steps.release.outputs.released == 'true'
         env:
@@ -47,4 +52,5 @@ jobs:
           git commit --message "chore(release): v$VERSION"
           git tag "v$VERSION"
           git push origin HEAD:main "v$VERSION"
-          gh release create "v$VERSION" --title "v$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
+          shopt -s nullglob
+          gh release create "v$VERSION" --title "v$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" "$RUNNER_TEMP"/dist/*.tar.gz
