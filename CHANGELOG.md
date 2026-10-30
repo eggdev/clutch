@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.2 (2026-10-30)
+
+### Fixes and maintenance
+
+- fix(cli): let clutch sync finish in a fresh project (CL-131)
+
 ## 0.20.1 (2026-10-30)
 
 ### Fixes and maintenance
