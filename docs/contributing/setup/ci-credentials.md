@@ -6,12 +6,12 @@ OIDC. Change a secret only with the owner. `clutch.yaml` records the
 
 ## Secrets and variables
 
-| Name                      | Kind     | Read by                                                      | Provider                    | GitHub OIDC                               |
-| ------------------------- | -------- | ------------------------------------------------------------ | --------------------------- | ----------------------------------------- |
-| `CLAUDE_CODE_OAUTH_TOKEN` | secret   | `agent-review.yml`, `gardening.yml`                          | Anthropic, Claude plan      | No. A plan token has no OIDC exchange     |
-| `ANTHROPIC_API_KEY`       | secret   | `agent-review.yml`, `gardening.yml`                          | Anthropic, Claude API       | Yes, through workload identity federation |
-| `CLUTCH_APP_PRIVATE_KEY`  | secret   | `release.yml`, `gardening.yml`, `renovate.yml`, `revert.yml` | GitHub App, the release bot | No. The key signs the app's own login     |
-| `CLUTCH_APP_ID`           | variable | the same workflows                                           | GitHub App, the release bot | Not a secret                              |
+| Name                      | Kind                                | Read by                                                      | Provider                    | GitHub OIDC                               |
+| ------------------------- | ----------------------------------- | ------------------------------------------------------------ | --------------------------- | ----------------------------------------- |
+| `CLAUDE_CODE_OAUTH_TOKEN` | secret                              | `agent-review.yml`, `gardening.yml`                          | Anthropic, Claude plan      | No. A plan token has no OIDC exchange     |
+| `ANTHROPIC_API_KEY`       | secret                              | `agent-review.yml`, `gardening.yml`                          | Anthropic, Claude API       | Yes, through workload identity federation |
+| `CLUTCH_APP_PRIVATE_KEY`  | secret in the `release` environment | `release.yml`, `gardening.yml`, `renovate.yml`, `revert.yml` | GitHub App, the release bot | No. The key signs the app's own login     |
+| `CLUTCH_APP_ID`           | variable                            | the same workflows                                           | GitHub App, the release bot | Not a secret                              |
 
 The default `github.token` is not in the table. GitHub mints it for each job,
 and it ends with the job. Each job's `permissions` block sets its scope.
@@ -31,7 +31,9 @@ and it ends with the job. Each job's `permissions` block sets its scope.
   [release bot setup](./releases.md#the-release-bot) gives the app Contents,
   Pull requests and Workflows read and write, and nothing more. It is on the bypass
   list of the `main` ruleset, so its token can push the release commit.
-  Protect this key most.
+  Protect this key most. It lives in the `release` environment, which only
+  the default branch may deploy to, so a run on any other branch cannot read
+  it. See [the release bot](./releases.md#the-release-bot).
 
 A fork PR gets none of these secrets, so a fork cannot reach any of them. See
 [CI](./checks.md#ci).

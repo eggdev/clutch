@@ -78,12 +78,51 @@ ruleset, the release push then fails, so set the bot up before the ruleset. Set 
    [Renovate](./dependencies.md#renovate).
 2. Install the app on the repository.
 3. Set the `CLUTCH_APP_ID` repository variable to the app id.
-4. Generate a private key for the app. Store it as the
-   `CLUTCH_APP_PRIVATE_KEY` repository secret.
-5. Run `mise exec -- bun run clutch ruleset --apply`. The `main` ruleset in
+4. Create the `release` environment, which only the default branch may deploy
+   to. Replace `<repo>` with `owner/name`, and `main` with the default branch:
+
+   ```sh
+   gh api -X PUT repos/<repo>/environments/release \
+     -F 'deployment_branch_policy[protected_branches]=false' \
+     -F 'deployment_branch_policy[custom_branch_policies]=true'
+   gh api -X POST repos/<repo>/environments/release/deployment-branch-policies \
+     -f name=main -f type=branch
+   ```
+
+5. Generate a private key for the app. Store it as the
+   `CLUTCH_APP_PRIVATE_KEY` secret of the `release` environment, never as a
+   repository secret:
+
+   ```sh
+   gh secret set CLUTCH_APP_PRIVATE_KEY --env release --repo <repo> < <key>.pem
+   ```
+
+6. Run `mise exec -- bun run clutch ruleset --apply`. The `main` ruleset in
    `.github/rulesets/main.json` names the bot's bypass with
    `"actor_id": "vars.CLUTCH_APP_ID"`, and the command puts in the variable's
    value.
+
+Each job that mints the bot token names `environment: release`, so only a run
+on the default branch can read the key. A workflow that a pull request starts
+cannot, so the Revert workflow starts a run of itself on the default branch.
+A job in an environment still reads repository secrets, and the environment's
+secret wins when both exist. When a job names an environment that does not exist,
+GitHub creates it with no branch rule, so run step 4 in each repository.
+
+### Move the key into the environment
+
+An older setup keeps the key as a repository secret, which every branch's runs
+can read. Secrets cannot be copied, so upload the key again:
+
+1. Make sure the `release` environment exists, as in step 4 above. Until the
+   next step, the workflows read the repository secret, so releases keep
+   working.
+2. Upload the key to the environment:
+   `gh secret set CLUTCH_APP_PRIVATE_KEY --env release --repo <repo> < <key>.pem`.
+3. Run a workflow that mints the token, such as Renovate from the Actions tab,
+   and check that the token step passes.
+4. Delete the repository secret:
+   `gh secret delete CLUTCH_APP_PRIVATE_KEY --repo <repo>`.
 
 <!-- kickoff: Whether this project has its own release bot app, and who holds its private key. -->
 

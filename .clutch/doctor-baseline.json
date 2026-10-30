@@ -1,5 +1,5 @@
 {
-  "ai_review_blocking": "partial",
+  "ai_review_blocking": "present",
   "ai_review_bot": "present",
   "canonical_check": "present",
   "changed_scope_check": "partial",
@@ -28,7 +28,7 @@
   "project_cli": "present",
   "protected_main": "present",
   "ratchets": "missing",
-  "risk_tier_automerge": "partial",
+  "risk_tier_automerge": "present",
   "root_agents_md": "present",
   "secret_scanning": "present",
   "skills_dir": "present",

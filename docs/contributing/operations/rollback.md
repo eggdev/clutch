@@ -67,7 +67,9 @@ deploy an old SHA by hand.
 ### Revert a merged pull request
 
 Add the `revert` label to a merged PR. The
-[Revert workflow](../../../.github/workflows/revert.yml) then:
+[Revert workflow](../../../.github/workflows/revert.yml) starts a run of
+itself on the default branch, because only that branch may use the release
+bot's key. That run:
 
 1. Reverts its merge commit on a `revert/<number>` branch, with `-m 1` for a
    merge commit.
