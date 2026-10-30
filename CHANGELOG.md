@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.5 (2026-10-30)
+
+### Fixes and maintenance
+
+- docs(tracker): re-sequence the plan around delegated merge (CL-040)
+
 ## 0.6.4 (2026-10-30)
 
 ### Fixes and maintenance
