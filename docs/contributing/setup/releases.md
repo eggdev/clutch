@@ -42,10 +42,20 @@ earlier release commit. When changesets are pending, it does these steps:
    [`tools/release/release.ts`](../../../tools/release/release.ts).
 2. It commits them as `chore(release): vX.Y.Z` with the GitHub Actions bot.
 3. It tags `vX.Y.Z` and pushes the commit and the tag to `main`.
-4. It publishes a GitHub release with the changelog section as its notes.
+4. It publishes a GitHub release with the changelog section as its notes and
+   the `clutch` binaries.
 
 With no pending changesets, the workflow ends without a release. A protected
 `main` needs a bypass for the release bot.
+
+## The clutch binary
+
+[`tools/release/binaries.ts`](../../../tools/release/binaries.ts) compiles
+`apps/cli` with `bun build --compile` for Linux and macOS, on x64 and arm64.
+Each release carries one `clutch-<os>-<arch>.tar.gz` per platform, with one
+`clutch` file inside. mise's `github:eggdev/clutch` backend picks the archive
+for the machine. Only Clutch has `apps/cli`, so a project's release has no
+binaries.
 
 ## A project's changelog
 

@@ -69,6 +69,14 @@ leaves the `clutch.yaml` pin alone.
 `clutch issues` reads the tracker in `.clutch/issues/`. Each issue is one
 Markdown file with a frontmatter block. See `.clutch/README.md` for the fields.
 
+The `clutch` script runs [`tools/clutch.ts`](../../tools/clutch.ts). In Clutch,
+that runs this source. A project has no `apps/cli/`, so it runs the `clutch`
+binary from the latest
+[GitHub release](../../docs/contributing/setup/releases.md#the-clutch-binary),
+which mise installs. The binary has the tracker commands. `install`, `init`,
+`sync` and `doctor` read Clutch's own files, so they still run from a Clutch
+clone, and the binary says so.
+
 ```sh
 mise exec -- bun run clutch issues
 mise exec -- bun run clutch issues next --stack
