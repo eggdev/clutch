@@ -111,6 +111,24 @@ mise exec -- bun run clutch issues --check
   file has a bad value. The message names the file and the field.
 - `--json` prints the issues and the errors as JSON.
 
+## Labels
+
+`clutch labels` prints the labels of a change. `kind/<type>` comes from the
+conventional type of `--title`. `area/<part>` comes from each changed file:
+a file in a workspace package from the root `package.json` gets the package
+folder's name, such as `area/cli` for `apps/cli/`. Any other file gets its
+top folder without a leading dot, such as `area/docs` or `area/github`, and a
+file at the root gets `area/root`.
+
+```sh
+mise exec -- bun run clutch labels --title "fix(cli): keep the value"
+mise exec -- bun run clutch labels --base origin/main --head HEAD --title "docs: x" --json
+```
+
+`--json` adds the color and description of each label, the label prefixes
+that the command owns, and `one-way-door`, which the Labels workflow creates
+so a person can add it. See [labels](../../docs/contributing/review.md#labels).
+
 ## Risk
 
 `clutch risk` gives a change a risk tier from the paths it touches: `low`,

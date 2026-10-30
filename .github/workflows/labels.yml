@@ -1,0 +1,92 @@
+name: Labels
+
+# Labels each pull request with kind/<type> from its conventional title and
+# area/<part> for each part of the repository it touches, from
+# `clutch labels`. It also makes sure the one-way-door label exists, which a
+# person adds when a change is one-way (docs/principles/two-way-doors.md).
+# risk/<tier> comes from risk.yml. See docs/contributing/review.md#labels.
+#
+# Two jobs, so the pull request's code never runs with a write token. compute
+# runs the head's CLI with a read-only token, since the labels describe the
+# change and gate nothing. apply writes the labels and checks out no code.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+# Least privilege. Each job grants what it needs in its own block.
+permissions:
+  contents: read
+
+# Runs queue instead of cancelling, so a cancelled run never shows as a failed
+# check on the head commit.
+concurrency:
+  group: labels-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  compute:
+    # An edit that leaves the title as it was changes no label.
+    if: github.event.action != 'edited' || github.event.changes.title != null
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      labels: ${{ steps.labels.outputs.json }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+          # The diff needs the merge base.
+          fetch-depth: 0
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile
+      - name: Compute the labels
+        id: labels
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          json="$(bun run --silent clutch labels --base "origin/$BASE_REF" --head "$HEAD_SHA" --title="$TITLE" --json)"
+          echo "json=$json" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$json" | jq -r '.apply[].name'
+
+  apply:
+    needs: compute
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Create the labels and set them on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          LABELS: ${{ needs.compute.outputs.labels }}
+        run: |
+          printf '%s' "$LABELS" | jq -c '.define[]' | while read -r label; do
+            gh label create "$(jq -r '.name' <<< "$label")" --force \
+              --color "$(jq -r '.color' <<< "$label")" \
+              --description "$(jq -r '.description' <<< "$label")" > /dev/null
+          done
+          wanted="$(printf '%s' "$LABELS" | jq -r '.apply[].name')"
+          owned="$(printf '%s' "$LABELS" | jq -r '.owned | join("|")')"
+          current="$(gh api "repos/$GH_REPO/issues/$PR/labels" --jq '.[].name')"
+          for old in $(printf '%s\n' "$current" | grep -E "^($owned)" || true); do
+            if ! printf '%s\n' "$wanted" | grep -qxF "$old"; then
+              gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/${old/\//%2F}" > /dev/null
+            fi
+          done
+          args=()
+          while read -r name; do
+            [ -n "$name" ] && args+=(-f "labels[]=$name")
+          done <<< "$wanted"
+          if [ "${#args[@]}" -gt 0 ]; then
+            gh api --method POST "repos/$GH_REPO/issues/$PR/labels" "${args[@]}" > /dev/null
+          fi
+          printf '%s\n' "$wanted"

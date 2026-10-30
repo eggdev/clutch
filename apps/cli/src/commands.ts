@@ -2,6 +2,7 @@ import { doctorCommand } from '@/doctor-command';
 import { initCommand } from '@/init-command';
 import { installCommand } from '@/install-command';
 import { issuesCommand } from '@/issues-command';
+import { labelsCommand } from '@/labels-command';
 import { metricsCommand } from '@/metrics-command';
 import { riskCommand } from '@/risk-command';
 import { syncCommand } from '@/sync-command';
@@ -51,6 +52,12 @@ export const commands: Record<string, Command> = {
     usage: 'clutch metrics [--since 14d] [--repo OWNER/NAME] [--root DIR] [--json]',
     summary: 'Report how pull requests flow through a repository, from read-only gh api calls.',
     run: (args, cwd) => metricsCommand(args, cwd),
+  },
+  labels: {
+    usage: 'clutch labels [--base REF] [--head REF] [--title TEXT] [--json]',
+    summary:
+      'Print the kind label of a PR title and an area label for each part of the repository the change touches.',
+    run: labelsCommand,
   },
   risk: {
     usage: 'clutch risk [--base REF] [--head REF] [--json]',

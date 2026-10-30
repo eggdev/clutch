@@ -234,6 +234,11 @@ touches. It runs `clutch risk` from the base branch, with the rules in
 migrations. It also holds two lists that each project fills: its billing code,
 and its infra, deploy and secrets paths.
 
+The [Labels workflow](../../../.github/workflows/labels.yml) labels each PR
+`kind/<type>` from its title and `area/<part>` for each workspace package or
+top folder it touches, with `clutch labels`. See
+[labels](../review.md#labels).
+
 <!-- kickoff: The globs of the project's payment and billing code, as the paths of the billing rule in .clutch/risk.yaml. Leave the list empty when the product bills nothing. -->
 
 <!-- kickoff: The globs of the project's deploy config, infrastructure code and secret handling, as the paths of the infra, deploy and secrets rule in .clutch/risk.yaml. Leave the list empty when the project has none. -->
