@@ -71,10 +71,10 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           git checkout --quiet --detach "origin/$DEFAULT_BRANCH"
-          if [ -f .clutch/risk.yaml ]; then
+          if [ -f .clutch/risk.yaml ] && [ -f tools/github/auto-merge.ts ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice title=Auto-merge off::The default branch has no .clutch/risk.yaml, so no pull request is low risk."
+            echo "::notice title=Auto-merge off::The default branch has no .clutch/risk.yaml or tools/github/auto-merge.ts yet, so nothing is judged."
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.base.outputs.present == 'true'
