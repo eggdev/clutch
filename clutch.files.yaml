@@ -125,6 +125,9 @@ files:
   - path: SECURITY.md
     rule: seed
     capability: secret_scanning
+  # Risk tiers by path. A project tunes the paths to its own layout.
+  - path: .clutch/risk.yaml
+    rule: seed
   # How a project writes changesets. Clutch's own pending changesets stay here.
   - path: .changeset/README.md
     rule: seed

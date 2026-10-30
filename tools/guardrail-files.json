@@ -49,6 +49,7 @@
     "tools/journeys/**",
     ".agents/skills/verify/verification.json",
     "clutch.yaml",
+    ".clutch/risk.yaml",
     "tools/github/**",
     "docs/contributing/capabilities/registry.yaml",
     ".clutch/doctor-baseline.json",

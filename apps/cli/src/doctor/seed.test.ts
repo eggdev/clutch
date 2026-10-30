@@ -45,7 +45,7 @@ const expected: Record<string, string> = {
   flake_hunter: 'missing',
   pr_size_limits: 'missing',
   merge_queue: 'missing',
-  risk_tier_automerge: 'missing',
+  risk_tier_automerge: 'partial',
   gardener_bots: 'unknown',
   factory_observability: 'present',
 };

@@ -1,0 +1,57 @@
+# Risk tiers by path. `clutch risk` gives each changed file the highest tier
+# whose globs match it, and a change the highest tier of its files. A file that
+# no rule matches gets `unmatched`. A file that matches a rule's `except`
+# does not match that rule. Auto-merge reads the tier, so this file is a
+# guardrail file. See apps/cli/README.md#risk.
+#   low:          docs, tests and tracker files. Auto-merge may take it.
+#   medium:       application and package code.
+#   high:         shared state that a bad change breaks for every user.
+#   one-way-door: guardrails, agent steering, migrations and auth. A person reviews it.
+schemaVersion: 1
+unmatched: high
+rules:
+  - tier: one-way-door
+    # Every pattern in this list is a one-way door, so the two cannot drift.
+    guardrails: tools/guardrail-files.json
+    paths:
+      # Agent steering. Every agent reads these.
+      - AGENTS.md
+      - CLAUDE.md
+      - '**/AGENTS.md'
+      - .agents/skills/**
+      - .claude/skills/**
+      # The main ruleset as applied on GitHub.
+      - .github/rulesets/**
+      # Migrations, the paths tools/check-migrations.ts matches. A deployed
+      # migration cannot be taken back.
+      - '{apps,features,packages}/**/migrations/**'
+      # Auth: who an actor is and what it may see.
+      - '**/auth/**'
+      - packages/access/**
+      - packages/identity/**
+  - tier: high
+    paths:
+      # A lockfile change alone can pull in new code.
+      - bun.lock
+      # The sync engine moves every user's data.
+      - packages/sync/**
+  - tier: medium
+    paths:
+      - apps/**
+      - features/**
+      - packages/**
+      - tools/**
+    # Docs and tests in these folders stay low.
+    except:
+      - '**/*.md'
+      - '**/*.test.ts'
+      - '**/*.test.tsx'
+  - tier: low
+    paths:
+      - docs/**
+      - '**/*.md'
+      - '**/*.test.ts'
+      - '**/*.test.tsx'
+      - .changeset/*.md
+      - .clutch/issues/**
+      - .clutch/TRACKER.md
