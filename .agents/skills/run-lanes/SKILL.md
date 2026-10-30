@@ -39,11 +39,11 @@ the next id by hand can pick the same one. Give each lane its own block, and
 have it file every new issue with that block:
 
 ```sh
-mise exec -- bun run clutch issues new --phase P1 --title 'Add x' --range CL-118..CL-120
+mise exec -- bun run clutch issues new --phase P1 --title 'Add x' --range CL-310..CL-312
 ```
 
 `clutch issues new` also counts the issue files on every `origin/*` branch.
-See `.clutch/README.md#commands`.
+Run `mise exec -- bun run clutch issues --help` for its options.
 
 ## 3. Write each brief
 
@@ -60,7 +60,7 @@ in your own git worktree. Do the work yourself.
 <Why these issues matter now, such as the critical path.>
 
 ## Read first
-`AGENTS.md`, `.clutch/README.md`, `.clutch/PLAN.md`,
+`AGENTS.md`, `.clutch/README.md`, <the plan, if the project keeps one>,
 `.agents/skills/deliver/references/pull-requests.md`, `docs/contributing/review.md`.
 
 ## Rules (from <owner>, <date>)
@@ -112,22 +112,22 @@ answers a note it disagrees with in the thread.
 
 ## 5. Merge in a train
 
-Each PR can pass CI alone and still break `main` together with another one. On
-2026-10-30, #63 added a workflow and #61 added a workflow lint. Each PR was
-green. Merged minutes apart, the lint failed on the new workflow, and `main` was
-red for every lane.
+Each PR can pass CI alone and still break `main` together with another one.
+For example, one lane adds a workflow while another adds a workflow lint. Each
+PR is green. Merged minutes apart, the lint fails on the new workflow, and
+`main` is red for every lane.
 
 Before a lane merges, it checks whether `main` moved since its last green run:
 
 1. Run `git fetch origin` and compare the PR's base with `origin/main`.
-2. When `main` moved, run `mise exec -- bun run pr sync` (CL-117). Until that
-   lands, rebase on `origin/main`, run `clutch issues --write` and `validate`,
-   and push with `pr open --force`.
+2. When `main` moved, run `mise exec -- bun run pr sync` if the project's `pr`
+   tool has it. Otherwise rebase on `origin/main`, run `clutch issues --write`
+   and `validate`, and push with `pr open --force`.
 3. Wait for the new run to pass, then merge.
 
 When `main` turns red anyway, the coordinator names one lane to fix it, and the
-other lanes stop merging until it is green. The CL-906 notes record each such
-incident as evidence for a merge queue.
+other lanes stop merging until it is green. Record each such incident in the
+issue that decides on a merge queue. Incidents are the evidence for one.
 
 ## 6. Steer the lanes
 
@@ -145,5 +145,5 @@ incident as evidence for a merge queue.
 Lanes put the owner's decisions at the end of each reply. Collect them, drop
 the ones that a lane already settled with a default, and ask the owner once.
 Relay each answer to the lane that asked, in the owner's own words, with the
-date. A decision that changes the plan also goes into `.clutch/PLAN.md#decisions`
-in the PR that acts on it.
+date. A decision that changes the plan also goes into the project's plan or
+decision records, in the PR that acts on it.

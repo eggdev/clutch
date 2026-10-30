@@ -109,4 +109,7 @@ test('the run-lanes skill keeps its contract and covers each part of a lane laun
   }
   expect(text).toContain('clutch issues new --phase P1');
   expect(text).toContain('T3 Code threads are one way');
+  // The skill reaches every project, so it names no Clutch-only file, issue or PR.
+  const prose = text.replaceAll(/CL-\d{3}\.\.CL-\d{3}/gu, '');
+  expect(prose).not.toMatch(/\.clutch\/PLAN\.md|\bCL-\d{3}\b|#\d{2,}\b/u);
 });
