@@ -8,15 +8,35 @@ Rank 28 of the researched practices. More than two in five of the leading reposi
 
 ## Detection
 
-`clutch doctor` reports this capability as present when a workflow file runs `clutch metrics`, or git tracks `.clutch/metrics.yaml`. See the `factory_observability` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when a workflow file runs `clutch metrics`, or git tracks `.clutch/metrics-baseline.json`. See the `factory_observability` entry in [the registry](./registry.yaml).
+
+## Measure
+
+`clutch metrics` reads the repository through `gh api` GET requests only, so it needs a signed-in `gh` and changes nothing. It runs from a Clutch clone and from the release binary, in any project. `--repo OWNER/NAME` reads another repository, and `--since 30d` widens the window from the default 14 days.
+
+```sh
+mise exec -- bun run clutch metrics
+mise exec -- bun run clutch metrics --since 30d --json
+```
+
+It reports these numbers for the pull requests merged in the window:
+
+- Merged PRs, and merged PRs per day.
+- The share merged with no human action. A person acts when a `User` account merges the PR, enables auto-merge, requests or submits a review, or comments. An agent that merges with a person's token counts as that person.
+- The hours from open to merge, and from the last passing check on the head commit to merge, as p50 and p90.
+- Main-red minutes: the time a required check of the default branch was failing. Main turns red when a required check concludes as a failure on a first-parent commit. It turns green when the latest run of each required check on that commit, or a later one, passes.
+- Reverts: merged PRs whose title starts with `Revert`, as a rate of the merged PRs, and revert commits on the default branch.
+- Agent share: the PRs and commits with a `Co-authored-by` trailer that names Claude, Codex, Cursor or Copilot.
+- CI: the completed workflow runs, their failure rate, and their p50 and p90 duration.
+- Issues done: the `.clutch/issues` set to `done` by a PR merged in the window. It is counted only for the checkout, so `--repo` for another repository leaves it null.
+
+`--json` prints the same report for a digest. A field that GitHub does not answer is null, and `unavailable` names the reason. `prSize` and `dryRunAgreement` are reserved for CL-503b. A reader ignores fields it does not know, so later releases can add fields.
 
 ## Adopt
 
-1. Pick the signals. Examples are agent spend for each pull request, CI time for each job, the count of flaky tests and the review findings.
-2. Define each signal in `.clutch/metrics.yaml`.
-3. Collect the signals in a scheduled workflow. Read the CI timing from the GitHub Actions API, and the spend from the agent provider.
-4. Publish a short report, such as a weekly issue or a dashboard.
-5. Set `factory_observability` to `adopted` in `clutch.yaml`.
+1. Run `mise exec -- bun run clutch metrics --json | jq . > .clutch/metrics-baseline.json` and commit it, so later changes have a number to beat.
+2. Run `clutch metrics` on a schedule, such as a weekly workflow that writes it to the job summary.
+3. Set `factory_observability` to `adopted` in `clutch.yaml`.
 
 ## Waive
 

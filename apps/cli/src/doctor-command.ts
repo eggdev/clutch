@@ -6,7 +6,7 @@ import { loadClutchConfig } from '@/clutch-config/load';
 import { baselineFile, nextBaseline, readBaseline, writeBaseline } from '@/doctor/baseline';
 import { detect } from '@/doctor/detect';
 import { gate } from '@/doctor/gate';
-import { remoteProber } from '@/doctor/remote';
+import { remoteProber, runGh } from '@/doctor/remote';
 import { buildReport, renderReport } from '@/doctor/report';
 import { cliRoot } from '@/format';
 import { git } from '@/git';
@@ -26,17 +26,6 @@ async function syncedRelease(root: string) {
     ? (JSON.parse(lineage.content.toString()) as { release?: unknown }).release
     : null;
   return typeof release === 'string' ? release : null;
-}
-
-/** Runs `gh` for the remote probes. */
-async function runGh(args: Array<string>) {
-  const proc = Bun.spawn(['gh', ...args], { stdout: 'pipe', stderr: 'pipe' });
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  return { ok: code === 0, out, err };
 }
 
 /** The status of each Clutch issue in `root`. A repository without `.clutch/issues` has none. */

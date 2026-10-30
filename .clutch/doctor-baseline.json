@@ -12,7 +12,7 @@
   "dep_automation": "missing",
   "dep_min_age": "present",
   "dev_bootstrap": "present",
-  "factory_observability": "missing",
+  "factory_observability": "present",
   "file_size_caps": "present",
   "flake_hunter": "missing",
   "flaky_quarantine": "missing",

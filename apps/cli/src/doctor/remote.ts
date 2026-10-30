@@ -13,8 +13,19 @@ const pass = (evidence: string): RuleResult => ({ outcome: 'pass', evidence: [ev
 const fail: RuleResult = { outcome: 'fail', evidence: [] };
 const unknown = (reason: string): RuleResult => ({ outcome: 'unknown', evidence: [reason] });
 
+/** Runs the `gh` on PATH. */
+export async function runGh(args: Array<string>) {
+  const proc = Bun.spawn(['gh', ...args], { stdout: 'pipe', stderr: 'pipe' });
+  const [out, err, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { ok: code === 0, out, err };
+}
+
 /** The owner/name of the origin remote, or nothing. */
-async function originRepo(root: string) {
+export async function originRepo(root: string) {
   const url = await git(root, 'remote', 'get-url', 'origin');
   return /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/u.exec(url.out)?.[1];
 }

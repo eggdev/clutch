@@ -613,4 +613,5 @@ capabilities:
           - grep:
               files: .github/workflows/*.y*ml
               pattern: clutch metrics
-          - file: .clutch/metrics.yaml
+          # The recorded baseline of `clutch metrics --json`.
+          - file: .clutch/metrics-baseline.json

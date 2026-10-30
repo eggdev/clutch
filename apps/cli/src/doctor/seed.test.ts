@@ -47,7 +47,7 @@ const expected: Record<string, string> = {
   merge_queue: 'missing',
   risk_tier_automerge: 'missing',
   gardener_bots: 'unknown',
-  factory_observability: 'missing',
+  factory_observability: 'present',
 };
 
 test('the registry holds the 36 seed capabilities with unique ids', async () => {
