@@ -17,9 +17,6 @@
     "fileFilters": [".changeset/renovate-*.md"],
     "executionMode": "branch"
   },
-  "github-actions": {
-    "enabled": false
-  },
   "vulnerabilityAlerts": {
     "minimumReleaseAge": "3 days",
     "schedule": ["at any time"]

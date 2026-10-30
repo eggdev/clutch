@@ -49,11 +49,11 @@ The config keeps the PR count low:
   which writes a patch changeset named after the branch. The workflow allows
   only that command.
 
-The `github-actions` manager is off. Updating an action pin changes a workflow
-file, and GitHub refuses that push unless the bot has the Workflows
-permission. Once the app has it, turn the manager on in `renovate.json`, and
-add `permission-workflows: write` to the token step in `renovate.yml`. Renovate
-then updates each SHA pin and its version comment together.
+Renovate also updates each GitHub Action. It keeps the full commit SHA, and
+it updates the SHA and the `# vX.Y.Z` comment together. Updating a pin
+changes a workflow file, and GitHub refuses that push unless the token has the
+Workflows permission. So the release bot needs Workflows write, and the token
+step in `renovate.yml` asks for it. An app without it fails that step.
 
 Dependabot security updates stay off, so updates come only from Renovate. The
 GitHub vulnerability alerts stay on, because Renovate reads them.

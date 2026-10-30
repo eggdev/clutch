@@ -7,8 +7,8 @@
 # CLUTCH_APP_PRIVATE_KEY secret, see docs/contributing/setup/releases.md) with
 # Contents and Pull requests write. Without it, the job skips with a notice.
 # Each Renovate PR gets its changeset from tools/release/renovate-changeset.mjs.
-# The github-actions manager stays off in renovate.json until the app also has
-# Workflows write. Do not also run the hosted Mend Renovate app on the same
+# The app needs Workflows write too, so Renovate can update action pins. Without
+# it, the token step fails. Do not also run the hosted Mend Renovate app on the same
 # repository with PRs on. In a private repository, each run uses Actions
 # minutes. See docs/contributing/setup/dependencies.md#renovate.
 name: Renovate
@@ -53,9 +53,10 @@ jobs:
           app-id: ${{ vars.CLUTCH_APP_ID }}
           private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
           # Branches and pull requests. Workflows write lets Renovate update
-          # action pins; renovate.json keeps that manager off until the app has it.
+          # the action pins in .github/workflows.
           permission-contents: write
           permission-pull-requests: write
+          permission-workflows: write
       # Renovate commits as the bot, so the commits job and CODEOWNERS see one author.
       - name: Find the bot's commit author
         id: author
