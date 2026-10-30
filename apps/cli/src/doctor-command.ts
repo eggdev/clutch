@@ -11,10 +11,21 @@ import { buildReport, renderReport } from '@/doctor/report';
 import { cliRoot } from '@/format';
 import { git } from '@/git';
 import { readIssues } from '@/issues/parse';
+import { localFile } from '@/review-source';
+import { lineagePath } from '@/sync/source';
 
 async function headCommit(root: string) {
   const head = await git(root, 'rev-parse', 'HEAD');
   return head.ok ? head.out : null;
+}
+
+/** The Clutch release that the project last synced from, as its lineage records it. */
+async function syncedRelease(root: string) {
+  const lineage = await localFile(root, lineagePath);
+  const release = lineage
+    ? (JSON.parse(lineage.content.toString()) as { release?: unknown }).release
+    : null;
+  return typeof release === 'string' ? release : null;
 }
 
 /** Runs `gh` for the remote probes. */
@@ -116,7 +127,7 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
       JSON.stringify({
         schemaVersion: 1,
         root,
-        templateCommit: config?.template.commit ?? null,
+        templateRelease: await syncedRelease(root),
         registryCommit: await headCommit(cliRoot),
         ...report,
       }),

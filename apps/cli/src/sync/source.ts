@@ -1,5 +1,6 @@
 import { parse } from 'yaml';
 
+import { releaseAt } from '@/release';
 import { gitBytes, safeRelative, tree } from '@/review-source';
 import type { SyncFile, SyncSource } from '@/sync/engine';
 
@@ -26,6 +27,8 @@ type FilesList = {
 /** What one Clutch commit puts in a project: managed files for the engine, plus merge and seed files. */
 export type ClutchSource = {
   commit: string;
+  /** The release tag of `commit`, or null for a commit between releases. */
+  release: string | null;
   managed: SyncSource;
   merge: Map<string, SyncFile>;
   seed: Map<string, SyncFile>;
@@ -126,5 +129,6 @@ export async function loadClutchSource(
       .map((entry) => entry.path),
     ...(list.retired ?? []),
   ];
-  return { commit, managed: { files: managed, baseline, roots }, merge, seed };
+  const release = await releaseAt(template, commit);
+  return { commit, release, managed: { files: managed, baseline, roots }, merge, seed };
 }

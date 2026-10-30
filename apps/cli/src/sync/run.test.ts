@@ -157,3 +157,47 @@ test('sync --check exits 0 when clean, 2 with changes or decisions, and 1 on an 
   }
   expect(JSON.parse(output.at(-1) ?? '{}')).toMatchObject({ status: 'error' });
 });
+
+test('without --to a sync takes the latest release, records it and drops an older pin', async () => {
+  const { repo, first, second } = await clutch();
+  await using template = repo;
+  await gitOrThrow(template.root, 'tag', 'v0.1.0', first);
+  await using target = await project({
+    'clutch.yaml': `schemaVersion: 1\nproject: shop\ntemplate:\n  repo: eggdev/clutch\n  commit: ${second}\n  mode: sync\n`,
+  });
+  const synced = await runSync({ root: target.root, template: template.root });
+  expect(synced).toMatchObject({
+    status: 'synced',
+    templateCommit: first,
+    release: 'v0.1.0',
+    latest: true,
+  });
+  expect(synced.changes).toContainEqual({ path: 'clutch.yaml', action: 'update' });
+  expect(await readFile(path.join(target.root, 'clutch.yaml'), 'utf-8')).not.toContain('commit');
+  const lineage = JSON.parse(await readFile(path.join(target.root, lineagePath), 'utf-8'));
+  expect(lineage).toMatchObject({ templateCommit: first, release: 'v0.1.0' });
+  await commitAll(target.root);
+
+  await gitOrThrow(template.root, 'tag', 'v0.2.0', second);
+  const output: Array<string> = [];
+  const { log } = console;
+  console.log = (line: string) => output.push(line);
+  try {
+    expect(await syncCommand(['--check'], target.root, template.root)).toBe(2);
+  } finally {
+    console.log = log;
+  }
+  expect(output.slice(-2)).toEqual([
+    'The project would move to Clutch v0.2.0, the latest release.',
+    'The project is behind the latest Clutch release. Run clutch sync to take it.',
+  ]);
+});
+
+test('without a release tag, a sync without --to stops and says how to fix it', async () => {
+  const { repo } = await clutch();
+  await using template = repo;
+  await using target = await project();
+  await expect(runSync({ root: target.root, template: template.root })).rejects.toThrow(
+    'has no Clutch release tag',
+  );
+});

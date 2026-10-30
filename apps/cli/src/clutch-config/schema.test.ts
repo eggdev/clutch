@@ -2,11 +2,10 @@ import { expect, test } from 'bun:test';
 
 import { validateClutchConfig } from '@/clutch-config/schema';
 
-const commit = '37e824f2d552163f18e5c91b126fc6655de435f9';
 const valid = {
   schemaVersion: 1,
   project: 'shop',
-  template: { repo: 'eggdev/clutch', commit, mode: 'sync' },
+  template: { repo: 'eggdev/clutch', mode: 'sync' },
   capabilities: {
     root_agents_md: 'adopted',
     codeql_sast: {
@@ -29,7 +28,7 @@ test('a valid file gives the typed config, with the short form expanded', () => 
     config: {
       ...valid,
       schemaVersion: 1,
-      template: { repo: 'eggdev/clutch', commit, mode: 'sync' },
+      template: { repo: 'eggdev/clutch', mode: 'sync' },
       capabilities: {
         root_agents_md: { status: 'adopted' },
         codeql_sast: {
@@ -43,6 +42,15 @@ test('a valid file gives the typed config, with the short form expanded', () => 
     },
     errors: [],
   });
+});
+
+test('an older file that pins template.commit still loads, and the pin is not read', () => {
+  const older = { ...valid, template: { ...valid.template, commit: 'any older pin' } };
+  expect(validateClutchConfig(older)).toMatchObject({
+    config: { template: { repo: 'eggdev/clutch', mode: 'sync' } },
+    errors: [],
+  });
+  expect(validateClutchConfig(older).config?.template).not.toHaveProperty('commit');
 });
 
 test('worktree is optional, and copy and setup default to empty lists', () => {
@@ -72,7 +80,6 @@ test('each top-level and template problem names its YAML path', () => {
     'project',
     'template.branch',
     'template.repo',
-    'template.commit',
     'template.mode',
   ]);
   expect(paths({ ...valid, template: 'eggdev/clutch' })).toEqual(['template']);

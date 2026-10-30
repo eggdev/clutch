@@ -62,7 +62,7 @@ delivery, audit, recap and verification-authoring skills, their Claude links and
 the Python helpers. It does not install dependencies, and it never copies this
 template's own verify. Use setup-verification afterward to author or maintain the
 project's own verify. A scoped sync keeps the lineage of the other files, and it
-leaves the `clutch.yaml` pin alone.
+leaves `clutch.yaml` alone.
 
 ## Issues
 
@@ -98,16 +98,16 @@ mise exec -- bun run clutch issues --check
 
 ## clutch.yaml
 
-Each repository that uses Clutch has a `clutch.yaml` at its root. It pins the
-template commit and records the state of each capability. A repository without
-the file has not adopted Clutch.
+Each repository that uses Clutch has a `clutch.yaml` at its root. It names the
+Clutch repository and records the state of each capability. A repository without
+the file has not adopted Clutch. A project never pins a Clutch commit: it
+follows the latest Clutch release.
 
 ```yaml
 schemaVersion: 1
 project: shop # a short name for reports
 template:
   repo: eggdev/clutch # the template repository
-  commit: <40-character SHA> # the template commit that the project matches
   mode: sync # sync: clutch sync manages the files. doctor: checks only.
 capabilities: # keys are capability ids from the registry
   root_agents_md: adopted # the short form
@@ -123,7 +123,9 @@ worktree: # optional
 ```
 
 The loader rejects unknown keys. Each error names its YAML path, such as
-`template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
+`template.mode` or `capabilities.codeql_sast.reason`. An older `clutch.yaml`
+has `template.commit`. The loader accepts it and reads nothing from it, and
+the next sync removes it. `clutch.yaml` is a
 guardrail file, so a person reviews each change to it.
 
 ## Init
@@ -145,11 +147,13 @@ mise exec -- bun run clutch init --root ../bar-savvy-web --mode doctor --yes
   sync may update it. An edited file stays a keep-or-take decision.
 - `--mode doctor` is for a repository that Clutch checks but never syncs. It
   writes no lineage.
+- `--adopt` compares the files with the latest Clutch release, the newest
+  `vX.Y.Z` tag in the clone.
 - Init refuses a repository that already has `clutch.yaml`.
 
 ## Sync
 
-`clutch sync` moves a project to a Clutch commit. `clutch.files.yaml` in Clutch
+`clutch sync` moves a project to the latest Clutch release. `clutch.files.yaml` in Clutch
 names the files and gives each one a rule. The longest matching path decides.
 
 | Rule      | What sync does                                                       |
@@ -160,11 +164,16 @@ names the files and gives each one a rule. The longest matching path decides.
 
 ```sh
 mise exec -- bun run clutch sync --root ../shop --check
-mise exec -- bun run clutch sync --root ../shop --latest
+mise exec -- bun run clutch sync --root ../shop
+mise exec -- bun run clutch sync --root ../shop --to v0.2.0
 ```
 
-- Without `--to` or `--latest`, sync uses the commit that the project's
-  `clutch.yaml` pins. A sync then sets that pin to the new commit.
+- Each merge to Clutch's `main` is a release with a `vX.Y.Z` tag. Without
+  `--to`, sync uses the newest tag in the clone that runs it. Run
+  `git pull --tags` in the clone first. It prints the release it used.
+- `--to <tag or commit>` syncs to one revision once, such as an unreleased
+  commit for a test.
+- `.clutch/lineage.json` records the release of the last sync in `release`.
 - `.clutch/lineage.json` records the hash of each managed file at the last
   sync. A project with only the older `.review/tooling.json` starts from it, and
   sync removes that file once the lineage holds its record.
@@ -172,6 +181,7 @@ mise exec -- bun run clutch sync --root ../shop --latest
   project file that matches one is unchanged, so sync may replace it.
 - `--check` changes nothing. It exits 0 when the project is up to date, 2 when a
   sync would change files or a file needs a decision, and 1 on an error.
+  Without `--to`, exit 2 means the project is behind the latest release.
 - A sync never commits. Commit the result on a branch, and open a PR.
 - A managed file that the project edited needs a decision, and nothing changes
   until each one has an answer. In a terminal, sync asks: keep the project
@@ -189,25 +199,26 @@ mise exec -- bun run clutch sync --root ../shop --latest
 ## Use Clutch in another repository
 
 A repository with `clutch.yaml` can run the Clutch checks in its own CI with
-one job. The workflow checks out the Clutch commit that `clutch.yaml` pins,
-runs `clutch doctor --check`, and runs `clutch sync --check` in `sync` mode:
+one job. The workflow checks out the latest release of the Clutch repository
+that `clutch.yaml` names, runs `clutch doctor --check`, and runs
+`clutch sync --check` against that release in `sync` mode. So the job fails
+when the project is behind the latest release:
 
 ```yaml
 jobs:
   clutch:
-    uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@<commit>
+    uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@main
 ```
 
-Pin `<commit>` to a Clutch commit, as with any action. The `template.commit`
-in `clutch.yaml` must be a Clutch commit that has `clutch doctor`. An older
-pin fails with "Unexpected argument 'doctor'". Pass `with: { root: <folder> }`
-when `clutch.yaml` is not at the repository root.
+Pass `with: { root: <folder> }` when `clutch.yaml` is not at the repository
+root.
 
 ## Doctor
 
 `clutch doctor` shows each capability that a repository has, next to what its
 `clutch.yaml` declares. It reads the registry of the Clutch checkout that runs
-it, so a project gets the registry of its pinned Clutch commit.
+it. `--json` names the release of the project's last sync in
+`templateRelease`.
 
 ```sh
 mise exec -- bun run clutch doctor

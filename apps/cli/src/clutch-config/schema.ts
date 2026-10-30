@@ -16,12 +16,12 @@ type Capability = {
 export type ClutchConfig = {
   schemaVersion: 1;
   project: string;
-  template: { repo: string; commit: string; mode: (typeof modes)[number] };
+  template: { repo: string; mode: (typeof modes)[number] };
   capabilities: Record<string, Capability>;
   worktree?: { root: string; copy: Array<string>; setup: Array<string> };
 };
 
-/** A problem in `clutch.yaml`, at a dotted YAML path such as `template.commit`. */
+/** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
 export type ConfigError = { path: string; message: string };
 
 type Errors = Array<ConfigError>;
@@ -29,7 +29,6 @@ type Data = Record<string, unknown>;
 
 const topKeys = ['schemaVersion', 'project', 'template', 'capabilities', 'worktree'];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
-const commitPattern = /^[0-9a-f]{40}$/u;
 const capabilityId = /^[a-z][a-z0-9_]*$/u;
 const issuePattern = /^CL-\d{3}[a-z]?$/u;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/u;
@@ -65,17 +64,16 @@ function isDate(value: unknown) {
 
 function readTemplate(value: unknown, errors: Errors) {
   if (!isObject(value)) {
-    errors.push({ path: 'template', message: 'Expected a map with repo, commit and mode.' });
+    errors.push({ path: 'template', message: 'Expected a map with repo and mode.' });
     return;
   }
+  // An older clutch.yaml pins `commit`. Nothing reads it: a project follows the
+  // latest Clutch release, and the next sync removes the key.
   unknownKeys(value, ['repo', 'commit', 'mode'], 'template', errors);
-  const { repo, commit, mode } = value;
+  const { repo, mode } = value;
   const before = errors.length;
   if (typeof repo !== 'string' || !repoPattern.test(repo)) {
     errors.push({ path: 'template.repo', message: 'Expected owner/name.' });
-  }
-  if (typeof commit !== 'string' || !commitPattern.test(commit)) {
-    errors.push({ path: 'template.commit', message: 'Expected a full 40-character commit SHA.' });
   }
   if (!oneOf(modes, mode)) {
     errors.push({ path: 'template.mode', message: `Expected ${modes.join(' or ')}.` });
@@ -83,7 +81,6 @@ function readTemplate(value: unknown, errors: Errors) {
   return errors.length === before
     ? {
         repo: repo as string,
-        commit: commit as string,
         mode: mode as ClutchConfig['template']['mode'],
       }
     : undefined;

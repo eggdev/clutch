@@ -18,6 +18,7 @@ async function commit(root: string) {
 /** A Clutch checkout and a project with its own validate script. */
 async function setup() {
   const template = await gitRepo({ 'clutch.files.yaml': list, 'package.json': pkg('nx run-many') });
+  await gitOrThrow(template.root, 'tag', 'v0.1.0');
   const project = await gitRepo({
     'package.json': JSON.stringify({ name: 'shop', scripts: { validate: 'make check' } }),
   });

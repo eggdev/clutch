@@ -6,7 +6,6 @@ import { parse } from 'yaml';
 
 import { doctorCommand } from '@/doctor-command';
 import { cliRoot } from '@/format';
-import { gitOrThrow } from '@/git';
 import { initCommand } from '@/init-command';
 import { lineagePath } from '@/sync/source';
 import { gitRepo } from '@/testing/git-repo';
@@ -28,8 +27,9 @@ test('init writes clutch.yaml, the tracker and the baseline, and doctor --check 
   const config = parse(await readFile(path.join(repo.root, 'clutch.yaml'), 'utf-8'));
   expect(config).toMatchObject({
     schemaVersion: 1,
-    template: { commit: await gitOrThrow(cliRoot, 'rev-parse', 'HEAD'), mode: 'sync' },
+    template: { repo: expect.any(String), mode: 'sync' },
   });
+  expect(config.template).not.toHaveProperty('commit');
   expect(config.capabilities.root_agents_md).toBe('adopted');
   expect(config.capabilities.codeql_sast).toEqual({
     status: 'waived',
