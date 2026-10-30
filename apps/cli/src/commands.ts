@@ -1,3 +1,4 @@
+import { doctorCommand } from '@/doctor-command';
 import { cliRoot } from '@/format';
 import { installCommand } from '@/install-command';
 import { issuesCommand } from '@/issues-command';
@@ -21,6 +22,11 @@ export const commands: Record<string, Command> = {
     summary:
       'Install only the shared review tooling. Project-specific verify and custom files stay.',
     run: (args, cwd) => reviewCommand(args, cwd, cliRoot),
+  },
+  doctor: {
+    usage: 'clutch doctor [--root DIR] [--json] [--remote] [--category C] [--phase P]',
+    summary: 'Report which capabilities a repository has, next to what its clutch.yaml declares.',
+    run: doctorCommand,
   },
   issues: {
     usage:

@@ -114,6 +114,24 @@ The loader rejects unknown keys. Each error names its YAML path, such as
 `template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
 guardrail file, so a person reviews each change to it.
 
+## Doctor
+
+`clutch doctor` shows each capability that a repository has, next to what its
+`clutch.yaml` declares. It reads the registry of the Clutch checkout that runs
+it, so a project gets the registry of its pinned Clutch commit.
+
+```sh
+mise exec -- bun run clutch doctor
+mise exec -- bun run clutch doctor --root ../shop --json
+mise exec -- bun run clutch doctor --phase P1
+```
+
+- Each line shows the detected state, the declared state and the evidence or
+  the waiver reason. A summary line follows.
+- A repository without `clutch.yaml` reports each capability as undeclared.
+- `--category` and `--phase` narrow the report. `--remote` is for remote probes.
+- It exits 0 after a report, and 1 when the registry or `clutch.yaml` is bad.
+
 ## Capability registry
 
 `docs/contributing/capabilities/registry.yaml` lists each capability that a
