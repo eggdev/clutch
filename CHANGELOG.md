@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 (2026-10-30)
+
+### Features
+
+- feat(mise): install the clutch binary from the latest release (CL-025b)
+
 ## 0.2.0 (2026-10-30)
 
 ### Features
