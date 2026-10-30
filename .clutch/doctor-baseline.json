@@ -28,7 +28,7 @@
   "project_cli": "present",
   "protected_main": "present",
   "ratchets": "missing",
-  "risk_tier_automerge": "missing",
+  "risk_tier_automerge": "partial",
   "root_agents_md": "present",
   "secret_scanning": "present",
   "skills_dir": "present",

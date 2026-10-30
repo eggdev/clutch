@@ -3,6 +3,7 @@ import { initCommand } from '@/init-command';
 import { installCommand } from '@/install-command';
 import { issuesCommand } from '@/issues-command';
 import { metricsCommand } from '@/metrics-command';
+import { riskCommand } from '@/risk-command';
 import { syncCommand } from '@/sync-command';
 
 type Command = {
@@ -50,6 +51,12 @@ export const commands: Record<string, Command> = {
     usage: 'clutch metrics [--since 14d] [--repo OWNER/NAME] [--root DIR] [--json]',
     summary: 'Report how pull requests flow through a repository, from read-only gh api calls.',
     run: (args, cwd) => metricsCommand(args, cwd),
+  },
+  risk: {
+    usage: 'clutch risk [--base REF] [--head REF] [--json]',
+    summary:
+      'Print the risk tier of the change from the merge base of --base to --head, by the paths in .clutch/risk.yaml.',
+    run: riskCommand,
   },
 };
 

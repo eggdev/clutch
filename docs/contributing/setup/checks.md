@@ -217,6 +217,11 @@ Two more jobs repeat checks that a local hook also runs, because
 PR's commits with gitleaks. The `commits` job checks each PR commit message
 with the `commit-msg` rule in [Git hooks](#git-hooks).
 
+The [Risk workflow](../../../.github/workflows/risk.yml) labels each PR
+`risk/low`, `risk/medium`, `risk/high` or `risk/one-way-door` from the paths it
+touches. It runs `clutch risk` from the base branch, with the rules in
+`.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk).
+
 - Each job names its runner image, `ubuntu-26.04`, not `ubuntu-latest`. A
   new image then arrives in a reviewed PR, not on GitHub's schedule.
 - Each action runs on the Node.js 24 runtime. GitHub ends Node.js 20 for

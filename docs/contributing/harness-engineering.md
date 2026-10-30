@@ -106,16 +106,17 @@ change to one.
 
 Each escape hatch lives in a guardrail file, so the review sees it:
 
-| Escape hatch                                 | Where it lives                       |
-| -------------------------------------------- | ------------------------------------ |
-| An override that turns a lint rule off       | `oxlint.config.ts`                   |
-| A raised file-size budget                    | `tools/file-size-budgets.json`       |
-| A knip ignore or entry                       | `knip.jsonc`                         |
-| An import exception                          | `primitives.yaml`, `exceptions`      |
-| A transaction-safe service                   | `primitives.yaml`, `transactionSafe` |
-| A test file that a change may delete or thin | `tools/test-integrity-allow.json`    |
-| A dependency override                        | `tools/dependency-overrides.yaml`    |
-| Agent review of a PR that a bot opened       | `agent-review.yml`, `allowed_bots`   |
+| Escape hatch                                 | Where it lives                         |
+| -------------------------------------------- | -------------------------------------- |
+| An override that turns a lint rule off       | `oxlint.config.ts`                     |
+| A raised file-size budget                    | `tools/file-size-budgets.json`         |
+| A knip ignore or entry                       | `knip.jsonc`                           |
+| An import exception                          | `primitives.yaml`, `exceptions`        |
+| A transaction-safe service                   | `primitives.yaml`, `transactionSafe`   |
+| A test file that a change may delete or thin | `tools/test-integrity-allow.json`      |
+| A dependency override                        | `tools/dependency-overrides.yaml`      |
+| Agent review of a PR that a bot opened       | `agent-review.yml`, `allowed_bots`     |
+| A path kept out of a risk tier               | `.clutch/risk.yaml`, a rule's `except` |
 
 <!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS. -->
 

@@ -103,6 +103,39 @@ mise exec -- bun run clutch issues --check
   file has a bad value. The message names the file and the field.
 - `--json` prints the issues and the errors as JSON.
 
+## Risk
+
+`clutch risk` gives a change a risk tier from the paths it touches: `low`,
+`medium`, `high` or `one-way-door`. The rules live in `.clutch/risk.yaml`, a
+guardrail file.
+
+```sh
+mise exec -- bun run clutch risk
+mise exec -- bun run clutch risk --base origin/main --head HEAD --json
+```
+
+- The change is every file that differs between the merge base of `--base`
+  and `--head`. `--base` defaults to the remote default branch and `--head`
+  to `HEAD`. A rename counts both paths.
+- Each file gets the highest tier of the rules whose `paths` globs match it.
+  A file that matches a rule's `except` glob does not match that rule. A file
+  that no rule matches gets the `unmatched` tier. The change gets the highest
+  tier of its files, and a change with no files is `low`.
+- A rule with `guardrails: tools/guardrail-files.json` adds every pattern in
+  that list to its paths, so the two cannot drift.
+- The rules and the CLI come from the working tree. The
+  [Risk workflow](../../.github/workflows/risk.yml) checks out the base
+  branch first, so a pull request cannot lower its own tier. It labels the
+  pull request `risk/<tier>` and removes any other `risk/` label.
+- `--json` prints the tier and each file with its tier and the pattern that
+  set it. Text output prints the tier and the files at that tier.
+
+Clutch's own rules put guardrails, agent steering, migrations and auth
+(`packages/access`, `packages/identity` and any `auth` folder) in
+`one-way-door`, the lockfile and `packages/sync` in `high`, other code in
+`apps`, `features`, `packages` and `tools` in `medium`, and docs, tests,
+changesets and tracker files in `low`. Any other path is `high`.
+
 ## clutch.yaml
 
 Each repository that uses Clutch has a `clutch.yaml` at its root. It names the

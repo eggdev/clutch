@@ -1,0 +1,76 @@
+name: Risk
+
+# Labels each pull request with its risk tier, risk/<tier>, from the paths it
+# touches. The rules live in .clutch/risk.yaml. The tier comes from the base
+# branch's CLI and rules, so a pull request cannot lower its own tier. A label
+# set with GITHUB_TOKEN starts no other workflow, so auto-merge computes the
+# tier itself. See apps/cli/README.md#risk.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Least privilege. The label job grants what it needs in its own block.
+permissions:
+  contents: read
+
+concurrency:
+  group: risk-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+          # The diff needs the merge base, and the base branch runs the CLI.
+          fetch-depth: 0
+      - name: Check out the base branch
+        id: base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git checkout --quiet --detach "origin/$BASE_REF"
+          if [ -f .clutch/risk.yaml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Risk off::The base branch has no .clutch/risk.yaml, so the pull request gets no risk label."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.base.outputs.present == 'true'
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - if: steps.base.outputs.present == 'true'
+        run: bun install --frozen-lockfile
+      - name: Compute the tier
+        id: tier
+        if: steps.base.outputs.present == 'true'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          bun run --silent clutch risk --base "origin/$BASE_REF" --head "$HEAD_SHA" --json > "$RUNNER_TEMP/risk.json"
+          tier="$(jq -r '.tier' "$RUNNER_TEMP/risk.json")"
+          echo "tier=$tier" >> "$GITHUB_OUTPUT"
+          bun run --silent clutch risk --base "origin/$BASE_REF" --head "$HEAD_SHA"
+      - name: Label the pull request
+        if: steps.base.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          TIER: ${{ steps.tier.outputs.tier }}
+        run: |
+          labels="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '.[].name')"
+          for old in $(printf '%s\n' "$labels" | grep '^risk/' || true); do
+            if [ "$old" != "risk/$TIER" ]; then
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/${old/\//%2F}" > /dev/null
+            fi
+          done
+          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/labels" -f "labels[]=risk/$TIER" > /dev/null
+          echo "risk/$TIER"
