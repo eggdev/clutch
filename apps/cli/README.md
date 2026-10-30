@@ -118,6 +118,27 @@ The loader rejects unknown keys. Each error names its YAML path, such as
 `template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
 guardrail file, so a person reviews each change to it.
 
+## Init
+
+`clutch init` adopts Clutch in a repository that does not have it yet. It
+writes `clutch.yaml`, the tracker in `.clutch/` and the doctor baseline. It
+never commits.
+
+```sh
+mise exec -- bun run clutch init --root ../shop --yes
+mise exec -- bun run clutch init --root ../shop --adopt --yes
+mise exec -- bun run clutch init --root ../bar-savvy-web --mode doctor --yes
+```
+
+- Each capability that the repository has is adopted. Each core gap gets the
+  waiver "Decide during adoption." Replace each one with a reason and an issue.
+- `--adopt` is for a repository that already holds Clutch files. A managed file
+  that matches an earlier Clutch version goes in `.clutch/lineage.json`, so
+  sync may update it. An edited file stays a keep-or-take decision.
+- `--mode doctor` is for a repository that Clutch checks but never syncs. It
+  writes no lineage.
+- Init refuses a repository that already has `clutch.yaml`.
+
 ## Sync
 
 `clutch sync` moves a project to a Clutch commit. `clutch.files.yaml` in Clutch

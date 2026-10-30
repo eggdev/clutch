@@ -1,4 +1,5 @@
 import { doctorCommand } from '@/doctor-command';
+import { initCommand } from '@/init-command';
 import { installCommand } from '@/install-command';
 import { issuesCommand } from '@/issues-command';
 import { syncCommand } from '@/sync-command';
@@ -21,6 +22,12 @@ export const commands: Record<string, Command> = {
       'clutch doctor [--root DIR] [--json] [--remote] [--category C] [--phase P]\nclutch doctor --check\nclutch doctor --write-baseline [--allow-downgrade]',
     summary: 'Report which capabilities a repository has, next to what its clutch.yaml declares.',
     run: doctorCommand,
+  },
+  init: {
+    usage: 'clutch init [--root DIR] [--mode sync|doctor] [--adopt] [--yes]',
+    summary:
+      'Adopt Clutch in a repository: write clutch.yaml, the tracker and the doctor baseline.',
+    run: (args, cwd) => initCommand(args, cwd),
   },
   sync: {
     usage:
