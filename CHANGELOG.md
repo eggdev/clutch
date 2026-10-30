@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0 (2026-10-30)
+
+### Features
+
+- feat(cli): add clutch metrics for factory observability (CL-503)
+
+### Fixes and maintenance
+
+- ci(workflows): pin every action to a commit SHA (CL-103)
+
 ## 0.6.8 (2026-10-30)
 
 ### Fixes and maintenance
