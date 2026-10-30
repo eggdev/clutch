@@ -14,6 +14,7 @@ How to run, check and ship the project. Open only the page you need.
 - [Native builds and devices](./native.md): the device host, the device lock,
   and `native:build`, which builds only when the native fingerprint changed
 - [Checks](./checks.md): `validate`, each check, CI
+- [Releases](./releases.md): changesets, the version and `CHANGELOG.md`
 - [Previews](./previews.md): a preview for each PR, flow checks, and the name
   guard on destructive automation
 - [Migrations](./migrations.md): Drizzle Kit, where migrations live, and why a

@@ -27,6 +27,9 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
   `type(scope)!: subject`, such as `fix(cli): keep the project value`. The
   `commit-msg` hook checks each commit, and `open` checks the title. `fix` is a
   patch release, `feat` is a minor one, and `!` marks a breaking change.
+- Each PR carries a changeset in `.changeset/`. `open` writes one from the
+  title when the branch has none. See
+  [releases](../../../../docs/contributing/setup/releases.md).
 - Fill every section of `.github/pull_request_template.md` in the body file.
 - `open` pushes the branch first, so the pre-push checks run.
 - When the branch already has an open PR, `open` replaces its body.

@@ -11,6 +11,7 @@ import {
 } from '@tools/github/stack';
 import type { Run } from '@tools/github/stack';
 import { conventionalProblem } from '@tools/hooks/commit-msg';
+import { bumpOf, changesetDir, changesetText } from '@tools/release/changeset';
 
 /**
  * The pull request commands that every project uses. They open each PR ready
@@ -128,9 +129,53 @@ async function setBody(run: Run, pr: string, file: string) {
   ]);
 }
 
+/** Writes a file at a path inside the repository. Tests pass a fake. */
+export type Write = (file: string, text: string) => Promise<void>;
+
+async function writeInRepo(file: string, text: string) {
+  await Bun.write(path.join(root, file), text);
+}
+
+/**
+ * Adds a changeset when the branch has none: its bump comes from the
+ * conventional title, and its summary is the title. Then commits it.
+ */
+async function ensureChangeset(
+  run: Run,
+  write: Write,
+  base: string,
+  branch: string,
+  title: string,
+) {
+  const added = await must(run, [
+    'git',
+    'diff',
+    '--name-only',
+    '--diff-filter=A',
+    `origin/${base}...HEAD`,
+    '--',
+    changesetDir,
+  ]);
+  if (added.split('\n').some((file) => file.endsWith('.md'))) {
+    return;
+  }
+  const file = `${changesetDir}/${branch.replaceAll(/[^\w-]+/gu, '-')}.md`;
+  const bump = bumpOf(title);
+  await write(file, changesetText(bump, title));
+  await must(run, ['git', 'add', file]);
+  await must(run, [
+    'git',
+    'commit',
+    '--quiet',
+    '--message',
+    `chore(changeset): add a ${bump} changeset for this PR`,
+  ]);
+}
+
 async function open(
   run: Run,
   options: { title?: string; 'body-file'?: string; base?: string; force?: boolean },
+  write: Write,
 ) {
   const { title, 'body-file': bodyFile } = options;
   if (!title || !bodyFile) {
@@ -148,6 +193,7 @@ async function open(
       `Switch to the branch for this PR. The current branch is ${branch || 'detached'}.`,
     );
   }
+  await ensureChangeset(run, write, base, branch, title);
   // After a rebase the branch needs a forced push. The lease refuses it when someone else pushed.
   const push = [
     'git',
@@ -231,7 +277,11 @@ async function merge(run: Run, number: string) {
 }
 
 /** Runs `bun run pr <command>`. Returns the exit code. */
-export async function runPr(args: Array<string>, run: Run): Promise<number> {
+export async function runPr(
+  args: Array<string>,
+  run: Run,
+  write: Write = writeInRepo,
+): Promise<number> {
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,
@@ -248,7 +298,7 @@ export async function runPr(args: Array<string>, run: Run): Promise<number> {
     return doctor(run, values.fix === true);
   }
   if (command === 'open' && rest.length === 0) {
-    return open(run, values);
+    return open(run, values, write);
   }
   if (command === 'body' && rest.length === 2) {
     await setBody(run, rest[0], rest[1]);

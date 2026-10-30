@@ -281,7 +281,8 @@
           "check-test-integrity",
           "check-journeys",
           "check-clutch",
-          "check-clutch-issues"
+          "check-clutch-issues",
+          "check-changeset"
         ]
       },
       "check-journeys": {
@@ -358,6 +359,13 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun apps/cli/src/main.ts issues --check"
+        },
+        "cache": false
+      },
+      "check-changeset": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-changeset.ts"
         },
         "cache": false
       }
