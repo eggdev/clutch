@@ -59,4 +59,4 @@ to Claude API billing. Then replace the waiver with `oidc_ci: adopted`.
 action uses it to trade the job's OIDC token for a Claude GitHub App token.
 Gardening uses that token to open its PR when the release bot is missing.
 Agent review passes `github.token` to the action, so it does not need the
-grant. CL-112 removes it there.
+grant. CL-115 removes it there.
