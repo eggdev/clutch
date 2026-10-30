@@ -98,6 +98,7 @@ with a plain copy.
 mise install
 mise exec -- bun install
 mise exec -- bun run validate
+mise exec -- bun run clutch doctor   # which capabilities this repository has
 ```
 
 <!-- kickoff: The command that starts the app, and the URL to open. -->
