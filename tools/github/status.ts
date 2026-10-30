@@ -1,4 +1,4 @@
-import { marker } from '@tools/github/auto-merge';
+import { marker } from '@tools/github/auto-merge-rules';
 import { must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';

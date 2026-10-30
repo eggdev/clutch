@@ -107,28 +107,56 @@ closes without a merge, set its task back to `todo` in the next branch.
 
 ## Auto-merge
 
-The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges each PR
-whose head branch starts with `clutch/cl-`. Only an agent opens such a branch.
-`pr open` runs under the operator's login, so the author cannot tell an agent
-from a person. The PR may merge without the owner when each of these is true:
+The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges agent and
+bot PRs. An agent PR's head branch starts with `clutch/cl-`. Only an agent opens
+such a branch: `pr open` runs under the operator's login, so the author cannot
+tell an agent from a person. A bot PR's branch starts with `renovate/` or
+`gardening/`, and its author is a bot.
 
-- `clutch risk` gives it `low`. See the CLI's
-  [risk section](../../../../apps/cli/README.md#risk).
+`automerge.step` in `clutch.yaml` sets how far auto-merge reaches. Each step
+takes the PRs of the steps before it:
+
+| Step     | Takes                                                                                         |
+| -------- | --------------------------------------------------------------------------------------------- |
+| `bots`   | Bot PRs that pass the bot rule.                                                               |
+| `low`    | Also agent PRs that `clutch risk` gives `low`.                                                |
+| `medium` | Also agent PRs that it gives `medium`. Agent review passed, so they have 0 blocking findings. |
+
+The bot rule:
+
+- A Renovate PR may change only versions: `package.json` dependency versions,
+  pinned action SHAs in workflows, tool versions in `mise.toml`, lockfiles and
+  changesets. Renovate already waits out the 3-day release age.
+- A gardening PR's `clutch risk` tier must be `low`.
+
+At each step, the PR also needs all of these:
+
 - It is open, not a draft, and its base is the default branch. A stacked PR
   waits.
-- The latest run of each required check of the default branch and of
-  `agent-review` succeeded on its head commit.
+- The latest run of each required check of the default branch, and of
+  `agent-review`, succeeded on its head commit.
+- No required check is red on the default branch's latest commit. A red
+  `main` stops every auto-merge until it is green again.
 
 The workflow runs when CI or agent review completes, and it runs the default
-branch's rules. It skips a run whose branch lives in a fork, even one named
-`clutch/cl-`, because that run gets this repository's token. `automerge.mode` in `clutch.yaml` decides what it does:
+branch's rules. It skips a run whose branch lives in a fork, because that run
+gets this repository's token. `automerge.mode` decides what it does:
 
 - `off` prints the verdict in the job summary.
-- `dry-run` comments its verdict once for each head commit of an open, ready
-  agent PR: "would auto-merge", or "would not auto-merge" with the reasons. It
-  waits until every required check has finished, so a check that is still
-  running never decides the verdict. The comment asks the owner to react 👍
-  when they agree and 👎 when they do not. `clutch metrics` counts those
-  reactions as `dryRunAgreement`.
-- `on` runs `gh pr merge --auto --merge`, so the PR merges with a merge commit
-  once its checks pass.
+- `dry-run` comments its verdict at the step, once for each head commit of an
+  open, ready agent PR: "would auto-merge", or "would not auto-merge" with the
+  reasons. It waits until every required check has finished. The comment asks
+  the owner to react 👍 when they agree and 👎 when they do not. `clutch
+  metrics` counts those reactions as `dryRunAgreement`.
+- `on` runs `gh pr merge --auto --merge` with the release bot token, for each
+  PR that may merge at the step, and comments that the merge is queued. A
+  separate `merge` job does that in the `release` environment, which holds the
+  bot's key and admits only the default branch. So only a run that CI or agent
+  review completes merges, and the merge is pinned to the judged head commit. GitHub
+  merges it with a merge commit once the required checks pass. A merge made with
+  the default token starts no workflow, so the bot's token keeps the release
+  and CI running on `main`. Each agent PR also gets the dry-run verdict for the
+  next step, so the owner can grade it before that step turns on.
+
+To stop one queued merge, run `gh pr merge --disable-auto <number>`. To stop
+all of them, set `automerge.mode` to `dry-run`.

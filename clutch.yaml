@@ -53,6 +53,8 @@ capabilities:
 # turns it on. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
 automerge:
   mode: dry-run
+  # How far auto-merge reaches: bots, low or medium. dry-run grades this step.
+  step: low
 # The static analysis engine that .github/workflows/sast.yml runs. auto runs CodeQL where
 # code scanning takes results and Semgrep elsewhere. This repository is public, so auto runs
 # CodeQL. Kickoff asks each project. See docs/contributing/capabilities/codeql-sast.md.

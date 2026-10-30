@@ -246,9 +246,11 @@ warns. Size never fails a PR. See
 <!-- kickoff: The globs of the project's deploy config, infrastructure code and secret handling, as the paths of the infra, deploy and secrets rule in .clutch/risk.yaml. Leave the list empty when the project has none. -->
 
 The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
-CI or agent review completes on a `clutch/cl-` branch of this repository,
-never a fork. It judges whether the PR
-may merge without a person and acts on `automerge.mode` in `clutch.yaml`. See
+CI or agent review completes on a branch of this repository, never a fork. It
+judges an agent's `clutch/cl-` branch, and a bot's `renovate/` or `gardening/`
+branch. It acts on `automerge.mode` and `automerge.step` in `clutch.yaml`. Its
+`merge` job enables GitHub's auto-merge with the release bot, in the `release`
+environment. See
 [auto-merge](../../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
 
 - Each job names its runner image, `ubuntu-26.04`, not `ubuntu-latest`. A

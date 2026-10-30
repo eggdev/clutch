@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { marker } from '@tools/github/auto-merge';
+import { marker } from '@tools/github/auto-merge-rules';
 import { readJobLog } from '@tools/github/failures';
 import type { Clock } from '@tools/github/github';
 import { runPr } from '@tools/github/pr';
