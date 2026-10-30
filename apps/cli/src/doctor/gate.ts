@@ -3,7 +3,7 @@ import type { buildReport } from '@/doctor/report';
 
 type Row = ReturnType<typeof buildReport>['results'][number];
 
-export type Finding = { id: string; kind: string; message: string };
+type Finding = { id: string; kind: string; message: string };
 
 const rank: Record<Status, number> = { missing: 0, partial: 1, present: 2, unknown: -1 };
 
