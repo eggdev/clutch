@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.3 (2026-10-30)
+
+### Fixes and maintenance
+
+- docs(gardening): name the token that opens the gardening PR
+
 ## 0.13.2 (2026-10-30)
 
 ### Fixes and maintenance
