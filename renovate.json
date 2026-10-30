@@ -9,6 +9,8 @@
   "labels": ["dependencies"],
   "semanticCommits": "enabled",
   "dependencyDashboard": false,
+  "automerge": false,
+  "platformAutomerge": true,
   "postUpgradeTasks": {
     "commands": ["node tools/release/renovate-changeset.mjs"],
     "dataFileTemplate": "{{{branchName}}}\n{{{prTitle}}}",

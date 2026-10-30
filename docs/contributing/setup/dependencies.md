@@ -58,10 +58,27 @@ then updates each SHA pin and its version comment together.
 Dependabot security updates stay off, so updates come only from Renovate. The
 GitHub vulnerability alerts stay on, because Renovate reads them.
 
-The hosted Mend Renovate app is a free alternative. Install it from
-<https://github.com/apps/renovate> and delete `renovate.yml`. The hosted app
-cannot run the changeset task, so each of its PRs needs
-`mise exec -- bun run pr open` to add one.
+Each PR waits for a person to merge it. `renovate.json` sets
+`automerge: false` and `platformAutomerge: true`. When CL-405 sets `automerge`
+to `true`, GitHub's own auto-merge merges each dependency PR once the
+required checks pass. No Clutch script does the merge.
+
+The workflow uses Actions minutes. A public repository's runs are free. A
+private one, such as Neighborhood or Bar Savvy, pays for each daily run from
+its plan's minutes.
+
+### The hosted app
+
+The hosted Mend Renovate app is free, and it is the alternative to the
+workflow. Use one of the two, never both on one repository. Both read the same
+`renovate.json`, and both would open PRs on the same `renovate/` branches.
+The hosted app also cannot run the changeset task, so each of its PRs would
+need `mise exec -- bun run pr open` to add a changeset.
+
+Where both are installed, the workflow opens the update PRs, and the hosted
+app must stay in a mode that opens no update PRs. In its "Scan and Alert" mode, the app
+still opens a "Configure Renovate" onboarding PR on a repository with no
+`renovate.json`. Close that PR unmerged.
 
 ## Production audit
 
