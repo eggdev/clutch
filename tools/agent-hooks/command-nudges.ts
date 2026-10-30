@@ -20,7 +20,7 @@ const prefix = /^(?:mise\s+exec\s+--|command|time|\w+=\S*)\s+/u;
  * The `bun run pr` command that replaces a raw `gh` call in `line`, or null.
  * Only a `gh` that starts a command counts, not one inside quoted text.
  */
-export function nudgeFor(line: string): string | null {
+function nudgeFor(line: string): string | null {
   for (const part of line.split(/&&|\|\||[;|\n]/u)) {
     let command = part.trim();
     for (let previous = ''; previous !== command;) {
