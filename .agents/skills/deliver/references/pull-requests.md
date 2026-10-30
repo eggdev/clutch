@@ -95,7 +95,8 @@ from a person. The PR may merge without the owner when each of these is true:
   `agent-review` succeeded on its head commit.
 
 The workflow runs when CI or agent review completes, and it runs the default
-branch's rules. `automerge.mode` in `clutch.yaml` decides what it does:
+branch's rules. It skips a run whose branch lives in a fork, even one named
+`clutch/cl-`, because that run gets this repository's token. `automerge.mode` in `clutch.yaml` decides what it does:
 
 - `off` prints the verdict in the job summary.
 - `dry-run` comments "would auto-merge" once for each head commit. The comment
