@@ -12,7 +12,7 @@ Rank 7 of the researched practices. About seven in ten of the leading repositori
 
 ## Adopt
 
-1. Add `.clutch/risk.yaml` with ordered rules. Each rule maps a tier to a list of path globs. The highest tier wins.
+1. Add `.clutch/risk.yaml` with rules. Each rule maps a tier to a list of path globs. The highest matching tier wins, whatever the rule order.
 2. Put guardrail files, workflows, migrations and auth code in the highest tier. Put changes to docs or tests only in the lowest tier.
 3. Add a CI job that labels each pull request with its tier, such as `risk/low`.
 4. Add a workflow that runs `gh pr merge --auto --squash` for a low-risk pull request. Require an allowed author and green required checks.
