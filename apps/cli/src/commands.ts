@@ -2,6 +2,7 @@ import { doctorCommand } from '@/doctor-command';
 import { initCommand } from '@/init-command';
 import { installCommand } from '@/install-command';
 import { issuesCommand } from '@/issues-command';
+import { metricsCommand } from '@/metrics-command';
 import { syncCommand } from '@/sync-command';
 
 type Command = {
@@ -44,6 +45,11 @@ export const commands: Record<string, Command> = {
       'clutch issues [--write | --check] [--json]\nclutch issues next [--stack] [--json]\nclutch issues set <id> <status> [--pr URL] [--owner NAME]',
     summary: 'List, pick and update the issues in .clutch/issues, and render .clutch/TRACKER.md.',
     run: issuesCommand,
+  },
+  metrics: {
+    usage: 'clutch metrics [--since 14d] [--repo OWNER/NAME] [--root DIR] [--json]',
+    summary: 'Report how pull requests flow through a repository, from read-only gh api calls.',
+    run: (args, cwd) => metricsCommand(args, cwd),
   },
 };
 

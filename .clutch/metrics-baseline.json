@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "repo": "eggdev/clutch",
+  "since": "2026-10-16T18:56:51.469Z",
+  "until": "2026-10-30T18:56:51.469Z",
+  "days": 14,
+  "pulls": {
+    "merged": 51,
+    "mergedPerDay": 3.64,
+    "noHumanAction": {
+      "count": 0,
+      "share": 0
+    },
+    "openToMergeHours": {
+      "p50": 0.3,
+      "p90": 10.7,
+      "count": 51
+    },
+    "greenToMergeHours": {
+      "p50": 0.2,
+      "p90": 10.7,
+      "count": 51
+    },
+    "agents": {
+      "commits": 158,
+      "agentCommits": 110,
+      "commitShare": 0.696,
+      "pullShare": 0.824,
+      "byAgent": {
+        "claude": 110
+      }
+    }
+  },
+  "reverts": {
+    "pulls": 0,
+    "commits": 0,
+    "rate": 0
+  },
+  "mainRed": {
+    "branch": "main",
+    "requiredChecks": ["validate", "journeys", "secrets", "commits"],
+    "minutes": 72
+  },
+  "ci": {
+    "runs": 312,
+    "failureRate": 0.087,
+    "durationMinutes": {
+      "p50": 1,
+      "p90": 1.5,
+      "count": 312
+    }
+  },
+  "issuesDone": 18,
+  "prSize": null,
+  "dryRunAgreement": null,
+  "unavailable": {
+    "prSize": "Lands in CL-503b.",
+    "dryRunAgreement": "Lands in CL-503b."
+  }
+}

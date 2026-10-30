@@ -270,6 +270,30 @@ above the baseline, the gate exits 2. Then run
 The baseline only moves up. A lower value needs `--allow-downgrade` and the
 owner's review, because the baseline is a guardrail file.
 
+## Metrics
+
+`clutch metrics` reports how pull requests flow through a repository over a
+window: merges per day, the share merged with no human action, the hours from
+open to merge, main-red minutes, reverts, the agent share from
+`Co-authored-by` trailers, CI run times and the issues done. It sends only
+`gh api` GET requests, for the origin repository or `--repo OWNER/NAME`, so it
+works from a clone and from the release binary in any project.
+
+```sh
+mise exec -- bun run clutch metrics
+mise exec -- bun run clutch metrics --since 30d --json
+```
+
+- `--since` takes a number of days, such as `14d`, the default.
+- `--json` prints the report for a digest. A section that GitHub does not
+  answer is null, and `unavailable` names the reason.
+- The issues done come from `.clutch/issues` in the checkout, so `--repo` for
+  another repository reports them as unavailable.
+- It exits 0 after a report, and 1 when `gh` fails for the merged pull requests.
+
+See [factory telemetry](../../docs/contributing/capabilities/factory-observability.md)
+for what each number counts.
+
 ## Capability registry
 
 `docs/contributing/capabilities/registry.yaml` lists each capability that a
