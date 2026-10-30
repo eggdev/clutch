@@ -55,8 +55,7 @@ to Claude API billing. Then replace the waiver with `oidc_ci: adopted`.
 
 ## The `id-token: write` grant
 
-`agent-review.yml` and `gardening.yml` grant `id-token: write`. The Claude
-action uses it to trade the job's OIDC token for a Claude GitHub App token.
-Gardening uses that token to open its PR when the release bot is missing.
-Agent review passes `github.token` to the action, so it does not need the
-grant. CL-115 removes it there.
+Only `gardening.yml` grants `id-token: write`. The Claude action uses it to
+trade the job's OIDC token for a Claude GitHub App token. Gardening uses that
+token to open its PR when the release bot is missing. Agent review passes
+`github.token` to the action, so it never makes that trade and has no grant.

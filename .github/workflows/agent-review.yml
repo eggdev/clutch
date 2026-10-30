@@ -24,7 +24,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      id-token: write
     steps:
       # GitHub gives no secrets to a fork PR, and a project may have none. The
       # review then passes with a notice, so the job never fails for setup.
