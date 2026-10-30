@@ -172,6 +172,8 @@ worktree: # optional
   setup: ['mise exec -- bun install']
 automerge: # optional
   mode: dry-run # off (the default), dry-run or on
+pr: # optional
+  branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 ```
 
 `automerge.mode` tells the Auto-merge workflow what to do with a low-risk agent

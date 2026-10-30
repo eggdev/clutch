@@ -1,8 +1,9 @@
 # Pull requests and stacks
 
 Every pull request in a project follows these rules. The commands below do the
-GitHub steps. Do not type the `gh` calls by hand, so each session does the same
-thing.
+GitHub steps. Use these commands. Do not hand-write `gh` calls or polling
+loops, so each session and each project does the same thing. The command
+index, `commands.md` next to this page, lists every command once CL-120 adds it.
 
 ## Set up once per machine
 
@@ -36,10 +37,25 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - After you rebase your own branch, run `open` again with `--force`. It pushes
   with `--force-with-lease`, which refuses when someone else pushed to the branch.
 - To change only the body, run `bun run pr body <number> <file>`.
-- After the first green push, run
-  `clutch issues set <id> done --pr <url>`, commit it, and run `open` again.
-  The merge makes `done` true. A PR that waits on a lower PR in a stack uses
-  `review` until it is ready to merge.
+- After the first green push, run `bun run pr ready <id> <number>`. The merge
+  makes `done` true. A PR that waits on a lower PR in a stack uses `review`
+  until it is ready to merge.
+
+## Follow a pull request to green
+
+| Command                                 | When to use it                                                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `bun run pr status <number> [--json]`   | Before each decision. It shows the required checks, the agent review's blocking count, the dry-run verdict and the mergeable state at the head commit. |
+| `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
+| `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. |
+| `bun run pr sync <number, branch or id>` | When the base moved or the tracker conflicts. It rebases on the PR's base, regenerates a conflicted `.clutch/TRACKER.md`, runs `validate` and pushes with a lease. It stops on any other conflict. |
+| `bun run pr ready <id> <number>`        | When the PR is green and ready to merge. It sets the issue to `done` with the PR link, regenerates the tracker, commits `chore(tracker): mark <id> done` and pushes. |
+
+Each command reads the repository from the `origin` remote. `sync` takes an
+issue id, such as `CL-117`, and finds the branch with the prefix that
+`pr.branchPrefix` in `clutch.yaml` names. The default is `clutch/cl-`. `sync`
+and `ready` change the tracker through `tools/clutch.ts`, so they run the
+release binary in a project.
 
 ## Stack a pull request on another one
 
@@ -72,8 +88,14 @@ mise exec -- bun run pr merge <number>
 
 For a PR in a stack, `merge` merges every PR from the bottom up to that one,
 with merge commits. When one merge fails, none of them merge. For a PR that is
-not in a stack, it merges that PR with a merge commit. Each merge to the
-default branch is a release.
+not in a stack, it merges that PR with a merge commit. GitHub can still count a
+PR as stacked after the PRs below it merged. When GitHub refuses the plain
+merge for that reason, `merge` merges through the stack.
+
+Each merge to the default branch is a release. `merge` then waits for the run of
+`release.yml` on the merge commit, up to `--timeout` (15 minutes by default). It
+prints the released version, or the failed run, and exits 1 when the release
+fails.
 
 The default branch takes no direct pushes, so a task cannot become `done`
 after its merge. When the PR is green and ready to merge, its last commit sets

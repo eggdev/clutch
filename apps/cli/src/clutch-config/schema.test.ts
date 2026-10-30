@@ -135,3 +135,14 @@ test('automerge is optional and takes off, dry-run or on', () => {
   ]);
   expect(paths({ ...valid, automerge: 'on' })).toEqual(['automerge']);
 });
+
+test('pr is optional and takes a branch prefix', () => {
+  expect(validateClutchConfig(valid).config?.pr).toBeUndefined();
+  expect(validateClutchConfig({ ...valid, pr: { branchPrefix: 'agent/' } }).config?.pr).toEqual({
+    branchPrefix: 'agent/',
+  });
+  expect(paths({ ...valid, pr: { branchPrefix: 'has space', base: 'main' } })).toEqual([
+    'pr.base',
+    'pr.branchPrefix',
+  ]);
+});
