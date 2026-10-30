@@ -115,6 +115,15 @@ async function readVerdicts(run: Run) {
   return JSON.parse(out) as Verdicts;
 }
 
+/**
+ * Whether `author` may grade: the one owner that `clutch metrics --verdicts`
+ * names. `check` and `grade` both ask here, so the rule lives in one place.
+ */
+async function ownerCheck(run: Run, author: string) {
+  const { owner } = await readVerdicts(run);
+  return { owner, isOwner: owner !== null && owner === author };
+}
+
 /** The open calibration issue, or null. */
 async function openIssue(run: Run) {
   const out = await must(run, [
@@ -230,13 +239,13 @@ export async function runGradeVerdicts(
     return 0;
   }
   if (mode === 'check' && values.author) {
-    const { owner } = await readVerdicts(run);
-    log(`owner=${owner === values.author ? 'true' : 'false'}`);
+    const { isOwner } = await ownerCheck(run, values.author);
+    log(`owner=${isOwner ? 'true' : 'false'}`);
     return 0;
   }
   if (mode === 'grade' && values.issue && values.author && values['body-file']) {
-    const { owner } = await readVerdicts(run);
-    if (owner !== values.author) {
+    const { owner, isOwner } = await ownerCheck(run, values.author);
+    if (!isOwner) {
       log(`Only @${owner ?? 'the owner'} grades verdicts. @${values.author} is not the owner.`);
       return 0;
     }
