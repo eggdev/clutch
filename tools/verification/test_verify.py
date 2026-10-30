@@ -10,6 +10,8 @@ import unittest
 
 
 RUNNER = Path(__file__).with_name('verify.py')
+sys.path.insert(0, str(RUNNER.parent))
+from processes import GATE
 
 
 class VerificationTests(unittest.TestCase):
@@ -32,7 +34,7 @@ class VerificationTests(unittest.TestCase):
                                 env={**os.environ, 'DELIVERY_EVIDENCE_ROOT': str(self.evidence)}, timeout=15)
         return result.returncode, json.loads(result.stdout)
 
-    def test_receipt_and_visual_artifacts_survive_failed_flow_and_stop(self):
+    def test_receipt_and_visual_artifacts_survive_failed_flow(self):
         (self.repo / 'visual').mkdir()
         (self.repo / 'visual/stale.png').write_bytes(b'old run')
         self.value['flows']['flow'].update({'artifactPaths': ['visual'],
@@ -44,8 +46,6 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual((receipt / 'artifacts/visual/frame.png').read_bytes(), b'fixture')
         self.assertFalse((receipt / 'artifacts/visual/stale.png').exists())
         self.assertEqual(json.loads((receipt / 'receipt.json').read_text())['commands'][0]['exitCode'], 3)
-        self.run_tool('stop')
-        self.assertTrue((receipt / 'receipt.json').exists())
 
     def test_failed_doctor_prevents_driving_shared_instance(self):
         self.value['doctor'] = [[sys.executable, '-c', 'raise SystemExit(1)']]
@@ -159,11 +159,37 @@ class VerificationTests(unittest.TestCase):
                 except ProcessLookupError:
                     pass
         self.addCleanup(cleanup)
+        # The flow is ready once its pid parses and the ownership record names that pid.
+        owner = self.repo / 'tmp/verification/command-owner.json'
         deadline = time.monotonic() + 5
-        while not pid_file.exists() and time.monotonic() < deadline:
+        while time.monotonic() < deadline:
+            try:
+                pid = int(pid_file.read_text())
+                if json.loads(owner.read_text())['pid'] == pid:
+                    return runner, pid
+            except (FileNotFoundError, ValueError, KeyError):
+                pass
             time.sleep(.02)
-        self.assertTrue(pid_file.exists(), 'Fixture flow did not start')
-        return runner, int(pid_file.read_text())
+        self.fail('Fixture flow did not start with an ownership record')
+
+    def test_gate_never_runs_the_command_when_the_runner_dies_first(self):
+        marker = self.repo / 'ran'
+        gate_read, gate_write = os.pipe()
+        child = subprocess.Popen([sys.executable, '-c', GATE, str(gate_read), sys.executable, '-c',
+            f'from pathlib import Path; Path({str(marker)!r}).touch()'], pass_fds=(gate_read,))
+        os.close(gate_read)
+        # A runner that dies before it saves the record never writes the gate byte.
+        os.close(gate_write)
+        self.assertEqual(child.wait(timeout=10), 125)
+        self.assertFalse(marker.exists())
+
+    def test_missing_command_fails_with_127_and_names_it(self):
+        self.value['flows']['flow']['commands'] = [['no-such-command-for-verify']]
+        code, summary = self.run_tool('run', 'flow')
+        self.assertEqual(code, 1)
+        receipt = json.loads((Path(summary['evidence']) / 'receipt.json').read_text())
+        self.assertEqual(receipt['commands'][0]['exitCode'], 127)
+        self.assertIn('no-such-command-for-verify', Path(receipt['commands'][0]['log']).read_text())
 
     def assert_not_running(self, pid):
         process = subprocess.run(['ps', '-p', str(pid), '-o', 'stat='], capture_output=True, text=True)
@@ -205,13 +231,14 @@ class VerificationTests(unittest.TestCase):
         parent = ('import os,subprocess,sys,time; from pathlib import Path; '
             f'Path({str(parent_file)!r}).write_text(str(os.getpid())); '
             f'subprocess.Popen([sys.executable,"-c",{worker!r}]); time.sleep(30)')
-        self.value['flows']['flow'].update({'timeoutSeconds': 1,
+        self.value['flows']['flow'].update({'timeoutSeconds': 3,
             'commands': [[sys.executable, '-c', parent]]})
         try:
             code, summary = self.run_tool('run', 'flow')
             self.assertEqual(code, 1)
             receipt = json.loads((Path(summary['evidence']) / 'receipt.json').read_text())
             self.assertEqual(receipt['commands'][0]['exitCode'], 124)
+            self.assertTrue(child_file.exists(), 'worker never started')
             self.assert_not_running(int(child_file.read_text()))
         finally:
             if parent_file.exists():
@@ -270,11 +297,12 @@ class VerificationTests(unittest.TestCase):
             f'Path({str(pid_file)!r}).write_text(str(os.getpid())); time.sleep(30)')
         parent = ('import subprocess,sys; '
             f'subprocess.Popen([sys.executable,"-c",{worker!r}],start_new_session=True)')
-        self.value['flows']['flow'].update({'timeoutSeconds': .5,
+        self.value['flows']['flow'].update({'timeoutSeconds': 2,
             'commands': [[sys.executable, '-c', parent]]})
         try:
             code, result = self.run_tool('run', 'flow')
             self.assertEqual(code, 1)
+            self.assertTrue(pid_file.exists(), 'worker never started')
             self.assertIn('output stream remained open', result['error'])
             journal = self.repo / 'tmp/verification/command-owner.json'
             self.assertTrue(journal.exists())

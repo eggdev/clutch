@@ -6,6 +6,7 @@ from pathlib import Path
 import selectors
 import signal
 import subprocess
+import sys
 import time
 
 
@@ -83,19 +84,42 @@ def recover(execution, root):
     return True
 
 
+# The child waits on this gate until its ownership record is saved, then execs
+# the command in place, so the pid and birth time stay the same. A runner that
+# dies before it opens the gate closes the pipe, and the child exits 125 without
+# running the command. No flow can run that no record owns.
+GATE = (
+    'import os, sys\n'
+    'gate = int(sys.argv[1])\n'
+    'if os.read(gate, 1) != b"g":\n'
+    '    sys.exit(125)\n'
+    'os.close(gate)\n'
+    'try:\n'
+    '    os.execvp(sys.argv[2], sys.argv[2:])\n'
+    'except OSError as error:\n'
+    '    print(f"Cannot run {sys.argv[2]}: {error}", flush=True)\n'
+    '    sys.exit(127)\n'
+)
+
+
 def spawn_owned(argv, root, stdout, record, log):
     blocked = {signal.SIGTERM, signal.SIGINT}
     previous = signal.pthread_sigmask(signal.SIG_BLOCK, blocked)
     child = None
     owner = None
+    gate_read, gate_write = os.pipe()
     try:
-        child = subprocess.Popen(argv, cwd=root, stdin=subprocess.DEVNULL, stdout=stdout,
-            stderr=subprocess.STDOUT, start_new_session=True,
-            preexec_fn=lambda: signal.pthread_sigmask(signal.SIG_SETMASK, previous))
+        try:
+            child = subprocess.Popen([sys.executable, '-c', GATE, str(gate_read), *argv], cwd=root,
+                stdin=subprocess.DEVNULL, stdout=stdout, stderr=subprocess.STDOUT, start_new_session=True,
+                pass_fds=(gate_read,), preexec_fn=lambda: signal.pthread_sigmask(signal.SIG_SETMASK, previous))
+        finally:
+            os.close(gate_read)
         birth = identity(child.pid)
         owner = {'pid': child.pid, 'birth': birth, 'repository': str(root),
                  'members': {child.pid: birth}, 'log': str(log), 'command': argv}
         write_json(record, owner)
+        os.write(gate_write, b'g')
         # Pending graceful termination is delivered inside this cleanup scope.
         signal.pthread_sigmask(signal.SIG_SETMASK, previous)
         return child, owner
@@ -108,6 +132,7 @@ def spawn_owned(argv, root, stdout, record, log):
                 child.stdout.close()
         raise
     finally:
+        os.close(gate_write)
         signal.pthread_sigmask(signal.SIG_SETMASK, previous)
 
 
