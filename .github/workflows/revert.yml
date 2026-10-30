@@ -60,8 +60,9 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      # The dispatch carries only a number, so read the rest from GitHub, and
-      # revert only a merged PR from this repository.
+      # The dispatch carries only a number, so read the rest from GitHub. Like
+      # the labeled run, revert only a merged PR from this repository that
+      # carries the revert label, so a manual dispatch cannot skip the label.
       - name: Find the pull request
         id: pr
         env:
@@ -69,9 +70,10 @@ jobs:
           PR: ${{ inputs.pr }}
         run: |
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq '
-            if .merged and .head.repo.full_name == .base.repo.full_name then
+            if .merged and .head.repo.full_name == .base.repo.full_name
+              and any(.labels[]; .name == "revert") then
               "sha=\(.merge_commit_sha)\nbase=\(.base.ref)"
-            else error("#\(.number) is not a merged pull request from this repository.") end' \
+            else error("#\(.number) is not a merged pull request from this repository with the revert label.") end' \
             >> "$GITHUB_OUTPUT"
           # A title can hold any character, so it goes through a file, not an output line.
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq .title > "$RUNNER_TEMP/title.txt"
