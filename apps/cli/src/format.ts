@@ -39,9 +39,13 @@ async function run(root: string, args: Array<string>, input?: string) {
   return out;
 }
 
-/** Writes `file` in the template's format, so that the format check passes after a write. */
+/**
+ * Writes `file` in the template's format, so that the format check passes
+ * after a write. A file that the formatter config ignores, such as
+ * `.claude/settings.json`, stays as it is.
+ */
 export async function formatFile(root: string, file: string) {
-  await run(root, [file]);
+  await run(root, ['--no-error-on-unmatched-pattern', file]);
 }
 
 /** Returns `text` in the format that the template gives the file at `file`. */

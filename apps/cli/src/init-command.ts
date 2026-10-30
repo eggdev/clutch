@@ -25,6 +25,13 @@ File a new issue with \`clutch issues new\`. See
 `;
 
 /** The owner/name of the Clutch checkout's origin remote. */
+/**
+ * The seed files that the managed tooling reads. Install writes every seed,
+ * and sync never writes one, so init writes these for a project that adopts
+ * Clutch without install. The Risk workflow and `clutch risk` read risk.yaml.
+ */
+const toolingSeeds = ['.clutch/risk.yaml', '.changeset/README.md'];
+
 async function templateRepo(template: string) {
   const url = await git(template, 'remote', 'get-url', 'origin');
   const match = /[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/u.exec(url.out);
@@ -107,8 +114,15 @@ async function run(args: Array<string>, cwd: string, template: string): Promise<
     }),
   );
   const written = ['clutch.yaml'];
-  if (values.mode === 'sync' && values.adopt) {
-    const source = await loadClutchSource(template, release);
+  const source = values.mode === 'sync' ? await loadClutchSource(template, release) : undefined;
+  for (const file of toolingSeeds) {
+    const seed = source?.seed.get(file);
+    if (seed && !(await Bun.file(path.join(root, file)).exists())) {
+      await write(root, file, seed.content.toString());
+      written.push(file);
+    }
+  }
+  if (source && values.adopt) {
     const files = await adoptedLineage(root, template, source.managed);
     const lineage = {
       schemaVersion: 1,

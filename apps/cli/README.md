@@ -249,7 +249,24 @@ mise exec -- bun run clutch init --root ../bar-savvy-web --mode doctor --yes
   writes no lineage.
 - `--adopt` compares the files with the latest Clutch release, the newest
   `vX.Y.Z` tag in the clone.
+- In `sync` mode, init also writes the seeds that the managed tooling reads:
+  `.clutch/risk.yaml` for the Risk workflow and `clutch risk`, and
+  `.changeset/README.md`. Install writes every seed, and sync never writes
+  one, so init fills the gap. It keeps a copy that the project already has.
 - Init refuses a repository that already has `clutch.yaml`.
+
+### Start a new project from Clutch
+
+Run these steps in order, from the project's root:
+
+1. Install the formatter: `bun add --dev oxfmt`. Init and sync format the
+   files they write, and they fail without it.
+2. Run `clutch init --yes`, then commit. Sync refuses uncommitted changes.
+3. Run `clutch sync`. It copies the managed files and merges `package.json`,
+   which gains the `pr`, `clutch` and `validate` scripts.
+4. Run `bun install`, then commit.
+
+`tools/release/fresh-project.test.ts` runs these steps with the release binary.
 
 ## Sync
 

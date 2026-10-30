@@ -1,4 +1,4 @@
-import { unlink, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { parseDocument } from 'yaml';
@@ -224,6 +224,8 @@ async function writeRest(
   legacy: boolean,
 ) {
   for (const [file, content] of merged) {
+    // A fresh project may not have the folder yet, such as .codex/.
+    await mkdir(path.dirname(path.join(root, file)), { recursive: true });
     await writeFile(path.join(root, file), content);
     if (file.endsWith('.json')) {
       await formatFile(root, file);
