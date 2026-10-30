@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1 (2026-10-30)
+
+### Fixes and maintenance
+
+- ci(workflows): lint workflows with actionlint and zizmor (CL-103b)
+
 ## 0.9.0 (2026-10-30)
 
 ### Features
