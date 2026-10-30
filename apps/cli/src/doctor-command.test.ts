@@ -44,6 +44,7 @@ test('--json reports every registry capability with its detected and declared st
     'results',
     'summary',
     'sast',
+    'rulesets',
   ]);
   expect(report).toMatchObject({ schemaVersion: 1, root: repo.root, templateRelease: 'v0.2.0' });
   expect(report.results).toHaveLength(36);
@@ -69,6 +70,7 @@ test('--json reports every registry capability with its detected and declared st
   });
   expect(report.summary.declared).toEqual({ adopted: 1, waived: 1, 'n/a': 0, undeclared: 34 });
   expect(report.sast).toMatchObject({ choice: 'auto', engine: null, problem: null });
+  expect(report.rulesets).toBeNull();
 });
 
 test('a repository without Clutch files reports every capability as undeclared', async () => {

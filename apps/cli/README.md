@@ -204,11 +204,17 @@ sast: auto # optional: auto (the default), codeql or semgrep
 pr_size: # optional
   warn: 300 # the default: clutch labels warns above it, and never fails
   exclude: [] # globs whose lines do not count, such as generated code
+agentReview: # optional
+  missingCredential: notice # notice (the default) or fail
 ```
 
 `automerge.mode` tells the Auto-merge workflow what to do with a low-risk agent
 PR. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
+
+`agentReview.missingCredential` tells `agent-review.yml` what to do without an
+Anthropic credential: pass with a notice, or fail. Set `fail` once
+`agent-review` is a required check. See [review](../../docs/contributing/review.md).
 
 `sast` picks the static analysis engine that `.github/workflows/sast.yml` runs.
 `auto` runs CodeQL where code scanning takes results and Semgrep elsewhere.
@@ -332,9 +338,12 @@ mise exec -- bun run clutch doctor --phase P1
   some pass and one fails. It is unknown when the rules that did not pass are
   all unknown, such as remote rules without `--remote`.
 - A repository without `clutch.yaml` reports each capability as undeclared.
-- The last line names the SAST engine that `sast` in `clutch.yaml` runs, such
-  as `SAST: auto -> codeql (public repository)`. Without `--remote`, doctor
-  cannot tell CodeQL from Semgrep for `auto` and `codeql`, and prints `?`.
+- After the summary, a line names the SAST engine that `sast` in
+  `clutch.yaml` runs, such as `SAST: auto -> codeql (public repository)`.
+  Without `--remote`, doctor cannot tell CodeQL from Semgrep for `auto` and
+  `codeql`, and prints `?`.
+- With `--remote`, the last lines compare each file in `.github/rulesets/`
+  with GitHub, as `clutch ruleset` does.
 - `--category` and `--phase` narrow the report.
 - `--remote` reads GitHub settings for the `remote:` rules: branch rules and
   protection, secret scanning, push protection, the merge queue, auto-merge,
@@ -353,6 +362,8 @@ mise exec -- bun run clutch doctor --phase P1
 - A capability dropped below `.clutch/doctor-baseline.json`.
 - With `--remote`, `sast` is `codeql` on a private repository without GitHub
   Code Security, so `sast.yml` fails.
+- With `--remote`, a ruleset on GitHub differs from its file in
+  `.github/rulesets/`, or does not exist. See [Ruleset](#ruleset).
 
 A remote rule that is unknown never fails the gate. When a capability's files
 pass and only its remote rules are left, it is unknown without `--remote`, so
@@ -361,6 +372,28 @@ above the baseline, the gate exits 2. Then run
 `mise exec -- bun run clutch doctor --write-baseline` to raise the baseline.
 The baseline only moves up. A lower value needs `--allow-downgrade` and the
 owner's review, because the baseline is a guardrail file.
+
+## Ruleset
+
+`clutch ruleset` compares each file in `.github/rulesets/` with the ruleset of
+the same name on GitHub, for the origin repository or `--repo OWNER/NAME`.
+`--apply` creates a ruleset that GitHub does not have, or updates the one with
+the same name with PUT, then compares again. Run it after each change to a
+ruleset file.
+
+```sh
+mise exec -- bun run clutch ruleset
+mise exec -- bun run clutch ruleset --apply
+```
+
+- Only the keys that the file names count, because GitHub adds defaults. A
+  list, such as the required checks, must hold the same items in any order.
+- A bypass actor whose `actor_id` is `vars.NAME` gets the value of the
+  repository variable `NAME`. The release bot uses `vars.CLUTCH_APP_ID`, so one
+  file fits each project. When the variable is not set, the actor is left out
+  with a note.
+- It exits 0 when every ruleset matches, 2 when one differs or is missing, and
+  1 when `gh` fails. Applying needs a token with admin rights on the repository.
 
 ## Metrics
 
