@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0 (2026-10-30)
+
+### Features
+
+- feat(pr): add status, wait, failures, sync and ready commands (CL-117)
+
 ## 0.12.2 (2026-10-30)
 
 ### Fixes and maintenance
