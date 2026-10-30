@@ -272,20 +272,21 @@ repository can adopt, and the rules that detect it. `clutch doctor` reads it.
 
 Each rule checks the files that git tracks. An untracked file never counts.
 
-| Rule                                  | Passes when                                                            |
-| ------------------------------------- | ---------------------------------------------------------------------- |
-| `file: <glob>`                        | A tracked file matches. `min` raises the count. `exclude` skips globs. |
-| `grep: { files, pattern }`            | A matching tracked file contains the regex.                            |
-| `script: <name>`                      | The root `package.json` has the script.                                |
-| `target: <name>`                      | A `package.json` or `project.json` defines the Nx target.              |
-| `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                           |
-| `yaml: { file, path }`                | The dotted path exists in the YAML or JSON file.                       |
-| `remote: <probe>`                     | The GitHub setting holds. It is unknown without `--remote`.            |
-| `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.           |
+| Rule                                  | Passes when                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------- |
+| `file: <glob>`                        | A tracked file matches. `min` raises the count. `exclude` skips globs.    |
+| `grep: { files, pattern }`            | A matching tracked file contains the regex.                               |
+| `script: <name>`                      | The root `package.json` has the script.                                   |
+| `target: <name>`                      | A `package.json` or `project.json` defines the Nx target.                 |
+| `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                              |
+| `yaml: { file, path }`                | The dotted path holds a value in the YAML or JSON file that is not empty. |
+| `remote: <probe>`                     | The GitHub setting holds. It is unknown without `--remote`.               |
+| `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.              |
 
 A capability is present when every `detect` rule passes. It is partial when
-some pass, or when only `partial_if` rules pass. It is missing when none pass.
-It is unknown when every `detect` rule is unknown. The registry is a guardrail
+some pass and one fails, or when only `partial_if` rules pass. It is missing
+when none pass. It is unknown when the rules that did not pass are all
+unknown, such as remote rules without `--remote`. The registry is a guardrail
 file, so a person reviews each change to it.
 
 ## Test it

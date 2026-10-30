@@ -8,7 +8,7 @@ Rank 27 of the researched practices. Almost two thirds of the leading repositori
 
 ## Detection
 
-`clutch doctor` reports this capability as present when two rules pass. `.clutch/ratchets.json` has a `ratchets` key. A `package.json` or `project.json` defines the Nx target `check-ratchets`. It is partial when only one rule passes. It is also partial when a file in `packages/lint-rules/` mentions `ratchet` or `shrink-only`. See the `ratchets` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when two rules pass. `.clutch/ratchets.json` has a `ratchets` key that is not empty. A `package.json` or `project.json` defines the Nx target `check-ratchets`. It is partial when only one rule passes. It is also partial when a file in `packages/lint-rules/` mentions `ratchet` or `shrink-only`. See the `ratchets` entry in [the registry](./registry.yaml).
 
 ## Adopt
 

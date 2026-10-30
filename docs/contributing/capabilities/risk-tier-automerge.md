@@ -8,7 +8,7 @@ Rank 7 of the researched practices. About seven in ten of the leading repositori
 
 ## Detection
 
-`clutch doctor` reports this capability as present when three rules pass. Git tracks `.clutch/risk.yaml`. A workflow file runs `gh pr merge --auto`. The `allow_auto_merge` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`, and reports it as unknown without that flag. A repository where only some rules pass reports as partial. See the `risk_tier_automerge` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when three rules pass. Git tracks `.clutch/risk.yaml`. A workflow file runs `gh pr merge --auto`. The `allow_auto_merge` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`, and reports it as unknown without that flag. A repository whose files pass reports as unknown without that flag. With `--remote`, a probe that fails makes it partial. See the `risk_tier_automerge` entry in [the registry](./registry.yaml).
 
 ## Adopt
 

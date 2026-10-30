@@ -8,7 +8,7 @@ Rank 62 of the researched practices. About one in seven of the leading repositor
 
 ## Detection
 
-`clutch doctor` reports this capability as present when two rules pass. A workflow file with `review` in its name mentions `blocking`. The `required_check:agent-review` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`. Without that flag, the probe is unknown, so a repository with only the workflow reports as unknown. With `--remote`, a probe that fails makes it partial. See the `ai_review_blocking` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when two rules pass. A workflow file with `review` in its name reads the `.blocking` result of the review. The `required_check:agent-review` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`. Without that flag, the probe is unknown, so a repository with only the workflow reports as unknown. With `--remote`, a probe that fails makes it partial. See the `ai_review_blocking` entry in [the registry](./registry.yaml).
 
 ## Adopt
 
