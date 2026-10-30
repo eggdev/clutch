@@ -3,12 +3,6 @@ import { lstat, readFile, readlink } from 'node:fs/promises';
 import path from 'node:path';
 
 export type ReviewFile = { mode: string; content: Buffer; hash: string };
-export type ReviewSource = {
-  commit: string;
-  files: Map<string, ReviewFile>;
-  baseline: Map<string, string>;
-  roots: Array<string>;
-};
 
 export function fingerprint(mode: string, content: Buffer): string {
   return createHash('sha256').update(mode).update('\0').update(content).digest('hex');
@@ -35,7 +29,7 @@ export async function gitBytes(root: string, args: Array<string>): Promise<Buffe
     child.exited,
   ]);
   if (code) {
-    throw new Error(`Cannot read committed review tooling: ${error.trim()}`);
+    throw new Error(`Cannot read committed Clutch files: ${error.trim()}`);
   }
   return Buffer.from(output);
 }
@@ -60,61 +54,6 @@ export async function tree(
     }),
   );
   return new Map(files);
-}
-
-export async function loadReviewSource(root: string): Promise<ReviewSource> {
-  const revision = await gitBytes(root, ['rev-parse', '--verify', 'HEAD^{commit}']);
-  const commit = revision.toString().trim();
-  const configBytes = await gitBytes(root, ['show', `${commit}:review.files.yaml`]);
-  const config = Bun.YAML.parse(configBytes.toString()) as {
-    baseline: string;
-    files: Array<string>;
-    retired: Array<string>;
-  };
-  for (const prefix of [...config.files, ...config.retired]) {
-    safeRelative(prefix);
-  }
-  if (config.files.some((p) => p === '.agents/skills/verify/' || p === '.claude/skills/verify')) {
-    throw new Error(
-      'Project-specific verify must be generated, never distributed by review install.',
-    );
-  }
-  safeRelative(config.baseline);
-  const files = await tree(root, commit, config.files);
-  const baselineBytes = await gitBytes(root, ['show', `${commit}:${config.baseline}`]);
-  const previous = JSON.parse(baselineBytes.toString()) as {
-    schemaVersion: number;
-    files: Record<string, string>;
-  };
-  if (previous.schemaVersion !== 1 || !previous.files || typeof previous.files !== 'object') {
-    throw new Error('Unsupported review-tooling baseline.');
-  }
-  for (const [filename, hash] of Object.entries(previous.files)) {
-    safeRelative(filename);
-    if (!/^[a-f0-9]{64}$/u.test(hash)) {
-      throw new Error(`Invalid baseline digest: ${filename}`);
-    }
-  }
-  const baseline = new Map(Object.entries(previous.files));
-  if (
-    [...files.keys()].some(
-      (p) => p.startsWith('.agents/skills/verify/') || p === '.claude/skills/verify',
-    )
-  ) {
-    throw new Error(
-      'Project-specific verify must be generated, never distributed by review install.',
-    );
-  }
-  for (const prefix of config.files) {
-    if (
-      ![...files.keys()].some((file) =>
-        prefix.endsWith('/') ? file.startsWith(prefix) : file === prefix,
-      )
-    ) {
-      throw new Error(`Review copy entry matches no committed file: ${prefix}`);
-    }
-  }
-  return { commit, files, baseline, roots: [...config.files, ...config.retired] };
 }
 
 export async function localFile(root: string, filename: string): Promise<ReviewFile | null> {

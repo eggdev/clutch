@@ -8,11 +8,17 @@ const filesList = 'clutch.files.yaml';
 export const lineagePath = '.clutch/lineage.json';
 const rules = new Set(['managed', 'merge', 'seed']);
 
-type Entry = { path: string; rule: 'managed' | 'merge' | 'seed'; capability?: string };
+type Entry = {
+  path: string;
+  rule: 'managed' | 'merge' | 'seed';
+  capability?: string;
+  group?: string;
+};
 type FilesList = {
   version: number;
-  baseline?: string;
   files: Array<Entry>;
+  /** Hashes of older Clutch copies, by path. */
+  known?: Record<string, string>;
   retired?: Array<string>;
   exclude?: Array<string>;
 };
@@ -45,15 +51,37 @@ function checkList(list: FilesList) {
   }
 }
 
-/** The rule for `file`: the entry with the longest path that covers it. */
-function ruleFor(list: FilesList, file: string) {
+/** The entry that decides `file`: the one with the longest path that covers it. */
+function entryFor(list: FilesList, file: string) {
   return list.files
     .filter((entry) => covers(entry.path, file))
-    .toSorted((a, b) => b.path.length - a.path.length)[0]?.rule;
+    .toSorted((a, b) => b.path.length - a.path.length)[0];
 }
 
-/** Reads `clutch.files.yaml` and the files it names at `revision` in the Clutch checkout `template`. */
-export async function loadClutchSource(template: string, revision: string): Promise<ClutchSource> {
+/** Whether `--only` selects this entry: by group, by capability, or by a path under it. */
+function selected(entry: Entry | undefined, file: string, only?: string) {
+  return (
+    !only ||
+    entry?.group === only ||
+    entry?.capability === only ||
+    covers(only.endsWith('/') ? only : `${only}/`, file) ||
+    file === only
+  );
+}
+
+const projectVerify = (file: string) =>
+  file.startsWith('.agents/skills/verify/') || file === '.claude/skills/verify';
+
+/**
+ * Reads `clutch.files.yaml` and the files it names at `revision` in the Clutch
+ * checkout `template`. `only` keeps the entries of one group or capability,
+ * or the files under one path.
+ */
+export async function loadClutchSource(
+  template: string,
+  revision: string,
+  only?: string,
+): Promise<ClutchSource> {
   const commitBytes = await gitBytes(template, ['rev-parse', '--verify', `${revision}^{commit}`]);
   const commit = commitBytes.toString().trim();
   const exists = Bun.spawnSync(['git', 'cat-file', '-e', `${commit}:${filesList}`], {
@@ -78,8 +106,12 @@ export async function loadClutchSource(template: string, revision: string): Prom
   const seed = new Map<string, SyncFile>();
   const byRule = { managed, merge, seed };
   for (const [file, content] of all) {
-    if (!excluded.some((item) => covers(item, file))) {
-      byRule[ruleFor(list, file) ?? 'seed'].set(file, content);
+    const entry = entryFor(list, file);
+    if (!excluded.some((item) => covers(item, file)) && selected(entry, file, only)) {
+      if (projectVerify(file)) {
+        throw new Error('Project-specific verify must be generated, never distributed by sync.');
+      }
+      byRule[entry?.rule ?? 'seed'].set(file, content);
     }
   }
   for (const entry of list.files) {
@@ -87,15 +119,11 @@ export async function loadClutchSource(template: string, revision: string): Prom
       throw new Error(`${filesList}: ${entry.path} matches no committed file.`);
     }
   }
-  let baseline = new Map<string, string>();
-  if (list.baseline) {
-    safeRelative(list.baseline);
-    const bytes = await gitBytes(template, ['show', `${commit}:${list.baseline}`]);
-    const parsed = JSON.parse(bytes.toString()) as { files: Record<string, string> };
-    baseline = new Map(Object.entries(parsed.files));
-  }
+  const baseline = new Map(Object.entries(list.known ?? {}));
   const roots = [
-    ...list.files.filter((entry) => entry.rule === 'managed').map((entry) => entry.path),
+    ...list.files
+      .filter((entry) => entry.rule === 'managed' && (!only || selected(entry, entry.path, only)))
+      .map((entry) => entry.path),
     ...(list.retired ?? []),
   ];
   return { commit, managed: { files: managed, baseline, roots }, merge, seed };

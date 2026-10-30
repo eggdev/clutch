@@ -1,7 +1,7 @@
 # Review tooling and runtime
 
 Clutch is the maintained source of shared review tooling. Repositories
-receive skills and helpers through the install CLI, then setup-verification
+receive skills and helpers through `clutch sync --only review`, then setup-verification
 authors their own committed verify skill and journey map. The template's own
 verify is excluded from distribution because it proves the template, not its consumer.
 
@@ -10,7 +10,7 @@ verify is excluded from distribution because it proves the template, not its con
 - deliver owns an authorized task through its destination.
 - setup-verification authors or maintains the project's single verify executor.
 - verify calls actual project commands, fixtures and assertions.
-- The install CLI records shared-file hashes and detects customization before updates.
+- `clutch sync` records shared-file hashes and detects customization before updates.
 - The central review runtime owns machine-wide resource admission and cleanup.
 
 The durable queue library lives in packages/runtime. It is not in either
@@ -31,28 +31,27 @@ and visible product assertions remain project responsibilities.
 From a clean committed target checkout:
 
 ```sh
-bun <clutch clone>/apps/cli/src/main.ts review install --check --json
-bun <clutch clone>/apps/cli/src/main.ts review install
+bun <clutch clone>/apps/cli/src/main.ts sync --only review --check --json
+bun <clutch clone>/apps/cli/src/main.ts sync --only review
 ```
 
-Check is read-only; exit 2 means changes are available, exit 1 means a conflict
-or prerequisite, and exit 0 means up to date. Actual install writes shared
-tooling in the current branch without switching or committing it. Run
-setup-verification next, inspect the diff and commit the project-specific result.
-Future updates use the same install command.
+Check is read-only. Exit 2 means changes or decisions are pending, exit 1 means
+an error, and exit 0 means up to date. A real sync writes shared tooling in the
+current branch without switching or committing it. Run setup-verification next,
+inspect the diff and commit the project-specific result. Later updates use the
+same command.
 
-The committed source list is review.files.yaml. The known legacy checksums in
-review-baseline.json allow unchanged prior template tooling to migrate without
-fetching old history. .review/tooling.json records the installed generation and
-hashes. Changed custom files stop the entire preflight; no force overwrite or
-automatic stash is provided. Individual file writes are atomic. An interrupted
-install can leave uncommitted files: inspect and commit or stash that partial
-state before retrying the same source. Already matching files are accepted on
-retry. This is not a filesystem transaction against a concurrent writer.
-Installation requires clean review-tooling paths. Other uncommitted work can
-stay in the checkout, and the installer does not touch it.
+`clutch.files.yaml` lists the files and tags the review tooling `group: review`.
+Its `known` hashes let unchanged older copies migrate without fetching old
+history. `.clutch/lineage.json` records the synced generation and hashes. A
+changed shared file needs the owner's keep-or-take decision, and nothing is
+written until each one has an answer. Individual file writes are atomic. An
+interrupted sync can leave uncommitted files: inspect and commit or stash that
+partial state before retrying. Already matching files are accepted on retry. A
+sync requires clean shared-tooling paths. Other uncommitted work can stay in the
+checkout, and sync does not touch it.
 
 The full template installer includes the shared tooling and hands off to kickoff.
-Review-only install preserves product docs, package manager, scripts and the
+A review-only sync preserves product docs, package manager, scripts and the
 existing project verify. The owner-selected archival or gardening workflow is
 not enabled by copying a skill.

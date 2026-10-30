@@ -56,6 +56,7 @@ export async function syncCommand(
         json: { type: 'boolean' },
         keep: { type: 'string', multiple: true },
         take: { type: 'string', multiple: true },
+        only: { type: 'string' },
       },
     });
     if (values.to && values.latest) {
@@ -68,6 +69,7 @@ export async function syncCommand(
       check: values.check,
       keep: values.keep ?? [],
       take: values.take ?? [],
+      only: values.only,
     };
     let result = await runSync(request);
     // A person at a terminal answers here. An agent, CI or --json gets the list and exit 2, and never waits.
@@ -92,6 +94,11 @@ export async function syncCommand(
       console.log(JSON.stringify(result));
     } else {
       print(result);
+      if (values.only === 'review' && result.status === 'synced') {
+        console.log(
+          'Use setup-verification to create or reconcile .agents/skills/verify/SKILL.md, then commit the project tooling.',
+        );
+      }
     }
     return codes[result.status];
   } catch (error) {

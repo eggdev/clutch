@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { parseDocument } from 'yaml';
@@ -40,7 +40,7 @@ async function readLineage(root: string) {
   const legacy = current ? null : await localFile(root, reviewRecord);
   const record = current ?? legacy;
   const parsed = record ? (JSON.parse(record.content.toString()) as Partial<Lineage>) : {};
-  return { previous: current, files: parsed.files ?? {}, kept: parsed.kept ?? {} };
+  return { previous: current, legacy, files: parsed.files ?? {}, kept: parsed.kept ?? {} };
 }
 
 /**
@@ -115,12 +115,48 @@ async function pinnedConfig(root: string, commit: string) {
   return doc.toString();
 }
 
+const under = (roots: Array<string>, file: string) =>
+  roots.some((root) => (root.endsWith('/') ? file.startsWith(root) : file === root));
+
+/** Entries of `record` that a sync scoped to `roots` must keep as they are. */
+function outside(record: Record<string, string>, roots: Array<string> | null) {
+  return roots
+    ? Object.fromEntries(Object.entries(record).filter(([file]) => !under(roots, file)))
+    : {};
+}
+
+/** The lineage after this sync. A scoped sync keeps the records of the files outside its scope. */
+function nextLineage(input: {
+  repo: string | undefined;
+  source: Awaited<ReturnType<typeof loadClutchSource>>;
+  lineage: Awaited<ReturnType<typeof readLineage>>;
+  scope: Array<string> | null;
+  kept: Record<string, string>;
+}): Lineage {
+  const { source, lineage, scope } = input;
+  const next: Lineage = {
+    schemaVersion: 1,
+    templateRepo: input.repo ?? '',
+    templateCommit: source.commit,
+    files: {
+      ...outside(lineage.files, scope),
+      ...Object.fromEntries([...source.managed.files].map(([file, entry]) => [file, entry.hash])),
+    },
+  };
+  const kept = { ...outside(lineage.kept, scope), ...input.kept };
+  if (Object.keys(kept).length > 0) {
+    next.kept = kept;
+  }
+  return next;
+}
+
 /** Writes the merged files, the lineage and the new pin, after the engine wrote the managed files. */
 async function writeRest(
   root: string,
   merged: Map<string, string>,
   lineageText: string,
   pinned: string | null,
+  legacy: boolean,
 ) {
   for (const [file, content] of merged) {
     await writeFile(path.join(root, file), content);
@@ -136,6 +172,9 @@ async function writeRest(
   if (pinned) {
     await writeFile(path.join(root, 'clutch.yaml'), pinned);
   }
+  if (legacy) {
+    await unlink(path.join(root, reviewRecord));
+  }
 }
 
 /**
@@ -150,6 +189,8 @@ export async function runSync(options: {
   check?: boolean;
   keep?: Array<string>;
   take?: Array<string>;
+  /** Sync only the entries of one group or capability, or the files under one path. */
+  only?: string;
 }): Promise<SyncResult> {
   const root = await gitOrThrow(options.root, 'rev-parse', '--show-toplevel');
   const loaded = await loadClutchConfig(root);
@@ -157,12 +198,18 @@ export async function runSync(options: {
   const source = await loadClutchSource(
     options.template,
     options.to ?? config?.template.commit ?? 'HEAD',
+    options.only,
   );
   const lineage = await readLineage(root);
+  // A scoped sync plans only its own files, and keeps the lineage of the rest.
+  const scope = options.only ? source.managed.roots : null;
+  const record = scope
+    ? Object.fromEntries(Object.entries(lineage.files).filter(([file]) => under(scope, file)))
+    : lineage.files;
   const managed = await plan(
     root,
     source.managed,
-    { files: lineage.files },
+    { files: record },
     lineagePath,
     lineage.previous,
   );
@@ -171,21 +218,19 @@ export async function runSync(options: {
     take: options.take ?? [],
   });
   const merges = await planMerges(root, source.merge);
-  const next: Lineage = {
-    schemaVersion: 1,
-    templateRepo: config?.template.repo ?? '',
-    templateCommit: source.commit,
-    files: Object.fromEntries([...source.managed.files].map(([file, entry]) => [file, entry.hash])),
-    ...(Object.keys(kept).length > 0 ? { kept } : {}),
-  };
+  const next = nextLineage({ repo: config?.template.repo, source, lineage, scope, kept });
   const lineageText = `${JSON.stringify(next, null, 2)}\n`;
-  const pinned = await pinnedConfig(root, source.commit);
+  const pinned = scope ? null : await pinnedConfig(root, source.commit);
   const changes = [...managed.changes, ...merges.changes];
   if (lineage.previous?.content.toString() !== lineageText) {
     changes.push({ path: lineagePath, action: lineage.previous ? 'update' : 'add' });
   }
   if (pinned) {
     changes.push({ path: 'clutch.yaml', action: 'update' });
+  }
+  if (lineage.legacy) {
+    changes.push({ path: reviewRecord, action: 'remove' });
+    managed.inspected.set(reviewRecord, lineage.legacy.hash);
   }
   const result: SyncResult = {
     schemaVersion: 1,
@@ -208,6 +253,6 @@ export async function runSync(options: {
     managed.inspected.set(file, hash);
   }
   await apply(root, source.managed, managed, lineagePath);
-  await writeRest(root, merges.writes, lineageText, pinned);
+  await writeRest(root, merges.writes, lineageText, pinned, lineage.legacy !== null);
   return { ...result, status: 'synced' };
 }

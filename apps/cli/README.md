@@ -53,25 +53,16 @@ Install also writes `.clutch/lineage.json`, so `clutch sync` can continue.
 For an existing project, run from its Git root:
 
 ```sh
-bun <template clone>/apps/cli/src/main.ts review install --check --json
-bun <template clone>/apps/cli/src/main.ts review install
+bun <clutch clone>/apps/cli/src/main.ts sync --only review --check --json
+bun <clutch clone>/apps/cli/src/main.ts sync --only review
 ```
 
-This installs the shared delivery, audit, recap and verification-authoring skills,
-their Claude links and Python helpers. It does not install dependencies or copy
-the central queue or this template's generated verify executor. Use
-setup-verification afterward to author or maintain the project's own verify.
-
-Only committed template files are exported. Check is read-only and exits 2 when
-changes are planned, 1 for conflict/error and 0 when unchanged. Installation needs
-a clean target if changes are required; it stays on the current branch and leaves
-the result uncommitted for review. Repeat the same command for updates.
-
-`.review/tooling.json` records managed hashes; known legacy checksums support
-migration from older template skills. Customized shared files stop the complete
-preflight. Reconcile them explicitly and retry. Existing project verify skills
-are always preserved. Full template installation also excludes this template's
-verify; kickoff uses setup-verification for the receiving project.
+This syncs the entries that `clutch.files.yaml` tags `group: review`: the shared
+delivery, audit, recap and verification-authoring skills, their Claude links and
+the Python helpers. It does not install dependencies, and it never copies this
+template's own verify. Use setup-verification afterward to author or maintain the
+project's own verify. A scoped sync keeps the lineage of the other files, and it
+leaves the `clutch.yaml` pin alone.
 
 ## Issues
 
@@ -146,7 +137,10 @@ mise exec -- bun run clutch sync --root ../shop --latest
 - Without `--to` or `--latest`, sync uses the commit that the project's
   `clutch.yaml` pins. A sync then sets that pin to the new commit.
 - `.clutch/lineage.json` records the hash of each managed file at the last
-  sync. A project with only review tooling starts from `.review/tooling.json`.
+  sync. A project with only the older `.review/tooling.json` starts from it, and
+  sync removes that file once the lineage holds its record.
+- `known` in `clutch.files.yaml` holds the hashes of older Clutch copies. A
+  project file that matches one is unchanged, so sync may replace it.
 - `--check` changes nothing. It exits 0 when the project is up to date, 2 when a
   sync would change files or a file needs a decision, and 1 on an error.
 - A sync never commits. Commit the result on a branch, and open a PR.

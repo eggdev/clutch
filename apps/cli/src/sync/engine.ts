@@ -9,8 +9,8 @@ import { localFile, safeRelative } from '@/review-source';
  * The sync engine. It plans how a target folder moves to a set of source
  * files, and applies the plan. A file that the target changed by hand is a
  * conflict: its hash matches neither the last install record nor the
- * baseline. Writes are symlink-safe. Review install uses it, and clutch sync
- * will.
+ * baseline. Writes are symlink-safe. `clutch sync` and `clutch install` use
+ * it.
  */
 
 /** One file: its git mode, its bytes and their fingerprint. */
@@ -42,7 +42,7 @@ function managed(source: SyncSource, filename: string): boolean {
 
 export async function writeEntry(root: string, filename: string, file: SyncFile): Promise<void> {
   const target = path.join(root, filename);
-  const temporary = `${target}.review-${randomUUID()}`;
+  const temporary = `${target}.clutch-${randomUUID()}`;
   await mkdir(path.dirname(target), { recursive: true });
   try {
     if (file.mode === '120000') {
@@ -181,7 +181,7 @@ export async function apply(
   );
   if (dirty) {
     throw new Error(
-      `Commit or stash changes to review tooling before installing it; --check is read-only.\n${dirty}`,
+      `Commit or stash changes to these managed files before a sync; --check is read-only.\n${dirty}`,
     );
   }
   // Check the complete preflight again before the first mutation.
