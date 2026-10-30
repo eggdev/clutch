@@ -22,11 +22,24 @@ jobs:
     permissions:
       contents: write
     steps:
+      # A protected main takes the release push only from a bot on the ruleset's
+      # bypass list. The default token cannot be on that list, so the release uses
+      # a GitHub App token when the repository has one. Without the app, it uses
+      # the default token, which works only while main is unprotected. See
+      # docs/contributing/setup/releases.md#the-release-bot.
+      - name: Get the release bot token
+        id: bot
+        if: vars.CLUTCH_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
       # The latest main, not the pushed commit, so an earlier release commit is included.
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
+          token: ${{ steps.bot.outputs.token || github.token }}
       - uses: jdx/mise-action@v2
       # Without scripts, so the repository's git hooks stay off. The merge already
       # passed CI, and the release commit only touches the version and the changelog.
@@ -51,6 +64,7 @@ jobs:
           git add --all CHANGELOG.md package.json .changeset
           git commit --message "chore(release): v$VERSION"
           git tag "v$VERSION"
-          git push origin HEAD:main "v$VERSION"
+          # Atomic, so a refused push to main leaves no orphan tag either.
+          git push --atomic origin HEAD:main "v$VERSION"
           shopt -s nullglob
           gh release create "v$VERSION" --title "v$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" "$RUNNER_TEMP"/dist/*.tar.gz
