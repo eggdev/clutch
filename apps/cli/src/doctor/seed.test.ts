@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { detect } from '@/doctor/detect';
 import { loadRegistry } from '@/doctor/registry';
+import { gitRepo } from '@/testing/git-repo';
 
 /**
  * The status of each seed capability on the template itself, from the plan's
@@ -63,4 +64,25 @@ test('each seed capability has its expected status on the template', async () =>
     found.map((item) => [item.id, item.status]),
   );
   expect(status).toEqual(expected);
+});
+
+test('a project CLI in a root script and a verify skill under its own name are detected', async () => {
+  const root = path.resolve(import.meta.dir, '../../../..');
+  const registry = await loadRegistry(root);
+  const wanted = (registry.capabilities ?? []).filter((entry) =>
+    ['project_cli', 'verification_cli'].includes(entry.id),
+  );
+  await using repo = await gitRepo({
+    'package.json': JSON.stringify({
+      scripts: { 'control-shop': 'python3 .agents/skills/control-shop/scripts/control.py' },
+    }),
+    '.agents/skills/control-shop/verification.json': '{}',
+    '.agents/skills/control-shop/scripts/verify.py': '',
+    '.agents/skills/control-shop/features/README.md': '# Features\n',
+  });
+  const found = await detect(repo.root, wanted);
+  expect(found.map((item) => [item.id, item.status])).toEqual([
+    ['project_cli', 'present'],
+    ['verification_cli', 'present'],
+  ]);
 });
