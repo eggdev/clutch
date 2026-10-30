@@ -65,6 +65,7 @@
 /clutch.yaml @eggdev
 /.clutch/risk.yaml @eggdev
 /tools/github/ @eggdev
+/apps/cli/src/labels/ @eggdev
 /docs/contributing/capabilities/registry.yaml @eggdev
 /.clutch/doctor-baseline.json @eggdev
 /clutch.files.yaml @eggdev

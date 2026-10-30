@@ -54,6 +54,7 @@
     "clutch.yaml",
     ".clutch/risk.yaml",
     "tools/github/**",
+    "apps/cli/src/labels/**",
     "docs/contributing/capabilities/registry.yaml",
     ".clutch/doctor-baseline.json",
     "clutch.files.yaml",

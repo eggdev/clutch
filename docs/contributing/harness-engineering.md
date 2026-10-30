@@ -124,7 +124,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A release range that needs no changeset                   | `tools/check-changeset.ts`, `onlyReleases`                                      |
 | A changeset written for a Renovate PR                     | `renovate.json`, `postUpgradeTasks`                                             |
 | Files kept out of the PR size count                       | `clutch.yaml`, `pr_size.exclude`                                                |
-| Lockfiles, snapshots and `.clutch/` out of the size count | `apps/cli/src/labels/compute.ts`, `sizeExcluded`                                |
+| Lockfiles, snapshots and `.clutch/` out of the size count | `apps/cli/src/labels/compute.ts`, `sizeExcluded` (a guardrail file)             |
 
 <!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS. -->
 
