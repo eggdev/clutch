@@ -96,6 +96,15 @@ jobs:
             --model ${{ vars.CLUTCH_AGENT_MODEL || 'claude-haiku-5-5' }}
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*)"
             --json-schema '{"type":"object","properties":{"title":{"type":"string"},"body":{"type":"string"}},"required":["title","body"]}'
+      # A PR that the default token opens starts no workflows, so CI and agent
+      # review would not run on it. The release bot's token does start them.
+      - name: Get the release bot token
+        id: bot
+        if: steps.open.outputs.run == 'true' && vars.CLUTCH_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
       - name: Open the gardening pull request
         if: steps.open.outputs.run == 'true'
         env:
@@ -103,7 +112,7 @@ jobs:
           # The action's token comes from the Claude GitHub App when it is
           # installed. A PR that the default token opens starts no workflows,
           # so CI and agent review would not run on it.
-          GH_TOKEN: ${{ steps.garden.outputs.github_token || github.token }}
+          GH_TOKEN: ${{ steps.bot.outputs.token || steps.garden.outputs.github_token || github.token }}
           # Kickoff sets this repository variable to the person who reviews.
           REVIEWER: ${{ vars.GARDENING_REVIEWER }}
         run: |

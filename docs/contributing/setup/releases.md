@@ -45,8 +45,29 @@ earlier release commit. When changesets are pending, it does these steps:
 4. It publishes a GitHub release with the changelog section as its notes and
    the `clutch` binaries.
 
-With no pending changesets, the workflow ends without a release. A protected
-`main` needs a bypass for the release bot.
+With no pending changesets, the workflow ends without a release. The push is
+atomic, so a refused push to `main` leaves no tag behind.
+
+## The release bot
+
+A protected `main` refuses a direct push. Only an actor on the ruleset's bypass
+list can push the release commit, and the default Actions token cannot be on
+that list. So the release pushes with a GitHub App token, the release bot. The
+gardening workflow opens its pull request with the same token, so CI runs on
+that PR.
+
+Without the app, both workflows use the default token. That works only while
+`main` has no ruleset. Set the bot up once per repository:
+
+1. Create a private GitHub App with no webhook. Give it the repository
+   permissions Contents read and write and Pull requests read and write.
+2. Install the app on the repository.
+3. Set the `CLUTCH_APP_ID` repository variable to the app id.
+4. Generate a private key for the app. Store it as the
+   `CLUTCH_APP_PRIVATE_KEY` repository secret.
+5. Add the app to the bypass list of the `main` ruleset.
+
+<!-- kickoff: Whether this project has its own release bot app, and who holds its private key. -->
 
 ## The clutch binary
 
