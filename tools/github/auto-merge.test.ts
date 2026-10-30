@@ -116,6 +116,10 @@ test('each dry-run comment carries the marker, the verdict, the step and the rea
 
 test('no verdict while a required check runs or for a draft or a non-agent branch', () => {
   expect(noVerdictYet(facts())).toBeUndefined();
+  // A finished check, even a failed or skipped one, is no reason to wait.
+  expect(
+    noVerdictYet(facts({ checks: { validate: 'failure', 'agent-review': 'skipped' } })),
+  ).toBeUndefined();
   expect(noVerdictYet(facts({ checks: { validate: 'pending', 'agent-review': 'missing' } }))).toBe(
     'Waiting for validate, agent-review to finish.',
   );
@@ -313,4 +317,17 @@ test('the enabled marker keeps the form that clutch metrics reads', () => {
       /^<!-- automerge-enabled:(bots|low|medium):[0-9a-f]+ -->$/u,
     );
   }
+});
+
+test('no dry-run comment while a required check is still running', async () => {
+  const running = fake([
+    [
+      'gh api --paginate repos/eggdev/clutch/commits/a1b2',
+      { out: JSON.stringify({ id: 1, name: 'validate', status: 'in_progress', conclusion: null }) },
+    ],
+  ]);
+  const [line] = await decide(running, { mode: 'dry-run', step: 'low' });
+  expect(line).toContain('- The required check validate is pending.');
+  expect(line).toEndWith('No dry-run comment: Waiting for validate, agent-review to finish.');
+  expect([...merges(running.calls), ...comments(running.calls)]).toEqual([]);
 });
