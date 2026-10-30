@@ -15,7 +15,7 @@ Rank 7 of the researched practices. About seven in ten of the leading repositori
 1. Add `.clutch/risk.yaml` with rules. Each rule maps a tier to a list of path globs. The highest matching tier wins, whatever the rule order.
 2. Put guardrail files, workflows, migrations and auth code in the highest tier. Put changes to docs or tests only in the lowest tier.
 3. Add a CI job that labels each pull request with its tier, such as `risk/low`.
-4. Add a workflow that runs `gh pr merge --auto --squash` for a low-risk pull request. Require an allowed author and green required checks.
+4. Add a workflow that runs `gh pr merge --auto` for a low-risk pull request, with the merge method that the branch rules allow. Require an allowed author and green required checks. Clutch's workflow uses `--merge`, and its head-branch prefix `clutch/cl-` stands in for an allowed author.
 5. Start in a dry-run mode that comments instead of merging. Compare the comments with human judgment.
 6. On GitHub, allow auto-merge in the repository settings.
 7. Set `risk_tier_automerge` to `adopted` in `clutch.yaml`.

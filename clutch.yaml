@@ -41,6 +41,11 @@ capabilities:
   flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
   pr_size_limits: { status: waived, reason: Lands in CL-401., issue: CL-401 }
   merge_queue: { status: waived, reason: Waits for its trigger in CL-906., issue: CL-906 }
-  risk_tier_automerge: { status: waived, reason: Lands in CL-404., issue: CL-404 }
+  risk_tier_automerge: { status: waived, reason: Dry-run until CL-405 turns it on., issue: CL-405 }
   gardener_bots: adopted
   factory_observability: adopted
+# What the Auto-merge workflow does with a low-risk agent PR: off, dry-run or on.
+# dry-run comments "would auto-merge" and asks the owner for a reaction. CL-405
+# turns it on. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
+automerge:
+  mode: dry-run

@@ -8,7 +8,7 @@ Rank 63 of the researched practices. More than one third of the leading reposito
 
 ## Detection
 
-`clutch doctor` reports this capability as present when two rules pass. A workflow triggers on `workflow_run`. A workflow file mentions `log-failed`, or tests whether a conclusion is `failure`. It is partial when only one rule passes. See the `ci_failure_explainer` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when two rules pass. A workflow triggers on `workflow_run` and a step of it reads the failed log or the conclusion. A workflow file mentions `log-failed`, or tests whether a conclusion is `failure`. It is partial when only one rule passes. See the `ci_failure_explainer` entry in [the registry](./registry.yaml).
 
 ## Adopt
 

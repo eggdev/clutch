@@ -1,5 +1,6 @@
 const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
 const modes = ['sync', 'doctor'] as const;
+const automergeModes = ['off', 'dry-run', 'on'] as const;
 
 type CapabilityStatus = (typeof capabilityStatuses)[number];
 
@@ -19,6 +20,8 @@ export type ClutchConfig = {
   template: { repo: string; mode: (typeof modes)[number] };
   capabilities: Record<string, Capability>;
   worktree?: { root: string; copy: Array<string>; setup: Array<string> };
+  /** What the Auto-merge workflow does with a low-risk agent PR. */
+  automerge?: { mode: (typeof automergeModes)[number] };
 };
 
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
@@ -27,7 +30,7 @@ export type ConfigError = { path: string; message: string };
 type Errors = Array<ConfigError>;
 type Data = Record<string, unknown>;
 
-const topKeys = ['schemaVersion', 'project', 'template', 'capabilities', 'worktree'];
+const topKeys = ['schemaVersion', 'project', 'template', 'capabilities', 'worktree', 'automerge'];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
 const capabilityId = /^[a-z][a-z0-9_]*$/u;
 const issuePattern = /^CL-\d{3}[a-z]?$/u;
@@ -172,6 +175,19 @@ function readWorktree(value: unknown, errors: Errors) {
     : undefined;
 }
 
+function readAutomerge(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'automerge', message: 'Expected a map with mode.' });
+    return;
+  }
+  unknownKeys(value, ['mode'], 'automerge', errors);
+  if (!oneOf(automergeModes, value.mode)) {
+    errors.push({ path: 'automerge.mode', message: `Expected ${automergeModes.join(', ')}.` });
+    return;
+  }
+  return { mode: value.mode };
+}
+
 /** Checks parsed `clutch.yaml` data. Returns the typed config only when there is no error. */
 export function validateClutchConfig(data: unknown): { config?: ClutchConfig; errors: Errors } {
   const errors: Errors = [];
@@ -188,6 +204,8 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   const template = readTemplate(data.template, errors);
   const capabilities = readCapabilities(data.capabilities, errors);
   const worktree = data.worktree === undefined ? undefined : readWorktree(data.worktree, errors);
+  const automerge =
+    data.automerge === undefined ? undefined : readAutomerge(data.automerge, errors);
   if (errors.length > 0 || !template) {
     return { errors };
   }
@@ -199,6 +217,9 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   };
   if (worktree) {
     config.worktree = worktree;
+  }
+  if (automerge) {
+    config.automerge = automerge;
   }
   return { config, errors };
 }

@@ -160,7 +160,13 @@ worktree: # optional
   root: ../shop.worktrees
   copy: [.env.local]
   setup: ['mise exec -- bun install']
+automerge: # optional
+  mode: dry-run # off (the default), dry-run or on
 ```
+
+`automerge.mode` tells the Auto-merge workflow what to do with a low-risk agent
+PR. See
+[auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
 
 The loader rejects unknown keys. Each error names its YAML path, such as
 `template.mode` or `capabilities.codeql_sast.reason`. An older `clutch.yaml`
