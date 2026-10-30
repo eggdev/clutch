@@ -320,3 +320,19 @@ test('sync stops on a conflict outside the tracker', async () => {
   );
   expect(gh.calls).not.toContain('bun run validate');
 });
+
+const releaseLookup = (err: string) =>
+  fake([
+    trunk,
+    ['gh pr view 12 --json mergeCommit', { out: 'm3rge' }],
+    ['gh pr view 12', { out: '{"baseRefName":"main","headRefName":"cl-024"}' }],
+    ['gh pr list --state open --base cl-024', { out: '[]' }],
+    ['gh run list --workflow release.yml', { ok: false, err }],
+  ]);
+
+test('merge passes without release.yml, and fails when it cannot read the release runs', async () => {
+  const missing = releaseLookup('HTTP 404: workflow release.yml not found on the default branch');
+  expect(await runPr(['merge', '12'], missing.run, noWrite, fakeClock())).toBe(0);
+  const offline = releaseLookup('error connecting to api.github.com');
+  expect(await runPr(['merge', '12'], offline.run, noWrite, fakeClock())).toBe(1);
+});

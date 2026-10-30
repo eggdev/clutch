@@ -29,7 +29,10 @@ async function awaitRelease(
       'headSha,status,conclusion,url',
     ]);
     if (!list.ok) {
-      return { code: 0, message: `No release workflow to wait for: ${list.err.trim()}` };
+      // Only a missing workflow means no release. Auth, network or rate limits fail the wait.
+      return /HTTP 404|workflow .* not found/iu.test(list.err)
+        ? { code: 0, message: 'This repository has no release.yml, so no release to wait for.' }
+        : { code: 1, message: `Could not read the release runs: ${list.err.trim()}` };
     }
     const found = (JSON.parse(list.out || '[]') as Array<ReleaseRun>).find(
       (item) => item.headSha === options.sha,
