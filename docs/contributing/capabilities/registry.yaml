@@ -19,7 +19,7 @@ capabilities:
   - id: nested_agent_rules
     name: Nested / scoped agent rules
     category: Agent context
-    phase: P3
+    phase: P5
     level: core
     effort: S
     research:
@@ -50,7 +50,7 @@ capabilities:
   - id: friction_log
     name: Friction logs / agent learnings file
     category: Scale loops
-    phase: P3
+    phase: P4
     level: core
     effort: S
     research:
@@ -210,7 +210,7 @@ capabilities:
   - id: ratchets
     name: Ratchets / shrink-only baselines
     category: Lint & guardrails
-    phase: P3
+    phase: P4
     level: core
     effort: M
     research:
@@ -392,7 +392,7 @@ capabilities:
   - id: worktree_parallel
     name: Worktree / parallel-agent workspace setup
     category: Parallel work
-    phase: P2
+    phase: P3
     level: core
     effort: M
     research:
@@ -410,7 +410,7 @@ capabilities:
   - id: cloud_agent_vm
     name: Cloud-agent VM / sandbox setup in repo
     category: Parallel work
-    phase: P2
+    phase: P3
     level: core
     effort: M
     research:
@@ -427,7 +427,7 @@ capabilities:
   - id: mcp_config
     name: Repo MCP config for agents
     category: Parallel work
-    phase: P2
+    phase: P3
     level: extra
     effort: S
     research:
@@ -466,7 +466,7 @@ capabilities:
   - id: ai_review_blocking
     name: AI review findings gate merge (severity / triage)
     category: Review & merge
-    phase: P3
+    phase: P2
     level: core
     effort: M
     research:
@@ -482,7 +482,7 @@ capabilities:
   - id: ci_failure_explainer
     name: CI failure explainer / investigation agent
     category: Review & merge
-    phase: P3
+    phase: P4
     level: extra
     effort: M
     research:
@@ -499,7 +499,7 @@ capabilities:
   - id: flaky_quarantine
     name: Flaky-test quarantine / registry
     category: Verification
-    phase: P3
+    phase: P4
     level: core
     effort: M
     research:
@@ -514,7 +514,7 @@ capabilities:
   - id: flake_hunter
     name: Flake hunters / test audit loops
     category: Scale loops
-    phase: P5
+    phase: P4
     level: extra
     effort: M
     research:
@@ -530,7 +530,7 @@ capabilities:
   - id: pr_size_limits
     name: PR size limits / size labels
     category: Review & merge
-    phase: P4
+    phase: P1
     level: core
     effort: S
     research:
@@ -549,7 +549,7 @@ capabilities:
   - id: merge_queue
     name: Merge queue / merge trains
     category: Review & merge
-    phase: P4
+    phase: P5
     level: core
     effort: S
     research:
@@ -564,7 +564,7 @@ capabilities:
   - id: risk_tier_automerge
     name: Risk-tiered / scoped auto-merge or auto-approve
     category: Review & merge
-    phase: P4
+    phase: P2
     level: core
     effort: L
     research:
@@ -600,7 +600,7 @@ capabilities:
   - id: factory_observability
     name: Factory telemetry (agent spend, CI timing, quality signals)
     category: Scale loops
-    phase: P5
+    phase: P1
     level: extra
     effort: M
     research:

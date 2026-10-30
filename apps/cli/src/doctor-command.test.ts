@@ -87,11 +87,10 @@ test('--phase narrows the report, and a bad clutch.yaml exits 1 with its path', 
   });
 
   await repo.write({ 'clutch.yaml': config });
-  const p4 = await doctor('--root', repo.root, '--phase', 'P4', '--json');
-  const { results } = JSON.parse(p4.stdout);
+  const p2 = await doctor('--root', repo.root, '--phase', 'P2', '--json');
+  const { results } = JSON.parse(p2.stdout);
   expect(results.map((item: { id: string }) => item.id)).toEqual([
-    'pr_size_limits',
-    'merge_queue',
+    'ai_review_blocking',
     'risk_tier_automerge',
   ]);
 });

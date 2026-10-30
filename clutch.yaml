@@ -45,7 +45,7 @@ capabilities:
   flaky_quarantine: { status: waived, reason: Lands in CL-304., issue: CL-304 }
   flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
   pr_size_limits: { status: waived, reason: Lands in CL-401., issue: CL-401 }
-  merge_queue: { status: waived, reason: Lands in CL-405., issue: CL-405 }
+  merge_queue: { status: waived, reason: Waits for its trigger in CL-906., issue: CL-906 }
   risk_tier_automerge: { status: waived, reason: Lands in CL-404., issue: CL-404 }
   gardener_bots: adopted
   factory_observability: { status: waived, reason: Lands in CL-503., issue: CL-503 }
