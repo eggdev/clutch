@@ -269,8 +269,13 @@ test('ready marks the issue done through tools/clutch.ts, commits and pushes', a
   ]);
 });
 
-const syncAnswers = (rebase: Array<Partial<Result>>, conflicted: Array<Partial<Result>>) =>
+const syncAnswers = (
+  rebase: Array<Partial<Result>>,
+  conflicted: Array<Partial<Result>>,
+  extra: Array<[string, Partial<Result>]> = [],
+) =>
   fake([
+    ...extra,
     trunk,
     [
       'gh pr view 7',
@@ -348,4 +353,46 @@ test('merge passes without release.yml, and fails when it cannot read the releas
   expect(await runPr(['merge', '12'], missing.run, noWrite, fakeClock())).toBe(0);
   const offline = releaseLookup('error connecting to api.github.com');
   expect(await runPr(['merge', '12'], offline.run, noWrite, fakeClock())).toBe(1);
+});
+
+test('sync replays only its own commits when the stack base moved under it', async () => {
+  const gh = syncAnswers(
+    [{ ok: true }],
+    [{ out: '' }],
+    [
+      ['git config --get branch.clutch/cl-117-pr-lifecycle.clutchForkPoint', { out: 'old1234\n' }],
+      ['git merge-base --is-ancestor old1234 origin/main', { ok: false }],
+      ['git merge-base HEAD origin/main', { out: 'new5678\n' }],
+    ],
+  );
+  const original = console.log;
+  console.log = () => {};
+  try {
+    expect(await runPr(['sync', '7'], gh.run, noWrite)).toBe(0);
+  } finally {
+    console.log = original;
+  }
+  expect(gh.calls).toContain('git rebase --onto origin/main old1234');
+  expect(gh.calls).not.toContain('git rebase origin/main');
+  expect(gh.calls).toContain(
+    'git config branch.clutch/cl-117-pr-lifecycle.clutchForkPoint new5678',
+  );
+});
+
+test('failures reports a job log that GitHub no longer has', async () => {
+  const gh = fake([
+    ['gh pr view 7', view([check('validate', 'CANCELLED'), check('agent-review', 'SUCCESS')])],
+    rules,
+    comments(),
+    ['gh api repos/{owner}/{repo}/actions/jobs/8/logs', { ok: false, err: 'gh: HTTP 404' }],
+  ]);
+  const logged: Array<string> = [];
+  const original = console.log;
+  console.log = (text: string) => logged.push(text);
+  try {
+    expect(await runPr(['failures', '7'], gh.run, noWrite)).toBe(0);
+  } finally {
+    console.log = original;
+  }
+  expect(logged.join('\n')).toContain('The log is not available: gh: HTTP 404');
 });

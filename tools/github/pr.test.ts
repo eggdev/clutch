@@ -217,7 +217,7 @@ test('open adds a changeset from the title when the branch has none, and keeps a
   expect(written).toEqual(['.changeset/cl-032.md']);
   expect(bare.calls).toContain('git add .changeset/cl-032.md');
   expect(bare.calls).toContain(
-    'git commit --quiet --message chore(changeset): add a minor changeset for this PR',
+    'git commit --quiet --message chore(changeset): add a minor changeset for this PR -- .changeset/cl-032.md',
   );
 
   written.length = 0;

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { ready, sync } from '@tools/github/branch';
+import { ready, recordForkPoint, sync } from '@tools/github/branch';
 import { failures, renderFailures } from '@tools/github/failures';
 import { defaultBranch, duration, must, prWithHead, realClock } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
@@ -134,6 +134,9 @@ async function ensureChangeset(
     '--quiet',
     '--message',
     `chore(changeset): add a ${bump} changeset for this PR`,
+    // Only the changeset. Anything else that is staged stays staged.
+    '--',
+    file,
   ]);
 }
 
@@ -204,6 +207,7 @@ async function open(
       await must(run, ['gh', 'pr', 'ready', String(opened.number)]);
     }
   } else {
+    await recordForkPoint(run, branch, base);
     const below = await stackChain(base, trunk, (head) => prWithHead(run, head));
     await must(
       run,
