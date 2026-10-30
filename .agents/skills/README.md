@@ -14,6 +14,8 @@ global skills or other repositories when maintaining this suite.
   committed verify executor and its journeys. This is the only authoring entry point.
 - [verify](./verify/SKILL.md): execute this project's existing proof and cleanup.
 - [audit-codebase](./audit-codebase/SKILL.md): investigate code risks and report findings.
+- [babysit-pr](./babysit-pr/SKILL.md): drive one open PR to green: classify each
+  failure, rerun a flaky job once, fix real ones, answer findings, stop after 3 rounds.
 - [run-lanes](./run-lanes/SKILL.md): coordinate agent lanes that deliver issues in
   parallel: split by file ownership, brief, reserve ids, merge in a train.
 - [pr-recap](./pr-recap/SKILL.md): on explicit request, explain a PR diff. It adds
