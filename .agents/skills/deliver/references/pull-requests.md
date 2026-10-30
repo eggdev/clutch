@@ -43,6 +43,9 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 
 ## Follow a pull request to green
 
+Between open and merge, use the [babysit-pr](../../babysit-pr/SKILL.md) skill.
+It decides what to do with each failure, on top of the commands below.
+
 | Command                                 | When to use it                                                                                                              |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `bun run pr status <number> [--json]`   | Before each decision. It shows the required checks, the agent review's blocking count, the dry-run verdict and the mergeable state at the head commit. |

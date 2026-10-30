@@ -27,7 +27,9 @@ its options, and so does `bun run pr --help`.
 
 ## The pull request loop
 
-See [pull requests](./pull-requests.md) for the rules behind each one.
+See [pull requests](./pull-requests.md) for the rules behind each one. The
+[babysit-pr](../../babysit-pr/SKILL.md) skill strings them into rounds that
+take a PR to green.
 
 | Command                                                  | Use it when                                          | It replaces                                     |
 | -------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------- |

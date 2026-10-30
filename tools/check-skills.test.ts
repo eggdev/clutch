@@ -113,3 +113,17 @@ test('the run-lanes skill keeps its contract and covers each part of a lane laun
   const prose = text.replaceAll(/CL-\d{3}\.\.CL-\d{3}/gu, '');
   expect(prose).not.toMatch(/\.clutch\/PLAN\.md|\bCL-\d{3}\b|#\d{2,}\b/u);
 });
+
+test('the babysit-pr skill keeps its contract, its round limit and its pr commands', () => {
+  const root = path.resolve(import.meta.dir, '..');
+  expect(checkSkills(root).filter((error) => error.startsWith('babysit-pr'))).toEqual([]);
+  const text = readFileSync(path.join(root, '.agents/skills/babysit-pr/SKILL.md'), 'utf-8');
+  for (const command of ['pr wait', 'pr status', 'pr sync', 'pr failures', 'pr open']) {
+    expect(text).toContain(`bun run ${command}`);
+  }
+  for (const word of ['Flaky', 'Real', 'Setup', 'Stop after 3 rounds', 'Babysit report']) {
+    expect(text).toContain(word);
+  }
+  // It reaches every project, so it names no Clutch-only file, issue or PR.
+  expect(text).not.toMatch(/\.clutch\/PLAN\.md|\bCL-\d{3}\b|#\d{2,}\b/u);
+});
