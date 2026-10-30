@@ -79,6 +79,10 @@ test('the blocking count reads each way the agent words it', () => {
   expect(blockingCount('## Agent review\n\n**Blocking findings: 0**')).toBe(0);
   expect(blockingCount('## Agent review\n\nFindings: 3 (2 blocking)')).toBe(2);
   expect(blockingCount('## Agent review\n\nFindings, 1 blocking:')).toBe(1);
+  expect(blockingCount('## Agent review\n\nRules: review.md\n\n**Blocking: 0**\n\n- note: x')).toBe(
+    0,
+  );
+  expect(blockingCount('## Agent review\n\nFindings, 0 blocking:\n\n- 2 notes')).toBe(0);
   expect(blockingCount('## Agent review\n\nNo findings.')).toBe(0);
   expect(blockingCount('## Agent review\n\nSomething else.')).toBeNull();
 });

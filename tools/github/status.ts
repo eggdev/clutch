@@ -45,12 +45,16 @@ function checkOf(item: Rollup): Check {
 
 /**
  * The blocking count in an agent review comment. The agent words it in several
- * ways: "Blocking findings: 0", "Findings: 1 (0 blocking)" or "0 blocking".
+ * ways: "Blocking findings: 0", "Blocking: 0", "Findings: 1 (0 blocking)" or
+ * "0 blocking".
  */
 export function blockingCount(body: string) {
   const text = body.replaceAll('*', '');
   const match =
-    /blocking findings:?\s*(\d+)/iu.exec(text) ?? /(\d+)\s+blocking\b/iu.exec(text) ?? undefined;
+    /blocking(?: findings)?:\s*(\d+)/iu.exec(text) ??
+    /blocking findings\s+(\d+)/iu.exec(text) ??
+    /(\d+)\s+blocking\b/iu.exec(text) ??
+    undefined;
   if (match) {
     return Number(match[1]);
   }
@@ -144,13 +148,22 @@ export async function prStatus(run: Run, number: string) {
     required,
     checks: all,
     counts: { pass: count('pass'), fail: count('fail'), pending: count('pending') },
-    agentReview: { blocking },
+    agentReview: { posted: review !== undefined, blocking },
     dryRun: dryRun ? verdict(dryRun.body) : null,
     ready,
   };
 }
 
 export type PrStatus = Awaited<ReturnType<typeof prStatus>>;
+
+function reviewLine(review: { posted: boolean; blocking: number | null }) {
+  if (!review.posted) {
+    return 'no review yet';
+  }
+  return review.blocking === null
+    ? 'posted, but its blocking count is unreadable'
+    : `${review.blocking} blocking`;
+}
 
 /** The status as a short block. */
 export function renderStatus(status: PrStatus) {
@@ -162,7 +175,7 @@ export function renderStatus(status: PrStatus) {
     `Head ${status.head.slice(0, 7)} into ${status.base}. ${status.state}, ${status.mergeable} (${status.mergeState}).`,
     `Required: ${status.required.map((check) => `${check.name} ${check.state}`).join(', ') || 'none'}`,
     `Checks: ${status.counts.pass} pass, ${status.counts.fail} fail, ${status.counts.pending} pending${failing.length > 0 ? ` (failed: ${failing.join(', ')})` : ''}`,
-    `Agent review: ${status.agentReview.blocking === null ? 'no review yet' : `${status.agentReview.blocking} blocking`}`,
+    `Agent review: ${reviewLine(status.agentReview)}`,
     `Dry run: ${status.dryRun ? `${status.dryRun} auto-merge at ${status.head.slice(0, 7)}` : 'no verdict for this head'}`,
     `Ready to merge: ${status.ready ? 'yes' : 'no'}`,
   ].join('\n');
