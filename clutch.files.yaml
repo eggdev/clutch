@@ -22,6 +22,8 @@ files:
     capability: git_hooks
   - path: .github/workflows/
     rule: managed
+  - path: .github/actionlint.yaml
+    rule: managed
   - path: .github/ISSUE_TEMPLATE/
     rule: managed
   - path: .github/pull_request_template.md

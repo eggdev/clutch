@@ -235,6 +235,13 @@
         },
         "cache": false
       },
+      "check-workflow-lint": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "actionlint && zizmor --min-severity medium .github/workflows"
+        },
+        "cache": false
+      },
       "check-dependency-overrides": {
         "executor": "nx:run-commands",
         "options": {
@@ -268,6 +275,7 @@
           "check-kickoff-slots",
           "check-primitives",
           "check-workflows",
+          "check-workflow-lint",
           "check-dependency-overrides",
           "check-user-docs",
           "knip",

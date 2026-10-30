@@ -66,6 +66,7 @@ tests the workflow and dependency checks.
 | `check-kickoff-slots`        | A kickoff slot left in a doc after `KICKOFF.md` is deleted                                                                                                                                                      |
 | `check-primitives`           | A broken [registry](../architecture/primitives.yaml) entry, or an Nx project with no primitive                                                                                                                  |
 | `check-workflows`            | A step or job reference that names nothing, a missing `permissions` block, `pull_request_target`, an unpinned `uses:`                                                                                           |
+| `check-workflow-lint`        | actionlint errors, shellcheck findings in `run:` scripts, and zizmor findings of medium severity or higher                                                                                                      |
 | `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)                                                                                                                            |
 | `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md)                                                                                                              |
 | `check-guardrail-coverage`   | A file that a check, a lint plugin or a hook reads, with no pattern in `tools/guardrail-files.json`. See [guardrail files](../harness-engineering.md#guardrail-files)                                           |
@@ -232,6 +233,14 @@ touches. It runs `clutch risk` from the base branch, with the rules in
   doctor workflow, pins a SHA too. Only a local `./` path needs no pin.
   `check-workflows` rejects any other `uses:`, and its message names the
   `gh api` command that prints the SHA.
+- `check-workflow-lint` runs actionlint and zizmor, at the versions in
+  `mise.toml`. actionlint finds broken expressions and shell mistakes. zizmor
+  finds unsafe patterns, such as an expression inside a `run:` script, a
+  checkout that keeps its token, or an app token with every permission of the
+  app. Pass an expression to a script through `env:`. Fix a finding, or narrow
+  a permission. Do not add an ignore without the owner's approval.
+  [`.github/actionlint.yaml`](../../../.github/actionlint.yaml) names the
+  runner images that actionlint does not know yet.
 - Each workflow sets a top-level `permissions` block. Start from
   `contents: read`, and grant more only in the job that needs it.
 - A PR from a fork never gets a token that writes, such as a cache write token

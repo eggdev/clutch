@@ -1,0 +1,6 @@
+# actionlint's built-in runner list lags GitHub's images. Each label below is a
+# GitHub-hosted image that the workflows name. See
+# docs/contributing/setup/checks.md#ci.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

@@ -33,6 +33,7 @@
 /.githooks/ @eggdev
 /.github/workflows/ @eggdev
 /.github/CODEOWNERS @eggdev
+/.github/actionlint.yaml @eggdev
 /KICKOFF.md @eggdev
 /tsconfig.json @eggdev
 /apps/*/tsconfig*.json @eggdev

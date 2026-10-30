@@ -107,6 +107,9 @@ jobs:
         with:
           app-id: ${{ vars.CLUTCH_APP_ID }}
           private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          # Only the branch push and the pull request. The app has more permissions.
+          permission-contents: write
+          permission-pull-requests: write
       - name: Open the gardening pull request
         if: steps.open.outputs.run == 'true'
         env:
@@ -117,6 +120,7 @@ jobs:
           GH_TOKEN: ${{ steps.bot.outputs.token || steps.garden.outputs.github_token || github.token }}
           # Kickoff sets this repository variable to the person who reviews.
           REVIEWER: ${{ vars.GARDENING_REVIEWER }}
+          BASE: ${{ github.event.repository.default_branch }}
         run: |
           if [ -z "$RESULT" ]; then
             echo "::error title=Gardening gave no result::The gardening step returned no structured output. Read its log."
@@ -134,7 +138,7 @@ jobs:
           git switch --create "$branch"
           # Each PR carries a changeset, as tools/github/pr.ts writes it: feat is
           # a minor bump, "!" is a major one, and the rest are a patch.
-          bump=patch
+          bump='patch'
           case "$title" in
             *'!:'*) bump=major ;;
             feat*) bump=minor ;;
@@ -144,6 +148,6 @@ jobs:
           git add --all
           git commit --message "$title"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
-          gh pr create --repo "$GITHUB_REPOSITORY" --base "${{ github.event.repository.default_branch }}" \
+          gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE" \
             --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/gardening-body.md" \
             ${REVIEWER:+--reviewer "$REVIEWER"}
