@@ -177,6 +177,10 @@ CI or agent review. See [the release bot](./setup/releases.md#the-release-bot).
 The agent runs on the model that the `CLUTCH_AGENT_MODEL` repository variable
 names, or on `claude-haiku-5-5` when it is unset. The workflow adds a
 changeset from the PR title, and agent review reviews the PR like any other.
+A second job, `calibration`, needs no credential. It opens or updates the
+issue "Auto-merge calibration: week of <date>", which lists each auto-merge
+dry-run verdict the owner has not graded. See
+[grade the verdicts](../../.agents/skills/deliver/references/pull-requests.md#grade-the-verdicts).
 The pass:
 
 1. Read the review comments of the week's merged PRs. Find a comment that
