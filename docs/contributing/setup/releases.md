@@ -22,6 +22,8 @@ feat(cli): add clutch init
 - `mise exec -- bun run pr open` writes the changeset from the conventional PR
   title when the branch has none. `fix` gives `patch`, `feat` gives `minor`,
   and `!` gives `major`.
+- The gardening workflow writes its PR's changeset the same way, from the
+  title the agent returns.
 - `check-changeset` fails a change outside `.clutch/` that has no changeset.
 
 ## Versions and the changelog

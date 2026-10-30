@@ -88,7 +88,9 @@ jobs:
             - Each cleanup issue that your edits close gets a "Closes #N" line
               in the body.
 
-            Return a pull request title and a body in Markdown. The body lists
+            Return a pull request title and a body in Markdown. The title is a
+            Conventional Commit of 72 characters or fewer, such as
+            "docs(review): drop a rule that a check covers". The body lists
             each edit and its reason, and each proposal. When the week needs
             no edit, return an empty title.
           # The cheapest model unless the CLUTCH_AGENT_MODEL repository variable names another one.
@@ -130,6 +132,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch --create "$branch"
+          # Each PR carries a changeset, as tools/github/pr.ts writes it: feat is
+          # a minor bump, "!" is a major one, and the rest are a patch.
+          bump=patch
+          case "$title" in
+            *'!:'*) bump=major ;;
+            feat*) bump=minor ;;
+          esac
+          printf -- '---\n"%s": %s\n---\n\n%s\n' "$(jq -r .name package.json)" "$bump" "$title" \
+            > ".changeset/gardening-$(date -u +%Y-%m-%d).md"
           git add --all
           git commit --message "$title"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
