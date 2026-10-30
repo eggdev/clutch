@@ -4,7 +4,7 @@
 #
 #   jobs:
 #     clutch:
-#       uses: eggdev/project-template/.github/workflows/clutch-doctor.yml@<commit>
+#       uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@<commit>
 #
 # See apps/cli/README.md#use-clutch-in-another-repository.
 name: Clutch doctor

@@ -187,14 +187,13 @@ runs `clutch doctor --check`, and runs `clutch sync --check` in `sync` mode:
 ```yaml
 jobs:
   clutch:
-    uses: eggdev/project-template/.github/workflows/clutch-doctor.yml@<commit>
+    uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@<commit>
 ```
 
 Pin `<commit>` to a Clutch commit, as with any action. The `template.commit`
 in `clutch.yaml` must be a Clutch commit that has `clutch doctor`. An older
 pin fails with "Unexpected argument 'doctor'". Pass `with: { root: <folder> }`
-when `clutch.yaml` is not at the repository root. The repository moves to
-`eggdev/clutch` after the rename in CL-006.
+when `clutch.yaml` is not at the repository root.
 
 ## Doctor
 

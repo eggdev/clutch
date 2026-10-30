@@ -2,7 +2,7 @@
 schemaVersion: 1
 project: clutch
 template:
-  repo: eggdev/project-template
+  repo: eggdev/clutch
   commit: 136c5a6eb67855a647f49240832bbed68fd0617a
   # The template is the source of Clutch, so doctor checks it and sync never runs on it.
   mode: doctor

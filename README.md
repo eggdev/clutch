@@ -48,7 +48,7 @@ Make each new part with a generator, such as
 ## Start a project
 
 ```sh
-gh repo create <name> --private --template eggdev/project-template --clone
+gh repo create <name> --private --template eggdev/clutch --clone
 cd <name>
 mise install && mise exec -- bun install
 # Open this folder in your agent interface and run the kickoff skill.
