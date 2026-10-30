@@ -1,0 +1,68 @@
+# Runs clutch doctor --check, and sync --check in sync mode, for another
+# repository. It uses the Clutch commit that the caller's clutch.yaml pins, so a
+# project is checked by the Clutch it adopted. A caller adds one job:
+#
+#   jobs:
+#     clutch:
+#       uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@<commit>
+#
+# See apps/cli/README.md#use-clutch-in-another-repository.
+name: Clutch doctor
+
+on:
+  workflow_call:
+    inputs:
+      root:
+        description: The folder in the caller's repository that holds clutch.yaml.
+        type: string
+        default: .
+
+# Read-only. The job checks out the caller and Clutch, and writes nothing.
+permissions:
+  contents: read
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read the Clutch pin from clutch.yaml
+        id: pin
+        env:
+          ROOT: ${{ inputs.root }}
+        run: |
+          config="$ROOT/clutch.yaml"
+          if [ ! -f "$config" ]; then
+            echo "::error title=No clutch.yaml::$config is missing. Run clutch init first."
+            exit 1
+          fi
+          {
+            echo "repo=$(yq -r '.template.repo' "$config")"
+            echo "commit=$(yq -r '.template.commit' "$config")"
+            echo "mode=$(yq -r '.template.mode' "$config")"
+          } >> "$GITHUB_OUTPUT"
+      # Clutch lives under the workspace, because actions/checkout writes only there.
+      # git ls-files skips it, so doctor never counts it as the caller's files.
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pin.outputs.repo }}
+          ref: ${{ steps.pin.outputs.commit }}
+          path: .clutch-checkout
+          persist-credentials: false
+      - uses: jdx/mise-action@v2
+        with:
+          working_directory: .clutch-checkout
+      - name: Install Clutch
+        working-directory: .clutch-checkout
+        run: bun install --frozen-lockfile
+      - name: clutch doctor --check
+        env:
+          ROOT: ${{ inputs.root }}
+        run: bun .clutch-checkout/apps/cli/src/main.ts doctor --check --root "$ROOT"
+      - name: clutch sync --check
+        if: steps.pin.outputs.mode == 'sync'
+        env:
+          ROOT: ${{ inputs.root }}
+        run: bun .clutch-checkout/apps/cli/src/main.ts sync --check --root "$ROOT"

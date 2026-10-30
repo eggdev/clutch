@@ -152,8 +152,12 @@ capabilities:
     detect:
       - any:
           - grep:
-              files: apps/*/package.json
+              files: '{apps,packages,tools}/*/package.json'
               pattern: '"bin"'
+          # A root script that runs a file named cli or control, such as control.py or catalog/cli.ts.
+          - grep:
+              files: package.json
+              pattern: '[\w./-]*(cli|control)\.(ts|mts|mjs|js|py)"'
           - file: justfile
           - file: Makefile
   - id: verification_cli
@@ -168,10 +172,12 @@ capabilities:
       adoption_top: 0.48
     doc: docs/contributing/capabilities/verification-cli.md
     detect:
+      # The verify skill, or a project skill with the same parts under its own name.
       - any:
-          - file: .agents/skills/verify/verification.json
+          - file: .agents/skills/*/verification.json
           - file: tools/verification/verify.py
-      - file: .agents/skills/verify/features/*.md
+          - file: .agents/skills/*/scripts/verify.py
+      - file: .agents/skills/*/features/*.md
   - id: custom_lint_plugin
     name: In-repo custom lint plugin / rules
     category: Lint & guardrails
@@ -340,7 +346,16 @@ capabilities:
               pattern: minimumReleaseAge
           - grep:
               files: .npmrc
-              pattern: minimum-release-age
+              pattern: min-release-age
+          - grep:
+              files: pnpm-workspace.yaml
+              pattern: minimumReleaseAge
+          - grep:
+              files: .yarnrc.yml
+              pattern: npmMinimalAgeGate
+          - grep:
+              files: .github/dependabot.y*ml
+              pattern: cooldown
   - id: ci_security_lint
     name: GitHub Actions security lint (zizmor / actionlint / pinned actions)
     category: Trust

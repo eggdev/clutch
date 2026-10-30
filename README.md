@@ -48,7 +48,7 @@ Make each new part with a generator, such as
 ## Start a project
 
 ```sh
-gh repo create <name> --private --template eggdev/project-template --clone
+gh repo create <name> --private --template eggdev/clutch --clone
 cd <name>
 mise install && mise exec -- bun install
 # Open this folder in your agent interface and run the kickoff skill.
@@ -65,14 +65,14 @@ the code and leaves unknowns open.
 From the receiving project's root, use a current committed template clone:
 
 ```sh
-bun <clutch clone>/apps/cli/src/main.ts review install --check --json
-bun <clutch clone>/apps/cli/src/main.ts review install
+bun <clutch clone>/apps/cli/src/main.ts sync --only review --check --json
+bun <clutch clone>/apps/cli/src/main.ts sync --only review
 ```
 
 Then ask the agent to use setup-verification to author the project's committed
-`.agents/skills/verify/SKILL.md`. Updates use the same install command; customized
-shared files require reconciliation. Review installation does not switch branches
-or replace product configuration. See [the CLI](./apps/cli/README.md) and
+`.agents/skills/verify/SKILL.md`. Updates use the same command. A shared file
+that the project edited needs the owner's keep-or-take decision. A review sync
+does not switch branches or replace product configuration. See [the CLI](./apps/cli/README.md) and
 [review architecture](./docs/contributing/architecture/review-runtime.md).
 
 ## What is universal and what is per project
@@ -98,6 +98,7 @@ with a plain copy.
 mise install
 mise exec -- bun install
 mise exec -- bun run validate
+mise exec -- bun run clutch doctor   # which capabilities this repository has
 ```
 
 <!-- kickoff: The command that starts the app, and the URL to open. -->

@@ -27,7 +27,7 @@ Docs follow ASD-STE100 Simplified Technical English, but not every rule.
 | Tier             | One of the three top folders: `apps/`, `features/` and `packages/`. See [architecture](./architecture/index.md#tiers).                           | layer, level                       |
 | App              | A runnable program in `apps/`. It holds routes, the composition root and runtime configuration. Nothing imports an app.                          | application package                |
 | Feature          | One folder in `features/` with the gate, the screens and the components of one area of the product.                                              | page module                        |
-| Package          | One folder in `packages/` that owns one capability, with its records and vendors.                                                                | library, domain, module (for this) |
+| Package          | One folder in `packages/` that owns one area of the product, with its records and vendors.                                                       | library, domain, module (for this) |
 | Tool             | A package or an app that is template tooling, such as `packages/runtime`. The product rules for Effect do not apply to it.                       | utility package                    |
 | Section          | One folder in a package, such as `types/` or `repo/`, with a fixed role. See [package sections](./architecture/index.md#package-sections).       | layer                              |
 | Public section   | A section that code outside its package can import.                                                                                              | exported layer                     |
@@ -130,6 +130,15 @@ These terms come from the
 | Provider  | A React context provider                         | vendor, for a third party                |
 | Store     | Never alone. Name which one                      | local store, object pool, local database |
 | View      | Nothing. It has too many meanings                | screen, component                        |
+
+## Clutch
+
+| Term       | Meaning                                                                                                                                                  | Do not use                 |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| Clutch     | This template repository and its CLI, `clutch`. A project adopts one Clutch commit and pins it in `clutch.yaml`.                                         | the template (for the CLI) |
+| Capability | A practice that `clutch doctor` detects, listed in the [capability registry](./capabilities/registry.yaml). See [capabilities](./capabilities/index.md). | feature, check (for this)  |
+| Waiver     | A `waived` decision for a capability in `clutch.yaml`. It needs a reason, and it can end with an issue or a date.                                        | exception, exemption       |
+| Lineage    | `.clutch/lineage.json`: the hash of each managed file at the last sync or install. Sync compares a project file with it.                                 | manifest (for this)        |
 
 ## Rejected words
 

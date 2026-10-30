@@ -12,6 +12,8 @@ export type Context = {
   root: string;
   files: Array<string>;
   remote: boolean;
+  /** Evaluates a `remote:` rule against GitHub. Only `--remote` provides it. */
+  probe?: (name: string) => Promise<RuleResult>;
   read: (file: string) => Promise<string | undefined>;
 };
 
@@ -186,9 +188,11 @@ const evaluators: Record<string, Evaluator> = {
       ? pass([`${rule.yaml.file} ${rule.yaml.path}`])
       : fail;
   },
-  // A remote probe reads GitHub. CL-020 adds the probes behind --remote.
-  remote: (rule: { remote: string }) =>
-    Promise.resolve({ outcome: 'unknown', evidence: [`remote ${rule.remote} not checked`] }),
+  // A remote probe reads GitHub, and only with --remote.
+  remote: (rule: { remote: string }, ctx: Context) =>
+    ctx.remote && ctx.probe
+      ? ctx.probe(rule.remote)
+      : Promise.resolve({ outcome: 'unknown', evidence: [`remote ${rule.remote} not checked`] }),
 };
 
 /** Evaluates one rule against the repository in `ctx`. */

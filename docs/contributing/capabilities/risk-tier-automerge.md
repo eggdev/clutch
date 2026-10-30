@@ -1,0 +1,25 @@
+# Risk-tiered / scoped auto-merge or auto-approve
+
+Risk-tiered auto-merge gives each pull request a risk tier from the paths it touches, and merges the low-risk ones without a person.
+
+## Why
+
+Rank 7 of the researched practices. About seven in ten of the leading repositories use it (70%). A person cannot read each agent pull request. Tiers keep human review for the risky paths, and let a docs or test change merge after its checks pass.
+
+## Detection
+
+`clutch doctor` reports this capability as present when three rules pass. Git tracks `.clutch/risk.yaml`. A workflow file runs `gh pr merge --auto`. The `allow_auto_merge` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`, and reports it as unknown without that flag. A repository where only some rules pass reports as partial. See the `risk_tier_automerge` entry in [the registry](./registry.yaml).
+
+## Adopt
+
+1. Add `.clutch/risk.yaml` with ordered rules. Each rule maps a tier to a list of path globs. The highest tier wins.
+2. Put guardrail files, workflows, migrations and auth code in the highest tier. Put changes to docs or tests only in the lowest tier.
+3. Add a CI job that labels each pull request with its tier, such as `risk/low`.
+4. Add a workflow that runs `gh pr merge --auto --squash` for a low-risk pull request. Require an allowed author and green required checks.
+5. Start in a dry-run mode that comments instead of merging. Compare the comments with human judgment.
+6. On GitHub, allow auto-merge in the repository settings.
+7. Set `risk_tier_automerge` to `adopted` in `clutch.yaml`.
+
+## Waive
+
+Set `risk_tier_automerge` to `waived` in `clutch.yaml` with a reason. A waiver is reasonable when a person must approve each merge, such as under a compliance rule.

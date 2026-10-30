@@ -2,7 +2,7 @@
 
 Installs this template into an existing project. The CLI checks the project,
 switches its checkout to a new branch `template/install` from the default
-branch, copies the files that [`template.files.yaml`](../../template.files.yaml)
+branch, copies the files that [`clutch.files.yaml`](../../clutch.files.yaml)
 names, and writes `.template-install/manifest.json`. The kickoff skill then works
 through the manifest with the owner in their chosen agent interface. The
 installer does not launch an agent by default.
@@ -35,30 +35,34 @@ To opt into the CLI-driven stages instead, pass `--agent claude` or
 `--agent codex`. This requires that CLI on PATH and launches its terminal
 interview. A saved provider preference never enables this mode implicitly.
 
+## Files the project already has
+
+Install reads `clutch.files.yaml`. A file that the project already has with
+other content needs a decision before install changes anything:
+
+- A `managed` file: keep the project copy, or take the Clutch copy.
+- A `seed` file: keep, take, or merge. Merge writes both copies with conflict
+  markers, and the manifest lists the file under `markers`.
+
+In a terminal, install asks. Otherwise it lists the files and stops. Run it
+again with `--keep <file>`, `--take <file>` or `--merge <file>` for each one.
+Install also writes `.clutch/lineage.json`, so `clutch sync` can continue.
+
 ## Review tooling only
 
 For an existing project, run from its Git root:
 
 ```sh
-bun <template clone>/apps/cli/src/main.ts review install --check --json
-bun <template clone>/apps/cli/src/main.ts review install
+bun <clutch clone>/apps/cli/src/main.ts sync --only review --check --json
+bun <clutch clone>/apps/cli/src/main.ts sync --only review
 ```
 
-This installs the shared delivery, audit, recap and verification-authoring skills,
-their Claude links and Python helpers. It does not install dependencies or copy
-the central queue or this template's generated verify executor. Use
-setup-verification afterward to author or maintain the project's own verify.
-
-Only committed template files are exported. Check is read-only and exits 2 when
-changes are planned, 1 for conflict/error and 0 when unchanged. Installation needs
-a clean target if changes are required; it stays on the current branch and leaves
-the result uncommitted for review. Repeat the same command for updates.
-
-`.review/tooling.json` records managed hashes; known legacy checksums support
-migration from older template skills. Customized shared files stop the complete
-preflight. Reconcile them explicitly and retry. Existing project verify skills
-are always preserved. Full template installation also excludes this template's
-verify; kickoff uses setup-verification for the receiving project.
+This syncs the entries that `clutch.files.yaml` tags `group: review`: the shared
+delivery, audit, recap and verification-authoring skills, their Claude links and
+the Python helpers. It does not install dependencies, and it never copies this
+template's own verify. Use setup-verification afterward to author or maintain the
+project's own verify. A scoped sync keeps the lineage of the other files, and it
+leaves the `clutch.yaml` pin alone.
 
 ## Issues
 
@@ -114,6 +118,27 @@ The loader rejects unknown keys. Each error names its YAML path, such as
 `template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
 guardrail file, so a person reviews each change to it.
 
+## Init
+
+`clutch init` adopts Clutch in a repository that does not have it yet. It
+writes `clutch.yaml`, the tracker in `.clutch/` and the doctor baseline. It
+never commits.
+
+```sh
+mise exec -- bun run clutch init --root ../shop --yes
+mise exec -- bun run clutch init --root ../shop --adopt --yes
+mise exec -- bun run clutch init --root ../bar-savvy-web --mode doctor --yes
+```
+
+- Each capability that the repository has is adopted. Each core gap gets the
+  waiver "Decide during adoption." Replace each one with a reason and an issue.
+- `--adopt` is for a repository that already holds Clutch files. A managed file
+  that matches an earlier Clutch version goes in `.clutch/lineage.json`, so
+  sync may update it. An edited file stays a keep-or-take decision.
+- `--mode doctor` is for a repository that Clutch checks but never syncs. It
+  writes no lineage.
+- Init refuses a repository that already has `clutch.yaml`.
+
 ## Sync
 
 `clutch sync` moves a project to a Clutch commit. `clutch.files.yaml` in Clutch
@@ -133,12 +158,42 @@ mise exec -- bun run clutch sync --root ../shop --latest
 - Without `--to` or `--latest`, sync uses the commit that the project's
   `clutch.yaml` pins. A sync then sets that pin to the new commit.
 - `.clutch/lineage.json` records the hash of each managed file at the last
-  sync. A project with only review tooling starts from `.review/tooling.json`.
+  sync. A project with only the older `.review/tooling.json` starts from it, and
+  sync removes that file once the lineage holds its record.
+- `known` in `clutch.files.yaml` holds the hashes of older Clutch copies. A
+  project file that matches one is unchanged, so sync may replace it.
 - `--check` changes nothing. It exits 0 when the project is up to date, 2 when a
   sync would change files or a file needs a decision, and 1 on an error.
 - A sync never commits. Commit the result on a branch, and open a PR.
-- When a managed file needs a decision, nothing changes. Ask the owner whether
-  to keep the edit or take the Clutch copy.
+- A managed file that the project edited needs a decision, and nothing changes
+  until each one has an answer. In a terminal, sync asks: keep the project
+  copy, take the Clutch copy, or show the difference first.
+- Without a terminal, or with `--json`, sync lists those files and exits 2. An
+  agent asks the owner, then runs sync again with `--keep <file>` or
+  `--take <file>` for each one. An agent never decides for the owner.
+- In a merge file, each value that the project and Clutch set differently is a
+  decision too, named by file and key path, such as
+  `package.json#scripts.validate`. Keep holds the project value, and take lets
+  Clutch's value win. Install still lets Clutch's value win on a new project.
+- A kept file stays quiet until Clutch changes it again. `.clutch/lineage.json`
+  records the Clutch copy that the project declined.
+
+## Use Clutch in another repository
+
+A repository with `clutch.yaml` can run the Clutch checks in its own CI with
+one job. The workflow checks out the Clutch commit that `clutch.yaml` pins,
+runs `clutch doctor --check`, and runs `clutch sync --check` in `sync` mode:
+
+```yaml
+jobs:
+  clutch:
+    uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@<commit>
+```
+
+Pin `<commit>` to a Clutch commit, as with any action. The `template.commit`
+in `clutch.yaml` must be a Clutch commit that has `clutch doctor`. An older
+pin fails with "Unexpected argument 'doctor'". Pass `with: { root: <folder> }`
+when `clutch.yaml` is not at the repository root.
 
 ## Doctor
 
@@ -155,7 +210,12 @@ mise exec -- bun run clutch doctor --phase P1
 - Each line shows the detected state, the declared state and the evidence or
   the waiver reason. A summary line follows.
 - A repository without `clutch.yaml` reports each capability as undeclared.
-- `--category` and `--phase` narrow the report. `--remote` is for remote probes.
+- `--category` and `--phase` narrow the report.
+- `--remote` reads GitHub settings for the `remote:` rules: branch rules and
+  protection, secret scanning, push protection, the merge queue, auto-merge and
+  CodeQL default setup. It sends only `gh api` GET requests, for the origin
+  repository or `--repo OWNER/NAME`. A setting that the token cannot read is
+  unknown, and an unknown result never fails `--check`.
 - It exits 0 after a report, and 1 when the registry or `clutch.yaml` is bad.
 
 `clutch doctor --check` is the gate. It fails, and exits 1, in these cases:
@@ -187,7 +247,7 @@ Each rule checks the files that git tracks. An untracked file never counts.
 | `target: <name>`                      | A `package.json` or `project.json` defines the Nx target.              |
 | `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                           |
 | `yaml: { file, path }`                | The dotted path exists in the YAML or JSON file.                       |
-| `remote: <probe>`                     | It is always unknown for now.                                          |
+| `remote: <probe>`                     | The GitHub setting holds. It is unknown without `--remote`.            |
 | `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.           |
 
 A capability is present when every `detect` rule passes. It is partial when

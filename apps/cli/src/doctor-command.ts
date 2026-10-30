@@ -6,6 +6,7 @@ import { baselineFile, nextBaseline, readBaseline, writeBaseline } from '@/docto
 import { detect } from '@/doctor/detect';
 import { gate } from '@/doctor/gate';
 import { loadRegistry } from '@/doctor/registry';
+import { remoteProber } from '@/doctor/remote';
 import { buildReport, renderReport } from '@/doctor/report';
 import { cliRoot } from '@/format';
 import { git } from '@/git';
@@ -14,6 +15,17 @@ import { readIssues } from '@/issues/parse';
 async function headCommit(root: string) {
   const head = await git(root, 'rev-parse', 'HEAD');
   return head.ok ? head.out : null;
+}
+
+/** Runs `gh` for the remote probes. */
+async function runGh(args: Array<string>) {
+  const proc = Bun.spawn(['gh', ...args], { stdout: 'pipe', stderr: 'pipe' });
+  const [out, err, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { ok: code === 0, out, err };
 }
 
 /** The status of each Clutch issue in `root`. A repository without `.clutch/issues` has none. */
@@ -41,6 +53,7 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
       check: { type: 'boolean' },
       'write-baseline': { type: 'boolean' },
       'allow-downgrade': { type: 'boolean' },
+      repo: { type: 'string' },
     },
   });
   const root = path.resolve(cwd, values.root ?? '.');
@@ -65,7 +78,8 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
       (!values.category || entry.category === values.category) &&
       (!values.phase || entry.phase === values.phase),
   );
-  const detections = await detect(root, entries, { remote: values.remote });
+  const probe = values.remote ? remoteProber({ root, repo: values.repo, gh: runGh }) : undefined;
+  const detections = await detect(root, entries, { remote: values.remote, probe });
   const report = buildReport(entries, detections, config);
   if (values['write-baseline']) {
     const next = nextBaseline(detections, await readBaseline(root), values['allow-downgrade']);

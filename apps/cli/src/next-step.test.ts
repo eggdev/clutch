@@ -10,7 +10,7 @@ import { gitRepo } from '@/testing/git-repo';
 
 async function installed() {
   const template = await gitRepo({
-    'template.files.yaml': 'files:\n  - path: AGENTS.md\n    rule: replace\n',
+    'clutch.files.yaml': 'version: 1\nfiles:\n  - path: AGENTS.md\n    rule: seed\n',
     'AGENTS.md': '# Template agents\n',
   });
   const project = await gitRepo({ 'package.json': '{}' }, { name: 'shop' });

@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { parse } from 'yaml';
@@ -184,7 +184,45 @@ export function validateRegistry(data: unknown) {
     : { capabilities: data.capabilities as Array<CapabilityEntry>, errors };
 }
 
-/** Reads and checks the registry in `root`. */
+/**
+ * Each capability has one page, and each page has one capability. `pages`
+ * lists the Markdown files in the capabilities folder, without `index.md`.
+ */
+export function docProblems(capabilities: Array<CapabilityEntry>, pages: Array<string>) {
+  const errors: Array<RegistryError> = [];
+  const documented = new Set(capabilities.map((entry) => entry.doc));
+  for (const entry of capabilities) {
+    if (!pages.includes(entry.doc)) {
+      errors.push({
+        id: entry.id,
+        field: 'doc',
+        message: `${entry.doc} does not exist. Write the page.`,
+      });
+    }
+  }
+  for (const page of pages) {
+    if (!documented.has(page)) {
+      errors.push({
+        id: '',
+        field: 'doc',
+        message: `${page} has no capability in the registry. Add the entry, or delete the page.`,
+      });
+    }
+  }
+  return errors;
+}
+
+/** Reads and checks the registry in `root`, and its page for each capability. */
 export async function loadRegistry(root: string) {
-  return validateRegistry(parse(await readFile(path.join(root, registryFile), 'utf-8')));
+  const result = validateRegistry(parse(await readFile(path.join(root, registryFile), 'utf-8')));
+  if (!result.capabilities) {
+    return result;
+  }
+  const folder = path.dirname(registryFile);
+  const names = await readdir(path.join(root, folder));
+  const pages = names
+    .filter((name) => name.endsWith('.md') && name !== 'index.md')
+    .map((name) => `${folder}/${name}`);
+  const errors = docProblems(result.capabilities, pages);
+  return errors.length > 0 ? { errors } : result;
 }

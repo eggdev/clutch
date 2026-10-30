@@ -31,6 +31,9 @@ decisions and corrections.
 - `.template-install/manifest.json`. `base.commit` is the project before the
   install. `files` lists each file that the install added, replaced or merged.
   `conflicts` lists each value in `package.json` where the template won.
+  `markers` lists each file where the owner chose to merge both copies. Each
+  holds conflict markers. Resolve them with the owner in the interview, and
+  keep the project's facts.
 - The project before the install: `git show <base.commit>:<path>`, and
   `git ls-files` for the list of files.
 - The history: `git log --stat`, to learn what changes often and who works on

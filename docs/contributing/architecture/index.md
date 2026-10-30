@@ -34,7 +34,7 @@ other packages.
 | ----------- | ----------------------------------------------------------- | ----------------------------- |
 | `apps/`     | Routes, the composition root and runtime configuration      | `platform:server` for an API  |
 | `features/` | The gate, screens and components of one area of the product | `type:feature`                |
-| `packages/` | One capability, with its records and vendors                | `type:package` or `type:tool` |
+| `packages/` | One area of the product, with its records and vendors       | `type:package` or `type:tool` |
 
 - Nothing imports an app. An app imports its own files through `@/`.
 - A feature never imports another feature.

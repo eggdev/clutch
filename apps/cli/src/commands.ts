@@ -1,8 +1,7 @@
 import { doctorCommand } from '@/doctor-command';
-import { cliRoot } from '@/format';
+import { initCommand } from '@/init-command';
 import { installCommand } from '@/install-command';
 import { issuesCommand } from '@/issues-command';
-import { reviewCommand } from '@/review-command';
 import { syncCommand } from '@/sync-command';
 
 type Command = {
@@ -18,20 +17,21 @@ export const commands: Record<string, Command> = {
     summary: 'Install Clutch into this project, then run or hand off the kickoff stages.',
     run: installCommand,
   },
-  review: {
-    usage: 'clutch review install [--check] [--json]',
-    summary:
-      'Install only the shared review tooling. Project-specific verify and custom files stay.',
-    run: (args, cwd) => reviewCommand(args, cwd, cliRoot),
-  },
   doctor: {
     usage:
-      'clutch doctor [--root DIR] [--json] [--remote] [--category C] [--phase P]\nclutch doctor --check\nclutch doctor --write-baseline [--allow-downgrade]',
+      'clutch doctor [--root DIR] [--json] [--remote [--repo OWNER/NAME]] [--category C] [--phase P]\nclutch doctor --check\nclutch doctor --write-baseline [--allow-downgrade]',
     summary: 'Report which capabilities a repository has, next to what its clutch.yaml declares.',
     run: doctorCommand,
   },
+  init: {
+    usage: 'clutch init [--root DIR] [--mode sync|doctor] [--adopt] [--yes]',
+    summary:
+      'Adopt Clutch in a repository: write clutch.yaml, the tracker and the doctor baseline.',
+    run: (args, cwd) => initCommand(args, cwd),
+  },
   sync: {
-    usage: 'clutch sync [--root DIR] [--to <commit> | --latest] [--check] [--json]',
+    usage:
+      'clutch sync [--root DIR] [--to <commit> | --latest] [--only GROUP] [--check] [--json]\nclutch sync --only review   (the shared review tooling only)',
     summary: 'Move a project to a Clutch commit. --check exits 2 when a sync would change files.',
     run: (args, cwd) => syncCommand(args, cwd),
   },

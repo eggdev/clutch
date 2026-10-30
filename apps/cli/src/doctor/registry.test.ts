@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { validateRegistry } from '@/doctor/registry';
+import { docProblems, validateRegistry } from '@/doctor/registry';
 
 const valid = {
   id: 'codeql_sast',
@@ -75,4 +75,24 @@ test('each bad rule names its path inside the entry', () => {
 
 test('a file without version 1 and a capabilities list is one error', () => {
   expect(validateRegistry({ capabilities: [] }).errors).toHaveLength(1);
+});
+
+test('a capability without a page, and a page without a capability, are errors', () => {
+  const entry = { ...valid, level: 'core' as const };
+  expect(docProblems([entry], [valid.doc])).toEqual([]);
+  expect(docProblems([entry], [])).toEqual([
+    {
+      id: 'codeql_sast',
+      field: 'doc',
+      message: 'docs/contributing/capabilities/codeql-sast.md does not exist. Write the page.',
+    },
+  ]);
+  expect(docProblems([entry], [valid.doc, 'docs/contributing/capabilities/orphan.md'])).toEqual([
+    {
+      id: '',
+      field: 'doc',
+      message:
+        'docs/contributing/capabilities/orphan.md has no capability in the registry. Add the entry, or delete the page.',
+    },
+  ]);
 });
