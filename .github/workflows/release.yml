@@ -34,12 +34,16 @@ jobs:
         with:
           app-id: ${{ vars.CLUTCH_APP_ID }}
           private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          # Only the push to main and the tag. The app has more permissions.
+          permission-contents: write
       # The latest main, not the pushed commit, so an earlier release commit is included.
+      # The checkout keeps no token, so the install, the version script and the
+      # build never see one. The push step passes the token itself.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ steps.bot.outputs.token || github.token }}
+          persist-credentials: false
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
       # Without scripts, so the repository's git hooks stay off. The merge already
       # passed CI, and the release commit only touches the version and the changelog.
@@ -56,6 +60,7 @@ jobs:
         if: steps.release.outputs.released == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
+          PUSH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
           GH_TOKEN: ${{ github.token }}
         run: |
           node_modules/.bin/oxfmt CHANGELOG.md package.json
@@ -65,6 +70,6 @@ jobs:
           git commit --message "chore(release): v$VERSION"
           git tag "v$VERSION"
           # Atomic, so a refused push to main leaves no orphan tag either.
-          git push --atomic origin HEAD:main "v$VERSION"
+          git push --atomic "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main "v$VERSION"
           shopt -s nullglob
           gh release create "v$VERSION" --title "v$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" "$RUNNER_TEMP"/dist/*.tar.gz
