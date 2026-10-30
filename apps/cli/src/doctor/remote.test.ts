@@ -172,3 +172,15 @@ test('bot_review passes when a named bot reviewed or commented on a recent pull 
   expect(await outcomeOf(probe, 'bot_review:cursor|coderabbitai')).toBe('pass');
   expect(await outcomeOf(probe, 'bot_review:cursor')).toBe('fail');
 });
+
+test('code_scanning passes on a public repository, and fails on a 403 from a private one', async () => {
+  const alerts = `repos/${repo}/code-scanning/alerts?per_page=1`;
+  const outcome = (routes: Record<string, unknown>) =>
+    outcomeOf(remoteProber({ root: '.', repo, gh: fakeGh(routes).gh }), 'code_scanning');
+  expect(await outcome({ [`repos/${repo}`]: settings({ private: false }) })).toBe('pass');
+  const priv = { [`repos/${repo}`]: settings({ private: true }) };
+  expect(await outcome({ ...priv, [alerts]: 403 })).toBe('fail');
+  expect(await outcome({ ...priv, [alerts]: 404 })).toBe('pass');
+  expect(await outcome({ ...priv, [alerts]: [] })).toBe('pass');
+  expect(await outcome(priv)).toBe('unknown');
+});

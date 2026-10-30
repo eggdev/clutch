@@ -14,7 +14,7 @@ Rank 19 of the researched practices. Almost two thirds of the leading repositori
 
 1. Add a script that scans the source files for suppression comments. This repository uses [`tools/check-suppressions.ts`](../../../tools/check-suppressions.ts).
 2. Add the root target `check-suppressions`, and run it in the canonical check command.
-3. In this repository, `check-suppressions` rejects any comment such as `oxlint-disable` or `@ts-expect-error`. Fix the cause instead.
+3. In this repository, `check-suppressions` rejects any comment such as `oxlint-disable` or `@ts-expect-error`. Fix the cause instead. The one exception is a Semgrep false positive: `nosemgrep: rule-id -- reason` names the rule and the reason, and the check rejects a `nosemgrep` without both. It also scans the scripts and workflows that Semgrep reads. See [CodeQL / SAST](./codeql-sast.md#silence-a-semgrep-false-positive).
 4. To allow some suppressions, require a reason in each comment, and count the comments against a shrink-only baseline.
 5. Set `suppression_discipline` to `adopted` in `clutch.yaml`.
 

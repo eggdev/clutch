@@ -52,3 +52,26 @@ test('prose about a directive, a string that is not a comment, and node_modules 
     ),
   ).toEqual([]);
 });
+
+test('a semgrep suppression needs the rule and a reason, in source, scripts and workflows', async () => {
+  const semgrep = `no${'semgrep'}`;
+  const matches = await inRepo(
+    {
+      'tools/g.ts': [
+        `// ${semgrep}`,
+        `// ${semgrep}: prototype-pollution-loop`,
+        `// ${semgrep}: prototype-pollution-loop -- reads only, and Object.hasOwn skips inherited keys.`,
+        `const value = 1; // ${semgrep}: a.b, c-d -- the input is a constant.`,
+      ].join('\n'),
+      'tools/verification/h.py': `x = 1  # ${semgrep}\ny = 2  # ${semgrep}: rule -- a reason\n`,
+      '.github/workflows/i.yml': `# no${'sem'}: rule\n`,
+    },
+    checkSuppressions,
+  );
+  expect(matches.map((m) => `${m.file}:${m.line} ${m.label}`)).toEqual([
+    '.github/workflows/i.yml:1 semgrep suppression without a reason',
+    'tools/g.ts:1 semgrep suppression without a reason',
+    'tools/g.ts:2 semgrep suppression without a reason',
+    'tools/verification/h.py:1 semgrep suppression without a reason',
+  ]);
+});

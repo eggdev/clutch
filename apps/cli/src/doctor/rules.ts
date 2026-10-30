@@ -127,6 +127,7 @@ function hasPath(doc: unknown, dotted: string) {
     if (typeof value !== 'object' || value === null || !Object.hasOwn(value, key)) {
       return false;
     }
+    // nosemgrep: prototype-pollution-loop -- reads only, and Object.hasOwn skips inherited keys.
     value = (value as Record<string, unknown>)[key];
   }
   if (value === null || value === '') {

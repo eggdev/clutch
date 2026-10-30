@@ -1,6 +1,7 @@
 const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
 const modes = ['sync', 'doctor'] as const;
 const automergeModes = ['off', 'dry-run', 'on'] as const;
+const sastEngines = ['auto', 'codeql', 'semgrep'] as const;
 
 type CapabilityStatus = (typeof capabilityStatuses)[number];
 
@@ -24,6 +25,11 @@ export type ClutchConfig = {
   automerge?: { mode: (typeof automergeModes)[number] };
   /** How `bun run pr` finds an agent's branch: its prefix, `clutch/cl-` by default. */
   pr?: { branchPrefix: string };
+  /**
+   * The engine that `sast.yml` runs. auto, the default, runs CodeQL where code
+   * scanning takes results and Semgrep elsewhere.
+   */
+  sast?: (typeof sastEngines)[number];
 };
 
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
@@ -40,6 +46,7 @@ const topKeys = [
   'worktree',
   'automerge',
   'pr',
+  'sast',
 ];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
 const capabilityId = /^[a-z][a-z0-9_]*$/u;
@@ -233,6 +240,9 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   const automerge =
     data.automerge === undefined ? undefined : readAutomerge(data.automerge, errors);
   const pr = data.pr === undefined ? undefined : readPr(data.pr, errors);
+  if (data.sast !== undefined && !oneOf(sastEngines, data.sast)) {
+    errors.push({ path: 'sast', message: `Expected ${sastEngines.join(', ')}.` });
+  }
   if (errors.length > 0 || !template) {
     return { errors };
   }
@@ -250,6 +260,9 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   }
   if (pr) {
     config.pr = pr;
+  }
+  if (oneOf(sastEngines, data.sast)) {
+    config.sast = data.sast;
   }
   return { config, errors };
 }

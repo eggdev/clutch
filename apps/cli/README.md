@@ -195,11 +195,18 @@ automerge: # optional
   mode: dry-run # off (the default), dry-run or on
 pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
+sast: auto # optional: auto (the default), codeql or semgrep
 ```
 
 `automerge.mode` tells the Auto-merge workflow what to do with a low-risk agent
 PR. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
+
+`sast` picks the static analysis engine that `.github/workflows/sast.yml` runs.
+`auto` runs CodeQL where code scanning takes results and Semgrep elsewhere.
+`codeql` fails the check where code scanning takes no results. `semgrep` runs
+Semgrep even on a public repository. See
+[CodeQL / SAST](../../docs/contributing/capabilities/codeql-sast.md).
 
 The loader rejects unknown keys. Each error names its YAML path, such as
 `template.mode` or `capabilities.codeql_sast.reason`. An older `clutch.yaml`
@@ -317,6 +324,9 @@ mise exec -- bun run clutch doctor --phase P1
   some pass and one fails. It is unknown when the rules that did not pass are
   all unknown, such as remote rules without `--remote`.
 - A repository without `clutch.yaml` reports each capability as undeclared.
+- The last line names the SAST engine that `sast` in `clutch.yaml` runs, such
+  as `SAST: auto -> codeql (public repository)`. Without `--remote`, doctor
+  cannot tell CodeQL from Semgrep for `auto` and `codeql`, and prints `?`.
 - `--category` and `--phase` narrow the report.
 - `--remote` reads GitHub settings for the `remote:` rules: branch rules and
   protection, secret scanning, push protection, the merge queue, auto-merge,
@@ -333,6 +343,8 @@ mise exec -- bun run clutch doctor --phase P1
   for it. An extra capability only gets a warning.
 - A waiver passed its `until` date, or its `issue` is done in `.clutch/issues/`.
 - A capability dropped below `.clutch/doctor-baseline.json`.
+- With `--remote`, `sast` is `codeql` on a private repository without GitHub
+  Code Security, so `sast.yml` fails.
 
 A remote rule that is unknown never fails the gate. When a capability's files
 pass and only its remote rules are left, it is unknown without `--remote`, so

@@ -308,6 +308,9 @@ capabilities:
       - any:
           - workflow:
               uses: github/codeql-action/
+          # Semgrep Community Edition, which sast.yml runs where code scanning takes no results.
+          - workflow:
+              run: semgrep (scan|ci)
           - remote: code_scanning_default_setup
   - id: dep_automation
     name: Dependency update bots (Renovate / Dependabot)
