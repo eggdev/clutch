@@ -1,4 +1,3 @@
-import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
 import type { Check } from '@tools/github/status';
 
@@ -79,13 +78,23 @@ export async function failures(run: Run, checks: Array<Check>): Promise<Array<Fa
       found.push({ check: check.name, url: check.url, tasks: [], tail: 'No GitHub Actions log.' });
       continue;
     }
-    const log = await must(run, [
+    const log = await run([
       'gh',
       'api',
       `repos/{owner}/{repo}/actions/jobs/${job}/logs`,
       '--allow-escape-sequences',
     ]);
-    found.push({ check: check.name, url: check.url, ...readJobLog(log) });
+    // A cancelled job, or one past log retention, has no log to read.
+    found.push(
+      log.ok
+        ? { check: check.name, url: check.url, ...readJobLog(log.out) }
+        : {
+            check: check.name,
+            url: check.url,
+            tasks: [],
+            tail: `The log is not available: ${log.err.trim() || 'gh failed'}`,
+          },
+    );
   }
   return found;
 }

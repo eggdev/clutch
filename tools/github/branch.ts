@@ -65,6 +65,18 @@ async function resolve(run: Run, root: string, target: string) {
   return view(run, String(found.number));
 }
 
+const forkKey = (branch: string) => `branch.${branch}.clutchForkPoint`;
+
+/**
+ * Remembers where a stacked branch left its base, in the clone's git config.
+ * When the base is later rewritten, or merges into the default branch with
+ * other commits, `pr sync` replays only the branch's own commits.
+ */
+export async function recordForkPoint(run: Run, branch: string, base: string) {
+  const point = await must(run, ['git', 'merge-base', 'HEAD', `origin/${base}`]);
+  await must(run, ['git', 'config', forkKey(branch), point]);
+}
+
 /** The files with a merge conflict. */
 async function conflicts(run: Run) {
   const out = await must(run, ['git', 'diff', '--name-only', '--diff-filter=U']);
@@ -76,8 +88,19 @@ async function conflicts(run: Run) {
  * resolved by regenerating it. Any other conflict stops, with the rebase left
  * in progress for the author to finish.
  */
-async function rebase(run: Run, base: string) {
-  let step = await run(['git', 'rebase', `origin/${base}`]);
+async function rebase(run: Run, branch: string, base: string) {
+  const recorded = await run(['git', 'config', '--get', forkKey(branch)]);
+  const point = recorded.ok ? recorded.out.trim() : '';
+  // A fork point that the new base does not contain means the base moved under
+  // the branch, so the commits below the point are not the branch's own.
+  const contains =
+    point === '' || (await run(['git', 'merge-base', '--is-ancestor', point, `origin/${base}`]));
+  const moved = contains !== true && !contains.ok;
+  let step = await run(
+    moved
+      ? ['git', 'rebase', '--onto', `origin/${base}`, point]
+      : ['git', 'rebase', `origin/${base}`],
+  );
   for (let round = 0; !step.ok && round < 100; round += 1) {
     const files = await conflicts(run);
     const other = files.filter((file) => file !== tracker);
@@ -115,7 +138,9 @@ export async function sync(
     await must(run, ['git', 'switch', pr.head]);
   }
   await must(run, ['git', 'fetch', '--prune', 'origin']);
-  await rebase(run, pr.base);
+  await rebase(run, pr.head, pr.base);
+  // The branch now sits on the base's tip, the fork point for the next sync.
+  await recordForkPoint(run, pr.head, pr.base);
   const stale = await run(clutch('issues', '--check'));
   if (!stale.ok) {
     await must(run, clutch('issues', '--write'));
