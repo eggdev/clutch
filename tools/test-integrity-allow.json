@@ -1,4 +1,7 @@
 {
   "description": "Test files that a change may delete, or whose test or expect count may drop, with the reason. check-test-integrity reads it. An entry covers only a file that the change touches. Delete the entry after the change merges. See docs/contributing/testing.md#test-integrity.",
-  "files": {}
+  "files": {
+    "packages/notes/repo/notes.test.ts": "CL-029, approved by Brendan 2026-10-30: the next test in the file does the same record and row round-trip through real Postgres.",
+    "tools/lint/import-policy-registry.test.ts": "CL-029, approved by Brendan 2026-10-30: its loop ran zero times (exceptions: []). The parseRegistry test in the same file covers a blank reason, and check-primitives checks the real file."
+  }
 }
