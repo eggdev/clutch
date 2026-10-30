@@ -25,29 +25,43 @@ version is a planned upgrade for every package at once.
 
 ## Renovate
 
-The Renovate GitHub app reads [`renovate.json`](../../../renovate.json) and
-opens update PRs. Install the app on the repository once. The config keeps the
-PR count low:
+Clutch runs Renovate itself.
+[`renovate.yml`](../../../.github/workflows/renovate.yml) runs the open-source
+Renovate CLI each day at 04:17 UTC, and on demand from the Actions tab. It reads
+[`renovate.json`](../../../renovate.json) and signs in as the
+[release bot](./releases.md#the-release-bot), so its PRs start CI and agent
+review. Without the release bot, the job skips with a notice.
 
-- Renovate runs before 06:00 UTC each Monday, with at most 3 open PRs.
+The config keeps the PR count low:
+
+- Renovate opens new PRs only before 06:00 UTC on Mondays, with at most 3 open.
+  The daily runs rebase open PRs and handle security fixes.
 - One PR holds every minor and patch update. A major update gets its own PR.
   Nx, oxlint and oxfmt have their own group, since they move together.
 - No version younger than 3 days is proposed. A security fix waits 3 days too,
   but skips the weekly schedule. This matches `minimumReleaseAge` in
   `bunfig.toml`, so `bun install` accepts each update.
-- `rangeStrategy: pin` keeps exact versions. Each GitHub Action keeps a full
-  commit SHA, and Renovate updates the SHA and the version comment together.
-- Each PR has the `dependencies` label and a `chore(deps):` commit.
+- `rangeStrategy: pin` keeps exact versions.
+- Each PR has the `dependencies` label and a `chore(deps):` commit, so the
+  `commits` check passes.
+- Each PR carries its changeset. A post-upgrade task runs
+  [`tools/release/renovate-changeset.mjs`](../../../tools/release/renovate-changeset.mjs),
+  which writes a patch changeset named after the branch. The workflow allows
+  only that command.
+
+The `github-actions` manager is off. Updating an action pin changes a workflow
+file, and GitHub refuses that push unless the bot has the Workflows
+permission. Once the app has it, turn the manager on in `renovate.json`, and
+add `permission-workflows: write` to the token step in `renovate.yml`. Renovate
+then updates each SHA pin and its version comment together.
 
 Dependabot security updates stay off, so updates come only from Renovate. The
 GitHub vulnerability alerts stay on, because Renovate reads them.
 
-Each PR needs a changeset, and the app cannot write one.
-[`renovate-changeset.yml`](../../../.github/workflows/renovate-changeset.yml)
-commits a patch changeset to each Renovate PR with the release bot token. A
-push with the default token would start no workflows. Without the
-[release bot](./releases.md#the-release-bot), the job skips, and a person runs
-`mise exec -- bun run pr open` on the branch instead.
+The hosted Mend Renovate app is a free alternative. Install it from
+<https://github.com/apps/renovate> and delete `renovate.yml`. The hosted app
+cannot run the changeset task, so each of its PRs needs
+`mise exec -- bun run pr open` to add one.
 
 ## Production audit
 

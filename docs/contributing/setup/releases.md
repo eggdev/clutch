@@ -61,14 +61,16 @@ A protected `main` refuses a direct push. Only an actor on the ruleset's bypass
 list can push the release commit, and the default Actions token cannot be on
 that list. So the release pushes with a GitHub App token, the release bot. The
 gardening workflow opens its pull request with the same token, so CI runs on
-that PR. The Renovate changeset job pushes with it too. See
+that PR. Self-hosted Renovate signs in with it too. See
 [Renovate](./dependencies.md#renovate).
 
 Without the app, both workflows use the default token. Once `main` has a
 ruleset, the release push then fails, so set the bot up before the ruleset. Set the bot up once per repository:
 
 1. Create a private GitHub App with no webhook. Give it the repository
-   permissions Contents read and write and Pull requests read and write.
+   permissions Contents, Pull requests and Workflows, each read and write.
+   Renovate needs Workflows to update action pins. See
+   [Renovate](./dependencies.md#renovate).
 2. Install the app on the repository.
 3. Set the `CLUTCH_APP_ID` repository variable to the app id.
 4. Generate a private key for the app. Store it as the

@@ -8,7 +8,16 @@
   "prConcurrentLimit": 3,
   "labels": ["dependencies"],
   "semanticCommits": "enabled",
-  "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
+  "dependencyDashboard": false,
+  "postUpgradeTasks": {
+    "commands": ["node tools/release/renovate-changeset.mjs"],
+    "dataFileTemplate": "{{{branchName}}}\n{{{prTitle}}}",
+    "fileFilters": [".changeset/renovate-*.md"],
+    "executionMode": "branch"
+  },
+  "github-actions": {
+    "enabled": false
+  },
   "vulnerabilityAlerts": {
     "minimumReleaseAge": "3 days",
     "schedule": ["at any time"]

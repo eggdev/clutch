@@ -12,7 +12,7 @@ Rank 50 of the researched practices. More than three quarters of the leading rep
 
 ## Adopt
 
-1. Add `renovate.json` at the root, and install the Renovate app on GitHub. As an alternative, add `dependabot.yml` in `.github/`.
+1. Add `renovate.json` at the root. Run Renovate from a scheduled workflow, as Clutch's `renovate.yml` does, or install the free hosted Renovate app. As an alternative, add `dependabot.yml` in `.github/`.
 2. For Renovate, extend `config:recommended` and set `rangeStrategy` to `pin`.
 3. Group related packages into one pull request, such as all the Nx packages.
 4. Set a weekly schedule and a limit on open pull requests.
