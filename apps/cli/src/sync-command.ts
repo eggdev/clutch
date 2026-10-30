@@ -2,6 +2,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { cliRoot } from '@/format';
+import { askDecisions } from '@/sync/ask';
 import { runSync } from '@/sync/run';
 import type { SyncResult } from '@/sync/run';
 
@@ -24,7 +25,8 @@ function print(result: SyncResult) {
       [
         'These managed files differ from both Clutch and the last sync, so the project edited them:',
         ...result.decisions.map((file) => `  ${file}`),
-        'Nothing changed. Ask the owner whether to keep each edit or take the Clutch copy, then reconcile the file and sync again.',
+        'Nothing changed. Ask the owner whether to keep each edit or take the Clutch copy.',
+        'Then run sync again with --keep <file> or --take <file> for each one. Never decide for the owner.',
       ].join('\n'),
     );
     return;
@@ -52,17 +54,40 @@ export async function syncCommand(
         latest: { type: 'boolean' },
         check: { type: 'boolean' },
         json: { type: 'boolean' },
+        keep: { type: 'string', multiple: true },
+        take: { type: 'string', multiple: true },
       },
     });
     if (values.to && values.latest) {
       throw new Error('Pass --to <commit> or --latest, not both.');
     }
-    const result = await runSync({
+    const request = {
       root: path.resolve(cwd, values.root ?? '.'),
       template,
       to: values.latest ? 'HEAD' : values.to,
       check: values.check,
-    });
+      keep: values.keep ?? [],
+      take: values.take ?? [],
+    };
+    let result = await runSync(request);
+    // A person at a terminal answers here. An agent, CI or --json gets the list and exit 2, and never waits.
+    const person = process.stdin.isTTY && process.stdout.isTTY && !values.json && !values.check;
+    if (result.status === 'decisions' && person) {
+      const answers = await askDecisions({
+        root: request.root,
+        template,
+        commit: result.templateCommit,
+        files: result.decisions,
+      });
+      if (answers) {
+        result = await runSync({
+          ...request,
+          to: result.templateCommit,
+          keep: [...request.keep, ...answers.keep],
+          take: [...request.take, ...answers.take],
+        });
+      }
+    }
     if (values.json) {
       console.log(JSON.stringify(result));
     } else {

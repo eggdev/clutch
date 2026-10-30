@@ -137,8 +137,14 @@ mise exec -- bun run clutch sync --root ../shop --latest
 - `--check` changes nothing. It exits 0 when the project is up to date, 2 when a
   sync would change files or a file needs a decision, and 1 on an error.
 - A sync never commits. Commit the result on a branch, and open a PR.
-- When a managed file needs a decision, nothing changes. Ask the owner whether
-  to keep the edit or take the Clutch copy.
+- A managed file that the project edited needs a decision, and nothing changes
+  until each one has an answer. In a terminal, sync asks: keep the project
+  copy, take the Clutch copy, or show the difference first.
+- Without a terminal, or with `--json`, sync lists those files and exits 2. An
+  agent asks the owner, then runs sync again with `--keep <file>` or
+  `--take <file>` for each one. An agent never decides for the owner.
+- A kept file stays quiet until Clutch changes it again. `.clutch/lineage.json`
+  records the Clutch copy that the project declined.
 
 ## Doctor
 
