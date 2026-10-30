@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0 (2026-10-30)
+
+### Features
+
+- feat(ci): make every dry-run verdict countable (CL-112)
+
 ## 0.9.4 (2026-10-30)
 
 ### Fixes and maintenance
