@@ -491,8 +491,10 @@ capabilities:
       adoption_top: 0.37
     doc: docs/contributing/capabilities/ci-failure-explainer.md
     detect:
+      # Auto-merge also runs on workflow_run, so the trigger alone is no explainer.
       - workflow:
           'on': workflow_run
+          run: log-failed|conclusion
       - grep:
           files: .github/workflows/*.y*ml
           pattern: log-failed|conclusion == .failure.

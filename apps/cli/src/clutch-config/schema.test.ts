@@ -123,3 +123,15 @@ test('each worktree problem names its YAML path', () => {
     'worktree.setup',
   ]);
 });
+
+test('automerge is optional and takes off, dry-run or on', () => {
+  expect(validateClutchConfig(valid).config?.automerge).toBeUndefined();
+  expect(
+    validateClutchConfig({ ...valid, automerge: { mode: 'dry-run' } }).config?.automerge,
+  ).toEqual({ mode: 'dry-run' });
+  expect(paths({ ...valid, automerge: { mode: 'yes', when: 'low' } })).toEqual([
+    'automerge.when',
+    'automerge.mode',
+  ]);
+  expect(paths({ ...valid, automerge: 'on' })).toEqual(['automerge']);
+});

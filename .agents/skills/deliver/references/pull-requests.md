@@ -63,7 +63,8 @@ lower PRs before you add another one.
 
 ## Merge
 
-Merge only when the owner says so.
+Merge only when the owner says so. The one exception is a low-risk PR under
+`automerge.mode: on` in `clutch.yaml`. See [Auto-merge](#auto-merge).
 
 ```sh
 mise exec -- bun run pr merge <number>
@@ -78,3 +79,27 @@ The default branch takes no direct pushes, so a task cannot become `done`
 after its merge. When the PR is green and ready to merge, its last commit sets
 the task to `done` with its PR link, and the merge makes that true. When a PR
 closes without a merge, set its task back to `todo` in the next branch.
+
+## Auto-merge
+
+The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges each PR
+whose head branch starts with `clutch/cl-`. Only an agent opens such a branch.
+`pr open` runs under the operator's login, so the author cannot tell an agent
+from a person. The PR may merge without the owner when each of these is true:
+
+- `clutch risk` gives it `low`. See the CLI's
+  [risk section](../../../../apps/cli/README.md#risk).
+- It is open, not a draft, and its base is the default branch. A stacked PR
+  waits.
+- The latest run of each required check of the default branch and of
+  `agent-review` succeeded on its head commit.
+
+The workflow runs when CI or agent review completes, and it runs the default
+branch's rules. `automerge.mode` in `clutch.yaml` decides what it does:
+
+- `off` prints the verdict in the job summary.
+- `dry-run` comments "would auto-merge" once for each head commit. The comment
+  asks the owner to react 👍 when they agree and 👎 when they do not. A PR
+  that may not merge gets no comment, and the job summary lists the reasons.
+- `on` runs `gh pr merge --auto --merge`, so the PR merges with a merge commit
+  once its checks pass.

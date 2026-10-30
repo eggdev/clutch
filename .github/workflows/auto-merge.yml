@@ -1,0 +1,92 @@
+name: Auto-merge
+
+# Decides whether a low-risk agent pull request may merge without a person, and
+# acts on automerge.mode in clutch.yaml. dry-run comments "would auto-merge"
+# once for each head commit. on queues the merge. tools/github/auto-merge.ts
+# holds the rules. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
+#
+# A check suite that GitHub Actions creates starts no check_suite workflow, so
+# this runs when CI or agent review completes. The run that sees every required
+# check green decides. It reads no label, because a label set with
+# GITHUB_TOKEN starts no workflow. It runs the base branch's code, so a pull
+# request cannot change the rules that judge it.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_run:
+    workflows: [CI, Agent review]
+    types: [completed]
+
+# Least privilege. The decide job grants what it needs in its own block.
+permissions:
+  contents: read
+
+# One run at a time for each head commit, so two runs cannot both comment.
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  decide:
+    # Only an agent opens a clutch/cl- branch. A push to main also completes CI, and is no pull request.
+    if: >-
+      (github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'clutch/cl-')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
+      startsWith(github.event.workflow_run.head_branch, 'clutch/cl-'))
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      checks: read
+      # The dry-run comment. CL-405 adds contents: write for gh pr merge --auto.
+      pull-requests: write
+    steps:
+      - name: Find the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+        run: |
+          if [ -z "$PR" ]; then
+            PR="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")][0].number // empty')"
+          fi
+          if [ -z "$PR" ]; then
+            echo "::notice title=Auto-merge skipped::No open pull request has head $HEAD_SHA."
+          fi
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+          echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+      - if: steps.pr.outputs.number != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ steps.pr.outputs.head }}
+          # The risk diff needs the merge base, and the default branch runs the rules.
+          fetch-depth: 0
+      - name: Check out the default branch
+        id: base
+        if: steps.pr.outputs.number != ''
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git checkout --quiet --detach "origin/$DEFAULT_BRANCH"
+          if [ -f .clutch/risk.yaml ] && [ -f tools/github/auto-merge.ts ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Auto-merge off::The default branch has no .clutch/risk.yaml or tools/github/auto-merge.ts yet, so nothing is judged."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.base.outputs.present == 'true'
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - if: steps.base.outputs.present == 'true'
+        run: bun install --frozen-lockfile
+      - name: Decide
+        if: steps.base.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head }}
+        run: |
+          set -o pipefail
+          bun tools/github/auto-merge.ts --pr "$PR" --head "$HEAD_SHA" | tee -a "$GITHUB_STEP_SUMMARY"

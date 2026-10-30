@@ -222,6 +222,11 @@ The [Risk workflow](../../../.github/workflows/risk.yml) labels each PR
 touches. It runs `clutch risk` from the base branch, with the rules in
 `.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk).
 
+The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
+CI or agent review completes on a `clutch/cl-` branch. It judges whether the PR
+may merge without a person and acts on `automerge.mode` in `clutch.yaml`. See
+[auto-merge](../../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
+
 - Each job names its runner image, `ubuntu-26.04`, not `ubuntu-latest`. A
   new image then arrives in a reviewed PR, not on GitHub's schedule.
 - Each action runs on the Node.js 24 runtime. GitHub ends Node.js 20 for
