@@ -68,3 +68,8 @@
 /tools/clutch.ts @eggdev
 /.gitleaks.toml @eggdev
 /.gitleaksignore @eggdev
+
+# Agent steering. Every agent reads these, so a person reviews each change.
+/AGENTS.md @eggdev
+/CLAUDE.md @eggdev
+/.agents/skills/ @eggdev

@@ -46,6 +46,6 @@ capabilities:
   flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
   pr_size_limits: { status: waived, reason: Lands in CL-401., issue: CL-401 }
   merge_queue: { status: waived, reason: Lands in CL-405., issue: CL-405 }
-  risk_tier_automerge: { status: waived, reason: Lands in CL-405., issue: CL-405 }
+  risk_tier_automerge: { status: waived, reason: Lands in CL-404., issue: CL-404 }
   gardener_bots: adopted
   factory_observability: { status: waived, reason: Lands in CL-503., issue: CL-503 }

@@ -92,7 +92,7 @@ export async function loadClutchSource(
   });
   if (exists.exitCode !== 0) {
     throw new Error(
-      `Clutch ${commit.slice(0, 12)} has no ${filesList}, so sync cannot read it. Pass --latest, or --to a newer Clutch commit.`,
+      `Clutch ${commit.slice(0, 12)} has no ${filesList}, so sync cannot read it. Run sync without --to for the latest release, or pass --to a newer release tag.`,
     );
   }
   const listBytes = await gitBytes(template, ['show', `${commit}:${filesList}`]);

@@ -1,0 +1,14 @@
+# Clutch only: runs the reusable doctor workflow on each pull request, so a
+# change to it fails here before a project calls it. clutch.files.yaml excludes
+# this file, so projects never get it.
+name: Clutch self-test
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  doctor:
+    uses: ./.github/workflows/clutch-doctor.yml
