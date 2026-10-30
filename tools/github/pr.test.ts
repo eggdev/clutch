@@ -91,22 +91,34 @@ test('open on a stacked base reuses the open PR and links the whole chain', asyn
 });
 
 test('merge uses gh stack for a PR in a stack, and gh pr merge for a lone PR', async () => {
+  const clock = { now: () => 0, sleep: () => Promise.resolve() };
+  const released = [
+    'gh run list',
+    { out: '[{"headSha":"m","status":"completed","conclusion":"success","url":"u"}]' },
+  ] as [string, Partial<Result>];
   const stacked = fake([
     trunk,
+    ['gh pr view 10 --json mergeCommit', { out: 'm' }],
     ['gh pr view 10', { out: '{"baseRefName":"cl-004","headRefName":"cl-007"}' }],
     ['gh pr list --state open --base cl-007', { out: '[]' }],
+    released,
+    ['git show', { out: '{"version":"1.0.0"}' }],
   ]);
-  await runPr(['merge', '10'], stacked.run, noWrite);
+  await runPr(['merge', '10'], stacked.run, noWrite, clock);
   expect(stacked.calls).toContain('gh stack merge 10 --merge --yes');
 
   const lone = fake([
     trunk,
+    ['gh pr view 12 --json mergeCommit', { out: 'm' }],
     ['gh pr view 12', { out: '{"baseRefName":"main","headRefName":"cl-024"}' }],
     ['gh pr list --state open --base cl-024', { out: '[]' }],
+    released,
+    ['git show', { out: '{"version":"1.0.0"}' }],
   ]);
-  await runPr(['merge', '12'], lone.run, noWrite);
+  await runPr(['merge', '12'], lone.run, noWrite, clock);
   expect(lone.calls).toContain('gh pr merge 12 --merge');
-  expect(lone.calls.at(-1)).toBe('git fetch --prune origin');
+  expect(lone.calls).toContain('git fetch --prune origin');
+  expect(lone.calls.at(-1)).toBe('git show origin/main:package.json');
 });
 
 test('doctor reports a gh that does not match mise.toml, and --fix installs the pinned extension', async () => {

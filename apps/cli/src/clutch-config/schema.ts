@@ -22,6 +22,8 @@ export type ClutchConfig = {
   worktree?: { root: string; copy: Array<string>; setup: Array<string> };
   /** What the Auto-merge workflow does with a low-risk agent PR. */
   automerge?: { mode: (typeof automergeModes)[number] };
+  /** How `bun run pr` finds an agent's branch: its prefix, `clutch/cl-` by default. */
+  pr?: { branchPrefix: string };
 };
 
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
@@ -30,7 +32,15 @@ export type ConfigError = { path: string; message: string };
 type Errors = Array<ConfigError>;
 type Data = Record<string, unknown>;
 
-const topKeys = ['schemaVersion', 'project', 'template', 'capabilities', 'worktree', 'automerge'];
+const topKeys = [
+  'schemaVersion',
+  'project',
+  'template',
+  'capabilities',
+  'worktree',
+  'automerge',
+  'pr',
+];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
 const capabilityId = /^[a-z][a-z0-9_]*$/u;
 const issuePattern = /^CL-\d{3}[a-z]?$/u;
@@ -188,6 +198,22 @@ function readAutomerge(value: unknown, errors: Errors) {
   return { mode: value.mode };
 }
 
+function readPr(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'pr', message: 'Expected a map with branchPrefix.' });
+    return;
+  }
+  unknownKeys(value, ['branchPrefix'], 'pr', errors);
+  if (typeof value.branchPrefix !== 'string' || !/^[\w./-]+$/u.test(value.branchPrefix)) {
+    errors.push({
+      path: 'pr.branchPrefix',
+      message: 'Expected a branch prefix, such as clutch/cl-.',
+    });
+    return;
+  }
+  return { branchPrefix: value.branchPrefix };
+}
+
 /** Checks parsed `clutch.yaml` data. Returns the typed config only when there is no error. */
 export function validateClutchConfig(data: unknown): { config?: ClutchConfig; errors: Errors } {
   const errors: Errors = [];
@@ -206,6 +232,7 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   const worktree = data.worktree === undefined ? undefined : readWorktree(data.worktree, errors);
   const automerge =
     data.automerge === undefined ? undefined : readAutomerge(data.automerge, errors);
+  const pr = data.pr === undefined ? undefined : readPr(data.pr, errors);
   if (errors.length > 0 || !template) {
     return { errors };
   }
@@ -220,6 +247,9 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   }
   if (automerge) {
     config.automerge = automerge;
+  }
+  if (pr) {
+    config.pr = pr;
   }
   return { config, errors };
 }

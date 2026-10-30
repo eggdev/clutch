@@ -2,6 +2,11 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { ready, sync } from '@tools/github/branch';
+import { failures, renderFailures } from '@tools/github/failures';
+import { defaultBranch, duration, must, prWithHead, realClock } from '@tools/github/github';
+import type { Clock } from '@tools/github/github';
+import { merge } from '@tools/github/merge';
 import {
   ghStack,
   ghVersion,
@@ -10,6 +15,8 @@ import {
   stackExtensionVersion,
 } from '@tools/github/stack';
 import type { Run } from '@tools/github/stack';
+import { prStatus, renderStatus, waitForChecks } from '@tools/github/status';
+import type { PrStatus } from '@tools/github/status';
 import { conventionalProblem } from '@tools/hooks/commit-msg';
 import { bumpOf, changesetDir, changesetText, packageName } from '@tools/release/changeset';
 
@@ -22,59 +29,15 @@ const usage = [
   'Usage: bun run pr doctor [--fix]',
   '       bun run pr open --title TEXT --body-file FILE [--base BRANCH] [--force]',
   '       bun run pr body <number> <file>',
-  '       bun run pr merge <number>',
+  '       bun run pr status <number> [--json]',
+  '       bun run pr wait <number> [--timeout 30m] [--json]',
+  '       bun run pr failures <number>',
+  '       bun run pr sync <number | branch | CL-id>',
+  '       bun run pr ready <CL-id> <number>',
+  '       bun run pr merge <number> [--timeout 15m]',
 ].join('\n');
 
 const root = path.resolve(import.meta.dir, '../..');
-
-async function must(run: Run, command: Array<string>, options?: { inherit?: boolean }) {
-  const result = await run(command, options);
-  if (!result.ok) {
-    throw new Error(`${command.join(' ')} failed: ${result.err || result.out}`);
-  }
-  return result.out.trim();
-}
-
-function defaultBranch(run: Run) {
-  return must(run, [
-    'gh',
-    'repo',
-    'view',
-    '--json',
-    'defaultBranchRef',
-    '--jq',
-    '.defaultBranchRef.name',
-  ]);
-}
-
-/** The open PR whose head is `branch`, with its base. */
-async function prWithHead(run: Run, branch: string) {
-  const out = await must(run, [
-    'gh',
-    'pr',
-    'list',
-    '--state',
-    'open',
-    '--head',
-    branch,
-    '--json',
-    'number,baseRefName,url,isDraft',
-  ]);
-  const [found] = JSON.parse(out || '[]') as Array<{
-    number: number;
-    baseRefName: string;
-    url: string;
-    isDraft: boolean;
-  }>;
-  return (
-    found && {
-      number: found.number,
-      base: found.baseRefName,
-      url: found.url,
-      isDraft: found.isDraft,
-    }
-  );
-}
 
 async function doctor(run: Run, fix: boolean) {
   const problems: Array<string> = [];
@@ -252,37 +215,12 @@ async function open(
   return 0;
 }
 
-async function merge(run: Run, number: string) {
-  const out = await must(run, ['gh', 'pr', 'view', number, '--json', 'baseRefName,headRefName']);
-  const { baseRefName, headRefName } = JSON.parse(out) as {
-    baseRefName: string;
-    headRefName: string;
-  };
-  const trunk = await defaultBranch(run);
-  const above = await must(run, [
-    'gh',
-    'pr',
-    'list',
-    '--state',
-    'open',
-    '--base',
-    headRefName,
-    '--json',
-    'number',
-  ]);
-  const stacked = baseRefName !== trunk || (JSON.parse(above || '[]') as Array<unknown>).length > 0;
-  await (stacked
-    ? must(run, ['gh', 'stack', 'merge', number, '--merge', '--yes'], { inherit: true })
-    : must(run, ['gh', 'pr', 'merge', number, '--merge'], { inherit: true }));
-  await must(run, ['git', 'fetch', '--prune', 'origin']);
-  return 0;
-}
-
 /** Runs `bun run pr <command>`. Returns the exit code. */
 export async function runPr(
   args: Array<string>,
   run: Run,
   write: Write = writeInRepo,
+  clock: Clock = realClock,
 ): Promise<number> {
   const { values, positionals } = parseArgs({
     args,
@@ -293,23 +231,64 @@ export async function runPr(
       'body-file': { type: 'string' },
       force: { type: 'boolean' },
       base: { type: 'string' },
+      json: { type: 'boolean' },
+      timeout: { type: 'string' },
     },
   });
-  const [command, ...rest] = positionals;
-  if (command === 'doctor' && rest.length === 0) {
-    return doctor(run, values.fix === true);
+  const timeout = (fallback: string) => duration(values.timeout ?? fallback);
+  const print = (status: object) =>
+    console.log(values.json ? JSON.stringify(status) : renderStatus(status as PrStatus));
+  /** Each command, with the count of arguments it takes. */
+  const commands: Record<string, [number, (rest: Array<string>) => Promise<number>]> = {
+    doctor: [0, () => doctor(run, values.fix === true)],
+    open: [0, () => open(run, values, write)],
+    body: [
+      2,
+      async ([number, file]) => {
+        await setBody(run, number, file);
+        return 0;
+      },
+    ],
+    status: [
+      1,
+      async ([number]) => {
+        print(await prStatus(run, number));
+        return 0;
+      },
+    ],
+    wait: [
+      1,
+      async ([number]) => {
+        const options = { timeout: timeout('30m'), interval: 20_000 };
+        const { status, code } = await waitForChecks(run, number, clock, options);
+        print({ ...status, timedOut: code === 2 });
+        if (code === 2) {
+          console.log('Timed out with checks still pending.');
+        }
+        return code;
+      },
+    ],
+    failures: [
+      1,
+      async ([number]) => {
+        const status = await prStatus(run, number);
+        console.log(renderFailures(await failures(run, status.checks)));
+        return 0;
+      },
+    ],
+    sync: [1, ([target]) => sync(run, root, target, (options) => open(run, options, write))],
+    ready: [2, ([id, number]) => ready(run, root, id, number)],
+    merge: [
+      1,
+      ([number]) => merge(run, number, clock, { timeout: timeout('15m'), interval: 15_000 }),
+    ],
+  };
+  const [command = '', ...rest] = positionals;
+  const entry = Object.hasOwn(commands, command) ? commands[command] : undefined;
+  if (!entry || entry[0] !== rest.length) {
+    throw new Error(usage);
   }
-  if (command === 'open' && rest.length === 0) {
-    return open(run, values, write);
-  }
-  if (command === 'body' && rest.length === 2) {
-    await setBody(run, rest[0], rest[1]);
-    return 0;
-  }
-  if (command === 'merge' && rest.length === 1) {
-    return merge(run, rest[0]);
-  }
-  throw new Error(usage);
+  return await entry[1](rest);
 }
 
 const spawn: Run = async (command, options) => {
