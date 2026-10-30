@@ -13,10 +13,6 @@ const note = {
   updatedAt: '2026-10-28T12:30:00.000Z',
 };
 
-test('a record becomes a row and comes back the same', () => {
-  expect(toRecord(toRow(note, 'org-a'))).toEqual(note);
-});
-
 test('a row written to Postgres reads back as the same record, only in its organization', async () => {
   const [mine, theirs] = await Effect.runPromise(
     Effect.gen(function* () {

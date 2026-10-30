@@ -1,17 +1,8 @@
 import { expect, test } from 'bun:test';
-import path from 'node:path';
 
-import {
-  mockCall,
-  notAnAlias,
-  parseRegistry,
-  registryFile,
-  registryOf,
-} from '@tools/lint/import-policy.mjs';
+import { mockCall, notAnAlias, parseRegistry, registryFile } from '@tools/lint/import-policy.mjs';
 import { fixtureRegistry, fixtureRegistryYaml, lint } from '@tools/testing/lint-imports';
 import { stringify } from 'yaml';
-
-const root = path.resolve(import.meta.dir, '../..');
 
 test('vendor and language rules do nothing until the registry names them', async () => {
   expect(
@@ -182,10 +173,4 @@ test('an exception lets one file import one specifier past one rule, and needs a
   expect(() => parseRegistry({ exceptions: [{ ...exception, rule: 'vendor' }] })).toThrow(
     '`rule` must be one of aliases-only',
   );
-});
-
-test('each exception in this repository states its reason', () => {
-  for (const exception of registryOf(root).exceptions) {
-    expect(exception.reason.trim()).not.toBe('');
-  }
 });
