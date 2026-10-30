@@ -54,6 +54,7 @@ test('--json reports every registry capability with its detected and declared st
     declared: 'adopted',
     reason: null,
     issue: null,
+    until: null,
     evidence: ['AGENTS.md'],
   });
   expect(row('codeql_sast')).toMatchObject({

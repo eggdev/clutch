@@ -16,6 +16,7 @@ type ReportRow = {
   declared: (typeof declaredStates)[number];
   reason: string | null;
   issue: string | null;
+  until: string | null;
   evidence: Array<string>;
 };
 
@@ -39,6 +40,7 @@ export function buildReport(
       declared: declared?.status ?? 'undeclared',
       reason: declared?.reason ?? null,
       issue: declared?.issue ?? null,
+      until: declared?.until ?? null,
       evidence: found?.evidence ?? [],
     };
   });

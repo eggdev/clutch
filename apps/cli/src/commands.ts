@@ -24,7 +24,8 @@ export const commands: Record<string, Command> = {
     run: (args, cwd) => reviewCommand(args, cwd, cliRoot),
   },
   doctor: {
-    usage: 'clutch doctor [--root DIR] [--json] [--remote] [--category C] [--phase P]',
+    usage:
+      'clutch doctor [--root DIR] [--json] [--remote] [--category C] [--phase P]\nclutch doctor --check\nclutch doctor --write-baseline [--allow-downgrade]',
     summary: 'Report which capabilities a repository has, next to what its clutch.yaml declares.',
     run: doctorCommand,
   },

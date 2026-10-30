@@ -3,7 +3,7 @@ import { context, evaluate } from '@/doctor/rules';
 import type { Context } from '@/doctor/rules';
 import { gitOrThrow } from '@/git';
 
-type Status = 'present' | 'partial' | 'missing' | 'unknown';
+export type Status = 'present' | 'partial' | 'missing' | 'unknown';
 export type Detection = { id: string; status: Status; evidence: Array<string> };
 
 /** The files that git tracks in `root`. An untracked file never counts as evidence. */

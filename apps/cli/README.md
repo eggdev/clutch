@@ -132,6 +132,20 @@ mise exec -- bun run clutch doctor --phase P1
 - `--category` and `--phase` narrow the report. `--remote` is for remote probes.
 - It exits 0 after a report, and 1 when the registry or `clutch.yaml` is bad.
 
+`clutch doctor --check` is the gate. It fails, and exits 1, in these cases:
+
+- An adopted capability is not present.
+- A core capability is not present, and `clutch.yaml` has no waiver or `n/a`
+  for it. An extra capability only gets a warning.
+- A waiver passed its `until` date, or its `issue` is done in `.clutch/issues/`.
+- A capability dropped below `.clutch/doctor-baseline.json`.
+
+A remote rule that is unknown never fails the gate. When a capability rose
+above the baseline, the gate exits 2. Then run
+`mise exec -- bun run clutch doctor --write-baseline` to raise the baseline.
+The baseline only moves up. A lower value needs `--allow-downgrade` and the
+owner's review, because the baseline is a guardrail file.
+
 ## Capability registry
 
 `docs/contributing/capabilities/registry.yaml` lists each capability that a
