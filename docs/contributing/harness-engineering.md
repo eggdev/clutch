@@ -167,10 +167,13 @@ Once a week, `.github/workflows/gardening.yml` runs an agent for one short
 pass. The agent edits files only. The workflow commits the edits to a
 `gardening/<date>` branch and opens one pull request. It never pushes to the
 default branch, and it skips the week while a gardening PR is open. A person
-reviews the PR. The agent runs on the model that the `CLUTCH_AGENT_MODEL`
-repository variable names, or on `claude-haiku-5-5` when it is unset. The
-workflow adds a changeset from the PR title, and agent review reviews the PR
-like any other. The pass:
+reviews the PR. The PR opens with the release bot's token when the
+`CLUTCH_APP_ID` variable is set. A PR that the default token opens starts no
+CI or agent review. See [the release bot](./setup/releases.md#the-release-bot).
+The agent runs on the model that the `CLUTCH_AGENT_MODEL` repository variable
+names, or on `claude-haiku-5-5` when it is unset. The workflow adds a
+changeset from the PR title, and agent review reviews the PR like any other.
+The pass:
 
 1. Read the review comments of the week's merged PRs. Find a comment that
    repeats. Read delivery records for repeated owner interventions and rework.
