@@ -13,8 +13,9 @@ type SastPath = {
 
 /**
  * The SAST engine that `.github/workflows/sast.yml` runs, from `sast` in
- * clutch.yaml and, with `--remote`, whether code scanning takes results. It
- * follows the workflow's own rules. See docs/contributing/capabilities/codeql-sast.md.
+ * clutch.yaml and, with `--remote`, whether code scanning takes results. The
+ * engine job in sast.yml owns these rules; this mirrors it, so change both
+ * together. See docs/contributing/capabilities/codeql-sast.md.
  */
 export async function sastPath(
   config: ClutchConfig | undefined,
