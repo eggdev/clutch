@@ -18,6 +18,10 @@ draft. It runs the Claude Code GitHub Action with this page as its rules.
 The job fails when the agent returns one or more blocking findings. The job
 also fails when the agent returns no result.
 
+The agent runs on the cheapest Claude model, `claude-haiku-5-5`. To choose
+another model, set the `CLUTCH_AGENT_MODEL` repository variable to its id. The
+gardening workflow reads the same variable.
+
 When the repository has no `ANTHROPIC_API_KEY` secret and no
 `CLAUDE_CODE_OAUTH_TOKEN` secret, the job writes a notice and passes. A pull
 request from a fork gets no secrets, so the same notice applies.
