@@ -3,11 +3,14 @@ import path from 'node:path';
 /**
  * Suppression comments. A lint or type rule is on everywhere or off
  * everywhere (docs/contributing/setup/lint-rules.md), so no file may silence
- * one. The directive names are joined from parts, so this file does not match
- * itself.
+ * one. A Semgrep false positive may be silenced on its line when the comment
+ * names the rule and a reason: `nosemgrep: rule-id -- reason`. The directive
+ * names are joined from parts, so this file does not match itself.
  */
 const sources = '{apps,features,packages,tools}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,css}';
 const rootFiles = '*.{ts,mts,js,mjs,cjs,css}';
+/** Semgrep also reads scripts and workflows. */
+const scripts = '{apps,features,packages,tools,.agents,.github}/**/*.{py,sh,yml,yaml}';
 
 export const directives: Array<[label: string, fix: string, pattern: RegExp]> = [
   [
@@ -24,6 +27,14 @@ export const directives: Array<[label: string, fix: string, pattern: RegExp]> = 
     'type check suppression',
     'Fix the type. For a value from outside the program, decode it with a schema.',
     new RegExp(String.raw`(?:\/\/|\/\*)\s*@ts-(?:${'ignore'}|expect-${'error'}|${'nocheck'})`, 'u'),
+  ],
+  [
+    'semgrep suppression without a reason',
+    'Fix the code. For a false positive, name the rule and the reason: nosemgrep: rule-id -- reason.',
+    new RegExp(
+      String.raw`(?:\/\/|\/\*|#)\s*${'no'}sem(?:grep)?\b(?!:\s*[\w.-]+(?:\s*,\s*[\w.-]+)*\s+--\s+\S)`,
+      'u',
+    ),
   ],
 ];
 
@@ -44,7 +55,7 @@ export function findSuppressions(file: string, content: string): Array<Match> {
 
 export async function checkSuppressions(root: string): Promise<Array<Match>> {
   const matches: Array<Match> = [];
-  for (const pattern of [sources, rootFiles]) {
+  for (const pattern of [sources, rootFiles, scripts]) {
     for await (const file of new Bun.Glob(pattern).scan({ cwd: root, dot: true })) {
       if (!file.split('/').includes('node_modules')) {
         matches.push(...findSuppressions(file, await Bun.file(path.join(root, file)).text()));

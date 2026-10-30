@@ -60,6 +60,7 @@ the whole checklist. Silence is not acceptance.
 | Inbound webhooks | On / off / later / undecided | Off |
 | Platforms and profiles | Web (Vite or Next.js) / native (One or Expo) / both / no client | Web, Vite with TanStack Router |
 | Repository access | Private / public; outside contributions yes / no | Private; no outside contributions |
+| Static analysis (SAST) | Auto / CodeQL / Semgrep. CodeQL is free on a public repository. On a private one it needs GitHub Code Security, about $30 per active committer per month, sold to organizations. Semgrep Community Edition is free everywhere; its findings show in the check log, with no Security tab. | Auto: CodeQL where code scanning takes results, Semgrep elsewhere |
 
 Add a capability when the owner's brief calls for it. Validation,
 accessibility, authorization and performance are quality rules. They are never
@@ -126,7 +127,9 @@ Examples:
 
 Write the reviewed choices under **Setup choices** in
 `docs/contributing/project-intent.md`: one row for each choice, with the
-selection and any provider or constraint. Provider details live in the owning
+selection and any provider or constraint. Write the SAST choice as `sast:
+auto`, `codeql` or `semgrep` in `clutch.yaml` too, because `sast.yml` reads it,
+and fill its slot in `docs/contributing/capabilities/codeql-sast.md`. Provider details live in the owning
 architecture page or decision record. The row links to it. The table records
 scope. It is not a list of what is built. Keep a kickoff slot for each open
 decision, so that a later session can resume. Do not copy the table into the

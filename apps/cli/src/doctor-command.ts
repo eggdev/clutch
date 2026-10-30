@@ -8,6 +8,7 @@ import { detect } from '@/doctor/detect';
 import { gate } from '@/doctor/gate';
 import { remoteProber, runGh } from '@/doctor/remote';
 import { buildReport, renderReport } from '@/doctor/report';
+import { renderSast, sastPath } from '@/doctor/sast';
 import { cliRoot } from '@/format';
 import { git } from '@/git';
 import { readIssues } from '@/issues/parse';
@@ -81,6 +82,7 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
   const probe = values.remote ? remoteProber({ root, repo: values.repo, gh: runGh }) : undefined;
   const detections = await detect(root, entries, { remote: values.remote, probe });
   const report = buildReport(entries, detections, config);
+  const sast = await sastPath(config, probe);
   if (values['write-baseline']) {
     const next = nextBaseline(detections, await readBaseline(root), values['allow-downgrade']);
     await writeBaseline(root, next);
@@ -94,6 +96,14 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
       today: new Date().toISOString().slice(0, 10),
       baseline: await readBaseline(root),
     });
+    if (sast.problem) {
+      result.failures.push({
+        id: 'sast',
+        kind: 'sast mismatch',
+        message: `sast mismatch: ${sast.problem}`,
+      });
+      result.code = 1;
+    }
     if (values.json) {
       console.log(JSON.stringify({ schemaVersion: 1, root, ...result }));
     } else {
@@ -119,10 +129,12 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
         templateRelease: await syncedRelease(root),
         registryCommit: await headCommit(cliRoot),
         ...report,
+        sast,
       }),
     );
   } else {
     console.log(renderReport(report));
+    console.log(renderSast(sast));
   }
   return 0;
 }

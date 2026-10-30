@@ -43,6 +43,7 @@ test('--json reports every registry capability with its detected and declared st
     'registryCommit',
     'results',
     'summary',
+    'sast',
   ]);
   expect(report).toMatchObject({ schemaVersion: 1, root: repo.root, templateRelease: 'v0.2.0' });
   expect(report.results).toHaveLength(36);
@@ -67,6 +68,7 @@ test('--json reports every registry capability with its detected and declared st
     issue: 'CL-102',
   });
   expect(report.summary.declared).toEqual({ adopted: 1, waived: 1, 'n/a': 0, undeclared: 34 });
+  expect(report.sast).toMatchObject({ choice: 'auto', engine: null, problem: null });
 });
 
 test('a repository without Clutch files reports every capability as undeclared', async () => {
@@ -75,7 +77,8 @@ test('a repository without Clutch files reports every capability as undeclared',
   expect(result.code).toBe(0);
   const lines = result.stdout.trim().split('\n');
   expect(lines.filter((line) => line.startsWith('  '))).toHaveLength(36);
-  expect(lines.at(-1)).toContain('Declared: 0 adopted, 0 waived, 0 n/a, 36 undeclared.');
+  expect(lines.at(-2)).toContain('Declared: 0 adopted, 0 waived, 0 n/a, 36 undeclared.');
+  expect(lines.at(-1)).toBe('SAST: auto -> ? (code scanning not checked without --remote)');
 });
 
 test('--phase narrows the report, and a bad clutch.yaml exits 1 with its path', async () => {

@@ -146,3 +146,12 @@ test('pr is optional and takes a branch prefix', () => {
     'pr.branchPrefix',
   ]);
 });
+
+test('sast is optional and takes auto, codeql or semgrep', () => {
+  expect(validateClutchConfig(valid).config?.sast).toBeUndefined();
+  for (const engine of ['auto', 'codeql', 'semgrep'] as const) {
+    expect(validateClutchConfig({ ...valid, sast: engine }).config?.sast).toBe(engine);
+  }
+  expect(paths({ ...valid, sast: 'opengrep' })).toEqual(['sast']);
+  expect(paths({ ...valid, sast: { engine: 'codeql' } })).toEqual(['sast']);
+});

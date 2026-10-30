@@ -227,6 +227,27 @@ export function remoteProber(options: { root: string; repo?: string; gh: Gh }) {
         ? pass('GitHub CodeQL default setup')
         : fail;
     },
+    /**
+     * Code scanning takes results here: the repository is public, or GitHub
+     * answers the alerts list. A 403 means a private repository without GitHub
+     * Code Security. A 404 means no analysis yet, which still counts.
+     */
+    code_scanning: async () => {
+      const response = await settings();
+      if (response.status !== 200) {
+        return unknown(response.reason);
+      }
+      if ((response.body as { private?: boolean }).private === false) {
+        return pass('public repository');
+      }
+      const alerts = await get(`repos/${await repo()}/code-scanning/alerts?per_page=1`);
+      if (alerts.status === 403) {
+        return { outcome: 'fail', evidence: ['private repository without GitHub Code Security'] };
+      }
+      return alerts.status === 0
+        ? unknown(alerts.reason)
+        : pass('private repository with GitHub Code Security');
+    },
     required_check: async (name) => {
       const rules = await branchRules();
       if (typeof rules === 'string') {
