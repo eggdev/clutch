@@ -14,6 +14,7 @@
     "prepare": "bun tools/hooks/install.ts",
     "hooks:pre-commit": "lint-staged --concurrent false --config tools/hooks/paths.mjs",
     "hooks:pre-push": "bun tools/hooks/pre-push.ts",
+    "hooks:commit-msg": "bun tools/hooks/commit-msg.ts",
     "validate": "CI=1 nx run-many -t typecheck test lint format-check lint-policy-test skill-tests audit-prod checks",
     "check": "nx run-many -t typecheck lint format-check",
     "dev": "bun tools/dev.ts",

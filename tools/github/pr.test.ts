@@ -39,10 +39,10 @@ test('open on the default branch base creates a ready PR and links no stack', as
     }
     return gh.run(command, options);
   };
-  expect(await runPr(['open', '--title', 'Add it', '--body-file', 'body.md'], run)).toBe(0);
+  expect(await runPr(['open', '--title', 'feat: add it', '--body-file', 'body.md'], run)).toBe(0);
   expect(gh.calls).toContain('git push --set-upstream origin HEAD');
   expect(gh.calls).toContain(
-    'gh pr create --base main --head cl-024 --title Add it --body-file body.md',
+    'gh pr create --base main --head cl-024 --title feat: add it --body-file body.md',
   );
   expect(gh.calls.some((call) => call.startsWith('gh stack'))).toBe(false);
   expect(gh.calls.some((call) => call.includes('--draft'))).toBe(false);
@@ -69,7 +69,7 @@ test('open on a stacked base reuses the open PR and links the whole chain', asyn
   ]);
   expect(
     await runPr(
-      ['open', '--title', 'Add it', '--body-file', 'body.md', '--base', 'cl-007'],
+      ['open', '--title', 'feat: add it', '--body-file', 'body.md', '--base', 'cl-007'],
       gh.run,
     ),
   ).toBe(0);
@@ -126,7 +126,7 @@ test('doctor reports a gh that does not match mise.toml, and --fix installs the 
 test('a wrong command or missing flag gives the usage', async () => {
   const gh = fake([]);
   await expect(runPr(['close', '1'], gh.run)).rejects.toThrow('Usage: bun run pr');
-  await expect(runPr(['open', '--title', 'x'], gh.run)).rejects.toThrow(
+  await expect(runPr(['open', '--title', 'fix: x'], gh.run)).rejects.toThrow(
     'open needs --title and --body-file',
   );
 });
@@ -138,7 +138,7 @@ test('a rejected push names --force, and --force pushes with a lease', async () 
     ['git push', { ok: false }],
   ]);
   await expect(
-    runPr(['open', '--title', 'x', '--body-file', 'b.md'], rejected.run),
+    runPr(['open', '--title', 'fix: x', '--body-file', 'b.md'], rejected.run),
   ).rejects.toThrow('run open again with --force');
 
   const forced = fake([
@@ -149,8 +149,16 @@ test('a rejected push names --force, and --force pushes with a lease', async () 
       { out: '[{"number":12,"baseRefName":"main","url":"u","isDraft":false}]' },
     ],
   ]);
-  expect(await runPr(['open', '--title', 'x', '--body-file', 'b.md', '--force'], forced.run)).toBe(
-    0,
-  );
+  expect(
+    await runPr(['open', '--title', 'fix: x', '--body-file', 'b.md', '--force'], forced.run),
+  ).toBe(0);
   expect(forced.calls).toContain('git push --set-upstream --force-with-lease origin HEAD');
+});
+
+test('open refuses a PR title that is not a conventional commit', async () => {
+  const gh = fake([trunk]);
+  await expect(runPr(['open', '--title', 'Add it', '--body-file', 'b.md'], gh.run)).rejects.toThrow(
+    'The PR title must be a conventional commit.',
+  );
+  expect(gh.calls).toEqual([]);
 });
