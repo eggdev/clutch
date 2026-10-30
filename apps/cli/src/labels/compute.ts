@@ -64,7 +64,7 @@ export function areaOf(file: string, workspaces: Array<string>) {
 }
 
 /** Files whose changed lines never count toward the size: lockfiles, snapshots and the tracker. */
-export const sizeExcluded = [
+const sizeExcluded = [
   'bun.lock',
   '**/bun.lock',
   'package-lock.json',
