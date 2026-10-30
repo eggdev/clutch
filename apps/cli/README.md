@@ -114,6 +114,32 @@ The loader rejects unknown keys. Each error names its YAML path, such as
 `template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
 guardrail file, so a person reviews each change to it.
 
+## Sync
+
+`clutch sync` moves a project to a Clutch commit. `clutch.files.yaml` in Clutch
+names the files and gives each one a rule. The longest matching path decides.
+
+| Rule      | What sync does                                                       |
+| --------- | -------------------------------------------------------------------- |
+| `managed` | Replaces the file. A file that the project edited needs a decision.  |
+| `merge`   | Merges the project's copy with Clutch's copy.                        |
+| `seed`    | Nothing. Install writes it once, and the project owns it after that. |
+
+```sh
+mise exec -- bun run clutch sync --root ../shop --check
+mise exec -- bun run clutch sync --root ../shop --latest
+```
+
+- Without `--to` or `--latest`, sync uses the commit that the project's
+  `clutch.yaml` pins. A sync then sets that pin to the new commit.
+- `.clutch/lineage.json` records the hash of each managed file at the last
+  sync. A project with only review tooling starts from `.review/tooling.json`.
+- `--check` changes nothing. It exits 0 when the project is up to date, 2 when a
+  sync would change files or a file needs a decision, and 1 on an error.
+- A sync never commits. Commit the result on a branch, and open a PR.
+- When a managed file needs a decision, nothing changes. Ask the owner whether
+  to keep the edit or take the Clutch copy.
+
 ## Doctor
 
 `clutch doctor` shows each capability that a repository has, next to what its

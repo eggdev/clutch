@@ -27,7 +27,7 @@ export function safeRelative(value: string): void {
   }
 }
 
-async function gitBytes(root: string, args: Array<string>): Promise<Buffer> {
+export async function gitBytes(root: string, args: Array<string>): Promise<Buffer> {
   const child = Bun.spawn(['git', ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' });
   const [output, error, code] = await Promise.all([
     new Response(child.stdout).arrayBuffer(),
@@ -40,7 +40,7 @@ async function gitBytes(root: string, args: Array<string>): Promise<Buffer> {
   return Buffer.from(output);
 }
 
-async function tree(
+export async function tree(
   root: string,
   commit: string,
   prefixes: Array<string>,
