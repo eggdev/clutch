@@ -43,7 +43,7 @@ export const commands: Record<string, Command> = {
   },
   issues: {
     usage:
-      'clutch issues [--write | --check] [--json]\nclutch issues next [--stack] [--json]\nclutch issues set <id> <status> [--pr URL] [--owner NAME]',
+      'clutch issues [--write | --check] [--json]\nclutch issues next [--stack] [--json]\nclutch issues set <id> <status> [--pr URL] [--owner NAME]\nclutch issues new --phase P --title TEXT [--depends CL-NNN,...] [--owner NAME] [--range CL-NNN..CL-NNN]',
     summary: 'List, pick and update the issues in .clutch/issues, and render .clutch/TRACKER.md.',
     run: issuesCommand,
   },

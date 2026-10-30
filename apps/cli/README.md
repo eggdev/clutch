@@ -88,6 +88,7 @@ which mise installs. `clutch --version` prints its release.
 mise exec -- bun run clutch issues
 mise exec -- bun run clutch issues next --stack
 mise exec -- bun run clutch issues set CL-003 review --pr <url>
+mise exec -- bun run clutch issues new --phase P1 --title 'Add x' --range CL-118..CL-120
 mise exec -- bun run clutch issues --write
 mise exec -- bun run clutch issues --check
 ```
@@ -97,6 +98,10 @@ mise exec -- bun run clutch issues --check
   PRs. A `later` issue never comes next.
 - `set` changes the frontmatter of one issue, then rewrites
   `.clutch/TRACKER.md`.
+- `new` fetches origin and writes a `todo` issue with the next free id. That
+  id is one above the highest id in the phase's range, or in `--range`, across
+  the working tree, each local branch and each `origin/*` branch. See
+  `.clutch/README.md#commands`.
 - `--write` renders `.clutch/TRACKER.md` in the format that `format-check`
   expects. Never edit that file by hand.
 - `--check` exits 2 when `.clutch/TRACKER.md` is stale, and 1 when an issue

@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { gitOrThrow } from '@/git';
 import { gitRepo } from '@/testing/git-repo';
 
 const main = path.join(import.meta.dir, 'main.ts');
@@ -76,4 +77,53 @@ test('set refuses an unknown status and an unknown issue', async () => {
   expect(await clutch(repo.root, 'set', 'CL-009', 'done')).toMatchObject({
     stderr: expect.stringContaining('No issue CL-009'),
   });
+});
+
+test('new takes the next id across every origin branch, and --range reserves a block', async () => {
+  await using upstream = await tracker();
+  await gitOrThrow(upstream.root, 'switch', '--quiet', '--create', 'lane-b');
+  await upstream.write({ '.clutch/issues/CL-005.md': issueFile('CL-005', 'todo', '') });
+  await gitOrThrow(upstream.root, 'add', '--all');
+  await gitOrThrow(upstream.root, 'commit', '--quiet', '--message', 'File CL-005');
+  await gitOrThrow(upstream.root, 'switch', '--quiet', 'main');
+  const root = path.join(upstream.parent, 'clone');
+  await gitOrThrow(upstream.parent, 'clone', '--quiet', upstream.root, root);
+
+  const created = await clutch(root, 'new', '--phase', 'P0', '--title', 'Next one', '--json');
+  expect(created.code).toBe(0);
+  expect(JSON.parse(created.stdout)).toEqual({
+    schemaVersion: 1,
+    id: 'CL-006',
+    file: '.clutch/issues/CL-006.md',
+  });
+  expect(await clutch(root, '--check')).toMatchObject({ code: 0 });
+
+  const args = ['new', '--phase', 'P1', '--title', 'Lane work', '--range', 'CL-118..CL-119'];
+  const first = await clutch(root, ...args);
+  expect(first.stdout).toStartWith('CL-118  .clutch/issues/CL-118.md');
+  const second = await clutch(root, ...args);
+  expect(second.stdout).toStartWith('CL-119  .clutch/issues/CL-119.md');
+  expect(await clutch(root, ...args)).toMatchObject({
+    code: 1,
+    stderr: expect.stringContaining('No free id in CL-118..CL-119.'),
+  });
+});
+
+test('new refuses an unknown phase and a bad dependency', async () => {
+  await using repo = await tracker();
+  expect(await clutch(repo.root, 'new', '--phase', 'P9', '--title', 'x')).toMatchObject({
+    code: 1,
+    stderr: expect.stringContaining('--phase must be one of'),
+  });
+  expect(
+    await clutch(repo.root, 'new', '--phase', 'P0', '--title', 'x', '--depends', 'CL-1'),
+  ).toMatchObject({ code: 1, stderr: expect.stringContaining('--depends takes issue ids') });
+});
+
+test('--check fails when an issue file claims the id of another file', async () => {
+  await using repo = await tracker();
+  await repo.write({ '.clutch/issues/CL-004.md': issueFile('CL-003', 'todo', '') });
+  const result = await clutch(repo.root, '--check');
+  expect(result.code).toBe(1);
+  expect(result.stderr).toContain('.clutch/issues/CL-004.md: id: The file name must be CL-003.md.');
 });

@@ -45,7 +45,7 @@ The body follows the frontmatter: `# CL-NNN: <title>`, then Goal, Context, Steps
 - Migrated `.delivery` records: `CL-8xx`.
 - Deferred backlog: `CL-9xx`, phase `later`. `clutch issues next` never picks it. Brendan moves an issue out of `later` when it is time.
 
-New issues take the next free id in their range. An issue that moves to another phase keeps its id, so links and waivers stay valid.
+New issues take the next free id in their range. Make them with `clutch issues new`, never by hand. Parallel branches cannot see each other's files, so two lanes that pick an id by hand can pick the same one. A coordinator reserves a block for each lane, such as `CL-118..CL-120`, and the lane passes it as `--range`. An issue that moves to another phase keeps its id, so links and waivers stay valid.
 
 ## Commands
 
@@ -54,5 +54,6 @@ New issues take the next free id in their range. An issue that moves to another 
 - `clutch issues --check`: exit 2 when `TRACKER.md` is stale.
 - `clutch issues next [--stack]`: print the first `todo` issue with `owner: agent`, outside `later`, whose dependencies are `done` (or in `review`, up to 3 deep, with `--stack`).
 - `clutch issues set CL-NNN <status> [--pr <url>] [--owner <name>]`.
+- `clutch issues new --phase <P> --title <title> [--depends CL-NNN,...] [--owner <name>] [--range CL-NNN..CL-NNN]`: fetch origin, then write `issues/CL-NNN.md` with `status: todo` and the next free id. The id is one above the highest id in the phase's range, or in `--range`. It counts each issue file in the working tree, in each local branch and in each `origin/*` branch. A renumbered id never comes back. It fails when the range is full. Fill in the body sections, then commit and push the file soon, so other lanes see the id.
 
 Mirroring issues to GitHub Issues needs Brendan's approval first.
