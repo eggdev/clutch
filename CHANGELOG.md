@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.23.0 (2026-10-30)
+
+### Features
+
+- feat(ci): turn auto-merge on for bot PRs (CL-405)
+
 ## 0.22.0 (2026-10-30)
 
 ### Features
