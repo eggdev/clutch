@@ -272,6 +272,7 @@ export async function installTemplate(options: {
     schemaVersion: 1,
     templateRepo: '',
     templateCommit: commit,
+    ...(source.release ? { release: source.release } : {}),
     files: Object.fromEntries([...source.managed.files].map(([name, file]) => [name, file.hash])),
     ...(Object.keys(planned.kept).length > 0 ? { kept: planned.kept } : {}),
   };

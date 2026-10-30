@@ -13,6 +13,7 @@ import { git, gitOrThrow } from '@/git';
 import { adoptedLineage } from '@/init/adopt';
 import { freshChangelog } from '@/install-template';
 import { renderTracker } from '@/issues/render';
+import { latestRelease } from '@/release';
 import { lineagePath, loadClutchSource } from '@/sync/source';
 
 const trackerReadme = `# Tracker
@@ -37,14 +38,13 @@ async function write(root: string, file: string, content: string) {
 function configText(input: {
   project: string;
   repo: string;
-  commit: string;
   mode: string;
   decisions: Record<string, unknown>;
 }) {
   const doc = new Document({
     schemaVersion: 1,
     project: input.project,
-    template: { repo: input.repo, commit: input.commit, mode: input.mode },
+    template: { repo: input.repo, mode: input.mode },
     capabilities: input.decisions,
   });
   doc.commentBefore =
@@ -80,7 +80,7 @@ async function run(args: Array<string>, cwd: string, template: string): Promise<
       return 0;
     }
   }
-  const commit = await gitOrThrow(template, 'rev-parse', 'HEAD');
+  const release = await latestRelease(template);
   const registry = await loadRegistry(template);
   const entries = registry.capabilities ?? [];
   const detections = await detect(root, entries);
@@ -100,19 +100,19 @@ async function run(args: Array<string>, cwd: string, template: string): Promise<
     configText({
       project: path.basename(root),
       repo: await templateRepo(template),
-      commit,
       mode: values.mode,
       decisions,
     }),
   );
   const written = ['clutch.yaml'];
   if (values.mode === 'sync' && values.adopt) {
-    const source = await loadClutchSource(template, commit);
+    const source = await loadClutchSource(template, release);
     const files = await adoptedLineage(root, template, source.managed);
     const lineage = {
       schemaVersion: 1,
       templateRepo: await templateRepo(template),
-      templateCommit: commit,
+      templateCommit: source.commit,
+      release,
       files,
     };
     await write(root, lineagePath, `${JSON.stringify(lineage, null, 2)}\n`);
@@ -140,7 +140,7 @@ async function run(args: Array<string>, cwd: string, template: string): Promise<
   const waived = Object.values(decisions).filter((value) => typeof value === 'object').length;
   console.log(
     [
-      `Clutch is adopted in ${root} (mode ${values.mode}, Clutch ${commit.slice(0, 12)}). Nothing is committed.`,
+      `Clutch is adopted in ${root} (mode ${values.mode}, Clutch ${release}). Nothing is committed.`,
       `Wrote: ${written.join(', ')}.`,
       `${waived} core gaps have the placeholder waiver "Decide during adoption." Replace each one with a reason and an issue.`,
       'Next: make a branch, review the files, run clutch doctor --check, then commit and open a PR.',

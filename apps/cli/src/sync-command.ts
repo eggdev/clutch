@@ -36,10 +36,15 @@ function print(result: SyncResult) {
     planned: 'would move to',
     synced: 'moved to',
   } as const;
-  console.log(`The project ${verbs[result.status]} Clutch ${result.templateCommit.slice(0, 12)}.`);
+  const target = result.release ?? result.templateCommit.slice(0, 12);
+  const latest = result.latest ? ', the latest release' : '';
+  console.log(`The project ${verbs[result.status]} Clutch ${target}${latest}.`);
+  if (result.latest && result.status === 'planned') {
+    console.log('The project is behind the latest Clutch release. Run clutch sync to take it.');
+  }
 }
 
-/** `clutch sync`: moves a project to a Clutch commit. `--check` only reports. */
+/** `clutch sync`: moves a project to the latest Clutch release. `--check` only reports. */
 export async function syncCommand(
   args: Array<string>,
   cwd: string,
@@ -51,7 +56,6 @@ export async function syncCommand(
       options: {
         root: { type: 'string' },
         to: { type: 'string' },
-        latest: { type: 'boolean' },
         check: { type: 'boolean' },
         json: { type: 'boolean' },
         keep: { type: 'string', multiple: true },
@@ -59,13 +63,10 @@ export async function syncCommand(
         only: { type: 'string' },
       },
     });
-    if (values.to && values.latest) {
-      throw new Error('Pass --to <commit> or --latest, not both.');
-    }
     const request = {
       root: path.resolve(cwd, values.root ?? '.'),
       template,
-      to: values.latest ? 'HEAD' : values.to,
+      to: values.to,
       check: values.check,
       keep: values.keep ?? [],
       take: values.take ?? [],
@@ -82,12 +83,14 @@ export async function syncCommand(
         files: result.decisions,
       });
       if (answers) {
-        result = await runSync({
+        // The same commit as the first run, even when a release lands in between.
+        const answered = await runSync({
           ...request,
           to: result.templateCommit,
           keep: [...request.keep, ...answers.keep],
           take: [...request.take, ...answers.take],
         });
+        result = { ...answered, latest: result.latest };
       }
     }
     if (values.json) {

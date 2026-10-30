@@ -4,7 +4,6 @@ import path from 'node:path';
 import { gitRepo } from '@/testing/git-repo';
 
 const main = path.join(import.meta.dir, 'main.ts');
-const commit = '37e824f2d552163f18e5c91b126fc6655de435f9';
 
 async function doctor(...args: Array<string>) {
   const proc = Bun.spawn([process.execPath, main, 'doctor', ...args], {
@@ -22,26 +21,30 @@ async function doctor(...args: Array<string>) {
 const config = [
   'schemaVersion: 1',
   'project: shop',
-  `template: { repo: eggdev/clutch, commit: ${commit}, mode: sync }`,
+  'template: { repo: eggdev/clutch, mode: sync }',
   'capabilities:',
   '  root_agents_md: adopted',
   '  codeql_sast: { status: waived, reason: Lands in CL-102., issue: CL-102 }',
 ].join('\n');
 
 test('--json reports every registry capability with its detected and declared state', async () => {
-  await using repo = await gitRepo({ 'AGENTS.md': '# Agents\n', 'clutch.yaml': config });
+  await using repo = await gitRepo({
+    'AGENTS.md': '# Agents\n',
+    'clutch.yaml': config,
+    '.clutch/lineage.json': JSON.stringify({ release: 'v0.2.0', files: {} }),
+  });
   const result = await doctor('--root', repo.root, '--json');
   expect(result.code).toBe(0);
   const report = JSON.parse(result.stdout);
   expect(Object.keys(report)).toEqual([
     'schemaVersion',
     'root',
-    'templateCommit',
+    'templateRelease',
     'registryCommit',
     'results',
     'summary',
   ]);
-  expect(report).toMatchObject({ schemaVersion: 1, root: repo.root, templateCommit: commit });
+  expect(report).toMatchObject({ schemaVersion: 1, root: repo.root, templateRelease: 'v0.2.0' });
   expect(report.results).toHaveLength(36);
   const row = (id: string) => report.results.find((item: { id: string }) => item.id === id);
   expect(row('root_agents_md')).toEqual({
@@ -76,11 +79,11 @@ test('a repository without Clutch files reports every capability as undeclared',
 });
 
 test('--phase narrows the report, and a bad clutch.yaml exits 1 with its path', async () => {
-  await using repo = await gitRepo({ 'clutch.yaml': config.replace(commit, 'abc') });
+  await using repo = await gitRepo({ 'clutch.yaml': config.replace('mode: sync', 'mode: copy') });
   const bad = await doctor('--root', repo.root);
   expect(bad).toMatchObject({
     code: 1,
-    stderr: expect.stringContaining('clutch.yaml template.commit'),
+    stderr: expect.stringContaining('clutch.yaml template.mode'),
   });
 
   await repo.write({ 'clutch.yaml': config });

@@ -46,8 +46,9 @@ async function source() {
   return repo;
 }
 
+// These tests commit to the fixture checkout and sync each new commit, so they pass --to HEAD.
 const review = (root: string, template: string, check?: boolean) =>
-  runSync({ root, template, only: 'review', check });
+  runSync({ root, template, to: 'HEAD', only: 'review', check });
 
 test('sync --only review distributes shared tooling, preserves project verify and repeats without changes', async () => {
   await using template = await source();
@@ -60,7 +61,9 @@ test('sync --only review distributes shared tooling, preserves project verify an
   const { log } = console;
   console.log = (line: string) => output.push(line);
   try {
-    expect(await syncCommand(['--only', 'review'], project.root, template.root)).toBe(0);
+    expect(
+      await syncCommand(['--only', 'review', '--to', 'HEAD'], project.root, template.root),
+    ).toBe(0);
   } finally {
     console.log = log;
   }

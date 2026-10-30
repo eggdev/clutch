@@ -7,6 +7,7 @@ import { loadClutchConfig } from '@/clutch-config/load';
 import { formatFile, formatText } from '@/format';
 import { gitOrThrow } from '@/git';
 import { mergers } from '@/install-template';
+import { latestRelease } from '@/release';
 import { localFile } from '@/review-source';
 import { apply, plan, writeEntry } from '@/sync/engine';
 import type { Change, SyncFile } from '@/sync/engine';
@@ -18,6 +19,8 @@ type Lineage = {
   schemaVersion: 1;
   templateRepo: string;
   templateCommit: string;
+  /** The Clutch release of `templateCommit`. Absent for a commit between releases. */
+  release?: string;
   files: Record<string, string>;
   /** Managed files the project kept over Clutch's copy, with the Clutch hash it declined. */
   kept?: Record<string, string>;
@@ -27,6 +30,10 @@ export type SyncResult = {
   schemaVersion: 1;
   status: 'unchanged' | 'planned' | 'decisions' | 'synced';
   templateCommit: string;
+  /** The Clutch release that the sync targets, or null for a commit between releases. */
+  release: string | null;
+  /** The sync targets the latest release, not a `--to` revision. */
+  latest: boolean;
   changes: Array<Change>;
   /** Managed files that the project edited. A person keeps or takes each one with --keep or --take. */
   decisions: Array<string>;
@@ -139,17 +146,17 @@ async function planMerges(
   return { writes, changes, clashes, inspected, decisions, kept: nextKept };
 }
 
-/** `clutch.yaml` with `template.commit` set to `commit`, or nothing when it already matches. */
-async function pinnedConfig(root: string, commit: string) {
+/** `clutch.yaml` without the pin that an older copy has, or nothing when it has none. */
+async function unpinnedConfig(root: string) {
   const config = await localFile(root, 'clutch.yaml');
   if (!config) {
     return null;
   }
   const doc = parseDocument(config.content.toString());
-  if (doc.getIn(['template', 'commit']) === commit) {
+  if (!doc.hasIn(['template', 'commit'])) {
     return null;
   }
-  doc.setIn(['template', 'commit'], commit);
+  doc.deleteIn(['template', 'commit']);
   return doc.toString();
 }
 
@@ -176,6 +183,7 @@ function nextLineage(input: {
     schemaVersion: 1,
     templateRepo: input.repo ?? '',
     templateCommit: source.commit,
+    ...(source.release ? { release: source.release } : {}),
     files: {
       ...outside(lineage.files, scope),
       ...Object.fromEntries([...source.managed.files].map(([file, entry]) => [file, entry.hash])),
@@ -188,17 +196,17 @@ function nextLineage(input: {
   return next;
 }
 
-/** The changes to the lineage, the pin in clutch.yaml and the old review record. */
+/** The changes to the lineage, the old pin in clutch.yaml and the old review record. */
 function recordChanges(
   lineage: Awaited<ReturnType<typeof readLineage>>,
   lineageText: string,
-  pinned: string | null,
+  unpinned: string | null,
 ): Array<Change> {
   const changes: Array<Change> = [];
   if (lineage.previous?.content.toString() !== lineageText) {
     changes.push({ path: lineagePath, action: lineage.previous ? 'update' : 'add' });
   }
-  if (pinned) {
+  if (unpinned) {
     changes.push({ path: 'clutch.yaml', action: 'update' });
   }
   if (lineage.legacy) {
@@ -207,12 +215,12 @@ function recordChanges(
   return changes;
 }
 
-/** Writes the merged files, the lineage and the new pin, after the engine wrote the managed files. */
+/** Writes the merged files, the lineage and clutch.yaml without its old pin, after the engine wrote the managed files. */
 async function writeRest(
   root: string,
   merged: Map<string, string>,
   lineageText: string,
-  pinned: string | null,
+  unpinned: string | null,
   legacy: boolean,
 ) {
   for (const [file, content] of merged) {
@@ -226,8 +234,8 @@ async function writeRest(
     content: Buffer.from(lineageText),
     hash: '',
   });
-  if (pinned) {
-    await writeFile(path.join(root, 'clutch.yaml'), pinned);
+  if (unpinned) {
+    await writeFile(path.join(root, 'clutch.yaml'), unpinned);
   }
   if (legacy) {
     await unlink(path.join(root, reviewRecord));
@@ -235,9 +243,9 @@ async function writeRest(
 }
 
 /**
- * Moves the project at `root` to the Clutch commit `to`, read from the Clutch
- * checkout `template`. Without `to`, it uses the commit that `clutch.yaml`
- * pins, or the checkout's HEAD. Seed files are never touched.
+ * Moves the project at `root` to the Clutch revision `to`, read from the Clutch
+ * checkout `template`. Without `to`, it uses the latest Clutch release. Seed
+ * files are never touched.
  */
 export async function runSync(options: {
   root: string;
@@ -254,7 +262,7 @@ export async function runSync(options: {
   const config = loaded.kind === 'loaded' ? loaded.config : undefined;
   const source = await loadClutchSource(
     options.template,
-    options.to ?? config?.template.commit ?? 'HEAD',
+    options.to ?? (await latestRelease(options.template)),
     options.only,
   );
   const lineage = await readLineage(root);
@@ -284,11 +292,11 @@ export async function runSync(options: {
     kept: { ...kept, ...merges.kept },
   });
   const lineageText = `${JSON.stringify(next, null, 2)}\n`;
-  const pinned = scope ? null : await pinnedConfig(root, source.commit);
+  const unpinned = scope ? null : await unpinnedConfig(root);
   const changes = [
     ...managed.changes,
     ...merges.changes,
-    ...recordChanges(lineage, lineageText, pinned),
+    ...recordChanges(lineage, lineageText, unpinned),
   ];
   if (lineage.legacy) {
     managed.inspected.set(reviewRecord, lineage.legacy.hash);
@@ -297,6 +305,8 @@ export async function runSync(options: {
     schemaVersion: 1,
     status: 'unchanged',
     templateCommit: source.commit,
+    release: source.release,
+    latest: options.to === undefined,
     changes,
     decisions: [...managed.conflicts, ...merges.decisions],
     mergeClashes: merges.clashes,
@@ -314,6 +324,6 @@ export async function runSync(options: {
     managed.inspected.set(file, hash);
   }
   await apply(root, source.managed, managed, lineagePath);
-  await writeRest(root, merges.writes, lineageText, pinned, lineage.legacy !== null);
+  await writeRest(root, merges.writes, lineageText, unpinned, lineage.legacy !== null);
   return { ...result, status: 'synced' };
 }

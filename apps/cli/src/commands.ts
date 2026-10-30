@@ -36,8 +36,9 @@ export const commands: Record<string, Command> = {
   },
   sync: {
     usage:
-      'clutch sync [--root DIR] [--to <commit> | --latest] [--only GROUP] [--check] [--json]\nclutch sync --only review   (the shared review tooling only)',
-    summary: 'Move a project to a Clutch commit. --check exits 2 when a sync would change files.',
+      'clutch sync [--root DIR] [--to <tag or commit>] [--only GROUP] [--check] [--json]\nclutch sync --only review   (the shared review tooling only)',
+    summary:
+      'Move a project to the latest Clutch release. --check exits 2 when the project is behind it.',
     run: (args, cwd) => syncCommand(args, cwd),
     clone: true,
   },
