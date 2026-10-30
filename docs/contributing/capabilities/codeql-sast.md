@@ -17,7 +17,7 @@ Rank 16 of the researched practices. About two thirds of the leading repositorie
 3. Use the `init` and `analyze` actions of `github/codeql-action`. Pin each action to a full commit SHA.
 4. Grant `contents: read` at the top level. Grant `security-events: write` to the job only.
 5. List each language of the repository, such as `javascript-typescript` and `actions`.
-6. As an alternative, turn on CodeQL default setup in the code security settings on GitHub.
+6. As an alternative, turn on CodeQL default setup in the code security settings on GitHub. Pick one: GitHub refuses the workflow's results while default setup is on.
 7. Set `codeql_sast` to `adopted` in `clutch.yaml`.
 
 ## Waive

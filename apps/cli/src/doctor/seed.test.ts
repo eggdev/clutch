@@ -30,7 +30,7 @@ const expected: Record<string, string> = {
   changed_scope_check: 'partial',
   protected_main: 'unknown',
   secret_scanning: 'unknown',
-  codeql_sast: 'missing',
+  codeql_sast: 'present',
   dep_automation: 'missing',
   dep_min_age: 'present',
   ci_security_lint: 'present',
