@@ -8,7 +8,7 @@ Rank 51 of the researched practices. About one third of the leading repositories
 
 ## Detection
 
-`clutch doctor` reports this capability as present when git tracks a `gardening.yml` or `gardening.yaml` workflow in `.github/workflows/`. Two workflow rules together also count: a workflow triggers on `schedule`, and a workflow uses `anthropics/claude-code-action`. See the `gardener_bots` entry in [the registry](./registry.yaml).
+`clutch doctor` looks for a `gardening.yml` or `gardening.yaml` workflow in `.github/workflows/`, or for one workflow that triggers on `schedule` and uses `anthropics/claude-code-action`. With `--remote`, it also checks for the `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` Actions secret, since the agent cannot run without one. Without `--remote`, the capability is unknown. See the `gardener_bots` entry in [the registry](./registry.yaml).
 
 ## Adopt
 

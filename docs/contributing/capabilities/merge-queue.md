@@ -8,7 +8,7 @@ Rank 73 of the researched practices. About half of the leading repositories use 
 
 ## Detection
 
-`clutch doctor` reports this capability as present when two rules pass. A workflow triggers on `merge_group`. The `merge_queue` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`. Without that flag, the probe is unknown, so a repository with only the trigger reports as partial. See the `merge_queue` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when two rules pass. A workflow triggers on `merge_group`. The `merge_queue` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`. Without that flag, the probe is unknown, so a repository with only the trigger reports as unknown. With `--remote`, a probe that fails makes it partial. See the `merge_queue` entry in [the registry](./registry.yaml).
 
 ## Adopt
 

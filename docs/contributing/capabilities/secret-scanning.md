@@ -8,7 +8,7 @@ Rank 91 of the researched practices. About one in five of the leading repositori
 
 ## Detection
 
-`clutch doctor` reports this capability as present when two rules pass. First, git tracks `.gitleaks.toml`, a file in `.githooks/` mentions gitleaks, or a workflow runs gitleaks. Second, the `secret_scanning` and `push_protection` remote probes pass. Doctor checks the remote probes on GitHub only with `--remote`. Without that flag, they are unknown, so a repository with only the local scan reports as partial. See the `secret_scanning` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when two rules pass. First, git tracks `.gitleaks.toml`, a file in `.githooks/` mentions gitleaks, or a workflow runs gitleaks. Second, the `secret_scanning` and `push_protection` remote probes pass. Doctor checks the remote probes on GitHub only with `--remote`. Without that flag, they are unknown, so a repository with only the local scan reports as unknown. With `--remote`, a probe that fails makes it partial. See the `secret_scanning` entry in [the registry](./registry.yaml).
 
 ## Adopt
 

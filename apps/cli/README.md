@@ -236,12 +236,16 @@ mise exec -- bun run clutch doctor --phase P1
 
 - Each line shows the detected state, the declared state and the evidence or
   the waiver reason. A summary line follows.
+- A capability is present when every detect rule passes, and partial when
+  some pass and one fails. It is unknown when the rules that did not pass are
+  all unknown, such as remote rules without `--remote`.
 - A repository without `clutch.yaml` reports each capability as undeclared.
 - `--category` and `--phase` narrow the report.
 - `--remote` reads GitHub settings for the `remote:` rules: branch rules and
-  protection, secret scanning, push protection, the merge queue, auto-merge and
-  CodeQL default setup. It sends only `gh api` GET requests, for the origin
-  repository or `--repo OWNER/NAME`. A setting that the token cannot read is
+  protection, secret scanning, push protection, the merge queue, auto-merge,
+  CodeQL default setup, Actions secret names and recent review bot comments.
+  It sends only `gh api` GET requests, for the origin repository or
+  `--repo OWNER/NAME`. A setting that the token cannot read is
   unknown, and an unknown result never fails `--check`.
 - It exits 0 after a report, and 1 when the registry or `clutch.yaml` is bad.
 
@@ -253,7 +257,9 @@ mise exec -- bun run clutch doctor --phase P1
 - A waiver passed its `until` date, or its `issue` is done in `.clutch/issues/`.
 - A capability dropped below `.clutch/doctor-baseline.json`.
 
-A remote rule that is unknown never fails the gate. When a capability rose
+A remote rule that is unknown never fails the gate. When a capability's files
+pass and only its remote rules are left, it is unknown without `--remote`, so
+config alone never reads as present. When a capability rose
 above the baseline, the gate exits 2. Then run
 `mise exec -- bun run clutch doctor --write-baseline` to raise the baseline.
 The baseline only moves up. A lower value needs `--allow-downgrade` and the
@@ -266,20 +272,21 @@ repository can adopt, and the rules that detect it. `clutch doctor` reads it.
 
 Each rule checks the files that git tracks. An untracked file never counts.
 
-| Rule                                  | Passes when                                                            |
-| ------------------------------------- | ---------------------------------------------------------------------- |
-| `file: <glob>`                        | A tracked file matches. `min` raises the count. `exclude` skips globs. |
-| `grep: { files, pattern }`            | A matching tracked file contains the regex.                            |
-| `script: <name>`                      | The root `package.json` has the script.                                |
-| `target: <name>`                      | A `package.json` or `project.json` defines the Nx target.              |
-| `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                           |
-| `yaml: { file, path }`                | The dotted path exists in the YAML or JSON file.                       |
-| `remote: <probe>`                     | The GitHub setting holds. It is unknown without `--remote`.            |
-| `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.           |
+| Rule                                  | Passes when                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------- |
+| `file: <glob>`                        | A tracked file matches. `min` raises the count. `exclude` skips globs.    |
+| `grep: { files, pattern }`            | A matching tracked file contains the regex.                               |
+| `script: <name>`                      | The root `package.json` has the script.                                   |
+| `target: <name>`                      | A `package.json` or `project.json` defines the Nx target.                 |
+| `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                              |
+| `yaml: { file, path }`                | The dotted path holds a value in the YAML or JSON file that is not empty. |
+| `remote: <probe>`                     | The GitHub setting holds. It is unknown without `--remote`.               |
+| `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.              |
 
 A capability is present when every `detect` rule passes. It is partial when
-some pass, or when only `partial_if` rules pass. It is missing when none pass.
-It is unknown when every `detect` rule is unknown. The registry is a guardrail
+some pass and one fails, or when only `partial_if` rules pass. It is missing
+when none pass. It is unknown when the rules that did not pass are all
+unknown, such as remote rules without `--remote`. The registry is a guardrail
 file, so a person reviews each change to it.
 
 ## Test it

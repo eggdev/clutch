@@ -8,7 +8,7 @@ Rank 18 of the researched practices. About three in five of the leading reposito
 
 ## Detection
 
-`clutch doctor` reports this capability as present when git tracks `.cursor/BUGBOT.md` or a `.coderabbit.yml` or `.coderabbit.yaml` file. A workflow that uses `anthropics/claude-code-action` also counts. See the `ai_review_bot` entry in [the registry](./registry.yaml).
+`clutch doctor` looks for review config first: `.cursor/BUGBOT.md`, a `.coderabbit.yml` or `.coderabbit.yaml` file, or a workflow that uses `anthropics/claude-code-action`. Config alone does not prove that a reviewer runs. So `--remote` also checks for the `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` Actions secret, or for Bugbot or CodeRabbit comments on one of the 10 latest pull requests. Without `--remote`, the capability is unknown. See the `ai_review_bot` entry in [the registry](./registry.yaml).
 
 ## Adopt
 

@@ -115,7 +115,59 @@ export function remoteProber(options: { root: string; repo?: string; gh: Gh }) {
     return status === 'enabled' ? pass(`GitHub ${key} enabled`) : fail;
   };
 
+  /** The logins that reviewed or commented on the 10 latest pull requests. */
+  const reviewers = async (): Promise<Set<string> | string> => {
+    const name = await repo();
+    if (!name) {
+      return 'no GitHub origin remote';
+    }
+    const pulls = await get(`repos/${name}/pulls?state=all&per_page=10`);
+    if (pulls.status !== 200) {
+      return pulls.reason;
+    }
+    const numbers = (pulls.body as Array<{ number: number }>).map((pull) => pull.number);
+    const pages = await Promise.all(
+      numbers.flatMap((number) => [
+        get(`repos/${name}/pulls/${number}/reviews`),
+        get(`repos/${name}/issues/${number}/comments`),
+      ]),
+    );
+    const logins = pages.flatMap((page) =>
+      page.status === 200
+        ? (page.body as Array<{ user?: { login?: string } }>).map((item) => item.user?.login ?? '')
+        : [],
+    );
+    return new Set(logins.map((login) => login.replace(/\[bot\]$/u, '')));
+  };
+
   const probes: Record<string, (argument?: string) => Promise<RuleResult>> = {
+    /** `actions_secret:A|B`: the repository has an Actions secret named A or B. */
+    actions_secret: async (names) => {
+      const name = await repo();
+      if (!name) {
+        return unknown('no GitHub origin remote');
+      }
+      const response = await get(`repos/${name}/actions/secrets?per_page=100`);
+      if (response.status !== 200) {
+        return unknown(response.reason);
+      }
+      const found = new Set(
+        ((response.body as { secrets?: Array<{ name: string }> }).secrets ?? []).map(
+          (secret) => secret.name,
+        ),
+      );
+      const hit = (names ?? '').split('|').find((secret) => found.has(secret));
+      return hit ? pass(`GitHub Actions secret ${hit}`) : fail;
+    },
+    /** `bot_review:a|b`: bot a or b reviewed or commented on one of the 10 latest pull requests. */
+    bot_review: async (logins) => {
+      const seen = await reviewers();
+      if (typeof seen === 'string') {
+        return unknown(seen);
+      }
+      const hit = (logins ?? '').split('|').find((login) => seen.has(login));
+      return hit ? pass(`${hit} reviewed a recent pull request`) : fail;
+    },
     protected_main: async () => {
       const rules = await branchRules();
       if (typeof rules === 'string') {

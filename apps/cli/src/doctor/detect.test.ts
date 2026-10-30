@@ -33,6 +33,12 @@ test('present, partial, missing and unknown follow the status rules, and git run
       entry('only_partial_if', [{ file: 'nope' }], [{ file: 'SECURITY.md' }]),
       entry('none_pass', [{ file: 'nope' }], [{ file: 'nope.too' }]),
       entry('all_unknown', [{ remote: 'branch_protection' }]),
+      entry('files_pass_remote_left', [{ file: 'AGENTS.md' }, { remote: 'actions_secret:X' }]),
+      entry('one_fails_one_unknown', [
+        { file: 'AGENTS.md' },
+        { file: 'nope' },
+        { remote: 'actions_secret:X' },
+      ]),
     ],
     { listFiles },
   );
@@ -42,6 +48,8 @@ test('present, partial, missing and unknown follow the status rules, and git run
     ['only_partial_if', 'partial'],
     ['none_pass', 'missing'],
     ['all_unknown', 'unknown'],
+    ['files_pass_remote_left', 'unknown'],
+    ['one_fails_one_unknown', 'partial'],
   ]);
   expect(found[2].evidence).toEqual(['SECURITY.md']);
   expect(lists).toBe(1);

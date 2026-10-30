@@ -458,6 +458,11 @@ capabilities:
           - workflow:
               uses: anthropics/claude-code-action
           - file: .coderabbit.y*ml
+      # Proof that a reviewer runs: the credential that the Claude action needs, or
+      # a review app that commented on a recent pull request.
+      - any:
+          - remote: actions_secret:ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN
+          - remote: bot_review:cursor|coderabbitai
   - id: ai_review_blocking
     name: AI review findings gate merge (severity / triage)
     category: Review & merge
@@ -472,7 +477,7 @@ capabilities:
     detect:
       - grep:
           files: .github/workflows/*review*.y*ml
-          pattern: blocking
+          pattern: '\.blocking'
       - remote: required_check:agent-review
   - id: ci_failure_explainer
     name: CI failure explainer / investigation agent
@@ -587,11 +592,11 @@ capabilities:
     detect:
       - any:
           - file: .github/workflows/gardening.y*ml
-          - all:
-              - workflow:
-                  'on': schedule
-              - workflow:
-                  uses: anthropics/claude-code-action
+          - workflow:
+              'on': schedule
+              uses: anthropics/claude-code-action
+      # Proof that the agent can run: the credential that the Claude action needs.
+      - remote: actions_secret:ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN
   - id: factory_observability
     name: Factory telemetry (agent spend, CI timing, quality signals)
     category: Scale loops
