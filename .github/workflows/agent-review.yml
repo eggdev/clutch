@@ -19,7 +19,7 @@ concurrency:
 jobs:
   agent-review:
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -41,7 +41,7 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.credential.outputs.present == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 1

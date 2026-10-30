@@ -27,9 +27,9 @@ permissions:
 
 jobs:
   doctor:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Find the latest Clutch release
@@ -66,13 +66,13 @@ jobs:
       # Clutch lives under the workspace, because actions/checkout writes only there.
       # git ls-files skips it, so doctor never counts it as the caller's files.
       - if: steps.clutch.outputs.self != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ steps.clutch.outputs.repo }}
           ref: ${{ steps.clutch.outputs.release }}
           path: .clutch-checkout
           persist-credentials: false
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v5
         with:
           working_directory: ${{ steps.clutch.outputs.cli }}
       - name: Install Clutch

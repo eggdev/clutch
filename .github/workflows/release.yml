@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
@@ -30,17 +30,17 @@ jobs:
       - name: Get the release bot token
         id: bot
         if: vars.CLUTCH_APP_ID != ''
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.CLUTCH_APP_ID }}
           private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
       # The latest main, not the pushed commit, so an earlier release commit is included.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
           token: ${{ steps.bot.outputs.token || github.token }}
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v5
       # Without scripts, so the repository's git hooks stay off. The merge already
       # passed CI, and the release commit only touches the version and the changelog.
       - run: bun install --frozen-lockfile --ignore-scripts
