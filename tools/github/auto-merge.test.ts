@@ -1,16 +1,16 @@
 import { expect, test } from 'bun:test';
 
+import { runAutoMerge } from '@tools/github/auto-merge';
 import {
   blockers,
   dryRunComment,
+  enabledMarker,
   marker,
   nextStep,
   noVerdictYet,
-  queuedMarker,
   reactionRequest,
-  runAutoMerge,
-} from '@tools/github/auto-merge';
-import type { Config, Facts } from '@tools/github/auto-merge';
+} from '@tools/github/auto-merge-rules';
+import type { Config, Facts } from '@tools/github/auto-merge-rules';
 import type { Result, Run } from '@tools/github/stack';
 
 const head = 'a1b2c3d4e5f6';
@@ -178,11 +178,14 @@ test('on at the step bots queues a Renovate PR with a version-only diff, and say
   ]);
   expect(merges(gh.calls)).toEqual(['gh pr merge 7 --auto --merge']);
   expect(comments(gh.calls)).toHaveLength(1);
-  expect(comments(gh.calls)[0]).toContain(queuedMarker(head));
+  expect(comments(gh.calls)[0]).toContain(enabledMarker('bots', head));
   const again = fake(
     [
       ['bun tools/clutch.ts risk', { out: '{"tier":"one-way-door"}' }],
-      ['gh api --paginate repos/eggdev/clutch/issues/7/comments', { out: queuedMarker(head) }],
+      [
+        'gh api --paginate repos/eggdev/clutch/issues/7/comments',
+        { out: enabledMarker('bots', head) },
+      ],
     ],
     renovate,
   );
