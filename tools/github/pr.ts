@@ -157,7 +157,7 @@ async function open(
     throw new Error(
       options.force
         ? 'The push failed. Read the git output above.'
-        : 'The push failed. After a rebase of your own branch, run open again with --force.',
+        : 'The push failed. Read the git output above. When a check failed, fix it. After a rebase of your own branch, run open again with --force.',
     );
   }
   const existing = await prWithHead(run, branch);

@@ -114,6 +114,47 @@ The loader rejects unknown keys. Each error names its YAML path, such as
 `template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
 guardrail file, so a person reviews each change to it.
 
+## Doctor
+
+`clutch doctor` shows each capability that a repository has, next to what its
+`clutch.yaml` declares. It reads the registry of the Clutch checkout that runs
+it, so a project gets the registry of its pinned Clutch commit.
+
+```sh
+mise exec -- bun run clutch doctor
+mise exec -- bun run clutch doctor --root ../shop --json
+mise exec -- bun run clutch doctor --phase P1
+```
+
+- Each line shows the detected state, the declared state and the evidence or
+  the waiver reason. A summary line follows.
+- A repository without `clutch.yaml` reports each capability as undeclared.
+- `--category` and `--phase` narrow the report. `--remote` is for remote probes.
+- It exits 0 after a report, and 1 when the registry or `clutch.yaml` is bad.
+
+## Capability registry
+
+`docs/contributing/capabilities/registry.yaml` lists each capability that a
+repository can adopt, and the rules that detect it. `clutch doctor` reads it.
+
+Each rule checks the files that git tracks. An untracked file never counts.
+
+| Rule                                  | Passes when                                                            |
+| ------------------------------------- | ---------------------------------------------------------------------- |
+| `file: <glob>`                        | A tracked file matches. `min` raises the count. `exclude` skips globs. |
+| `grep: { files, pattern }`            | A matching tracked file contains the regex.                            |
+| `script: <name>`                      | The root `package.json` has the script.                                |
+| `target: <name>`                      | A `package.json` or `project.json` defines the Nx target.              |
+| `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                           |
+| `yaml: { file, path }`                | The dotted path exists in the YAML or JSON file.                       |
+| `remote: <probe>`                     | It is always unknown for now.                                          |
+| `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.           |
+
+A capability is present when every `detect` rule passes. It is partial when
+some pass, or when only `partial_if` rules pass. It is missing when none pass.
+It is unknown when every `detect` rule is unknown. The registry is a guardrail
+file, so a person reviews each change to it.
+
 ## Test it
 
 ```sh
