@@ -1,6 +1,6 @@
 # Clutch tracker
 
-This folder is the task tracker for Clutch work. It holds one Markdown file per issue in `issues/CL-NNN.md`. `TRACKER.md` is generated from those files. Edit the issue files, never `TRACKER.md` by hand.
+This folder is the task tracker for Clutch work. [`PLAN.md`](./PLAN.md) says what each phase means and why the issues sit where they do. It holds one Markdown file per issue in `issues/CL-NNN.md`. `TRACKER.md` is generated from those files. Edit the issue files, never `TRACKER.md` by hand.
 
 ## One issue per PR
 
@@ -45,7 +45,7 @@ The body follows the frontmatter: `# CL-NNN: <title>`, then Goal, Context, Steps
 - Migrated `.delivery` records: `CL-8xx`.
 - Deferred backlog: `CL-9xx`, phase `later`. `clutch issues next` never picks it. Brendan moves an issue out of `later` when it is time.
 
-New issues take the next free id in their range.
+New issues take the next free id in their range. An issue that moves to another phase keeps its id, so links and waivers stay valid.
 
 ## Commands
 
