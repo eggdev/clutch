@@ -8,7 +8,7 @@ Each issue gets one branch (`clutch/cl-NNN-<slug>`) and one PR, opened ready for
 
 ## Pull requests and stacks
 
-Follow `.agents/skills/deliver/references/pull-requests.md`. Open, stack and merge each PR with `mise exec -- bun run pr`. After a merge, run `clutch issues set` for each merged issue.
+Follow `.agents/skills/deliver/references/pull-requests.md`. Open, stack and merge each PR with `mise exec -- bun run pr`. After a merge, set each merged issue to `done` with `clutch issues set` in the first commit of the next branch.
 
 ## Frontmatter
 
@@ -36,7 +36,7 @@ The body follows the frontmatter: `# CL-NNN: <title>`, then Goal, Context, Steps
 | `in_progress` | An agent owns it now. One per agent.                                                                    | Work starts. Commit this change with the first commit on the branch. |
 | `blocked`     | Waiting on a person or another issue. The reason goes in a `## Blocked` section at the end of the file. | A stop condition hits.                                               |
 | `review`      | A PR exists, validate is green locally and in CI, and `pr:` holds the URL.                              | After the green push.                                                |
-| `done`        | The PR is merged into `main`.                                                                           | At session start, when `gh pr view` shows `MERGED`.                  |
+| `done`        | The PR is merged into `main`.                                                                           | The PR merged. The first commit of the next branch sets it.          |
 
 ## Id ranges
 
@@ -52,7 +52,7 @@ New issues take the next free id in their range.
 - `clutch issues`: print the table.
 - `clutch issues --write`: regenerate `TRACKER.md`.
 - `clutch issues --check`: exit 2 when `TRACKER.md` is stale.
-- `clutch issues next [--stack]`: print the next ready issue.
+- `clutch issues next [--stack]`: print the first `todo` issue with `owner: agent`, outside `later`, whose dependencies are `done` (or in `review`, up to 3 deep, with `--stack`).
 - `clutch issues set CL-NNN <status> [--pr <url>] [--owner <name>]`.
 
 Mirroring issues to GitHub Issues needs Brendan's approval first.

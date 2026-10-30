@@ -1,7 +1,7 @@
 import { phases } from '@/issues/parse';
 import type { Issue } from '@/issues/parse';
 
-/** The most draft PRs that may stack on each other, counting the new one. */
+/** The most open PRs that may stack on each other, counting the new one. */
 const maxStackDepth = 3;
 
 function order(issue: Issue) {

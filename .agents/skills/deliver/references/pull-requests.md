@@ -36,6 +36,8 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - After you rebase your own branch, run `open` again with `--force`. It pushes
   with `--force-with-lease`, which refuses when someone else pushed to the branch.
 - To change only the body, run `bun run pr body <number> <file>`.
+- After the first green push, run
+  `clutch issues set <id> review --pr <url>`, commit it, and run `open` again.
 
 ## Stack a pull request on another one
 
@@ -67,5 +69,7 @@ mise exec -- bun run pr merge <number>
 
 For a PR in a stack, `merge` merges every PR from the bottom up to that one,
 with merge commits. When one merge fails, none of them merge. For a PR that is
-not in a stack, it merges that PR with a merge commit. After the merge, update
-the task records of the merged tasks.
+not in a stack, it merges that PR with a merge commit. Each merge to the
+default branch is a release. After the merge, set each merged task to `done`
+in the first commit of the next branch, because the default branch takes no
+direct pushes.

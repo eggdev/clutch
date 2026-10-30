@@ -21,7 +21,7 @@ capabilities:
   verification_cli: adopted
   custom_lint_plugin: adopted
   suppression_discipline: adopted
-  ratchets: { status: waived, reason: Lands in CL-302., issue: CL-302 }
+  ratchets: { status: waived, reason: Lands in CL-302b., issue: CL-302b }
   file_size_caps: adopted
   changed_scope_check: { status: waived, reason: Lands in CL-303., issue: CL-303 }
   protected_main: { status: waived, reason: Lands in CL-106., issue: CL-106 }
@@ -31,7 +31,7 @@ capabilities:
   dep_min_age: adopted
   ci_security_lint: { status: waived, reason: Lands in CL-103., issue: CL-103 }
   oidc_ci: { status: waived, reason: Lands in CL-105., issue: CL-105 }
-  worktree_parallel: { status: waived, reason: Lands in CL-201., issue: CL-201 }
+  worktree_parallel: { status: waived, reason: Lands in CL-202., issue: CL-202 }
   cloud_agent_vm: { status: waived, reason: Lands in CL-203., issue: CL-203 }
   mcp_config: { status: waived, reason: Lands in CL-205., issue: CL-205 }
   ai_review_bot: adopted
@@ -40,7 +40,7 @@ capabilities:
   flaky_quarantine: { status: waived, reason: Lands in CL-304., issue: CL-304 }
   flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
   pr_size_limits: { status: waived, reason: Lands in CL-401., issue: CL-401 }
-  merge_queue: { status: waived, reason: Lands in CL-402., issue: CL-402 }
-  risk_tier_automerge: { status: waived, reason: Lands in CL-404., issue: CL-404 }
+  merge_queue: { status: waived, reason: Lands in CL-405., issue: CL-405 }
+  risk_tier_automerge: { status: waived, reason: Lands in CL-405., issue: CL-405 }
   gardener_bots: adopted
   factory_observability: { status: waived, reason: Lands in CL-503., issue: CL-503 }
