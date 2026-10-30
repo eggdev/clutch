@@ -15,7 +15,14 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/test-budget.ts 60 -- bun test apps/cli"
-        }
+        },
+        "inputs": [
+          "default",
+          "{workspaceRoot}/**/*",
+          {
+            "env": "CI"
+          }
+        ]
       }
     }
   }
