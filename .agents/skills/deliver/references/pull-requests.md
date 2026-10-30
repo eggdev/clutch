@@ -82,8 +82,10 @@ lower PRs before you add another one.
 
 ## Merge
 
-Merge only when the owner says so. The one exception is a low-risk PR under
-`automerge.mode: on` in `clutch.yaml`. See [Auto-merge](#auto-merge).
+Merge only when the owner says so. The one exception is a PR that the Auto-merge
+workflow queues under `automerge.mode: on` in `clutch.yaml`, within the reach of
+`automerge.step`. At `bots`, only Renovate and gardening PRs merge this way. See
+[Auto-merge](#auto-merge).
 
 ```sh
 mise exec -- bun run pr merge <number>
