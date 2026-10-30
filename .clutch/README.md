@@ -4,7 +4,7 @@ This folder is the task tracker for Clutch work. [`PLAN.md`](./PLAN.md) says wha
 
 ## One issue per PR
 
-Each issue gets one branch (`clutch/cl-NNN-<slug>`) and one PR, opened ready for review, not as a draft. Commits and PR titles are Conventional Commits, such as `feat(cli): add clutch init (CL-015)`. Do not mix issues. When you find unrelated work, add a new issue file with the next free id in its range, set `status: todo`, and keep going.
+Each issue gets one branch (`clutch/cl-NNN-<slug>`) and one PR, opened ready for review, not as a draft. Commits and PR titles are Conventional Commits, such as `feat(cli): add clutch init (CL-015)`. Do not mix issues. When you find unrelated work, file it with `clutch issues new`, which gives it the next free id and `status: todo`, and keep going.
 
 ## Pull requests and stacks
 

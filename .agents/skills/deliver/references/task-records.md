@@ -6,8 +6,10 @@ and evidence in that issue, or its linked task document. Do not create a second
 status list in the repository.
 
 When no writable tracker is available, use one Markdown file per task in
-`.clutch/issues/<id>.md`. The id is `CL-` and three digits. Take the next free
-id in the phase range that `.clutch/README.md` gives. Run
+`.clutch/issues/<id>.md`. The id is `CL-` and three digits. Make each file with
+`mise exec -- bun run clutch issues new --phase <P> --title <title>`, never by
+hand. It takes the next free id across every branch, so parallel branches never
+reuse one. Pass `--range` when a coordinator reserved a block of ids. Run
 `mise exec -- bun run clutch issues --write` after each change, so
 `.clutch/TRACKER.md` stays current. Keep these files outside durable
 architecture docs: task state changes as work proceeds. Never store credentials, personal data or private
