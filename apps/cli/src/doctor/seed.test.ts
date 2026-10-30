@@ -31,7 +31,7 @@ const expected: Record<string, string> = {
   protected_main: 'unknown',
   secret_scanning: 'unknown',
   codeql_sast: 'present',
-  dep_automation: 'missing',
+  dep_automation: 'present',
   dep_min_age: 'present',
   ci_security_lint: 'present',
   oidc_ci: 'missing',

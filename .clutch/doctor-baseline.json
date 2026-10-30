@@ -9,7 +9,7 @@
   "codeowners": "present",
   "codeql_sast": "present",
   "custom_lint_plugin": "present",
-  "dep_automation": "missing",
+  "dep_automation": "present",
   "dep_min_age": "present",
   "dev_bootstrap": "present",
   "factory_observability": "present",

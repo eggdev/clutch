@@ -45,6 +45,7 @@
 /packages/*/package.json @eggdev
 /bunfig.toml @eggdev
 /mise.toml @eggdev
+/renovate.json @eggdev
 /docs/contributing/glossary.md @eggdev
 /tools/docs-files.ts @eggdev
 /tools/testing/ @eggdev

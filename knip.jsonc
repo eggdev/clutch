@@ -14,6 +14,8 @@
         ".agents/hooks/*.ts",
         // tools/journeys/run.ts passes this config to Playwright through --config.
         "tools/journeys/playwright.config.ts",
+        // Renovate runs this as a post-upgrade task from renovate.json.
+        "tools/release/renovate-changeset.mjs",
       ],
       "project": ["tools/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
       // tools/dev.ts runs node_modules/.bin/portless as a child process, which

@@ -17,9 +17,67 @@ upgrade is a reviewed change. These are the template's core pins:
 | `@tanstack/react-router`                                                 | 1.170.46   |
 | `tailwindcss`, `@tailwindcss/vite`                                       | 4.3.3      |
 
+[Renovate](#renovate) opens the upgrade PRs.
+
 Drizzle 1.0 is a release candidate. Its Effect drivers need Effect 4, and the
 older `@effect/sql-drizzle` package works only with Effect 3. An Effect major
 version is a planned upgrade for every package at once.
+
+## Renovate
+
+The repository runs Renovate itself.
+[`renovate.yml`](../../../.github/workflows/renovate.yml) runs the open-source
+Renovate CLI each day at 04:17 UTC, and on demand from the Actions tab. It reads
+[`renovate.json`](../../../renovate.json) and signs in as the
+[release bot](./releases.md#the-release-bot), so its PRs start CI and agent
+review. Without the release bot, the job skips with a notice.
+
+The config keeps the PR count low:
+
+- Renovate opens new PRs only before 06:00 UTC on Mondays, with at most 3 open.
+  The daily runs rebase open PRs and handle security fixes.
+- One PR holds every minor and patch update. A major update gets its own PR.
+  Nx, oxlint and oxfmt have their own group, since they move together.
+- No version younger than 3 days is proposed. A security fix waits 3 days too,
+  but skips the weekly schedule. This matches `minimumReleaseAge` in
+  `bunfig.toml`, so `bun install` accepts each update.
+- `rangeStrategy: pin` keeps exact versions.
+- Each PR has the `dependencies` label and a `chore(deps):` commit, so the
+  `commits` check passes.
+- Each PR carries its changeset. A post-upgrade task runs
+  [`tools/release/renovate-changeset.mjs`](../../../tools/release/renovate-changeset.mjs),
+  which writes a patch changeset named after the branch. The workflow allows
+  only that command.
+
+Renovate also updates each GitHub Action. It keeps the full commit SHA, and
+it updates the SHA and the `# vX.Y.Z` comment together. Updating a pin
+changes a workflow file, and GitHub refuses that push unless the token has the
+Workflows permission. So the release bot needs Workflows write, and the token
+step in `renovate.yml` asks for it. An app without it fails that step.
+
+Dependabot security updates stay off, so updates come only from Renovate. The
+GitHub vulnerability alerts stay on, because Renovate reads them.
+
+Each PR waits for a person to merge it. `renovate.json` sets
+`automerge: false` and `platformAutomerge: true`. Set `automerge` to `true` to
+let GitHub's own auto-merge merge each dependency PR once the required checks
+pass. No script in the repository does the merge.
+
+The workflow uses Actions minutes. A public repository's runs are free. A
+private one pays for each daily run from its plan's minutes.
+
+### The hosted app
+
+The hosted Mend Renovate app is free, and it is the alternative to the
+workflow. Use one of the two, never both on one repository. Both read the same
+`renovate.json`, and both would open PRs on the same `renovate/` branches.
+The hosted app also cannot run the changeset task, so each of its PRs would
+need `mise exec -- bun run pr open` to add a changeset.
+
+Where both are installed, the workflow opens the update PRs, and the hosted
+app must stay in a mode that opens no update PRs. In its "Scan and Alert" mode, the app
+still opens a "Configure Renovate" onboarding PR on a repository with no
+`renovate.json`. Close that PR unmerged.
 
 ## Production audit
 

@@ -120,6 +120,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A zizmor finding the owner accepted          | `# zizmor: ignore[<audit>]` in the workflow |
 | A file that tooling reads but sets no rule   | `tools/guardrail-files.json`, `exempt`      |
 | A release range that needs no changeset      | `tools/check-changeset.ts`, `onlyReleases`  |
+| A changeset written for a Renovate PR        | `renovate.json`, `postUpgradeTasks`         |
 
 <!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS. -->
 

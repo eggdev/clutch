@@ -22,6 +22,10 @@ files:
     capability: git_hooks
   - path: .github/workflows/
     rule: managed
+  # Renovate's config. Managed, so it arrives with renovate.yml and its changeset task.
+  - path: renovate.json
+    rule: managed
+    capability: dep_automation
   - path: .github/actionlint.yaml
     rule: managed
   - path: .github/ISSUE_TEMPLATE/

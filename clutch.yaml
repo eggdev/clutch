@@ -27,7 +27,7 @@ capabilities:
   protected_main: adopted
   secret_scanning: adopted
   codeql_sast: adopted
-  dep_automation: { status: waived, reason: Lands in CL-104., issue: CL-104 }
+  dep_automation: adopted
   dep_min_age: adopted
   ci_security_lint: adopted
   oidc_ci:
