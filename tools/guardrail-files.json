@@ -50,7 +50,9 @@
     ".agents/skills/verify/verification.json",
     "clutch.yaml",
     "tools/github/**",
-    "docs/contributing/capabilities/registry.yaml"
+    "docs/contributing/capabilities/registry.yaml",
+    ".clutch/doctor-baseline.json",
+    "clutch.files.yaml"
   ],
   "exempt": {
     "AGENTS.md": "check-file-size measures its length, and the doc checks read it as a doc. It sets no rule.",

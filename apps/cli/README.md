@@ -114,6 +114,32 @@ The loader rejects unknown keys. Each error names its YAML path, such as
 `template.commit` or `capabilities.codeql_sast.reason`. `clutch.yaml` is a
 guardrail file, so a person reviews each change to it.
 
+## Sync
+
+`clutch sync` moves a project to a Clutch commit. `clutch.files.yaml` in Clutch
+names the files and gives each one a rule. The longest matching path decides.
+
+| Rule      | What sync does                                                       |
+| --------- | -------------------------------------------------------------------- |
+| `managed` | Replaces the file. A file that the project edited needs a decision.  |
+| `merge`   | Merges the project's copy with Clutch's copy.                        |
+| `seed`    | Nothing. Install writes it once, and the project owns it after that. |
+
+```sh
+mise exec -- bun run clutch sync --root ../shop --check
+mise exec -- bun run clutch sync --root ../shop --latest
+```
+
+- Without `--to` or `--latest`, sync uses the commit that the project's
+  `clutch.yaml` pins. A sync then sets that pin to the new commit.
+- `.clutch/lineage.json` records the hash of each managed file at the last
+  sync. A project with only review tooling starts from `.review/tooling.json`.
+- `--check` changes nothing. It exits 0 when the project is up to date, 2 when a
+  sync would change files or a file needs a decision, and 1 on an error.
+- A sync never commits. Commit the result on a branch, and open a PR.
+- When a managed file needs a decision, nothing changes. Ask the owner whether
+  to keep the edit or take the Clutch copy.
+
 ## Doctor
 
 `clutch doctor` shows each capability that a repository has, next to what its
@@ -131,6 +157,20 @@ mise exec -- bun run clutch doctor --phase P1
 - A repository without `clutch.yaml` reports each capability as undeclared.
 - `--category` and `--phase` narrow the report. `--remote` is for remote probes.
 - It exits 0 after a report, and 1 when the registry or `clutch.yaml` is bad.
+
+`clutch doctor --check` is the gate. It fails, and exits 1, in these cases:
+
+- An adopted capability is not present.
+- A core capability is not present, and `clutch.yaml` has no waiver or `n/a`
+  for it. An extra capability only gets a warning.
+- A waiver passed its `until` date, or its `issue` is done in `.clutch/issues/`.
+- A capability dropped below `.clutch/doctor-baseline.json`.
+
+A remote rule that is unknown never fails the gate. When a capability rose
+above the baseline, the gate exits 2. Then run
+`mise exec -- bun run clutch doctor --write-baseline` to raise the baseline.
+The baseline only moves up. A lower value needs `--allow-downgrade` and the
+owner's review, because the baseline is a guardrail file.
 
 ## Capability registry
 

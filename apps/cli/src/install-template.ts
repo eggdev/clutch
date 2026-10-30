@@ -22,7 +22,7 @@ function mergeJson(project: string, template: string): Merged {
 }
 
 /** How the merge rule combines the project's copy of a file with the template's, by file name. */
-const mergers: Record<string, (project: string, template: string) => Merged> = {
+export const mergers: Record<string, (project: string, template: string) => Merged> = {
   'package.json': mergeJson,
   // Agent hook configs. A project keeps its own hooks and settings, and gains the template's hooks.
   'settings.json': mergeJson,

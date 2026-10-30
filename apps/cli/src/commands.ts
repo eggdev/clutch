@@ -3,6 +3,7 @@ import { cliRoot } from '@/format';
 import { installCommand } from '@/install-command';
 import { issuesCommand } from '@/issues-command';
 import { reviewCommand } from '@/review-command';
+import { syncCommand } from '@/sync-command';
 
 type Command = {
   usage: string;
@@ -24,9 +25,15 @@ export const commands: Record<string, Command> = {
     run: (args, cwd) => reviewCommand(args, cwd, cliRoot),
   },
   doctor: {
-    usage: 'clutch doctor [--root DIR] [--json] [--remote] [--category C] [--phase P]',
+    usage:
+      'clutch doctor [--root DIR] [--json] [--remote] [--category C] [--phase P]\nclutch doctor --check\nclutch doctor --write-baseline [--allow-downgrade]',
     summary: 'Report which capabilities a repository has, next to what its clutch.yaml declares.',
     run: doctorCommand,
+  },
+  sync: {
+    usage: 'clutch sync [--root DIR] [--to <commit> | --latest] [--check] [--json]',
+    summary: 'Move a project to a Clutch commit. --check exits 2 when a sync would change files.',
+    run: (args, cwd) => syncCommand(args, cwd),
   },
   issues: {
     usage:

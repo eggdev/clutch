@@ -1,0 +1,95 @@
+# The files that Clutch puts in a project, and how `clutch sync` treats each one.
+# The longest matching path decides the rule for a file.
+#   managed: sync replaces it. A project edit needs a person's keep-or-take decision.
+#   merge:   sync merges the project's copy with Clutch's copy.
+#   seed:    install writes it once. Sync never touches it again.
+# See apps/cli/README.md#sync.
+version: 1
+# Hashes of older Clutch copies. A project file that matches one is safe to replace.
+baseline: review-baseline.json
+files:
+  # Shared tooling and agent setup.
+  - path: tools/
+    rule: managed
+  - path: .agents/skills/
+    rule: managed
+    capability: skills_dir
+  - path: .claude/skills/
+    rule: managed
+    capability: skills_dir
+  - path: .agents/hooks/
+    rule: managed
+  - path: .githooks/
+    rule: managed
+    capability: git_hooks
+  - path: .github/workflows/
+    rule: managed
+  - path: .github/ISSUE_TEMPLATE/
+    rule: managed
+  - path: .github/pull_request_template.md
+    rule: managed
+    capability: pr_template
+  # Shared configuration. A project that customizes one decides at each sync.
+  - path: .editorconfig
+    rule: managed
+  - path: .oxfmtrc.json
+    rule: managed
+  - path: bunfig.toml
+    rule: managed
+  - path: tsconfig.base.json
+    rule: managed
+  - path: oxlint.config.ts
+    rule: managed
+    capability: custom_lint_plugin
+  - path: stylelint.config.ts
+    rule: managed
+  - path: nx.json
+    rule: managed
+  - path: knip.jsonc
+    rule: managed
+  - path: mise.toml
+    rule: managed
+  # Universal docs. Every other docs page belongs to the project.
+  - path: docs/principles/
+    rule: managed
+  - path: docs/contributing/documentation.md
+    rule: managed
+  - path: docs/contributing/harness-engineering.md
+    rule: managed
+  - path: docs/contributing/import-boundaries.md
+    rule: managed
+  - path: docs/
+    rule: seed
+  # Files that both sides edit.
+  - path: package.json
+    rule: merge
+  - path: .gitignore
+    rule: merge
+  - path: .claude/settings.json
+    rule: merge
+  - path: .codex/hooks.json
+    rule: merge
+  # Files that the project owns after install.
+  - path: AGENTS.md
+    rule: seed
+    capability: root_agents_md
+  - path: KICKOFF.md
+    rule: seed
+  - path: .github/CODEOWNERS
+    rule: seed
+    capability: codeowners
+retired:
+  - .agents/skills/audit/
+  - .agents/skills/linear-delivery/
+  - .agents/skills/verify-repo/
+  - .agents/skills/visual-recap/
+  - .claude/skills/audit
+  - .claude/skills/linear-delivery
+  - .claude/skills/verify-repo
+  - .claude/skills/visual-recap
+exclude:
+  # Each project generates its own verify skill.
+  - .agents/skills/verify/
+  - .claude/skills/verify
+  # The capability registry belongs to Clutch. Projects read the copy in their Clutch checkout.
+  - docs/contributing/capabilities/registry.yaml
