@@ -18,12 +18,16 @@ on:
 permissions:
   contents: read
 
+# Runs queue instead of cancelling, so a cancelled run never shows as a failed
+# check on the head commit.
 concurrency:
   group: labels-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   compute:
+    # An edit that leaves the title as it was changes no label.
+    if: github.event.action != 'edited' || github.event.changes.title != null
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
