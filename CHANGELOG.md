@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.1 (2026-10-30)
+
+### Fixes and maintenance
+
+- ci(review): drop the unused id-token grant (CL-115)
+
 ## 0.14.0 (2026-10-30)
 
 ### Features
