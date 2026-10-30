@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 (2026-10-30)
+
+### Features
+
+- feat(cli): run sync, init and doctor from the release binary (CL-028b)
+
 ## 0.4.0 (2026-10-30)
 
 ### Features
