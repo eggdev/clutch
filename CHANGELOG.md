@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.7 (2026-10-30)
+
+### Fixes and maintenance
+
+- ci(gardening): let gardening PRs pass the gates (CL-041)
+
 ## 0.6.6 (2026-10-30)
 
 ### Fixes and maintenance
