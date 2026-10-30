@@ -215,8 +215,13 @@ when the project is behind the latest release:
 ```yaml
 jobs:
   clutch:
-    uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@main
+    uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@<sha> # main
 ```
+
+Pin a commit SHA from `main`. `check-workflows` rejects a branch or tag ref.
+`gh api repos/eggdev/clutch/commits/main --jq .sha` prints the newest one. The
+workflow still checks against the latest Clutch release, so an older pin only
+holds the workflow steps back.
 
 Pass `with: { root: <folder> }` when `clutch.yaml` is not at the repository
 root.

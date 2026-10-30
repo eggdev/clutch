@@ -5,7 +5,9 @@
 #
 #   jobs:
 #     clutch:
-#       uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@main
+#       uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@<sha> # main
+#
+# Pin a commit SHA from main. check-workflows rejects a branch or tag ref.
 #
 # When the caller is the Clutch repository itself, the job runs the CLI from the
 # caller's own commit instead, so each Clutch PR tests this workflow.
@@ -29,7 +31,7 @@ jobs:
   doctor:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Find the latest Clutch release
@@ -66,13 +68,13 @@ jobs:
       # Clutch lives under the workspace, because actions/checkout writes only there.
       # git ls-files skips it, so doctor never counts it as the caller's files.
       - if: steps.clutch.outputs.self != 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ steps.clutch.outputs.repo }}
           ref: ${{ steps.clutch.outputs.release }}
           path: .clutch-checkout
           persist-credentials: false
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           working_directory: ${{ steps.clutch.outputs.cli }}
       - name: Install Clutch
