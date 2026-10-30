@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.6 (2026-10-30)
+
+### Fixes and maintenance
+
+- chore(trust): record the main ruleset and adopt protection (CL-106)
+
 ## 0.6.5 (2026-10-30)
 
 ### Fixes and maintenance
