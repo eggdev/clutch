@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2 (2026-10-30)
+
+### Fixes and maintenance
+
+- docs(tracker): refresh every plan against the current repository
+
 ## 0.5.1 (2026-10-30)
 
 ### Fixes and maintenance
