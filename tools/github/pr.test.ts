@@ -212,3 +212,18 @@ test('open adds a changeset from the title when the branch has none, and keeps a
   await runPr(['open', '--title', 'fix: x', '--body-file', 'b.md'], ready.run, noWrite);
   expect(written).toEqual([]);
 });
+
+test('an added .changeset/README.md is not a changeset', async () => {
+  written.length = 0;
+  const gh = fake([
+    trunk,
+    ['git branch --show-current', { out: 'cl-032b\n' }],
+    ['git diff --name-only --diff-filter=A', { out: '.changeset/README.md\n' }],
+    [
+      'gh pr list --state open --head cl-032b',
+      { out: '[{"number":39,"baseRefName":"main","url":"u","isDraft":false}]' },
+    ],
+  ]);
+  await runPr(['open', '--title', 'feat: add it', '--body-file', 'b.md'], gh.run, noWrite);
+  expect(written).toEqual(['.changeset/cl-032b.md']);
+});
