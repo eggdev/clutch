@@ -23,7 +23,7 @@
   "merge_queue": "missing",
   "nested_agent_rules": "missing",
   "oidc_ci": "missing",
-  "pr_size_limits": "missing",
+  "pr_size_limits": "present",
   "pr_template": "present",
   "project_cli": "present",
   "protected_main": "present",

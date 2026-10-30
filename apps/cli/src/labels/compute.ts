@@ -2,7 +2,7 @@
 export type Label = { name: string; color: string; description: string };
 
 /** The prefixes that `clutch labels` owns. The workflow removes a stale label with one of them. */
-export const ownedPrefixes = ['kind/', 'area/'] as const;
+export const ownedPrefixes = ['kind/', 'area/', 'size/'] as const;
 
 const kinds: Record<string, string> = {
   feat: 'A new feature. A minor release.',
@@ -61,6 +61,51 @@ export function areaOf(file: string, workspaces: Array<string>) {
     }
   }
   return parts.length === 1 ? 'root' : parts[0].replace(/^\.+/u, '');
+}
+
+/** Files whose changed lines never count toward the size: lockfiles, snapshots and the tracker. */
+const sizeExcluded = [
+  'bun.lock',
+  '**/bun.lock',
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  '**/*.snap',
+  '.clutch/**',
+];
+
+/**
+ * The changed lines of a change, from `git diff --numstat`: added plus
+ * deleted, without the excluded files. A binary file counts no lines.
+ */
+export function changedLines(numstat: string, exclude: Array<string>) {
+  const globs = [...sizeExcluded, ...exclude].map((pattern) => new Bun.Glob(pattern));
+  let lines = 0;
+  for (const row of numstat.split('\n').filter(Boolean)) {
+    const [added, deleted, file] = row.split('\t');
+    if (!globs.some((glob) => glob.match(file))) {
+      lines += (Number(added) || 0) + (Number(deleted) || 0);
+    }
+  }
+  return lines;
+}
+
+const sizes = [
+  { name: 'S', max: 100 },
+  { name: 'M', max: 300 },
+  { name: 'L', max: 800 },
+  { name: 'XL', max: Infinity },
+] as const;
+
+/** `size/S` (up to 100 lines), `size/M` (300), `size/L` (800) or `size/XL`. */
+export function sizeLabel(lines: number): Label {
+  const size = sizes.find((item) => lines <= item.max) ?? sizes[3];
+  const range = size.max === Infinity ? 'more than 800' : `up to ${size.max}`;
+  return {
+    name: `size/${size.name}`,
+    color: 'ededed',
+    description: `Changes ${range} lines, without lockfiles, snapshots and the tracker.`,
+  };
 }
 
 /** The labels of a change: its kind from the title, and an area for each part it touches. */

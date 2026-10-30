@@ -43,7 +43,7 @@ const expected: Record<string, string> = {
   ci_failure_explainer: 'missing',
   flaky_quarantine: 'missing',
   flake_hunter: 'missing',
-  pr_size_limits: 'missing',
+  pr_size_limits: 'present',
   merge_queue: 'missing',
   risk_tier_automerge: 'unknown',
   gardener_bots: 'unknown',

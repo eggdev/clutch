@@ -1,6 +1,6 @@
 # PR size limits / size labels
 
-PR size limits label each pull request by its changed lines, and warn or fail above a threshold.
+PR size limits label each pull request by its changed lines, and warn above a threshold.
 
 ## Why
 
@@ -12,12 +12,15 @@ Rank 69 of the researched practices. About one in five of the leading repositori
 
 ## Adopt
 
-1. Count the added and deleted lines with `git diff --numstat` against the merge base.
-2. Skip lockfiles, snapshots and generated files.
-3. Set a warning threshold and a failure threshold, such as 300 and 800 lines.
-4. Add a CI job on `pull_request` that sets one label: `size/S`, `size/M`, `size/L` or `size/XL`.
-5. Let only the owner apply an exemption label, such as `size/exempt`.
-6. Set `pr_size_limits` to `adopted` in `clutch.yaml`.
+`clutch labels` counts the added and deleted lines against the merge base. It
+skips lockfiles, snapshots and `.clutch/`, plus the globs in `pr_size.exclude`.
+It gives one label: `size/S` (up to 100 lines), `size/M` (300), `size/L` (800)
+or `size/XL`. The Labels workflow sets it on each pull request.
+
+1. Add `pr_size` to `clutch.yaml`, such as `pr_size: { warn: 300, exclude: [] }`.
+2. Above `warn`, the workflow adds a warning to the run. Size never fails a
+   pull request: in the research, size had no link to throughput.
+3. Set `pr_size_limits` to `adopted` in `clutch.yaml`.
 
 ## Waive
 

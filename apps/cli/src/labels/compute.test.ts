@@ -1,6 +1,13 @@
 import { expect, test } from 'bun:test';
 
-import { areaOf, changeLabels, kindLabel, workspaceGlobs } from '@/labels/compute';
+import {
+  areaOf,
+  changedLines,
+  changeLabels,
+  kindLabel,
+  sizeLabel,
+  workspaceGlobs,
+} from '@/labels/compute';
 
 const workspaces = ['apps/*', 'packages/*', 'tools/generators'];
 
@@ -40,4 +47,29 @@ test('a change gets one kind and each area once, and the one-way-door label is d
     expect(label.color).toMatch(/^[0-9a-f]{6}$/u);
     expect(label.description.length).toBeLessThanOrEqual(100);
   }
+});
+
+test('changed lines skip lockfiles, snapshots, the tracker, binaries and project excludes', () => {
+  const numstat = [
+    '10\t5\tsrc/a.ts',
+    '400\t300\tbun.lock',
+    '50\t0\tsrc/__snapshots__/a.test.ts.snap',
+    '20\t20\t.clutch/TRACKER.md',
+    '-\t-\tassets/logo.png',
+    '7\t3\tsrc/generated/api.ts',
+  ].join('\n');
+  expect(changedLines(numstat, [])).toBe(25);
+  expect(changedLines(numstat, ['src/generated/**'])).toBe(15);
+});
+
+test('the size label follows the thresholds at their edges', () => {
+  expect([0, 100, 101, 300, 301, 800, 801].map((lines) => sizeLabel(lines).name)).toEqual([
+    'size/S',
+    'size/S',
+    'size/M',
+    'size/M',
+    'size/L',
+    'size/L',
+    'size/XL',
+  ]);
 });
