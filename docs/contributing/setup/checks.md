@@ -10,7 +10,13 @@ mise exec -- bun run validate
 
 Run it before you say a change is done. CI runs the same command on each PR.
 Nx caches results, so a second run with no changes takes seconds. A failure
-names its target.
+names its target and prints that task's full output. A passing or cached task
+prints one line.
+
+`validate`, `check` and the pre-push hook pass
+`--outputStyle=static-failures-only` to Nx. Without it, Nx 23 picks the
+`summary` style when an AI agent runs it. That style prints only the path of
+each failing task's log under `~/.nx`, so an agent has to go and read the file.
 
 ## Git hooks
 
