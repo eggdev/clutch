@@ -105,7 +105,9 @@ test('fetches from a disposable server', async () => {
 Put setup builders and Test Layers in `packages/<name>/testing/`, and call them
 inside each test. Do not hide setup in `beforeEach`. Examples:
 
-- `packages/sync/testing/database.ts` gives a PGlite database for a test.
+- `packages/sync/testing/database.ts` gives each test its own PGlite
+  database. A process migrates once for each list of migrations, and each test
+  loads that dump, so a test does not pay for the migrations.
 - `packages/sync/testing/render-warm.tsx` renders a screen with a warm object
   pool and fails on any network call.
 - `packages/notes/testing/notes.ts` runs the notes commands through the Test
