@@ -41,6 +41,7 @@
     "tools/audit-prod.ts",
     "tools/accepted-advisories.yaml",
     "tools/test-budget.ts",
+    "tools/validate.ts",
     "tools/dev.ts",
     "tools/native/**",
     "tools/test-integrity-allow.json",

@@ -13,10 +13,12 @@ Nx caches results, so a second run with no changes takes seconds. A failure
 names its target and prints that task's full output. A passing or cached task
 prints one line.
 
-`validate`, `check` and the pre-push hook pass
-`--outputStyle=static-failures-only` to Nx. Without it, Nx 23 picks the
-`summary` style when an AI agent runs it. That style prints only the path of
-each failing task's log under `~/.nx`, so an agent has to go and read the file.
+[`tools/validate.ts`](../../../tools/validate.ts) holds the target list and
+runs Nx for `validate`, `check` (`--quick`) and the pre-push hook. It passes
+`--outputStyle=static-failures-only`. Without it, Nx 23 picks the `summary`
+style when an AI agent runs it. That style prints only the path of each failing
+task's log under `~/.nx`. Clutch syncs `tools/`, so a project gets a change to
+the list or the flags without a decision on its `package.json` scripts.
 
 ## Git hooks
 
