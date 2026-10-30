@@ -115,6 +115,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A transaction-safe service                   | `primitives.yaml`, `transactionSafe` |
 | A test file that a change may delete or thin | `tools/test-integrity-allow.json`    |
 | A dependency override                        | `tools/dependency-overrides.yaml`    |
+| Agent review of a PR that a bot opened       | `agent-review.yml`, `allowed_bots`   |
 
 <!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS. -->
 
