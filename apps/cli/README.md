@@ -174,6 +174,24 @@ mise exec -- bun run clutch sync --root ../shop --latest
 - A kept file stays quiet until Clutch changes it again. `.clutch/lineage.json`
   records the Clutch copy that the project declined.
 
+## Use Clutch in another repository
+
+A repository with `clutch.yaml` can run the Clutch checks in its own CI with
+one job. The workflow checks out the Clutch commit that `clutch.yaml` pins,
+runs `clutch doctor --check`, and runs `clutch sync --check` in `sync` mode:
+
+```yaml
+jobs:
+  clutch:
+    uses: eggdev/project-template/.github/workflows/clutch-doctor.yml@<commit>
+```
+
+Pin `<commit>` to a Clutch commit, as with any action. The `template.commit`
+in `clutch.yaml` must be a Clutch commit that has `clutch doctor`. An older
+pin fails with "Unexpected argument 'doctor'". Pass `with: { root: <folder> }`
+when `clutch.yaml` is not at the repository root. The repository moves to
+`eggdev/clutch` after the rename in CL-006.
+
 ## Doctor
 
 `clutch doctor` shows each capability that a repository has, next to what its
