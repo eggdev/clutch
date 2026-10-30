@@ -29,7 +29,7 @@
   "ratchets": "missing",
   "risk_tier_automerge": "missing",
   "root_agents_md": "present",
-  "secret_scanning": "missing",
+  "secret_scanning": "partial",
   "skills_dir": "present",
   "suppression_discipline": "present",
   "verification_cli": "present",
