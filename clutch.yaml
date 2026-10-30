@@ -45,16 +45,19 @@ capabilities:
   flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
   pr_size_limits: adopted
   merge_queue: { status: waived, reason: Waits for its trigger in CL-906., issue: CL-906 }
-  risk_tier_automerge: { status: waived, reason: Dry-run until CL-405 turns it on., issue: CL-405 }
+  risk_tier_automerge: adopted
   gardener_bots: adopted
   factory_observability: adopted
-# What the Auto-merge workflow does with a low-risk agent PR: off, dry-run or on.
-# dry-run comments would or would not auto-merge and asks the owner for a reaction. CL-405
-# turns it on. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
+# What the Auto-merge workflow does: off, dry-run or on. on queues GitHub's
+# auto-merge, with the release bot, for each PR in reach at the step, and never
+# while main is red. The step is how far it reaches: bots, then low, then
+# medium. Brendan approved the steps on 2026-10-30. Each later step needs his
+# go-ahead. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
 automerge:
-  mode: dry-run
-  # How far auto-merge reaches: bots, low or medium. dry-run grades this step.
-  step: low
+  mode: on
+  # Renovate and gardening PRs that pass the bot rule. Agent PRs keep getting a
+  # dry-run verdict for the step low, for the owner to grade.
+  step: bots
 # The static analysis engine that .github/workflows/sast.yml runs. auto runs CodeQL where
 # code scanning takes results and Semgrep elsewhere. This repository is public, so auto runs
 # CodeQL. Kickoff asks each project. See docs/contributing/capabilities/codeql-sast.md.
