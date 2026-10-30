@@ -7,7 +7,8 @@ import { gitRepo } from '@/testing/git-repo';
 
 /**
  * The status of each seed capability on the template itself, from the plan's
- * capability table. Remote rules stay unknown without --remote. When a rule
+ * capability table. Remote rules stay unknown without --remote, and so does a
+ * capability whose files pass and whose remote rules are left. When a rule
  * disagrees, fix the rule, not this table.
  */
 const expected: Record<string, string> = {
@@ -28,7 +29,7 @@ const expected: Record<string, string> = {
   file_size_caps: 'present',
   changed_scope_check: 'partial',
   protected_main: 'unknown',
-  secret_scanning: 'partial',
+  secret_scanning: 'unknown',
   codeql_sast: 'missing',
   dep_automation: 'missing',
   dep_min_age: 'present',
@@ -37,15 +38,15 @@ const expected: Record<string, string> = {
   worktree_parallel: 'partial',
   cloud_agent_vm: 'partial',
   mcp_config: 'missing',
-  ai_review_bot: 'present',
-  ai_review_blocking: 'partial',
+  ai_review_bot: 'unknown',
+  ai_review_blocking: 'unknown',
   ci_failure_explainer: 'missing',
   flaky_quarantine: 'missing',
   flake_hunter: 'missing',
   pr_size_limits: 'missing',
   merge_queue: 'missing',
   risk_tier_automerge: 'missing',
-  gardener_bots: 'present',
+  gardener_bots: 'unknown',
   factory_observability: 'missing',
 };
 

@@ -120,6 +120,7 @@ async function targetIn(ctx: Context, name: string) {
   return files.find((_, index) => Object.hasOwn(targetsOf(docs[index]), name));
 }
 
+/** True when `dotted` leads to a value that is not empty: `{}`, `[]`, `''` and null do not count. */
 function hasPath(doc: unknown, dotted: string) {
   let value = doc;
   for (const key of dotted.split('.')) {
@@ -128,7 +129,10 @@ function hasPath(doc: unknown, dotted: string) {
     }
     value = (value as Record<string, unknown>)[key];
   }
-  return true;
+  if (value === null || value === '') {
+    return false;
+  }
+  return typeof value !== 'object' || Object.keys(value).length > 0;
 }
 
 /** Combines child results. An unknown child counts only when every child is unknown. */

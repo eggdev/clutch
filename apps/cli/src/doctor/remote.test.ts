@@ -137,3 +137,38 @@ test('every probe only reads: gh never gets a method, a field or an input', asyn
   expect(writes).toEqual([]);
   expect(calls.every((args) => args.length === 2 && args[0] === 'api')).toBe(true);
 });
+
+test('actions_secret passes on any named secret, fails on none, and is unknown without access', async () => {
+  const secrets = (names: Array<string>) => ({
+    [`repos/${repo}/actions/secrets?per_page=100`]: { secrets: names.map((name) => ({ name })) },
+  });
+  const has = remoteProber({
+    root: '.',
+    repo,
+    gh: fakeGh(secrets(['CLAUDE_CODE_OAUTH_TOKEN'])).gh,
+  });
+  expect(await outcomeOf(has, 'actions_secret:ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN')).toBe(
+    'pass',
+  );
+  const none = remoteProber({ root: '.', repo, gh: fakeGh(secrets(['OTHER'])).gh });
+  expect(await outcomeOf(none, 'actions_secret:ANTHROPIC_API_KEY')).toBe('fail');
+  const denied = remoteProber({
+    root: '.',
+    repo,
+    gh: fakeGh({ [`repos/${repo}/actions/secrets?per_page=100`]: 403 }).gh,
+  });
+  expect(await outcomeOf(denied, 'actions_secret:ANTHROPIC_API_KEY')).toBe('unknown');
+});
+
+test('bot_review passes when a named bot reviewed or commented on a recent pull request', async () => {
+  const routes = {
+    [`repos/${repo}/pulls?state=all&per_page=10`]: [{ number: 7 }, { number: 8 }],
+    [`repos/${repo}/pulls/7/reviews`]: [{ user: { login: 'brendan' } }],
+    [`repos/${repo}/issues/7/comments`]: [],
+    [`repos/${repo}/pulls/8/reviews`]: [],
+    [`repos/${repo}/issues/8/comments`]: [{ user: { login: 'coderabbitai[bot]' } }],
+  };
+  const probe = remoteProber({ root: '.', repo, gh: fakeGh(routes).gh });
+  expect(await outcomeOf(probe, 'bot_review:cursor|coderabbitai')).toBe('pass');
+  expect(await outcomeOf(probe, 'bot_review:cursor')).toBe('fail');
+});

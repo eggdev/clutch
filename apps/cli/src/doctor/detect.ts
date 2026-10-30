@@ -18,8 +18,10 @@ function results(rules: Array<Rule>, ctx: Context) {
 
 /**
  * The status of one capability. Every `detect` rule passes: present. Some
- * pass, or only `partial_if` rules pass: partial. None pass: missing. Every
- * `detect` rule is unknown: unknown.
+ * pass and one fails, or only `partial_if` rules pass: partial. None pass:
+ * missing. Every `detect` rule is unknown, or the rules that did not pass are
+ * all unknown: unknown. So a capability whose last proof needs `--remote` is
+ * unknown without it, and never looks present from its files alone.
  */
 async function detectOne(entry: CapabilityEntry, ctx: Context): Promise<Detection> {
   const main = await results(entry.detect, ctx);
@@ -30,6 +32,9 @@ async function detectOne(entry: CapabilityEntry, ctx: Context): Promise<Detectio
   }
   if (passed === main.length) {
     return { id: entry.id, status: 'present', evidence };
+  }
+  if (passed > 0 && !main.some((result) => result.outcome === 'fail')) {
+    return { id: entry.id, status: 'unknown', evidence };
   }
   if (passed > 0) {
     return { id: entry.id, status: 'partial', evidence };

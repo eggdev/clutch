@@ -15,7 +15,7 @@ const fixture = {
   }),
   'packages/ui/project.json': JSON.stringify({ targets: { build: {} } }),
   'bunfig.toml': '[install]\nminimumReleaseAge = 259200\n',
-  '.clutch/ratchets.json': JSON.stringify({ ratchets: { suppressions: 3 } }),
+  '.clutch/ratchets.json': JSON.stringify({ ratchets: { suppressions: 3 }, empty: {} }),
   '.github/workflows/ci.yml': [
     'on:',
     '  pull_request:',
@@ -104,4 +104,11 @@ test('any ignores an unknown child, and all needs every child', async () => {
   expect(await outcome({ all: [{ file: 'AGENTS.md' }, { script: 'validate' }] })).toBe('pass');
   expect(await outcome({ all: [{ file: 'AGENTS.md' }, { file: 'nope' }] })).toBe('fail');
   expect(await outcome({ all: [{ file: 'AGENTS.md' }, unknown] })).toBe('unknown');
+});
+
+test('yaml does not count an empty value', async () => {
+  expect(await check({ yaml: { file: '.clutch/ratchets.json', path: 'empty' } })).toEqual([
+    'fail',
+    [],
+  ]);
 });

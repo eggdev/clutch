@@ -239,8 +239,8 @@ mise exec -- bun run clutch doctor --phase P1
 - A repository without `clutch.yaml` reports each capability as undeclared.
 - `--category` and `--phase` narrow the report.
 - `--remote` reads GitHub settings for the `remote:` rules: branch rules and
-  protection, secret scanning, push protection, the merge queue, auto-merge and
-  CodeQL default setup. It sends only `gh api` GET requests, for the origin
+  protection, secret scanning, push protection, the merge queue, auto-merge,
+  CodeQL default setup, Actions secret names and recent review bot comments. It sends only `gh api` GET requests, for the origin
   repository or `--repo OWNER/NAME`. A setting that the token cannot read is
   unknown, and an unknown result never fails `--check`.
 - It exits 0 after a report, and 1 when the registry or `clutch.yaml` is bad.
@@ -253,7 +253,9 @@ mise exec -- bun run clutch doctor --phase P1
 - A waiver passed its `until` date, or its `issue` is done in `.clutch/issues/`.
 - A capability dropped below `.clutch/doctor-baseline.json`.
 
-A remote rule that is unknown never fails the gate. When a capability rose
+A remote rule that is unknown never fails the gate. When a capability's files
+pass and only its remote rules are left, it is unknown without `--remote`, so
+config alone never reads as present. When a capability rose
 above the baseline, the gate exits 2. Then run
 `mise exec -- bun run clutch doctor --write-baseline` to raise the baseline.
 The baseline only moves up. A lower value needs `--allow-downgrade` and the
