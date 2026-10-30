@@ -70,6 +70,23 @@ while its rules get weaker.
   A fingerprint change with no change to native code, native config or a
   native dependency is `blocking`.
 
+## Labels
+
+Each PR carries labels that tools and people route on:
+
+| Label          | Set by                                                    | From                                                                                    |
+| -------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `kind/<type>`  | The [Labels workflow](../../.github/workflows/labels.yml) | The conventional type of the PR title, such as `kind/fix`.                              |
+| `area/<part>`  | The Labels workflow                                       | Each workspace package or top folder the PR touches, such as `area/cli`.                |
+| `risk/<tier>`  | The [Risk workflow](../../.github/workflows/risk.yml)     | The paths in `.clutch/risk.yaml`. See [risk](../../apps/cli/README.md#risk).            |
+| `one-way-door` | A person                                                  | The change is one-way. See [two-way and one-way doors](../principles/two-way-doors.md). |
+
+The workflows replace a stale `kind/`, `area/` or `risk/` label on each push.
+The Labels workflow also creates `one-way-door`, so a person can always add
+it. `risk/one-way-door` comes from paths. `one-way-door` is a person's call
+about a change that the paths do not show, such as one that breaks a hard
+invariant.
+
 ## Hard invariants
 
 Read [project intent](./project-intent.md#hard-invariants). Flag a change that
