@@ -37,7 +37,9 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
   with `--force-with-lease`, which refuses when someone else pushed to the branch.
 - To change only the body, run `bun run pr body <number> <file>`.
 - After the first green push, run
-  `clutch issues set <id> review --pr <url>`, commit it, and run `open` again.
+  `clutch issues set <id> done --pr <url>`, commit it, and run `open` again.
+  The merge makes `done` true. A PR that waits on a lower PR in a stack uses
+  `review` until it is ready to merge.
 
 ## Stack a pull request on another one
 
@@ -70,6 +72,9 @@ mise exec -- bun run pr merge <number>
 For a PR in a stack, `merge` merges every PR from the bottom up to that one,
 with merge commits. When one merge fails, none of them merge. For a PR that is
 not in a stack, it merges that PR with a merge commit. Each merge to the
-default branch is a release. After the merge, set each merged task to `done`
-in the first commit of the next branch, because the default branch takes no
-direct pushes.
+default branch is a release.
+
+The default branch takes no direct pushes, so a task cannot become `done`
+after its merge. When the PR is green and ready to merge, its last commit sets
+the task to `done` with its PR link, and the merge makes that true. When a PR
+closes without a merge, set its task back to `todo` in the next branch.

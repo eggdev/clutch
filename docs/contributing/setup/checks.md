@@ -212,6 +212,11 @@ every web journey in Chromium. See
 [`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml) and
 [journeys](./verification.md#where-journeys-run).
 
+Two more jobs repeat checks that a local hook also runs, because
+`--no-verify` or another machine skips the hook. The `secrets` job scans the
+PR's commits with gitleaks. The `commits` job checks each PR commit message
+with the `commit-msg` rule in [Git hooks](#git-hooks).
+
 - Each workflow sets a top-level `permissions` block. Start from
   `contents: read`, and grant more only in the job that needs it.
 - A PR from a fork never gets a token that writes, such as a cache write token

@@ -114,6 +114,10 @@ files:
   - path: AGENTS.md
     rule: seed
     capability: root_agents_md
+  # Claude Code reads CLAUDE.md. It imports AGENTS.md, so both agents read one file.
+  - path: CLAUDE.md
+    rule: managed
+    capability: root_agents_md
   - path: KICKOFF.md
     rule: seed
   - path: .github/CODEOWNERS
@@ -135,6 +139,8 @@ retired:
   - .claude/skills/verify-repo
   - .claude/skills/visual-recap
 exclude:
+  # Clutch's test of its own reusable doctor workflow.
+  - .github/workflows/clutch-self-test.yml
   # Clutch's own approved false positives, by commit. A project keeps its own.
   - .gitleaksignore
   # Clutch's release history. A project starts its own changelog.

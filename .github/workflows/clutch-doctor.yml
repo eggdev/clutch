@@ -7,6 +7,9 @@
 #     clutch:
 #       uses: eggdev/clutch/.github/workflows/clutch-doctor.yml@main
 #
+# When the caller is the Clutch repository itself, the job runs the CLI from the
+# caller's own commit instead, so each Clutch PR tests this workflow.
+#
 # See apps/cli/README.md#use-clutch-in-another-repository.
 name: Clutch doctor
 
@@ -47,14 +50,23 @@ jobs:
             echo "::error title=No Clutch release::$repo has no vX.Y.Z release tag."
             exit 1
           fi
+          self=false
+          cli=.clutch-checkout
+          if [ "$repo" = "$GITHUB_REPOSITORY" ]; then
+            self=true
+            cli=.
+          fi
           {
             echo "repo=$repo"
             echo "release=$release"
             echo "mode=$(yq -r '.template.mode' "$config")"
+            echo "self=$self"
+            echo "cli=$cli"
           } >> "$GITHUB_OUTPUT"
       # Clutch lives under the workspace, because actions/checkout writes only there.
       # git ls-files skips it, so doctor never counts it as the caller's files.
-      - uses: actions/checkout@v4
+      - if: steps.clutch.outputs.self != 'true'
+        uses: actions/checkout@v4
         with:
           repository: ${{ steps.clutch.outputs.repo }}
           ref: ${{ steps.clutch.outputs.release }}
@@ -62,17 +74,19 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@v2
         with:
-          working_directory: .clutch-checkout
+          working_directory: ${{ steps.clutch.outputs.cli }}
       - name: Install Clutch
-        working-directory: .clutch-checkout
+        working-directory: ${{ steps.clutch.outputs.cli }}
         run: bun install --frozen-lockfile
       - name: clutch doctor --check
         env:
           ROOT: ${{ inputs.root }}
-        run: bun .clutch-checkout/apps/cli/src/main.ts doctor --check --root "$ROOT"
+          CLI: ${{ steps.clutch.outputs.cli }}
+        run: bun "$CLI/apps/cli/src/main.ts" doctor --check --root "$ROOT"
       - name: clutch sync --check
         if: steps.clutch.outputs.mode == 'sync'
         env:
           ROOT: ${{ inputs.root }}
           RELEASE: ${{ steps.clutch.outputs.release }}
-        run: bun .clutch-checkout/apps/cli/src/main.ts sync --check --root "$ROOT" --to "$RELEASE"
+          CLI: ${{ steps.clutch.outputs.cli }}
+        run: bun "$CLI/apps/cli/src/main.ts" sync --check --root "$ROOT" --to "$RELEASE"

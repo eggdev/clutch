@@ -32,6 +32,31 @@ jobs:
           # the commit before the push.
           CHECK_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
 
+  # Checks each commit subject of a PR against Conventional Commits. The
+  # commit-msg hook checks them too, but --no-verify or another machine skips it.
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: jdx/mise-action@v2
+        with:
+          install_args: bun
+      - name: Conventional commit subjects
+        env:
+          CHECK_BASE: origin/${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          status=0
+          for sha in $(git rev-list --no-merges "$CHECK_BASE..$HEAD_SHA"); do
+            git log -1 --format=%B "$sha" > "$RUNNER_TEMP/message"
+            bun tools/hooks/commit-msg.ts "$RUNNER_TEMP/message" || { echo "::error title=Commit $sha::Reword it with git rebase."; status=1; }
+          done
+          exit "$status"
+
   # Scans the commits of the change for secrets. Pre-commit scans each commit
   # too, but a commit made with --no-verify or on another machine skips it.
   secrets:

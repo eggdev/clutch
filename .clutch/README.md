@@ -8,7 +8,7 @@ Each issue gets one branch (`clutch/cl-NNN-<slug>`) and one PR, opened ready for
 
 ## Pull requests and stacks
 
-Follow `.agents/skills/deliver/references/pull-requests.md`. Open, stack and merge each PR with `mise exec -- bun run pr`. After a merge, set each merged issue to `done` with `clutch issues set` in the first commit of the next branch.
+Follow `.agents/skills/deliver/references/pull-requests.md`. Open, stack and merge each PR with `mise exec -- bun run pr`. When the PR is green and ready to merge, its last commit sets the issue to `done` with `clutch issues set <id> done --pr <url>`. The merge makes that true, so `main` never lags behind GitHub. When a PR closes without a merge, set its issue back to `todo` in the next branch.
 
 ## Frontmatter
 
@@ -36,7 +36,7 @@ The body follows the frontmatter: `# CL-NNN: <title>`, then Goal, Context, Steps
 | `in_progress` | An agent owns it now. One per agent.                                                                    | Work starts. Commit this change with the first commit on the branch. |
 | `blocked`     | Waiting on a person or another issue. The reason goes in a `## Blocked` section at the end of the file. | A stop condition hits.                                               |
 | `review`      | A PR exists, validate is green locally and in CI, and `pr:` holds the URL.                              | After the green push.                                                |
-| `done`        | The PR is merged into `main`.                                                                           | The PR merged. The first commit of the next branch sets it.          |
+| `done`        | The PR is merged into `main`.                                                                           | The last commit of the PR, once it is green and ready to merge.      |
 
 ## Id ranges
 
