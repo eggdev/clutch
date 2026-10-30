@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.0 (2026-10-30)
+
+### Features
+
+- feat(ci): label each PR with its size and warn when large (CL-401)
+
 ## 0.18.0 (2026-10-30)
 
 ### Features
