@@ -30,7 +30,11 @@ capabilities:
   dep_automation: { status: waived, reason: Lands in CL-104., issue: CL-104 }
   dep_min_age: adopted
   ci_security_lint: adopted
-  oidc_ci: { status: waived, reason: Lands in CL-105., issue: CL-105 }
+  oidc_ci:
+    {
+      status: waived,
+      reason: 'CI deploys to no cloud provider. The Claude plan token has no OIDC exchange, and the release bot needs its GitHub App key. See docs/contributing/setup/ci-credentials.md.',
+    }
   worktree_parallel: { status: waived, reason: Lands in CL-202., issue: CL-202 }
   cloud_agent_vm: { status: waived, reason: Lands in CL-203., issue: CL-203 }
   mcp_config: { status: waived, reason: Lands in CL-205., issue: CL-205 }
