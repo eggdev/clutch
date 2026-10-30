@@ -7,6 +7,7 @@ import {
   isRevert,
   mainRedMinutes,
 } from '@/metrics/compute';
+import { agentBranchShare, byStep, prSize } from '@/metrics/pulls';
 
 /** The issues that the checkout tracks, for the issues-done count. */
 type LocalIssue = { status: string; pr: string };
@@ -18,6 +19,9 @@ type Options = {
   now: Date;
   /** The checkout's issues, or nothing for another repository or a checkout without them. */
   issues?: Array<LocalIssue>;
+  /** The checkout's `pr.branchPrefix` and `pr_size.exclude`, or the defaults for another repository. */
+  branchPrefix?: string;
+  sizeExclude?: Array<string>;
 };
 
 /** Each field that the report leaves null, and why. CL-503b fills the reserved ones. */
@@ -35,9 +39,7 @@ export async function metricsReport(options: Options) {
   const reader = githubReader(gh, repo);
   const until = now.toISOString();
   const since = new Date(now.getTime() - days * 86_400_000).toISOString();
-  const unavailable: Unavailable = {
-    prSize: 'Lands in CL-503b.',
-  };
+  const unavailable: Unavailable = {};
 
   const numbers = await reader.mergedNumbers(since.slice(0, 10));
   const read = await reader.mergedPulls(numbers);
@@ -89,13 +91,21 @@ export async function metricsReport(options: Options) {
   }
 
   const { revertPulls, ...rest } = flow;
+  const pullsOut = {
+    ...rest,
+    noHumanAction: { ...rest.noHumanAction, byStep: byStep(pulls) },
+    agents: {
+      ...rest.agents,
+      branch: agentBranchShare(pulls, options.branchPrefix ?? 'clutch/cl-'),
+    },
+  };
   return {
     schemaVersion: 1,
     repo,
     since,
     until,
     days,
-    pulls: rest,
+    pulls: pullsOut,
     reverts: {
       pulls: revertPulls,
       commits: revertCommits,
@@ -104,7 +114,7 @@ export async function metricsReport(options: Options) {
     mainRed,
     ci,
     issuesDone,
-    prSize: null,
+    prSize: prSize(pulls, options.sizeExclude ?? []),
     dryRunAgreement: agreement,
     unavailable,
   };
@@ -122,6 +132,10 @@ const spread = (value: { p50: number | null; p90: number | null; count: number }
 /** The report as a two-column table. */
 export function renderMetrics(report: MetricsReport) {
   const { pulls } = report;
+  const steps = pulls.noHumanAction.byStep;
+  const sizes = Object.entries(report.prSize.labels)
+    .map(([label, count]) => `${label} ${count}`)
+    .join(', ');
   const agents = Object.entries(pulls.agents.byAgent)
     .map(([name, count]) => `${name} ${count}`)
     .join(', ');
@@ -152,6 +166,15 @@ export function renderMetrics(report: MetricsReport) {
       `${percent(pulls.agents.pullShare)} of PRs, ${percent(pulls.agents.commitShare)} of ${pulls.agents.commits} commits${agents ? ` (${agents})` : ''}`,
     ],
     [
+      'Agent branches',
+      `${pulls.agents.branch.pulls} PRs (${percent(pulls.agents.branch.share)}) on ${pulls.agents.branch.prefix}*`,
+    ],
+    [
+      'No human action by step',
+      `bots ${steps.bots}, low ${steps.low}, medium ${steps.medium}, unattributed ${steps.unattributed} (${steps.marked} from auto-merge markers)`,
+    ],
+    ['PR size', `${spread(report.prSize.lines, ' lines')}; ${sizes}`],
+    [
       'CI runs',
       report.ci
         ? `${report.ci.runs}, ${percent(report.ci.failureRate)} failed, ${spread(report.ci.durationMinutes, ' min')}`
@@ -168,7 +191,6 @@ export function renderMetrics(report: MetricsReport) {
   const width = Math.max(...rows.map(([label]) => label.length));
   const lines = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`);
   const notes = Object.entries(report.unavailable).map(([field, why]) => `  ${field}: ${why}`);
-  return [`clutch metrics for ${report.repo}`, '', ...lines, '', 'Unavailable:', ...notes].join(
-    '\n',
-  );
+  const missing = notes.length > 0 ? ['', 'Unavailable:', ...notes] : [];
+  return [`clutch metrics for ${report.repo}`, '', ...lines, ...missing].join('\n');
 }

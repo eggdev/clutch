@@ -29,16 +29,39 @@ function fakeGh(routes: Record<string, unknown>) {
   return { gh, calls };
 }
 
-const pullRoutes = (number: number, mergedBy: object, title: string, trailer: string) => ({
-  [`repos/${repo}/pulls/${number}/commits`]: [{ commit: { message: `${title}\n\n${trailer}` } }],
+type Shape = {
+  mergedBy: object;
+  title: string;
+  trailer: string;
+  ref: string;
+  author: object;
+  labels: Array<string>;
+  files: Array<[string, number, number]>;
+  comments?: Array<string>;
+};
+
+const pullRoutes = (number: number, shape: Shape) => ({
+  [`repos/${repo}/pulls/${number}/commits`]: [
+    { commit: { message: `${shape.title}\n\n${shape.trailer}` } },
+  ],
+  [`repos/${repo}/pulls/${number}/files`]: shape.files.map(([filename, additions, deletions]) => ({
+    filename,
+    additions,
+    deletions,
+  })),
   [`repos/${repo}/pulls/${number}`]: {
-    title,
+    title: shape.title,
     created_at: '2026-10-10T00:00:00Z',
     merged_at: `2026-10-10T0${number}:00:00Z`,
-    merged_by: mergedBy,
-    head: { sha: `head${number}` },
+    merged_by: shape.mergedBy,
+    user: shape.author,
+    labels: shape.labels.map((name) => ({ name })),
+    head: { sha: `head${number}`, ref: shape.ref },
   },
-  [`repos/${repo}/issues/${number}/timeline`]: [{ event: 'merged', actor: mergedBy }],
+  [`repos/${repo}/issues/${number}/timeline`]: [
+    ...(shape.comments ?? []).map((body) => ({ event: 'commented', user: bot, body })),
+    { event: 'merged', actor: shape.mergedBy },
+  ],
   [`repos/${repo}/commits/head${number}/check-runs`]: {
     check_runs: [
       {
@@ -53,8 +76,30 @@ const pullRoutes = (number: number, mergedBy: object, title: string, trailer: st
 
 const routes = {
   'search/issues': { items: [{ number: 1 }, { number: 2 }] },
-  ...pullRoutes(1, bot, 'feat: add x', 'Co-authored-by: Claude <noreply@anthropic.com>'),
-  ...pullRoutes(2, person, 'Revert "feat: add x"', ''),
+  // An agent PR that auto-merge merged at the low step, with a lockfile that does not count.
+  ...pullRoutes(1, {
+    mergedBy: bot,
+    title: 'feat: add x',
+    trailer: 'Co-authored-by: Claude <noreply@anthropic.com>',
+    ref: 'clutch/cl-001-x',
+    author: { login: 'jane', type: 'User' },
+    labels: ['risk/low', 'kind/feat'],
+    files: [
+      ['src/x.ts', 100, 20],
+      ['bun.lock', 4000, 1000],
+    ],
+    comments: ['<!-- automerge-enabled:low:abc1234 -->\nAuto-merge is on.'],
+  }),
+  // A Renovate PR that a person merged.
+  ...pullRoutes(2, {
+    mergedBy: person,
+    title: 'Revert "feat: add x"',
+    trailer: '',
+    ref: 'renovate/x',
+    author: { login: 'renovate[bot]', type: 'Bot' },
+    labels: ['risk/medium'],
+    files: [['src/x.ts', 20, 100]],
+  }),
   [`repos/${repo}/rules/branches/main`]: [
     {
       type: 'required_status_checks',
@@ -128,17 +173,28 @@ test('the report reads only gh api GET routes and fills every field', async () =
     repo,
     pulls: {
       merged: 2,
-      noHumanAction: { count: 1, share: 0.5 },
-      agents: { pullShare: 0.5, byAgent: { claude: 1 } },
+      noHumanAction: {
+        count: 1,
+        share: 0.5,
+        byStep: { bots: 0, low: 1, medium: 0, unattributed: 0, marked: 1 },
+      },
+      agents: {
+        pullShare: 0.5,
+        byAgent: { claude: 1 },
+        branch: { prefix: 'clutch/cl-', pulls: 1, share: 0.5 },
+      },
     },
     reverts: { pulls: 1, commits: 1, rate: 0.5 },
     mainRed: { branch: 'main', requiredChecks: ['validate'], minutes: 75 },
     ci: { runs: 1, failureRate: 0 },
     issuesDone: 1,
-    prSize: null,
+    prSize: {
+      lines: { p50: 120, p90: 120, count: 2 },
+      labels: { 'size/S': 0, 'size/M': 2, 'size/L': 0, 'size/XL': 0 },
+    },
     dryRunAgreement: { verdicts: 2, wouldMerge: 1, agreed: 1, unanswered: 1, streak: 1 },
   });
-  expect(Object.keys(report.unavailable)).toEqual(['prSize']);
+  expect(Object.keys(report.unavailable)).toEqual([]);
   expect(renderMetrics(report)).toContain('Main red');
   expect(renderMetrics(report)).toContain('1 agreed, 0 disagreed, 1 unanswered of 2; streak 1');
 });

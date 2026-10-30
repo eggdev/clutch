@@ -417,8 +417,9 @@ mise exec -- bun run clutch ruleset --apply
 `clutch metrics` reports how pull requests flow through a repository over a
 window: merges per day, the share merged with no human action, the hours from
 open to merge, main-red minutes, reverts, the agent share from
-`Co-authored-by` trailers, CI run times, the issues done and the owner's
-agreement with the auto-merge dry run. It sends only
+`Co-authored-by` trailers and agent branches, PR size, the merges with no
+human action by auto-merge step, CI run times, the issues done and the
+owner's agreement with the auto-merge dry run. It sends only
 `gh api` GET requests, for the origin repository or `--repo OWNER/NAME`, so it
 works from a clone and from the release binary in any project.
 
@@ -431,7 +432,9 @@ mise exec -- bun run clutch metrics --since 30d --json
 - `--json` prints the report for a digest. A section that GitHub does not
   answer is null, and `unavailable` names the reason.
 - The issues done come from `.clutch/issues` in the checkout, so `--repo` for
-  another repository reports them as unavailable.
+  another repository reports them as unavailable. The same goes for
+  `pr.branchPrefix` and `pr_size.exclude`: another repository gets the
+  defaults.
 - It exits 0 after a report, and 1 when `gh` fails for the merged pull requests.
 
 See [factory telemetry](../../docs/contributing/capabilities/factory-observability.md)
