@@ -1,8 +1,16 @@
 # Self-hosted Renovate. It runs the open-source Renovate CLI each day against
-# this repository, with renovate.json as its config. It signs in as the release
-# bot, so its PRs start CI and agent review, which a PR from the default token
-# would not. Without the release bot, the job skips with a notice. See
-# docs/contributing/setup/dependencies.md#renovate.
+# this repository, with renovate.json as its config, and on demand from the
+# Actions tab. It signs in as the release bot, so its PRs start CI and agent
+# review, which a PR from the default token would not.
+#
+# Setup: the release bot (the CLUTCH_APP_ID variable and the
+# CLUTCH_APP_PRIVATE_KEY secret, see docs/contributing/setup/releases.md) with
+# Contents and Pull requests write. Without it, the job skips with a notice.
+# Each Renovate PR gets its changeset from tools/release/renovate-changeset.mjs.
+# The github-actions manager stays off in renovate.json until the app also has
+# Workflows write. Do not also run the hosted Mend Renovate app on the same
+# repository with PRs on. In a private repository, each run uses Actions
+# minutes. See docs/contributing/setup/dependencies.md#renovate.
 name: Renovate
 
 on:

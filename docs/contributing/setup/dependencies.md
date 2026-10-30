@@ -25,7 +25,7 @@ version is a planned upgrade for every package at once.
 
 ## Renovate
 
-Clutch runs Renovate itself.
+The repository runs Renovate itself.
 [`renovate.yml`](../../../.github/workflows/renovate.yml) runs the open-source
 Renovate CLI each day at 04:17 UTC, and on demand from the Actions tab. It reads
 [`renovate.json`](../../../renovate.json) and signs in as the
@@ -59,13 +59,12 @@ Dependabot security updates stay off, so updates come only from Renovate. The
 GitHub vulnerability alerts stay on, because Renovate reads them.
 
 Each PR waits for a person to merge it. `renovate.json` sets
-`automerge: false` and `platformAutomerge: true`. When CL-405 sets `automerge`
-to `true`, GitHub's own auto-merge merges each dependency PR once the
-required checks pass. No Clutch script does the merge.
+`automerge: false` and `platformAutomerge: true`. Set `automerge` to `true` to
+let GitHub's own auto-merge merge each dependency PR once the required checks
+pass. No script in the repository does the merge.
 
 The workflow uses Actions minutes. A public repository's runs are free. A
-private one, such as Neighborhood or Bar Savvy, pays for each daily run from
-its plan's minutes.
+private one pays for each daily run from its plan's minutes.
 
 ### The hosted app
 
