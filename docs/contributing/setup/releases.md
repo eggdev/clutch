@@ -56,8 +56,8 @@ that list. So the release pushes with a GitHub App token, the release bot. The
 gardening workflow opens its pull request with the same token, so CI runs on
 that PR.
 
-Without the app, both workflows use the default token. That works only while
-`main` has no ruleset. Set the bot up once per repository:
+Without the app, both workflows use the default token. Once `main` has a
+ruleset, the release push then fails, so set the bot up before the ruleset. Set the bot up once per repository:
 
 1. Create a private GitHub App with no webhook. Give it the repository
    permissions Contents read and write and Pull requests read and write.
