@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 (2026-10-30)
+
+### Features
+
+- feat(security): scan secrets with gitleaks, add SECURITY.md (CL-101)
+
 ## 0.5.2 (2026-10-30)
 
 ### Fixes and maintenance
