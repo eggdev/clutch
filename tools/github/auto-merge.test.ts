@@ -112,6 +112,8 @@ test('each dry-run comment carries the marker, the verdict, the step and the rea
   const wouldNot = dryRunComment(facts(), ['The risk tier is medium, not low.'], 'low');
   expect(wouldNot).toContain('would not auto-merge at a1b2c3d.');
   expect(wouldNot).toContain('- The risk tier is medium, not low.');
+  expect(wouldNot.startsWith(marker(head))).toBe(true);
+  expect(wouldNot.split('\n').at(-1)).toBe(reactionRequest);
 });
 
 test('no verdict while a required check runs or for a draft or a non-agent branch', () => {
