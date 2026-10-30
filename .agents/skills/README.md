@@ -6,6 +6,8 @@ tests together. Git history records their provenance. Do not silently overwrite
 global skills or other repositories when maintaining this suite.
 
 - [deliver](./deliver/SKILL.md): own one task through its authorized destination.
+  Its [command index](./deliver/references/commands.md) names the repeatable
+  command for each step.
 - [deliver-linear](./deliver-linear/SKILL.md): claim and dispatch a Linear issue,
   then apply its status and review gates around deliver.
 - [setup-verification](./setup-verification/SKILL.md): create or maintain the one

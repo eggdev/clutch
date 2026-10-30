@@ -81,6 +81,8 @@ policy. A working preview deployment is not permission to retain a local server.
 ## Complete the destination
 
 Continue through already authorized commit, PR, merge and release actions.
+Use the repeatable command for each step from [commands](./references/commands.md),
+never a hand-rolled `gh` or `git` sequence.
 Open, stack and merge PRs with the commands in
 [pull requests](./references/pull-requests.md): ready for review, never a draft,
 and in one linear stack when a PR builds on another open PR.

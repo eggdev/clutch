@@ -25,7 +25,7 @@ import { bumpOf, changesetDir, changesetText, packageName } from '@tools/release
  * for review, keep stacked PRs in one linear GitHub stack, and merge in order.
  * See .agents/skills/deliver/references/pull-requests.md.
  */
-const usage = [
+export const usage = [
   'Usage: bun run pr doctor [--fix]',
   '       bun run pr open --title TEXT --body-file FILE [--base BRANCH] [--force]',
   '       bun run pr body <number> <file>',
@@ -233,8 +233,13 @@ export async function runPr(
       base: { type: 'string' },
       json: { type: 'boolean' },
       timeout: { type: 'string' },
+      help: { type: 'boolean' },
     },
   });
+  if (values.help) {
+    console.log(usage);
+    return 0;
+  }
   const timeout = (fallback: string) => duration(values.timeout ?? fallback);
   const print = (status: object) =>
     console.log(values.json ? JSON.stringify(status) : renderStatus(status as PrStatus));

@@ -137,3 +137,29 @@ test('a Simulator tool build is denied, and a control call that names a device i
     expect(answer({ tool_name: simulatorTools.control, tool_input: { action } })).toBeNull();
   }
 });
+
+/** The hint that the hook gives a shell line, or null. It never sets a decision. */
+function hint(command: string) {
+  const outcome = guardDevServers({ tool_input: { command } }, { agent: 'claude', root: '/repo' });
+  expect(outcome.exitCode).toBe(0);
+  if (!outcome.stdout) {
+    return null;
+  }
+  const output = JSON.parse(outcome.stdout);
+  expect(output.hookSpecificOutput.permissionDecision).toBeUndefined();
+  expect(output.systemMessage).toBe(output.hookSpecificOutput.additionalContext);
+  return output.systemMessage as string;
+}
+
+test('a raw gh call that a pr command replaces runs, with a hint that names the command', () => {
+  expect(hint('mise exec -- gh pr checks 72')).toContain('bun run pr status <number>');
+  expect(hint('gh pr merge 72 --merge')).toContain('bun run pr merge <number>');
+  expect(hint('gh stack merge 68 --merge --yes')).toContain('bun run pr merge <number>');
+  expect(hint('gh run view 123 --log-failed | tail')).toContain('bun run pr failures <number>');
+  expect(hint('gh run view 123 --json conclusion')).toBeNull();
+  expect(hint('gh pr view 72 --json state')).toBeNull();
+  expect(hint('mise exec -- bun run pr status 72')).toBeNull();
+  expect(hint('cd /repo && GH_TOKEN=x gh pr checks 72')).toContain('bun run pr status');
+  expect(hint(`echo "use gh pr checks 72 later"`)).toBeNull();
+  expect(hint("grep -n 'gh pr merge' docs/a.md")).toBeNull();
+});
