@@ -49,7 +49,10 @@ never exclude product source. Unversioned fixtures are labelled versioned false
 and cannot establish a Git revision.
 
 SIGTERM/SIGINT trigger command-group cleanup and a failed final receipt. Commands
-persist their owner identity and known group members. After abrupt runner loss,
+persist their owner identity and known group members. A command starts only
+after its owner record is saved: it waits on a gate pipe first, and exits 125
+without running if the runner dies before the record exists. A command that
+cannot be found exits 127, and its log names it. After abrupt runner loss,
 the next invocation reconciles the interrupted command; run/start stop before
 replaying it. Use stop or doctor to inspect recovery before a fresh attempt.
 Unknown or changed group ownership retains the journal and fails closed.
