@@ -4,13 +4,14 @@ import { parseArgs } from 'node:util';
 
 import { formatFile, formatText } from '@/format';
 import { git } from '@/git';
+import { newIssue } from '@/issues/new';
 import { nextIssue } from '@/issues/next';
 import { frontmatter, ownerPattern, readIssues, statuses } from '@/issues/parse';
 import type { Issue, IssueError } from '@/issues/parse';
 import { renderTracker, trackerFile } from '@/issues/render';
 
 const usage =
-  'Usage: clutch issues [--write | --check] [--json]\n       clutch issues next [--stack] [--json]\n       clutch issues set <id> <status> [--pr URL] [--owner NAME]';
+  'Usage: clutch issues [--write | --check] [--json]\n       clutch issues next [--stack] [--json]\n       clutch issues set <id> <status> [--pr URL] [--owner NAME]\n       clutch issues new --phase P --title TEXT [--depends CL-NNN,...] [--owner NAME] [--range CL-NNN..CL-NNN] [--json]';
 
 /** The repository that holds `cwd`, or `cwd` when it is not in one. */
 async function repoRoot(cwd: string) {
@@ -85,6 +86,15 @@ function printList(issues: Array<Issue>) {
   }
 }
 
+/** Reads the issues again after a change, and rewrites the tracker from them. */
+async function rewriteTracker(root: string) {
+  const updated = await readIssues(root);
+  if (updated.errors.length > 0) {
+    throw new Error(updated.errors.map(describe).join('\n'));
+  }
+  await writeFile(path.join(root, trackerFile), await tracker(root, updated.issues));
+}
+
 async function run(args: Array<string>, cwd: string): Promise<number> {
   const { values, positionals } = parseArgs({
     args,
@@ -96,6 +106,10 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
       stack: { type: 'boolean' },
       pr: { type: 'string' },
       owner: { type: 'string' },
+      phase: { type: 'string' },
+      title: { type: 'string' },
+      depends: { type: 'string' },
+      range: { type: 'string' },
     },
   });
   const [action, ...rest] = positionals;
@@ -119,13 +133,20 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
     }
     return issue ? 0 : 1;
   }
+  if (action === 'new' && rest.length === 0) {
+    const created = await newIssue(root, values);
+    await formatFile(root, created.file);
+    await rewriteTracker(root);
+    console.log(
+      values.json
+        ? JSON.stringify({ schemaVersion: 1, ...created })
+        : `${created.id}  ${created.file}. ${trackerFile} is up to date.`,
+    );
+    return 0;
+  }
   if (action === 'set' && rest.length === 2) {
     await setIssue(root, issues, rest, values);
-    const updated = await readIssues(root);
-    if (updated.errors.length > 0) {
-      throw new Error(updated.errors.map(describe).join('\n'));
-    }
-    await writeFile(path.join(root, trackerFile), await tracker(root, updated.issues));
+    await rewriteTracker(root);
     console.log(`${rest[0]} is ${rest[1]}. ${trackerFile} is up to date.`);
     return 0;
   }

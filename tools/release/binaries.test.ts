@@ -97,6 +97,17 @@ test('a project runs the clutch commands through the launcher and the release bi
     expect(await readFile(path.join(dir, '.clutch/TRACKER.md'), 'utf-8')).toContain('in_progress');
     expect(clutch('issues', '--check')).toEqual({ code: 0, out: '' });
     expect(clutch('issues', 'next').out).toBe('No unblocked issue.\n');
+    const created = clutch('issues', 'new', '--phase', 'P0', '--title', 'Add the cart');
+    expect(created).toEqual({
+      code: 0,
+      out: 'CL-002  .clutch/issues/CL-002.md. .clutch/TRACKER.md is up to date.\n',
+    });
+    expect(await readFile(path.join(dir, '.clutch/issues/CL-002.md'), 'utf-8')).toContain(
+      "title: 'Add the cart'\nphase: P0\nstatus: todo",
+    );
+    expect(clutch('issues', '--check')).toEqual({ code: 0, out: '' });
+    git(dir, 'add', '--all');
+    git(dir, 'commit', '--quiet', '--message', 'File CL-002');
 
     const behind = clutch('sync', '--check');
     expect(behind.code).toBe(2);
