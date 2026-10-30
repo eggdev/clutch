@@ -18,10 +18,11 @@ test('docs-only covers Markdown, the docs folder and license texts, and nothing 
   );
 });
 
-test('pre-commit lints, then formats, then typechecks the staged tree when code changed', () => {
+test('pre-commit scans for secrets, lints, formats, then typechecks the staged tree when code changed', () => {
   expect(
     stagedCommands(['/repo/tools/a b.ts', '/repo/apps/web/app.css', '/repo/README.md'], '/repo'),
   ).toEqual([
+    'gitleaks git --staged --redact --no-banner',
     'oxlint --fix "/repo/tools/a b.ts"',
     'stylelint --fix "/repo/apps/web/app.css"',
     'oxfmt --no-error-on-unmatched-pattern "/repo/tools/a b.ts" "/repo/apps/web/app.css" "/repo/README.md"',
@@ -29,6 +30,7 @@ test('pre-commit lints, then formats, then typechecks the staged tree when code 
     'nx run-many -t typecheck',
   ]);
   expect(stagedCommands(['/repo/docs/x.md'], '/repo')).toEqual([
+    'gitleaks git --staged --redact --no-banner',
     'oxfmt --no-error-on-unmatched-pattern "/repo/docs/x.md"',
   ]);
 });

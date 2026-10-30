@@ -3,6 +3,8 @@
 This page holds the security rules that each change must keep, and the risks
 that the [owner](./project-intent.md#owner) accepts.
 
+To report a vulnerability, follow [SECURITY.md](../../SECURITY.md).
+
 An audit (the `audit` skill in `.agents/skills/`) or a security review reads
 this page first. It does not reopen an
 accepted risk. To challenge one, show that its revisit-if condition is true.

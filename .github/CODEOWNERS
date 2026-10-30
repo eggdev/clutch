@@ -66,3 +66,5 @@
 /clutch.files.yaml @eggdev
 /tools/release/ @eggdev
 /tools/clutch.ts @eggdev
+/.gitleaks.toml @eggdev
+/.gitleaksignore @eggdev

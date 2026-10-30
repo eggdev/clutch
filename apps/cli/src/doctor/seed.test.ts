@@ -28,7 +28,7 @@ const expected: Record<string, string> = {
   file_size_caps: 'present',
   changed_scope_check: 'partial',
   protected_main: 'unknown',
-  secret_scanning: 'missing',
+  secret_scanning: 'partial',
   codeql_sast: 'missing',
   dep_automation: 'missing',
   dep_min_age: 'present',

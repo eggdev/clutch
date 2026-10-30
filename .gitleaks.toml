@@ -1,0 +1,7 @@
+# Secret scanning for pre-commit (tools/hooks/paths.mjs) and CI (.github/workflows/ci.yml).
+# It uses gitleaks' default rules. Add an allowlist entry only for a false positive
+# that a reviewer approved, with a comment that says why.
+title = "Clutch gitleaks config"
+
+[extend]
+useDefault = true

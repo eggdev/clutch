@@ -54,7 +54,9 @@
     ".clutch/doctor-baseline.json",
     "clutch.files.yaml",
     "tools/release/**",
-    "tools/clutch.ts"
+    "tools/clutch.ts",
+    ".gitleaks.toml",
+    ".gitleaksignore"
   ],
   "exempt": {
     "AGENTS.md": "check-file-size measures its length, and the doc checks read it as a doc. It sets no rule.",

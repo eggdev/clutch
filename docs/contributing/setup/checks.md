@@ -19,11 +19,11 @@ names its target.
 the hooks in `.githooks/`. Each hook runs through `mise`, so it uses the pinned
 Bun and Node.
 
-| Hook         | Runs                                                                                                                                                                | Skips when                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `pre-commit` | On staged files: `oxlint --fix` and `stylelint --fix`, then `oxfmt`. Then `bun install --frozen-lockfile` and the typecheck of the staged tree                      | The install check and typecheck skip a docs-only commit                                                      |
-| `commit-msg` | [`tools/hooks/commit-msg.ts`](../../../tools/hooks/commit-msg.ts) on the message: a Conventional Commits header, `type(scope)!: subject`, of 72 characters or fewer | Git's own merge, revert, fixup and squash messages                                                           |
-| `pre-push`   | `test`, `lint-policy-test`, `checks` (every fast check and `knip`) and `journeys`, with `CI=1` so the Nx cache matches `validate`                                   | `test`, `lint-policy-test` and `journeys` skip a docs-only push. Nothing runs when the push deletes a branch |
+| Hook         | Runs                                                                                                                                                                   | Skips when                                                                                                   |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `pre-commit` | On staged files: `gitleaks` for secrets, `oxlint --fix` and `stylelint --fix`, then `oxfmt`. Then `bun install --frozen-lockfile` and the typecheck of the staged tree | The install check and typecheck skip a docs-only commit                                                      |
+| `commit-msg` | [`tools/hooks/commit-msg.ts`](../../../tools/hooks/commit-msg.ts) on the message: a Conventional Commits header, `type(scope)!: subject`, of 72 characters or fewer    | Git's own merge, revert, fixup and squash messages                                                           |
+| `pre-push`   | `test`, `lint-policy-test`, `checks` (every fast check and `knip`) and `journeys`, with `CI=1` so the Nx cache matches `validate`                                      | `test`, `lint-policy-test` and `journeys` skip a docs-only push. Nothing runs when the push deletes a branch |
 
 [`tools/hooks/paths.mjs`](../../../tools/hooks/paths.mjs) defines docs-only:
 Markdown anywhere, any file under `docs/`, or a license text. A pushed branch is
