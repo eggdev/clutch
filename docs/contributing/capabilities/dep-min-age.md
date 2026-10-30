@@ -8,15 +8,26 @@ Rank 30 of the researched practices. About seven in ten of the leading repositor
 
 ## Detection
 
-`clutch doctor` reports this capability as present when one of three files sets the age. `bunfig.toml` sets `minimumReleaseAge`. A `renovate.json` file sets `minimumReleaseAge`. `.npmrc` sets `minimum-release-age`. See the `dep_min_age` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when one file sets an age or a cooldown. The table below lists each file and key. See the `dep_min_age` entry in [the registry](./registry.yaml).
 
 ## Adopt
 
-1. For Bun, add `minimumReleaseAge = 259200` to the `[install]` section of `bunfig.toml`. The value is three days, in seconds.
-2. Run `mise exec -- bun install --dry-run` to confirm that the pinned Bun accepts the key.
-3. For Renovate, set `minimumReleaseAge` to `3 days` in `renovate.json`.
-4. For pnpm, set `minimum-release-age` in `.npmrc`.
+Set the age in the package manager that the repository uses. Three days is a good start. The units differ, so check the value.
+
+| Package manager | File                  | Setting                               | Unit                    | Three days |
+| --------------- | --------------------- | ------------------------------------- | ----------------------- | ---------- |
+| Bun             | `bunfig.toml`         | `minimumReleaseAge` under `[install]` | seconds                 | `259200`   |
+| npm             | `.npmrc`              | `min-release-age`                     | days                    | `3`        |
+| pnpm            | `pnpm-workspace.yaml` | `minimumReleaseAge`                   | minutes                 | `4320`     |
+| Yarn            | `.yarnrc.yml`         | `npmMinimalAgeGate`                   | a duration such as `3d` | `3d`       |
+
+1. Add the setting from the table.
+2. Run a clean install with the lockfile, such as `bun install --frozen-lockfile`. A locked version younger than the age makes the install fail. Wait, or add an exception.
+3. To let one package through, use the exception setting of the package manager. Bun has `minimumReleaseAgeExcludes`. pnpm has `minimumReleaseAgeExclude`. Yarn has `npmPreapprovedPackages`.
+4. For an update bot, set a cooldown too. Renovate has `minimumReleaseAge` in `renovate.json`. Dependabot has `cooldown` in its configuration file.
 5. Set `dep_min_age` to `adopted` in `clutch.yaml`.
+
+Sources: [Bun](https://bun.com/docs/runtime/bunfig), [npm](https://docs.npmjs.com/cli/v11/using-npm/config), [pnpm](https://pnpm.io/settings/dependency-resolution), [Yarn](https://yarnpkg.com/configuration/yarnrc).
 
 ## Waive
 

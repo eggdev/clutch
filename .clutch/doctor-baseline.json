@@ -10,7 +10,7 @@
   "codeql_sast": "missing",
   "custom_lint_plugin": "present",
   "dep_automation": "missing",
-  "dep_min_age": "missing",
+  "dep_min_age": "present",
   "dev_bootstrap": "present",
   "factory_observability": "missing",
   "file_size_caps": "present",

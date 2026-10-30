@@ -31,7 +31,7 @@ const expected: Record<string, string> = {
   secret_scanning: 'missing',
   codeql_sast: 'missing',
   dep_automation: 'missing',
-  dep_min_age: 'missing',
+  dep_min_age: 'present',
   ci_security_lint: 'partial',
   oidc_ci: 'missing',
   worktree_parallel: 'partial',

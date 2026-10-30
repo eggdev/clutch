@@ -1,5 +1,7 @@
 [install]
 linker = "hoisted"
+# Install no package version until it is 3 days old, so a hijacked release has time to be caught.
+minimumReleaseAge = 259200
 
 [test]
 preload = ["./tools/testing/console-guard.ts", "./tools/testing/react-compiler.ts"]

@@ -29,7 +29,7 @@ capabilities:
   secret_scanning: { status: waived, reason: Lands in CL-101., issue: CL-101 }
   codeql_sast: { status: waived, reason: Lands in CL-102., issue: CL-102 }
   dep_automation: { status: waived, reason: Lands in CL-104., issue: CL-104 }
-  dep_min_age: { status: waived, reason: Lands in CL-104., issue: CL-104 }
+  dep_min_age: adopted
   ci_security_lint: { status: waived, reason: Lands in CL-103., issue: CL-103 }
   oidc_ci: { status: waived, reason: Lands in CL-105., issue: CL-105 }
   worktree_parallel: { status: waived, reason: Lands in CL-201., issue: CL-201 }
