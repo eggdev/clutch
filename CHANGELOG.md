@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 (2026-10-30)
+
+### Features
+
+- feat(cli): follow the latest Clutch release, not a pin (CL-028)
+
 ## 0.3.0 (2026-10-30)
 
 ### Features
