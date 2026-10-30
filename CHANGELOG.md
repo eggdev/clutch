@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3 (2026-10-30)
+
+### Fixes and maintenance
+
+- fix(tracker): close the gaps the P0 audit found (CL-036)
+
 ## 0.6.2 (2026-10-30)
 
 ### Fixes and maintenance
