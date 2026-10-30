@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.0 (2026-10-30)
+
+### Features
+
+- feat(ci): auto-merge in steps, with a main-red guard (CL-132)
+
 ## 0.21.0 (2026-10-30)
 
 ### Features
