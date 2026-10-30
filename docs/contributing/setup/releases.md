@@ -25,6 +25,11 @@ feat(cli): add clutch init
 - The gardening workflow writes its PR's changeset the same way, from the
   title the agent returns.
 - `check-changeset` fails a change outside `.clutch/` that has no changeset.
+  A release needs none. Its range may touch only the release output: deleted
+  changesets, `CHANGELOG.md` and the root `package.json`. It passes when it
+  consumes a changeset, or when each of its commits is a `chore(release):
+  vX.Y.Z` commit by `github-actions[bot]`. Its tests are in
+  `tools/check-changeset.test.ts`.
 
 ## Versions and the changelog
 
