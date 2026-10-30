@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { loadClutchConfig } from '@/clutch-config/load';
 import { originRepo, runGh } from '@/doctor/remote';
 import type { Gh } from '@/doctor/remote';
 import { git } from '@/git';
@@ -47,12 +48,18 @@ async function run(args: Array<string>, cwd: string, gh: Gh) {
   if (!repo) {
     throw new Error('No GitHub origin remote. Pass --repo OWNER/NAME.');
   }
+  // The checkout's own settings apply only to its own repository.
+  const local = repo === origin;
+  const loaded = local ? await loadClutchConfig(root) : undefined;
+  const config = loaded?.kind === 'loaded' ? loaded.config : undefined;
   const report = await metricsReport({
     gh,
     repo,
     days: windowDays(values.since),
     now: new Date(),
-    issues: repo === origin ? await localIssues(root) : undefined,
+    issues: local ? await localIssues(root) : undefined,
+    branchPrefix: config?.pr?.branchPrefix,
+    sizeExclude: config?.pr_size?.exclude,
   });
   console.log(values.json ? JSON.stringify(report) : renderMetrics(report));
   return 0;

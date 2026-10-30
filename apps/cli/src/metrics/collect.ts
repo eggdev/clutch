@@ -6,6 +6,8 @@ import type {
   MergedPull,
   WorkflowRun,
 } from '@/metrics/compute';
+import { enabledMarker } from '@/metrics/pulls';
+import type { PullShape } from '@/metrics/pulls';
 
 /** The marker that starts each dry-run comment of `tools/github/auto-merge.ts`. */
 const dryRunMarker = '<!-- automerge-dry-run:';
@@ -13,7 +15,13 @@ const dryRunMarker = '<!-- automerge-dry-run:';
 /** A person or a bot, as the GitHub API reports one. */
 type Account = { login?: string; type?: string } | null | undefined;
 
-type TimelineEvent = { event?: string; actor?: Account; user?: Account; state?: string };
+type TimelineEvent = {
+  event?: string;
+  actor?: Account;
+  user?: Account;
+  state?: string;
+  body?: string;
+};
 type ApiCheckRun = {
   name: string;
   status: string;
@@ -92,17 +100,22 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
     );
   }
 
-  async function mergedPull(number: number): Promise<MergedPull> {
-    const [pull, timeline, commits] = await Promise.all([
+  async function mergedPull(number: number): Promise<MergedPull & PullShape> {
+    const [pull, timeline, commits, files] = await Promise.all([
       get<{
         title: string;
         created_at: string;
         merged_at: string;
         merged_by: Account;
-        head: { sha: string };
+        user: Account;
+        labels: Array<{ name: string }>;
+        head: { sha: string; ref: string };
       }>(`repos/${repo}/pulls/${number}`),
       list<TimelineEvent>(`repos/${repo}/issues/${number}/timeline`),
       list<{ commit: { message: string } }>(`repos/${repo}/pulls/${number}/commits`),
+      list<{ filename: string; additions: number; deletions: number }>(
+        `repos/${repo}/pulls/${number}/files`,
+      ),
     ]);
     const runs = await checkRuns(pull.head.sha, 'latest');
     const green = runs
@@ -124,6 +137,20 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
       humanAction: human,
       lastGreenAt: green.at(-1),
       commitMessages: commits.map((commit) => commit.commit.message),
+      headRef: pull.head.ref,
+      author: {
+        login: pull.user?.login ?? '',
+        bot: pull.user?.type === 'Bot' || (pull.user?.login ?? '').endsWith('[bot]'),
+      },
+      labels: pull.labels.map((label) => label.name),
+      numstat: files
+        .map((file) => `${file.additions}\t${file.deletions}\t${file.filename}`)
+        .join('\n'),
+      // Only a bot's marker counts, as for the dry-run comments.
+      markedStep: timeline
+        .filter((event) => event.event === 'commented' && !isPerson(event.user))
+        .map((event) => enabledMarker.exec(event.body ?? '')?.[1])
+        .findLast(Boolean),
     };
   }
 
