@@ -50,6 +50,12 @@ take a PR to green.
 | Command                                       | Use it when                                         | It replaces                          |
 | --------------------------------------------- | --------------------------------------------------- | ------------------------------------ |
 | `bun run clutch metrics [--since 30d] [--json]` | You want flow numbers or the dry-run agreement streak. | Counting PRs and reactions by hand. |
+| `bun run clutch metrics --verdicts [--json]` | You want the dry-run verdicts the owner has not graded yet, with reasons and links. | Searching PR comments for verdicts. |
+| `bun tools/github/grade-verdicts.ts calibrate` | You want the weekly calibration issue now. The gardening workflow runs it each week. | Collecting verdicts into an issue by hand. |
+
+The owner grades every listed verdict in the calibration issue with one
+comment: `agree with all` or `/agree all`, or `/disagree #<pr>` for one PR.
+Do not add 👍 reactions for the owner by hand.
 
 ## Release
 

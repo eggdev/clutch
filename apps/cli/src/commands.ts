@@ -50,7 +50,8 @@ export const commands: Record<string, Command> = {
     run: issuesCommand,
   },
   metrics: {
-    usage: 'clutch metrics [--since 14d] [--repo OWNER/NAME] [--root DIR] [--json]',
+    usage:
+      'clutch metrics [--since 14d] [--repo OWNER/NAME] [--root DIR] [--owner LOGIN] [--json]\nclutch metrics --verdicts [--since 14d] [--owner LOGIN] [--json]',
     summary: 'Report how pull requests flow through a repository, from read-only gh api calls.',
     run: (args, cwd) => metricsCommand(args, cwd),
   },

@@ -162,3 +162,21 @@ gets this repository's token. `automerge.mode` decides what it does:
 
 To stop one queued merge, run `gh pr merge --disable-auto <number>`. To stop
 all of them, set `automerge.mode` to `dry-run`.
+
+### Grade the verdicts
+
+The owner grades verdicts after the fact, in one place. Each week the gardening
+workflow opens or updates the issue "Auto-merge calibration: week of <date>".
+It lists each verdict that the owner has not graded, with its reasons and a
+link. In that issue, the owner comments:
+
+- `agree with all` or `/agree all`: a 👍 on every listed verdict.
+- `/disagree #<pr>`: a 👎 on that PR's verdict. It stays on the list with a note.
+
+The Grade verdicts workflow (`.github/workflows/grade-verdicts.yml`) reads only
+the owner's comments. The owner is `automerge.owner` in `clutch.yaml`, else the
+default owner in CODEOWNERS. The release bot adds the reactions, and replies
+"Graded on the owner's instruction" on the issue. `clutch metrics` counts the
+owner's reactions, and the reactions of each bot that posted such a reply on a
+calibration issue. It ignores anyone else's. `clutch metrics --verdicts` lists the ungraded verdicts
+and the agreement streak.

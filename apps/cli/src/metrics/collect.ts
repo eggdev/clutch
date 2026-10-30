@@ -8,6 +8,7 @@ import type {
 } from '@/metrics/compute';
 import { enabledMarker } from '@/metrics/pulls';
 import type { PullShape } from '@/metrics/pulls';
+import { verdictReasons } from '@/metrics/compute';
 
 /** The marker that starts each dry-run comment of `tools/github/auto-merge.ts`. */
 const dryRunMarker = '<!-- automerge-dry-run:';
@@ -224,23 +225,53 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
       return withChecks.toReversed();
     },
 
-    /** The dry-run verdicts commented on or after `since`, an ISO time. */
-    async dryRunVerdicts(since: string): Promise<Array<DryRunVerdict>> {
+    /**
+     * The dry-run verdicts commented on or after `since`, an ISO time. With an
+     * `owner`, only the owner's reactions and a bot's count as grades. The
+     * grading workflow is the only bot that reacts to a verdict, and it reacts
+     * only on the owner's instruction. Without one, every reaction counts.
+     */
+    async dryRunVerdicts(since: string, owner?: string | null): Promise<Array<DryRunVerdict>> {
       const comments = await list<{
+        id: number;
+        html_url: string;
         body?: string;
         created_at: string;
         issue_url: string;
         reactions?: Record<string, number>;
       }>(`repos/${repo}/issues/comments?since=${encodeURIComponent(since)}`);
-      return comments
-        .filter((comment) => comment.body?.startsWith(dryRunMarker) && comment.created_at >= since)
-        .map((comment) => ({
-          pull: Number(comment.issue_url.split('/').at(-1)),
-          createdAt: comment.created_at,
-          wouldMerge: !comment.body?.includes('would not auto-merge'),
-          thumbsUp: comment.reactions?.['+1'] ?? 0,
-          thumbsDown: comment.reactions?.['-1'] ?? 0,
-        }));
+      const verdicts = comments.filter(
+        (comment) => comment.body?.startsWith(dryRunMarker) && comment.created_at >= since,
+      );
+      return Promise.all(
+        verdicts.map((comment) =>
+          limit(async () => {
+            let thumbsUp = comment.reactions?.['+1'] ?? 0;
+            let thumbsDown = comment.reactions?.['-1'] ?? 0;
+            if (owner) {
+              const reactions = await list<{ content: string; user: Account }>(
+                `repos/${repo}/issues/comments/${comment.id}/reactions`,
+              );
+              const graded = reactions.filter(
+                (reaction) => reaction.user?.login === owner || reaction.user?.type === 'Bot',
+              );
+              thumbsUp = graded.filter((reaction) => reaction.content === '+1').length;
+              thumbsDown = graded.filter((reaction) => reaction.content === '-1').length;
+            }
+            const body = comment.body ?? '';
+            return {
+              commentId: comment.id,
+              url: comment.html_url,
+              pull: Number(comment.issue_url.split('/').at(-1)),
+              createdAt: comment.created_at,
+              wouldMerge: !body.includes('would not auto-merge'),
+              reasons: verdictReasons(body),
+              thumbsUp,
+              thumbsDown,
+            };
+          }),
+        ),
+      );
     },
 
     /** The workflow runs created on or after `since`, a date. */

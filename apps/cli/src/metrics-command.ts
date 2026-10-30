@@ -6,7 +6,8 @@ import { originRepo, runGh } from '@/doctor/remote';
 import type { Gh } from '@/doctor/remote';
 import { git } from '@/git';
 import { readIssues } from '@/issues/parse';
-import { metricsReport, renderMetrics } from '@/metrics/report';
+import { verdictOwner } from '@/metrics/owner';
+import { metricsReport, renderMetrics, renderVerdicts, verdictReport } from '@/metrics/report';
 
 /** `14d`, or a number of days. */
 function windowDays(since: string) {
@@ -38,6 +39,8 @@ async function run(args: Array<string>, cwd: string, gh: Gh) {
       since: { type: 'string', default: '14d' },
       repo: { type: 'string' },
       json: { type: 'boolean' },
+      verdicts: { type: 'boolean' },
+      owner: { type: 'string' },
     },
   });
   const folder = path.resolve(cwd, values.root ?? '.');
@@ -52,11 +55,19 @@ async function run(args: Array<string>, cwd: string, gh: Gh) {
   const local = repo === origin;
   const loaded = local ? await loadClutchConfig(root) : undefined;
   const config = loaded?.kind === 'loaded' ? loaded.config : undefined;
+  const days = windowDays(values.since);
+  const owner = await verdictOwner(root, values.owner);
+  if (values.verdicts) {
+    const verdicts = await verdictReport({ gh, repo, days, now: new Date(), owner });
+    console.log(values.json ? JSON.stringify(verdicts) : renderVerdicts(verdicts));
+    return 0;
+  }
   const report = await metricsReport({
     gh,
     repo,
-    days: windowDays(values.since),
+    days,
     now: new Date(),
+    owner,
     issues: local ? await localIssues(root) : undefined,
     branchPrefix: config?.pr?.branchPrefix,
     sizeExclude: config?.pr_size?.exclude,
