@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.2 (2026-10-30)
+
+### Fixes and maintenance
+
+- ci(workflows): admit only same-repo runs to auto-merge (CL-113)
+
 ## 0.9.1 (2026-10-30)
 
 ### Fixes and maintenance
