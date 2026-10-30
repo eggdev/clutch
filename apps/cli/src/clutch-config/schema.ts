@@ -30,6 +30,8 @@ export type ClutchConfig = {
    * scanning takes results and Semgrep elsewhere.
    */
   sast?: (typeof sastEngines)[number];
+  /** When `clutch labels` warns about a large PR. It never fails one. */
+  pr_size?: { warn: number; exclude: Array<string> };
 };
 
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
@@ -47,6 +49,7 @@ const topKeys = [
   'automerge',
   'pr',
   'sast',
+  'pr_size',
 ];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
 const capabilityId = /^[a-z][a-z0-9_]*$/u;
@@ -221,6 +224,25 @@ function readPr(value: unknown, errors: Errors) {
   return { branchPrefix: value.branchPrefix };
 }
 
+function readPrSize(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'pr_size', message: 'Expected a map with warn and exclude.' });
+    return;
+  }
+  unknownKeys(value, ['warn', 'exclude'], 'pr_size', errors);
+  const { warn = 300, exclude = [] } = value;
+  const before = errors.length;
+  if (typeof warn !== 'number' || !Number.isInteger(warn) || warn < 1) {
+    errors.push({ path: 'pr_size.warn', message: 'Expected a whole number of lines.' });
+  }
+  if (!isStringList(exclude)) {
+    errors.push({ path: 'pr_size.exclude', message: 'Expected a list of globs.' });
+  }
+  return errors.length === before
+    ? { warn: warn as number, exclude: exclude as Array<string> }
+    : undefined;
+}
+
 /** Checks parsed `clutch.yaml` data. Returns the typed config only when there is no error. */
 export function validateClutchConfig(data: unknown): { config?: ClutchConfig; errors: Errors } {
   const errors: Errors = [];
@@ -243,6 +265,7 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   if (data.sast !== undefined && !oneOf(sastEngines, data.sast)) {
     errors.push({ path: 'sast', message: `Expected ${sastEngines.join(', ')}.` });
   }
+  const prSize = data.pr_size === undefined ? undefined : readPrSize(data.pr_size, errors);
   if (errors.length > 0 || !template) {
     return { errors };
   }
@@ -263,6 +286,9 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   }
   if (oneOf(sastEngines, data.sast)) {
     config.sast = data.sast;
+  }
+  if (prSize) {
+    config.pr_size = prSize;
   }
   return { config, errors };
 }

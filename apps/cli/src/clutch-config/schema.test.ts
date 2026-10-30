@@ -155,3 +155,15 @@ test('sast is optional and takes auto, codeql or semgrep', () => {
   expect(paths({ ...valid, sast: 'opengrep' })).toEqual(['sast']);
   expect(paths({ ...valid, sast: { engine: 'codeql' } })).toEqual(['sast']);
 });
+
+test('pr_size is optional, defaults its fields and takes no fail threshold', () => {
+  expect(validateClutchConfig({ ...valid, pr_size: {} }).config?.pr_size).toEqual({
+    warn: 300,
+    exclude: [],
+  });
+  expect(paths({ ...valid, pr_size: { warn: 0, exclude: 'x', fail: 800 } })).toEqual([
+    'pr_size.fail',
+    'pr_size.warn',
+    'pr_size.exclude',
+  ]);
+});

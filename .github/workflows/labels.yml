@@ -1,8 +1,9 @@
 name: Labels
 
 # Labels each pull request with kind/<type> from its conventional title and
-# area/<part> for each part of the repository it touches, from
-# `clutch labels`. It also makes sure the one-way-door label exists, which a
+# area/<part> for each part of the repository it touches, and size/S to
+# size/XL by its changed lines, from `clutch labels`. Above pr_size.warn in
+# clutch.yaml it warns. Size never fails a pull request. It also makes sure the one-way-door label exists, which a
 # person adds when a change is one-way (docs/principles/two-way-doors.md).
 # risk/<tier> comes from risk.yml. See docs/contributing/review.md#labels.
 #
@@ -53,6 +54,10 @@ jobs:
           json="$(bun run --silent clutch labels --base "origin/$BASE_REF" --head "$HEAD_SHA" --title="$TITLE" --json)"
           echo "json=$json" >> "$GITHUB_OUTPUT"
           printf '%s\n' "$json" | jq -r '.apply[].name'
+          warning="$(printf '%s' "$json" | jq -r '.size.warning // empty')"
+          if [ -n "$warning" ]; then
+            echo "::warning title=Large pull request::$warning"
+          fi
 
   apply:
     needs: compute

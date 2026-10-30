@@ -125,6 +125,11 @@ mise exec -- bun run clutch labels --title "fix(cli): keep the value"
 mise exec -- bun run clutch labels --base origin/main --head HEAD --title "docs: x" --json
 ```
 
+It also gives `size/S` (up to 100 changed lines), `size/M` (300), `size/L`
+(800) or `size/XL`. Lockfiles, snapshots, `.clutch/` and the globs in
+`pr_size.exclude` do not count. Above `pr_size.warn` (300 by default) it
+prints a warning. It never fails.
+
 `--json` adds the color and description of each label, the label prefixes
 that the command owns, and `one-way-door`, which the Labels workflow creates
 so a person can add it. See [labels](../../docs/contributing/review.md#labels).
@@ -196,6 +201,9 @@ automerge: # optional
 pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 sast: auto # optional: auto (the default), codeql or semgrep
+pr_size: # optional
+  warn: 300 # the default: clutch labels warns above it, and never fails
+  exclude: [] # globs whose lines do not count, such as generated code
 ```
 
 `automerge.mode` tells the Auto-merge workflow what to do with a low-risk agent

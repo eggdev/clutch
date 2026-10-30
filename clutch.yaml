@@ -43,7 +43,7 @@ capabilities:
   ci_failure_explainer: { status: waived, reason: Lands in CL-305., issue: CL-305 }
   flaky_quarantine: { status: waived, reason: Lands in CL-304., issue: CL-304 }
   flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
-  pr_size_limits: { status: waived, reason: Lands in CL-401., issue: CL-401 }
+  pr_size_limits: adopted
   merge_queue: { status: waived, reason: Waits for its trigger in CL-906., issue: CL-906 }
   risk_tier_automerge: { status: waived, reason: Dry-run until CL-405 turns it on., issue: CL-405 }
   gardener_bots: adopted
@@ -57,3 +57,7 @@ automerge:
 # code scanning takes results and Semgrep elsewhere. This repository is public, so auto runs
 # CodeQL. Kickoff asks each project. See docs/contributing/capabilities/codeql-sast.md.
 sast: auto
+# When clutch labels warns about a large PR. Size never fails one (CL-401).
+pr_size:
+  warn: 300
+  exclude: []

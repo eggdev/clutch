@@ -2,8 +2,15 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { loadClutchConfig } from '@/clutch-config/load';
 import { git, gitOrThrow } from '@/git';
-import { changeLabels, ownedPrefixes, workspaceGlobs } from '@/labels/compute';
+import {
+  changedLines,
+  changeLabels,
+  ownedPrefixes,
+  sizeLabel,
+  workspaceGlobs,
+} from '@/labels/compute';
 
 /** The workspace globs of the project's root `package.json`. None without one. */
 async function workspaces(root: string) {
@@ -33,10 +40,38 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
   );
   const files = out ? out.split('\n') : [];
   const labels = changeLabels(values.title, files, await workspaces(root));
+  const loaded = await loadClutchConfig(root);
+  const limits = (loaded.kind === 'loaded' && loaded.config.pr_size) || { warn: 300, exclude: [] };
+  const numstat = await gitOrThrow(
+    root,
+    'diff',
+    '--numstat',
+    '--no-renames',
+    `${base}...${values.head}`,
+  );
+  const lines = changedLines(numstat, limits.exclude);
+  const size = sizeLabel(lines);
+  labels.apply.push(size);
+  labels.define.push(size);
+  // A warning, never a failure: the exit code stays 0.
+  const warning =
+    lines > limits.warn
+      ? `This change has ${lines} changed lines, more than the ${limits.warn} in pr_size.warn. Split it if a part can merge alone.`
+      : null;
   if (values.json) {
-    console.log(JSON.stringify({ schemaVersion: 1, owned: ownedPrefixes, ...labels }));
+    console.log(
+      JSON.stringify({
+        schemaVersion: 1,
+        owned: ownedPrefixes,
+        ...labels,
+        size: { lines, warn: limits.warn, warning },
+      }),
+    );
   } else {
     console.log(labels.apply.map((label) => label.name).join('\n'));
+    if (warning) {
+      console.log(`Warning: ${warning}`);
+    }
   }
   return 0;
 }
