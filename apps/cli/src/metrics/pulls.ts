@@ -16,7 +16,7 @@ export type PullShape = {
 };
 
 /** The auto-merge steps of CL-405, in order. */
-export const steps = ['bots', 'low', 'medium'] as const;
+const steps = ['bots', 'low', 'medium'] as const;
 type Step = (typeof steps)[number];
 
 /** The marker that auto-merge leaves when it turns on a merge, as agreed with CL-405. */
