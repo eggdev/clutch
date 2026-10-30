@@ -54,6 +54,9 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # The job's own token, so the review needs no Claude GitHub App install.
           github_token: ${{ github.token }}
+          # Review PRs that a bot opens too, such as gardening and dependency PRs.
+          # A fork PR gets no secrets, so this reaches only bots inside the repository.
+          allowed_bots: '*'
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
