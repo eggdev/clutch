@@ -1,4 +1,5 @@
 import { isDocsOnly } from '@tools/hooks/paths.mjs';
+import { runTargets } from '@tools/validate';
 
 /**
  * Git passes one line per pushed ref on stdin:
@@ -70,23 +71,8 @@ if (import.meta.main) {
     process.exit(0);
   }
   console.log(`pre-push: nx run-many -t ${targets.join(' ')}`);
-  const run = Bun.spawnSync(
-    [
-      process.execPath,
-      'x',
-      'nx',
-      'run-many',
-      '--outputStyle=static-failures-only',
-      '-t',
-      ...targets,
-    ],
-    {
-      env: { ...checkEnvironment(process.env), CI: '1' },
-      stdout: 'inherit',
-      stderr: 'inherit',
-    },
-  );
-  if (run.exitCode !== 0) {
+  const exitCode = runTargets(targets, { ...checkEnvironment(process.env), CI: '1' });
+  if (exitCode !== 0) {
     console.error(
       'pre-push: a check failed. Fix it, then push again. Never push with --no-verify.',
     );

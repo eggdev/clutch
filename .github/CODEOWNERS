@@ -52,6 +52,7 @@
 /tools/audit-prod.ts @eggdev
 /tools/accepted-advisories.yaml @eggdev
 /tools/test-budget.ts @eggdev
+/tools/validate.ts @eggdev
 /tools/dev.ts @eggdev
 /tools/native/ @eggdev
 /tools/test-integrity-allow.json @eggdev
