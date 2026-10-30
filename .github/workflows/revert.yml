@@ -1,0 +1,70 @@
+name: Revert
+
+# Adding the `revert` label to a merged pull request opens a revert PR. It
+# reverts the merge commit on a revert/<number> branch, with a conventional
+# `revert:` title and a changeset, and links the original PR. The release bot
+# pushes and opens it, so CI runs on it. tools/github/revert.ts holds the steps.
+# This is the safety valve for auto-merge. See
+# docs/contributing/operations/rollback.md#revert-a-merged-pull-request.
+
+on:
+  pull_request:
+    types: [labeled]
+
+# Least privilege. The revert job grants what it needs in its own block.
+permissions:
+  contents: read
+
+concurrency:
+  group: revert-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  revert:
+    # Only a merged PR from this repository. A fork's run gets no bot token.
+    if: >-
+      github.event.label.name == 'revert' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # A push or a PR made with the default token starts no workflow, so CI
+      # would not run on the revert. The release bot's token does start it.
+      - name: Get the release bot token
+        id: bot
+        if: vars.CLUTCH_APP_ID != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          # Only the branch push, the PR and the comment. The app has more permissions.
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Warn without the release bot
+        if: vars.CLUTCH_APP_ID == ''
+        run: echo "::warning title=No release bot::The revert PR is opened with the default token, so CI does not run on it. Push an empty commit to start CI. See docs/contributing/setup/releases.md#the-release-bot."
+      # The default branch, with history, so the merge commit is there to revert.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      # Without scripts, so the repository's git hooks stay off.
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Revert and open the PR
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
+          PUSH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          bun tools/github/revert.ts --pr "$PR" --sha "$SHA" --title "$TITLE" --base "$BASE"
