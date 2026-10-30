@@ -22,7 +22,7 @@ const kinds: Record<string, string> = {
  * approve it. See docs/principles/two-way-doors.md. `risk/one-way-door` is
  * the tier that `clutch risk` gives from paths. This one is the person's call.
  */
-export const oneWayDoor: Label = {
+const oneWayDoor: Label = {
   name: 'one-way-door',
   color: 'b60205',
   description: 'A person marked this change one-way. The owner approves it before it merges.',
