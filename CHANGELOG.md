@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.3 (2026-10-30)
+
+### Fixes and maintenance
+
+- ci(codeql): add the CodeQL workflow (CL-102)
+
 ## 0.9.2 (2026-10-30)
 
 ### Fixes and maintenance
