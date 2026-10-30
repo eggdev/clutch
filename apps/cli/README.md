@@ -73,9 +73,16 @@ The `clutch` script runs [`tools/clutch.ts`](../../tools/clutch.ts). In Clutch,
 that runs this source. A project has no `apps/cli/`, so it runs the `clutch`
 binary from the latest
 [GitHub release](../../docs/contributing/setup/releases.md#the-clutch-binary),
-which mise installs. The binary has the tracker commands. `install`, `init`,
-`sync` and `doctor` read Clutch's own files, so they still run from a Clutch
-clone, and the binary says so.
+which mise installs. `clutch --version` prints its release.
+
+- `doctor` in the binary uses the capability registry built into it, the one
+  of its release.
+- `sync` and `init` in the binary read Clutch from a bare clone of the
+  `template.repo` in `clutch.yaml`, kept in `$XDG_CACHE_HOME/clutch` or
+  `~/.cache/clutch`. Each run fetches its tags first, so the latest release is
+  the newest one on GitHub.
+- `install` still runs from a Clutch clone, as [Run it](#run-it) shows. The
+  binary says so.
 
 ```sh
 mise exec -- bun run clutch issues
@@ -169,8 +176,9 @@ mise exec -- bun run clutch sync --root ../shop --to v0.2.0
 ```
 
 - Each merge to Clutch's `main` is a release with a `vX.Y.Z` tag. Without
-  `--to`, sync uses the newest tag in the clone that runs it. Run
-  `git pull --tags` in the clone first. It prints the release it used.
+  `--to`, sync uses the newest tag. The release binary fetches the tags on each
+  run. A clone uses its own tags, so run `git pull --tags` in it first. Sync
+  prints the release it used.
 - `--to <tag or commit>` syncs to one revision once, such as an unreleased
   commit for a test.
 - `.clutch/lineage.json` records the release of the last sync in `release`.

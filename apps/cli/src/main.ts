@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { clutchVersion } from '@/build';
 import { commands, usage } from '@/commands';
 import { inClone } from '@/format';
 
@@ -15,6 +16,10 @@ async function run(command: string, commandArgs: Array<string>) {
   return commands[command].run(commandArgs, process.cwd());
 }
 
+if (name === '--version') {
+  console.log(await clutchVersion());
+  process.exit(0);
+}
 if (Object.hasOwn(commands, name)) {
   if (rest.includes('--help')) {
     console.log(usage([name]));

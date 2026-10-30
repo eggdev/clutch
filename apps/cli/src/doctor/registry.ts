@@ -212,6 +212,11 @@ export function docProblems(capabilities: Array<CapabilityEntry>, pages: Array<s
   return errors;
 }
 
+/** Checks a registry built into the release binary. Its pages stay in Clutch, so they are not checked. */
+export function builtInRegistry(registry: string) {
+  return validateRegistry(parse(registry));
+}
+
 /** Reads and checks the registry in `root`, and its page for each capability. */
 export async function loadRegistry(root: string) {
   const result = validateRegistry(parse(await readFile(path.join(root, registryFile), 'utf-8')));

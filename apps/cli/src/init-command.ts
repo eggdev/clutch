@@ -5,10 +5,10 @@ import { parseArgs } from 'node:util';
 import * as prompts from '@clack/prompts';
 import { Document } from 'yaml';
 
+import { capabilityRegistry, clutchCheckout } from '@/clutch-checkout';
 import { nextBaseline, writeBaseline } from '@/doctor/baseline';
 import { detect } from '@/doctor/detect';
-import { loadRegistry } from '@/doctor/registry';
-import { cliRoot, formatText } from '@/format';
+import { formatText } from '@/format';
 import { git, gitOrThrow } from '@/git';
 import { adoptedLineage } from '@/init/adopt';
 import { freshChangelog } from '@/install-template';
@@ -81,7 +81,7 @@ async function run(args: Array<string>, cwd: string, template: string): Promise<
     }
   }
   const release = await latestRelease(template);
-  const registry = await loadRegistry(template);
+  const registry = await capabilityRegistry();
   const entries = registry.capabilities ?? [];
   const detections = await detect(root, entries);
   const byId = new Map(detections.map((item) => [item.id, item.status]));
@@ -153,10 +153,10 @@ async function run(args: Array<string>, cwd: string, template: string): Promise<
 export async function initCommand(
   args: Array<string>,
   cwd: string,
-  template = cliRoot,
+  checkout?: string,
 ): Promise<number> {
   try {
-    return await run(args, cwd, template);
+    return await run(args, cwd, checkout ?? (await clutchCheckout()));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     return 1;
