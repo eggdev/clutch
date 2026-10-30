@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.18.0 (2026-10-30)
+
+### Features
+
+- feat(ci): run Semgrep where code scanning is not available (CL-135)
+
 ## 0.17.0 (2026-10-30)
 
 ### Features
