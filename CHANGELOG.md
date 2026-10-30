@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.4 (2026-10-30)
+
+### Fixes and maintenance
+
+- docs(ci): audit CI credentials and waive oidc_ci (CL-105)
+
 ## 0.9.3 (2026-10-30)
 
 ### Fixes and maintenance
