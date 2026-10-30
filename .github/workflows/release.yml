@@ -28,7 +28,9 @@ jobs:
           ref: main
           fetch-depth: 0
       - uses: jdx/mise-action@v2
-      - run: bun install --frozen-lockfile
+      # Without scripts, so the repository's git hooks stay off. The merge already
+      # passed CI, and the release commit only touches the version and the changelog.
+      - run: bun install --frozen-lockfile --ignore-scripts
       - name: Version and changelog
         id: release
         run: bun tools/release/release.ts "$RUNNER_TEMP/release-notes.md"
