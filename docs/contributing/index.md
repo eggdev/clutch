@@ -112,6 +112,8 @@ on those pages; this list only points at them.
   vendor owners, aliases, re-exports and test imports, with the lint rule for
   each
 - [Nx](./setup/nx.md) and [checks](./setup/checks.md)
+- [Capabilities](./capabilities/index.md): the practices that `clutch doctor`
+  checks, and how to adopt or waive each one
 
 <!-- kickoff: A list of module READMEs, one link each. Write it when the first module exists. Delete this slot if kickoff ends before that. -->
 

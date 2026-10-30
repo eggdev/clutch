@@ -16,7 +16,7 @@ How server code is written. All server code uses Effect 4. The API app,
 
 ## Services and Layers
 
-A service is the interface of a capability. Its Live Layer uses the real
+A service is the interface of one area of the product. Its Live Layer uses the real
 vendor, and its Test Layer uses a fake. Both satisfy the same service, so a
 change of vendor is a new Layer and one line in the composition root. See
 [generic platform](../../principles/generic-platform.md).
