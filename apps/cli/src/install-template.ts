@@ -22,13 +22,16 @@ export type InstallAnswers = { keep: Array<string>; take: Array<string>; merge: 
 type Merged = { content: string; conflicts: Array<Conflict> };
 
 /** Objects merge key by key, and lists keep the items of both. The template wins a clash. */
-function mergeJson(project: string, template: string): Merged {
-  const merged = mergePackageJson(JSON.parse(project), JSON.parse(template));
+function mergeJson(project: string, template: string, keep?: (path: string) => boolean): Merged {
+  const merged = mergePackageJson(JSON.parse(project), JSON.parse(template), keep);
   return { content: `${JSON.stringify(merged.manifest, null, 2)}\n`, conflicts: merged.conflicts };
 }
 
 /** How the merge rule combines the project's copy of a file with the template's, by file name. */
-export const mergers: Record<string, (project: string, template: string) => Merged> = {
+export const mergers: Record<
+  string,
+  (project: string, template: string, keep?: (path: string) => boolean) => Merged
+> = {
   'package.json': mergeJson,
   // Agent hook configs. A project keeps its own hooks and settings, and gains the template's hooks.
   'settings.json': mergeJson,

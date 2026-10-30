@@ -171,6 +171,10 @@ mise exec -- bun run clutch sync --root ../shop --latest
 - Without a terminal, or with `--json`, sync lists those files and exits 2. An
   agent asks the owner, then runs sync again with `--keep <file>` or
   `--take <file>` for each one. An agent never decides for the owner.
+- In a merge file, each value that the project and Clutch set differently is a
+  decision too, named by file and key path, such as
+  `package.json#scripts.validate`. Keep holds the project value, and take lets
+  Clutch's value win. Install still lets Clutch's value win on a new project.
 - A kept file stays quiet until Clutch changes it again. `.clutch/lineage.json`
   records the Clutch copy that the project declined.
 

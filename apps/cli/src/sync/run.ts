@@ -54,7 +54,7 @@ function settle(
   kept: Record<string, string>,
   answers: { keep: Array<string>; take: Array<string> },
 ) {
-  for (const file of [...answers.keep, ...answers.take]) {
+  for (const file of [...answers.keep, ...answers.take].filter((id) => !id.includes('#'))) {
     if (!planned.conflicts.includes(file)) {
       throw new Error(
         `${file} needs no decision. Pass --keep or --take only for the files that sync lists.`,
@@ -77,17 +77,50 @@ function settle(
   return nextKept;
 }
 
-async function planMerges(root: string, merge: Map<string, SyncFile>) {
+/** A stable hash of one JSON value, so a kept value is asked again only when Clutch changes it. */
+const valueHash = (value: unknown) =>
+  new Bun.CryptoHasher('sha256').update(JSON.stringify(value)).digest('hex');
+
+/**
+ * Plans the merge files. Where the project and Clutch set different values, each
+ * clash is a decision named `<file>#<key path>`. `take` lets Clutch's value win.
+ * `keep`, or a value kept before that Clutch has not changed, keeps the project's.
+ */
+async function planMerges(
+  root: string,
+  merge: Map<string, SyncFile>,
+  answers: { keep: Array<string>; take: Array<string> },
+  kept: Record<string, string>,
+) {
   const writes = new Map<string, string>();
   const changes: Array<Change> = [];
   const clashes: SyncResult['mergeClashes'] = [];
   const inspected = new Map<string, string | null>();
+  const decisions: Array<string> = [];
+  const asked = new Set<string>();
+  const nextKept: Record<string, string> = {};
   for (const [file, theirs] of merge) {
     const mine = await localFile(root, file);
     inspected.set(file, mine?.hash ?? null);
     const template = theirs.content.toString();
+    const fn = mergers[path.basename(file)];
+    const own = mine?.content.toString().trimEnd() ?? '';
+    const keepPaths = new Set<string>();
+    for (const clash of mine ? fn(own, template).conflicts : []) {
+      const id = `${file}#${clash.path}`;
+      asked.add(id);
+      if (answers.take.includes(id)) {
+        continue;
+      }
+      if (answers.keep.includes(id) || kept[id] === valueHash(clash.template)) {
+        keepPaths.add(clash.path);
+        nextKept[id] = valueHash(clash.template);
+      } else {
+        decisions.push(id);
+      }
+    }
     const merged = mine
-      ? mergers[path.basename(file)](mine.content.toString().trimEnd(), template)
+      ? fn(own, template, (key) => keepPaths.has(key))
       : { content: template, conflicts: [] };
     const content = file.endsWith('.json')
       ? await formatText(root, file, merged.content)
@@ -98,7 +131,12 @@ async function planMerges(root: string, merge: Map<string, SyncFile>) {
       changes.push({ path: file, action: mine ? 'update' : 'add' });
     }
   }
-  return { writes, changes, clashes, inspected };
+  for (const id of [...answers.keep, ...answers.take].filter((answer) => answer.includes('#'))) {
+    if (!asked.has(id)) {
+      throw new Error(`${id} needs no decision. Pass --keep or --take only for what sync lists.`);
+    }
+  }
+  return { writes, changes, clashes, inspected, decisions, kept: nextKept };
 }
 
 /** `clutch.yaml` with `template.commit` set to `commit`, or nothing when it already matches. */
@@ -148,6 +186,25 @@ function nextLineage(input: {
     next.kept = kept;
   }
   return next;
+}
+
+/** The changes to the lineage, the pin in clutch.yaml and the old review record. */
+function recordChanges(
+  lineage: Awaited<ReturnType<typeof readLineage>>,
+  lineageText: string,
+  pinned: string | null,
+): Array<Change> {
+  const changes: Array<Change> = [];
+  if (lineage.previous?.content.toString() !== lineageText) {
+    changes.push({ path: lineagePath, action: lineage.previous ? 'update' : 'add' });
+  }
+  if (pinned) {
+    changes.push({ path: 'clutch.yaml', action: 'update' });
+  }
+  if (lineage.legacy) {
+    changes.push({ path: reviewRecord, action: 'remove' });
+  }
+  return changes;
 }
 
 /** Writes the merged files, the lineage and the new pin, after the engine wrote the managed files. */
@@ -217,19 +274,23 @@ export async function runSync(options: {
     keep: options.keep ?? [],
     take: options.take ?? [],
   });
-  const merges = await planMerges(root, source.merge);
-  const next = nextLineage({ repo: config?.template.repo, source, lineage, scope, kept });
+  const answers = { keep: options.keep ?? [], take: options.take ?? [] };
+  const merges = await planMerges(root, source.merge, answers, lineage.kept);
+  const next = nextLineage({
+    repo: config?.template.repo,
+    source,
+    lineage,
+    scope,
+    kept: { ...kept, ...merges.kept },
+  });
   const lineageText = `${JSON.stringify(next, null, 2)}\n`;
   const pinned = scope ? null : await pinnedConfig(root, source.commit);
-  const changes = [...managed.changes, ...merges.changes];
-  if (lineage.previous?.content.toString() !== lineageText) {
-    changes.push({ path: lineagePath, action: lineage.previous ? 'update' : 'add' });
-  }
-  if (pinned) {
-    changes.push({ path: 'clutch.yaml', action: 'update' });
-  }
+  const changes = [
+    ...managed.changes,
+    ...merges.changes,
+    ...recordChanges(lineage, lineageText, pinned),
+  ];
   if (lineage.legacy) {
-    changes.push({ path: reviewRecord, action: 'remove' });
     managed.inspected.set(reviewRecord, lineage.legacy.hash);
   }
   const result: SyncResult = {
@@ -237,10 +298,10 @@ export async function runSync(options: {
     status: 'unchanged',
     templateCommit: source.commit,
     changes,
-    decisions: managed.conflicts,
+    decisions: [...managed.conflicts, ...merges.decisions],
     mergeClashes: merges.clashes,
   };
-  if (managed.conflicts.length > 0) {
+  if (result.decisions.length > 0) {
     return { ...result, status: 'decisions' };
   }
   if (changes.length === 0) {
