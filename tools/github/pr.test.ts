@@ -130,3 +130,27 @@ test('a wrong command or missing flag gives the usage', async () => {
     'open needs --title and --body-file',
   );
 });
+
+test('a rejected push names --force, and --force pushes with a lease', async () => {
+  const rejected = fake([
+    trunk,
+    ['git branch --show-current', { out: 'cl-024\n' }],
+    ['git push', { ok: false }],
+  ]);
+  await expect(
+    runPr(['open', '--title', 'x', '--body-file', 'b.md'], rejected.run),
+  ).rejects.toThrow('run open again with --force');
+
+  const forced = fake([
+    trunk,
+    ['git branch --show-current', { out: 'cl-024\n' }],
+    [
+      'gh pr list --state open --head cl-024',
+      { out: '[{"number":12,"baseRefName":"main","url":"u","isDraft":false}]' },
+    ],
+  ]);
+  expect(await runPr(['open', '--title', 'x', '--body-file', 'b.md', '--force'], forced.run)).toBe(
+    0,
+  );
+  expect(forced.calls).toContain('git push --set-upstream --force-with-lease origin HEAD');
+});

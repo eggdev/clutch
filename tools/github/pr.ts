@@ -18,7 +18,7 @@ import type { Run } from '@tools/github/stack';
  */
 const usage = [
   'Usage: bun run pr doctor [--fix]',
-  '       bun run pr open --title TEXT --body-file FILE [--base BRANCH]',
+  '       bun run pr open --title TEXT --body-file FILE [--base BRANCH] [--force]',
   '       bun run pr body <number> <file>',
   '       bun run pr merge <number>',
 ].join('\n');
@@ -127,7 +127,10 @@ async function setBody(run: Run, pr: string, file: string) {
   ]);
 }
 
-async function open(run: Run, options: { title?: string; 'body-file'?: string; base?: string }) {
+async function open(
+  run: Run,
+  options: { title?: string; 'body-file'?: string; base?: string; force?: boolean },
+) {
   const { title, 'body-file': bodyFile } = options;
   if (!title || !bodyFile) {
     throw new Error(`open needs --title and --body-file.\n${usage}`);
@@ -140,7 +143,23 @@ async function open(run: Run, options: { title?: string; 'body-file'?: string; b
       `Switch to the branch for this PR. The current branch is ${branch || 'detached'}.`,
     );
   }
-  await must(run, ['git', 'push', '--set-upstream', 'origin', 'HEAD'], { inherit: true });
+  // After a rebase the branch needs a forced push. The lease refuses it when someone else pushed.
+  const push = [
+    'git',
+    'push',
+    '--set-upstream',
+    ...(options.force ? ['--force-with-lease'] : []),
+    'origin',
+    'HEAD',
+  ];
+  const pushed = await run(push, { inherit: true });
+  if (!pushed.ok) {
+    throw new Error(
+      options.force
+        ? 'The push failed. Read the git output above.'
+        : 'The push failed. After a rebase of your own branch, run open again with --force.',
+    );
+  }
   const existing = await prWithHead(run, branch);
   let opened = existing;
   if (existing) {
@@ -215,6 +234,7 @@ export async function runPr(args: Array<string>, run: Run): Promise<number> {
       fix: { type: 'boolean' },
       title: { type: 'string' },
       'body-file': { type: 'string' },
+      force: { type: 'boolean' },
       base: { type: 'string' },
     },
   });

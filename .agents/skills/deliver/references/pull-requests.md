@@ -26,6 +26,8 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - Fill every section of `.github/pull_request_template.md` in the body file.
 - `open` pushes the branch first, so the pre-push checks run.
 - When the branch already has an open PR, `open` replaces its body.
+- After you rebase your own branch, run `open` again with `--force`. It pushes
+  with `--force-with-lease`, which refuses when someone else pushed to the branch.
 - To change only the body, run `bun run pr body <number> <file>`.
 
 ## Stack a pull request on another one
