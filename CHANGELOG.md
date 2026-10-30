@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0 (2026-10-30)
+
+### Features
+
+- feat(risk): re-tier risk to Brendan's rule (CL-114)
+
 ## 0.10.0 (2026-10-30)
 
 ### Features
