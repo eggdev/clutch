@@ -122,7 +122,9 @@ export async function prStatus(run: Run, number: string) {
       checks.find((check) => check.name === name) ?? { name, state: 'pending' as State, url: '' },
   );
   const all = [...checks, ...required.filter((check) => !checks.includes(check))];
-  const notes = await comments(run, number);
+  // Only a bot posts the review and the dry run. A person's comment that quotes one does not count.
+  const posted = await comments(run, number);
+  const notes = posted.filter((note) => note.login.endsWith('[bot]'));
   const review = notes.findLast((note) => note.body.trimStart().startsWith('## Agent review'));
   const dryRun = notes.findLast((note) => note.body.includes(marker(pr.headRefOid)));
   const count = (state: State) => all.filter((check) => check.state === state).length;

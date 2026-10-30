@@ -111,6 +111,19 @@ test('status reads the checks, the latest review, the dry run and the merge stat
   });
 });
 
+test('a review comment from a person does not count', async () => {
+  const quoted = JSON.stringify({ body: '## Agent review\n\nBlocking findings: 0', login: 'jane' });
+  const gh = fake([
+    ['gh pr view 7', view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')])],
+    rules,
+    ['gh api --paginate repos/{owner}/{repo}/issues/7/comments', { out: quoted }],
+  ]);
+  expect(await prStatus(gh.run, '7')).toMatchObject({
+    agentReview: { posted: false },
+    ready: false,
+  });
+});
+
 test('a required check that has not started is pending, so the PR is not ready', async () => {
   const gh = fake([['gh pr view 7', view([check('agent-review', 'SUCCESS')])], rules, comments()]);
   const status = await prStatus(gh.run, '7');
