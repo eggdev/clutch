@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0 (2026-10-30)
+
+### Features
+
+- feat(cli): add clutch issues new with safe ids (CL-118)
+
 ## 0.11.1 (2026-10-30)
 
 ### Fixes and maintenance
