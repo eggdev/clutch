@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.2 (2026-10-30)
+
+### Fixes and maintenance
+
+- build(deps): add Renovate with a 3-day minimum release age (CL-104)
+
 ## 0.13.1 (2026-10-30)
 
 ### Fixes and maintenance
