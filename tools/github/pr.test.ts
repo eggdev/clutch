@@ -365,4 +365,24 @@ test('merge refuses while GitHub wants a review, and names who must review', asy
   await expect(runPr(['merge', '15'], changes.run, noWrite, clock)).rejects.toThrow(
     '#15 has changes requested by @eggdev.',
   );
+  // A ruleset's code owner review: no reviewDecision, but blocked with the owner requested.
+  const ruleset = fake([
+    trunk,
+    [
+      'gh pr view 16',
+      {
+        out: JSON.stringify({
+          baseRefName: 'main',
+          headRefName: 'cl-026',
+          reviewDecision: '',
+          mergeStateStatus: 'BLOCKED',
+          reviewRequests: [{ login: 'eggdev' }],
+          latestReviews: [],
+        }),
+      },
+    ],
+  ]);
+  await expect(runPr(['merge', '16'], ruleset.run, noWrite, clock)).rejects.toThrow(
+    '#16 needs an approving review from @eggdev before it merges.',
+  );
 });
