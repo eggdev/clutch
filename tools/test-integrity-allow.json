@@ -1,6 +1,6 @@
 {
   "description": "Test files that a change may delete, or whose test or expect count may drop, with the reason. check-test-integrity reads it. An entry covers only a file that the change touches. Delete the entry after the change merges. See docs/contributing/testing.md#test-integrity.",
   "files": {
-    "tools/github/lifecycle.test.ts": "CL-122 moved the four pr sync tests, with their assertions, to tools/github/sync.test.ts to stay under the 400-line budget, and added two tests. No test was deleted."
+    "tools/github/lifecycle.test.ts": "CL-122 moved the three pr sync tests, with their assertions, to tools/github/sync.test.ts to stay under the 400-line budget. It added four tests: one sync test in sync.test.ts, and three wait and status tests here. No test was deleted."
   }
 }
