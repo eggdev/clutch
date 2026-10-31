@@ -63,6 +63,7 @@ async function awaitRelease(
 
 type Review = {
   reviewDecision: string | null;
+  mergeStateStatus: string;
   reviewRequests: Array<{ login?: string; slug?: string; name?: string }>;
   latestReviews: Array<{ author: { login: string }; state: string }>;
 };
@@ -79,7 +80,11 @@ function reviewProblem(number: string, pr: Review) {
       .map((review) => `@${review.author.login}`);
     return `#${number} has changes requested by ${who.join(', ') || 'a reviewer'}. Address them, and ask for a new review.`;
   }
-  if (pr.reviewDecision === 'REVIEW_REQUIRED') {
+  // A ruleset's code owner review leaves reviewDecision empty. GitHub then
+  // reports the PR as blocked, with the code owners still requested.
+  const blockedOnReview =
+    pr.reviewDecision === null && pr.mergeStateStatus === 'BLOCKED' && pr.reviewRequests.length > 0;
+  if (pr.reviewDecision === 'REVIEW_REQUIRED' || blockedOnReview) {
     const who = pr.reviewRequests.map((request) =>
       request.login ? `@${request.login}` : `the ${request.slug ?? request.name} team`,
     );
@@ -107,12 +112,14 @@ export async function merge(
     'view',
     number,
     '--json',
-    'baseRefName,headRefName,reviewDecision,reviewRequests,latestReviews',
+    'baseRefName,headRefName,reviewDecision,mergeStateStatus,reviewRequests,latestReviews',
   ]);
   const pr = JSON.parse(out) as Review & { baseRefName: string; headRefName: string };
   const { baseRefName, headRefName } = pr;
   const problem = reviewProblem(number, {
-    reviewDecision: pr.reviewDecision ?? null,
+    // gh prints an empty reviewDecision as an empty string.
+    reviewDecision: pr.reviewDecision || null,
+    mergeStateStatus: pr.mergeStateStatus ?? '',
     reviewRequests: pr.reviewRequests ?? [],
     latestReviews: pr.latestReviews ?? [],
   });
