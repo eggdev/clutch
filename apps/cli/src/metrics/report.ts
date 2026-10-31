@@ -3,6 +3,7 @@ import { githubReader } from '@/metrics/collect';
 import {
   ciMetrics,
   dryRunAgreement,
+  gradeOf,
   flowMetrics,
   isRevert,
   mainRedMinutes,
@@ -22,6 +23,8 @@ type Options = {
   /** The checkout's `pr.branchPrefix` and `pr_size.exclude`, or the defaults for another repository. */
   branchPrefix?: string;
   sizeExclude?: Array<string>;
+  /** The login whose reactions grade the dry-run verdicts. See `verdictOwner`. */
+  owner?: string | null;
 };
 
 /** Each field that the report leaves null, and why. CL-503b fills the reserved ones. */
@@ -75,7 +78,11 @@ export async function metricsReport(options: Options) {
 
   let agreement: ReturnType<typeof dryRunAgreement> | null = null;
   try {
-    agreement = dryRunAgreement(await reader.dryRunVerdicts(since));
+    agreement = dryRunAgreement(await reader.dryRunVerdicts(since, options.owner));
+    if (!options.owner) {
+      unavailable.verdictOwner =
+        'No owner in clutch.yaml automerge.owner or CODEOWNERS, so no reaction counts as a grade.';
+    }
   } catch (error) {
     unavailable.dryRunAgreement = reason(error);
   }
@@ -193,4 +200,49 @@ export function renderMetrics(report: MetricsReport) {
   const notes = Object.entries(report.unavailable).map(([field, why]) => `  ${field}: ${why}`);
   const missing = notes.length > 0 ? ['', 'Unavailable:', ...notes] : [];
   return [`clutch metrics for ${report.repo}`, '', ...lines, ...missing].join('\n');
+}
+
+/**
+ * The dry-run verdicts of `repo` in the window, for grading: the ungraded
+ * ones, the ones the owner disagreed with, and the agreement streak.
+ */
+export async function verdictReport(options: Options) {
+  const { gh, repo, days, now } = options;
+  const since = new Date(now.getTime() - days * 86_400_000).toISOString();
+  const verdicts = await githubReader(gh, repo).dryRunVerdicts(since, options.owner);
+  const sorted = verdicts.toSorted((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const entry = (verdict: (typeof sorted)[number]) => ({
+    commentId: verdict.commentId,
+    pull: verdict.pull,
+    url: verdict.url,
+    createdAt: verdict.createdAt,
+    verdict: verdict.wouldMerge ? 'would auto-merge' : 'would not auto-merge',
+    reasons: verdict.reasons,
+  });
+  return {
+    schemaVersion: 1,
+    repo,
+    owner: options.owner ?? null,
+    since,
+    agreement: dryRunAgreement(sorted),
+    ungraded: sorted.filter((verdict) => gradeOf(verdict) === null).map(entry),
+    disagreed: sorted.filter((verdict) => gradeOf(verdict) === 'disagree').map(entry),
+  };
+}
+
+export type VerdictReport = Awaited<ReturnType<typeof verdictReport>>;
+
+/** The ungraded verdicts as one line each, with the streak. */
+export function renderVerdicts(report: VerdictReport) {
+  const who = report.owner ? `@${report.owner}` : 'anyone (no owner found)';
+  const lines = report.ungraded.map(
+    (item) =>
+      `#${item.pull}  ${item.verdict}${item.reasons.length > 0 ? `: ${item.reasons.join(' ')}` : ''}  ${item.url}`,
+  );
+  return [
+    `Dry-run verdicts for ${report.repo}, graded by ${who}. Streak: ${report.agreement.streak} agreed in a row.`,
+    '',
+    lines.length > 0 ? `Ungraded (${lines.length}):` : 'Nothing to grade.',
+    ...lines,
+  ].join('\n');
 }

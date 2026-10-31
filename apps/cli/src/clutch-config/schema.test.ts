@@ -138,6 +138,13 @@ test('automerge is optional and takes off, dry-run or on', () => {
     validateClutchConfig({ ...valid, automerge: { mode: 'on', step: 'bots' } }).config?.automerge,
   ).toEqual({ mode: 'on', step: 'bots' });
   expect(paths({ ...valid, automerge: { mode: 'on', step: 'high' } })).toEqual(['automerge.step']);
+  expect(
+    validateClutchConfig({ ...valid, automerge: { mode: 'dry-run', owner: 'eggdev' } }).config
+      ?.automerge,
+  ).toEqual({ mode: 'dry-run', owner: 'eggdev' });
+  expect(paths({ ...valid, automerge: { mode: 'on', owner: '@eggdev' } })).toEqual([
+    'automerge.owner',
+  ]);
 });
 
 test('pr is optional and takes a branch prefix', () => {

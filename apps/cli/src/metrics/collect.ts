@@ -6,11 +6,18 @@ import type {
   MergedPull,
   WorkflowRun,
 } from '@/metrics/compute';
+import { verdictReasons } from '@/metrics/compute';
 import { enabledMarker } from '@/metrics/pulls';
 import type { PullShape } from '@/metrics/pulls';
 
 /** The marker that starts each dry-run comment of `tools/github/auto-merge.ts`. */
 const dryRunMarker = '<!-- automerge-dry-run:';
+
+/** How the Grade verdicts workflow's reply starts. */
+const gradedReply = "Graded on the owner's instruction";
+
+/** The grading bot that a reply names: the login of the workflow's app token. */
+const graderMarker = /<!-- grader:(\S+) -->/u;
 
 /** A person or a bot, as the GitHub API reports one. */
 type Account = { login?: string; type?: string } | null | undefined;
@@ -224,23 +231,64 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
       return withChecks.toReversed();
     },
 
-    /** The dry-run verdicts commented on or after `since`, an ISO time. */
-    async dryRunVerdicts(since: string): Promise<Array<DryRunVerdict>> {
+    /**
+     * The dry-run verdicts commented on or after `since`, an ISO time. With an
+     * `owner`, only the owner's reactions count as grades, and those of each
+     * grading bot. The Grade verdicts workflow names that bot, the login of its
+     * app token, in its `Graded on the owner's instruction` reply. Only a reply
+     * that a bot posted counts. Without an owner, no reaction counts.
+     */
+    async dryRunVerdicts(since: string, owner?: string | null): Promise<Array<DryRunVerdict>> {
       const comments = await list<{
+        id: number;
+        html_url: string;
         body?: string;
         created_at: string;
         issue_url: string;
+        user?: Account;
         reactions?: Record<string, number>;
       }>(`repos/${repo}/issues/comments?since=${encodeURIComponent(since)}`);
-      return comments
-        .filter((comment) => comment.body?.startsWith(dryRunMarker) && comment.created_at >= since)
-        .map((comment) => ({
-          pull: Number(comment.issue_url.split('/').at(-1)),
-          createdAt: comment.created_at,
-          wouldMerge: !comment.body?.includes('would not auto-merge'),
-          thumbsUp: comment.reactions?.['+1'] ?? 0,
-          thumbsDown: comment.reactions?.['-1'] ?? 0,
-        }));
+      const verdicts = comments.filter(
+        (comment) => comment.body?.startsWith(dryRunMarker) && comment.created_at >= since,
+      );
+      const graders = new Set(
+        comments
+          .filter(
+            (comment) => comment.user?.type === 'Bot' && comment.body?.startsWith(gradedReply),
+          )
+          .map((comment) => graderMarker.exec(comment.body ?? '')?.[1])
+          .filter(Boolean),
+      );
+      return Promise.all(
+        verdicts.map((comment) =>
+          limit(async () => {
+            // With no owner, no reaction is a grade, so nobody else moves the streak.
+            let thumbsUp = 0;
+            let thumbsDown = 0;
+            if (owner) {
+              const reactions = await list<{ content: string; user: Account }>(
+                `repos/${repo}/issues/comments/${comment.id}/reactions`,
+              );
+              const graded = reactions.filter(
+                (reaction) => reaction.user?.login === owner || graders.has(reaction.user?.login),
+              );
+              thumbsUp = graded.filter((reaction) => reaction.content === '+1').length;
+              thumbsDown = graded.filter((reaction) => reaction.content === '-1').length;
+            }
+            const body = comment.body ?? '';
+            return {
+              commentId: comment.id,
+              url: comment.html_url,
+              pull: Number(comment.issue_url.split('/').at(-1)),
+              createdAt: comment.created_at,
+              wouldMerge: !body.includes('would not auto-merge'),
+              reasons: verdictReasons(body),
+              thumbsUp,
+              thumbsDown,
+            };
+          }),
+        ),
+      );
     },
 
     /** The workflow runs created on or after `since`, a date. */

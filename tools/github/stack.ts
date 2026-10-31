@@ -3,8 +3,14 @@ export const ghStack = { repo: 'github/gh-stack', name: 'gh-stack', version: 'v0
 
 export type Result = { ok: boolean; out: string; err: string };
 
-/** Runs a command. `inherit` shows its output as it runs, for a push that runs the hooks. */
-export type Run = (command: Array<string>, options?: { inherit?: boolean }) => Promise<Result>;
+/**
+ * Runs a command. `inherit` shows its output as it runs, for a push that runs
+ * the hooks. `env` adds variables, such as another `GH_TOKEN` for one call.
+ */
+export type Run = (
+  command: Array<string>,
+  options?: { inherit?: boolean; env?: Record<string, string> },
+) => Promise<Result>;
 
 /** The `gh` version that `mise.toml` pins, such as `2.103.3`. */
 export function pinnedGh(miseToml: string) {

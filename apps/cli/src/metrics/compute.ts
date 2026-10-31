@@ -187,14 +187,41 @@ export function ciMetrics(runs: Array<WorkflowRun>) {
   };
 }
 
-/** One dry-run verdict that the Auto-merge workflow commented, with the reactions on it. */
+/**
+ * One dry-run verdict that the Auto-merge workflow commented, with the grading
+ * reactions on it: the owner's, and a bot's made on the owner's instruction.
+ */
 export type DryRunVerdict = {
+  /** The id of the verdict comment. */
+  commentId: number;
+  url: string;
   pull: number;
   createdAt: string;
   wouldMerge: boolean;
+  /** Why the PR would not auto-merge. Empty when it would. */
+  reasons: Array<string>;
   thumbsUp: number;
   thumbsDown: number;
 };
+
+/** The owner's grade of a verdict: a 👎 disagrees, a 👍 alone agrees, and none is ungraded. */
+export function gradeOf(verdict: DryRunVerdict) {
+  if (verdict.thumbsDown > 0) {
+    return 'disagree';
+  }
+  return verdict.thumbsUp > 0 ? 'agree' : null;
+}
+
+/** The reasons in a would-not verdict: its `- ` lines before the reaction request. */
+export function verdictReasons(body: string) {
+  if (!body.includes('would not auto-merge')) {
+    return [];
+  }
+  return body
+    .split('\n')
+    .filter((line) => line.startsWith('- '))
+    .map((line) => line.slice(2).trim());
+}
 
 /**
  * How often the owner agrees with the auto-merge dry run. A 👎 is a

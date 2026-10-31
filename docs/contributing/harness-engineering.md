@@ -167,8 +167,9 @@ never the only record of a leftover. Report a bug with the
 
 ## Weekly gardening
 
-Once a week, `.github/workflows/gardening.yml` runs an agent for one short
-pass. The agent edits files only. The workflow commits the edits to a
+Once a week, `.github/workflows/gardening.yml` runs two jobs. The `gardening`
+job runs an agent for one short pass, and the `calibration` job updates the
+auto-merge calibration issue, described below. The agent edits files only. The workflow commits the edits to a
 `gardening/<date>` branch and opens one pull request. It never pushes to the
 default branch, and it skips the week while a gardening PR is open. A person
 reviews the PR. The PR opens with the release bot's token when the
@@ -177,6 +178,10 @@ CI or agent review. See [the release bot](./setup/releases.md#the-release-bot).
 The agent runs on the model that the `CLUTCH_AGENT_MODEL` repository variable
 names, or on `claude-haiku-5-5` when it is unset. The workflow adds a
 changeset from the PR title, and agent review reviews the PR like any other.
+The `calibration` job needs no credential. It opens or updates the
+issue "Auto-merge calibration: week of <date>", which lists each auto-merge
+dry-run verdict the owner has not graded. See
+[grade the verdicts](../../.agents/skills/deliver/references/pull-requests.md#grade-the-verdicts).
 The pass:
 
 1. Read the review comments of the week's merged PRs. Find a comment that

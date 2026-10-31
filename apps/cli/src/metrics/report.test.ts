@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 
 import type { Gh } from '@/doctor/remote';
-import { metricsReport, renderMetrics } from '@/metrics/report';
+import { metricsReport, renderMetrics, renderVerdicts, verdictReport } from '@/metrics/report';
 
 const repo = 'acme/shop';
 const now = new Date('2026-10-15T00:00:00Z');
@@ -143,18 +143,29 @@ const routes = {
   [`repos/${repo}`]: { default_branch: 'main' },
   [`repos/${repo}/issues/comments`]: [
     {
+      id: 11,
+      html_url: `https://github.com/${repo}/pull/1#issuecomment-11`,
       body: '<!-- automerge-dry-run:head1 -->\n**Auto-merge dry run:** this pull request would auto-merge at head1.',
       created_at: '2026-10-10T00:40:00Z',
       issue_url: `https://api.github.com/repos/${repo}/issues/1`,
       reactions: { '+1': 1, '-1': 0 },
     },
     {
-      body: '<!-- automerge-dry-run:head2 -->\n**Auto-merge dry run:** this pull request would not auto-merge at head2.',
+      id: 12,
+      html_url: `https://github.com/${repo}/pull/2#issuecomment-12`,
+      body: '<!-- automerge-dry-run:head2 -->\n**Auto-merge dry run:** this pull request would not auto-merge at head2.\n\n- The risk tier is medium, not low.\n\nOwner: react 👍 if you agree with this verdict, or 👎 if not.',
       created_at: '2026-10-10T01:40:00Z',
       issue_url: `https://api.github.com/repos/${repo}/issues/2`,
       reactions: { '+1': 0, '-1': 0 },
     },
     { body: 'LGTM', created_at: '2026-10-10T01:50:00Z', issue_url: 'x/2', reactions: {} },
+  ],
+  // The owner's 👍 on the first verdict. A stranger's 👍 on the second does not count.
+  [`repos/${repo}/issues/comments/11/reactions`]: [
+    { content: '+1', user: { login: 'jane', type: 'User' } },
+  ],
+  [`repos/${repo}/issues/comments/12/reactions`]: [
+    { content: '+1', user: { login: 'visitor', type: 'User' } },
   ],
 };
 
@@ -164,7 +175,7 @@ test('the report reads only gh api GET routes and fills every field', async () =
     { status: 'done', pr: `https://github.com/${repo}/pull/1` },
     { status: 'done', pr: 'https://github.com/acme/other/pull/1' },
   ];
-  const report = await metricsReport({ gh, repo, days: 14, now, issues });
+  const report = await metricsReport({ gh, repo, days: 14, now, issues, owner: 'jane' });
   for (const call of calls) {
     expect(call[0]).toBe('api');
   }
@@ -207,4 +218,88 @@ test('another repository has no issues count, and an unreadable section names it
   expect(report.ci).toBeNull();
   expect(report.unavailable.ci).toContain('HTTP 404');
   expect(report.unavailable.issuesDone).toContain('.clutch/issues');
+});
+
+/** The comments with the grading bot's reply on a calibration issue. */
+const withGrader = [
+  ...(routes[`repos/${repo}/issues/comments`] as Array<object>),
+  {
+    body: "Graded on the owner's instruction: 👍 on 0 verdicts, 👎 on 1.\n\n<!-- grader:release-app[bot] -->",
+    created_at: '2026-10-10T02:00:00Z',
+    issue_url: `https://api.github.com/repos/${repo}/issues/40`,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  },
+];
+
+test('the verdict report lists the ungraded verdicts with their reasons, and a bot grade counts', async () => {
+  const { gh } = fakeGh({
+    ...routes,
+    [`repos/${repo}/issues/comments`]: withGrader,
+    [`repos/${repo}/issues/comments/12/reactions`]: [
+      { content: '-1', user: { login: 'release-app[bot]', type: 'Bot' } },
+    ],
+  });
+  const graded = await verdictReport({ gh, repo, days: 14, now, owner: 'jane' });
+  expect(graded.ungraded).toEqual([]);
+  expect(graded.disagreed).toEqual([
+    {
+      commentId: 12,
+      pull: 2,
+      url: `https://github.com/${repo}/pull/2#issuecomment-12`,
+      createdAt: '2026-10-10T01:40:00Z',
+      verdict: 'would not auto-merge',
+      reasons: ['The risk tier is medium, not low.'],
+    },
+  ]);
+  expect(graded.agreement).toMatchObject({ agreed: 1, disagreed: 1, streak: 0 });
+
+  const open = await verdictReport({ gh: fakeGh(routes).gh, repo, days: 14, now, owner: 'jane' });
+  expect(open.ungraded.map((item) => item.pull)).toEqual([2]);
+  expect(renderVerdicts(open)).toContain(
+    '#2  would not auto-merge: The risk tier is medium, not low.  https://github.com/acme/shop/pull/2#issuecomment-12',
+  );
+  expect(renderVerdicts(open)).toContain('graded by @jane. Streak: 1 agreed in a row.');
+});
+
+test('only the bot that posted the grading reply grades, not any other bot', async () => {
+  const { gh } = fakeGh({
+    ...routes,
+    [`repos/${repo}/issues/comments`]: withGrader,
+    [`repos/${repo}/issues/comments/12/reactions`]: [
+      { content: '-1', user: { login: 'other-app[bot]', type: 'Bot' } },
+    ],
+  });
+  const report = await verdictReport({ gh, repo, days: 14, now, owner: 'jane' });
+  expect(report.disagreed).toEqual([]);
+  expect(report.ungraded.map((item) => item.pull)).toEqual([2]);
+});
+
+test("a grader marker in a person's comment names no grader", async () => {
+  const forged = [
+    ...(routes[`repos/${repo}/issues/comments`] as Array<object>),
+    {
+      body: "Graded on the owner's instruction: 👍 on 1 verdicts, 👎 on 0.\n\n<!-- grader:other-app[bot] -->",
+      created_at: '2026-10-10T02:00:00Z',
+      issue_url: `https://api.github.com/repos/${repo}/issues/40`,
+      user: { login: 'visitor', type: 'User' },
+    },
+  ];
+  const { gh } = fakeGh({
+    ...routes,
+    [`repos/${repo}/issues/comments`]: forged,
+    [`repos/${repo}/issues/comments/12/reactions`]: [
+      { content: '+1', user: { login: 'other-app[bot]', type: 'Bot' } },
+    ],
+  });
+  const report = await verdictReport({ gh, repo, days: 14, now, owner: 'jane' });
+  expect(report.ungraded.map((item) => item.pull)).toEqual([2]);
+});
+
+test('with no owner, no reaction is a grade, and the report says why', async () => {
+  const { gh } = fakeGh(routes);
+  const verdicts = await verdictReport({ gh, repo, days: 14, now, owner: null });
+  expect(verdicts.ungraded.map((item) => item.pull)).toEqual([1, 2]);
+  expect(verdicts.agreement).toMatchObject({ agreed: 0, streak: 0 });
+  const report = await metricsReport({ gh, repo, days: 14, now, owner: null });
+  expect(report.unavailable.verdictOwner).toContain('no reaction counts as a grade');
 });

@@ -146,6 +146,9 @@ test('CI metrics skip unfinished and skipped runs', () => {
 });
 
 const verdict = (number: number, day: number, thumbsUp: number, thumbsDown: number) => ({
+  commentId: number,
+  url: `https://github.com/acme/shop/pull/${number}`,
+  reasons: [],
   pull: number,
   createdAt: `2026-10-${String(day).padStart(2, '0')}T00:00:00Z`,
   wouldMerge: number % 2 === 0,

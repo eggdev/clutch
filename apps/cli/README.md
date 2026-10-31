@@ -199,6 +199,7 @@ worktree: # optional
 automerge: # optional
   mode: dry-run # off (the default), dry-run or on
   step: low # bots (the default), low or medium: how far auto-merge reaches
+  owner: eggdev # optional: the login whose reactions grade the dry-run verdicts
 pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 sast: auto # optional: auto (the default), codeql or semgrep
@@ -427,6 +428,7 @@ works from a clone and from the release binary in any project.
 ```sh
 mise exec -- bun run clutch metrics
 mise exec -- bun run clutch metrics --since 30d --json
+mise exec -- bun run clutch metrics --verdicts
 ```
 
 - `--since` takes a number of days, such as `14d`, the default.
@@ -436,6 +438,11 @@ mise exec -- bun run clutch metrics --since 30d --json
   another repository reports them as unavailable. The same goes for
   `pr.branchPrefix` and `pr_size.exclude`: another repository gets the
   defaults.
+- `--verdicts` lists the auto-merge dry-run verdicts that the owner has not
+  graded, with the reasons, the link and the agreement streak. `--owner LOGIN`
+  names the owner; it defaults to `automerge.owner` in `clutch.yaml`, then the
+  CODEOWNERS default. See
+  [grade the verdicts](../../.agents/skills/deliver/references/pull-requests.md#grade-the-verdicts).
 - It exits 0 after a report, and 1 when `gh` fails for the merged pull requests.
 
 See [factory telemetry](../../docs/contributing/capabilities/factory-observability.md)

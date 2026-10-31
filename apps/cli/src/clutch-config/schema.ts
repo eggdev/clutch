@@ -4,6 +4,7 @@ const automergeModes = ['off', 'dry-run', 'on'] as const;
 const automergeSteps = ['bots', 'low', 'medium'] as const;
 const sastEngines = ['auto', 'codeql', 'semgrep'] as const;
 const missingCredentials = ['notice', 'fail'] as const;
+const loginPattern = /^[a-z\d](?:[a-z\d-]{0,38})$/iu;
 
 type CapabilityStatus = (typeof capabilityStatuses)[number];
 
@@ -24,8 +25,12 @@ export type ClutchConfig = {
   capabilities: Record<string, Capability>;
   worktree?: { root: string; copy: Array<string>; setup: Array<string> };
   /** What the Auto-merge workflow does with a low-risk agent PR. */
-  /** `step` is how far auto-merge reaches: bot PRs, then low-risk agent PRs, then medium-risk ones. */
-  automerge?: { mode: (typeof automergeModes)[number]; step?: (typeof automergeSteps)[number] };
+  /** `step` is how far auto-merge reaches. `owner` is the login whose reactions grade the dry-run verdicts. */
+  automerge?: {
+    mode: (typeof automergeModes)[number];
+    step?: (typeof automergeSteps)[number];
+    owner?: string;
+  };
   /** How `bun run pr` finds an agent's branch: its prefix, `clutch/cl-` by default. */
   pr?: { branchPrefix: string };
   /**
@@ -209,7 +214,7 @@ function readAutomerge(value: unknown, errors: Errors) {
     errors.push({ path: 'automerge', message: 'Expected a map with mode.' });
     return;
   }
-  unknownKeys(value, ['mode', 'step'], 'automerge', errors);
+  unknownKeys(value, ['mode', 'step', 'owner'], 'automerge', errors);
   if (!oneOf(automergeModes, value.mode)) {
     errors.push({ path: 'automerge.mode', message: `Expected ${automergeModes.join(', ')}.` });
     return;
@@ -218,7 +223,16 @@ function readAutomerge(value: unknown, errors: Errors) {
     errors.push({ path: 'automerge.step', message: `Expected ${automergeSteps.join(', ')}.` });
     return;
   }
-  return value.step === undefined ? { mode: value.mode } : { mode: value.mode, step: value.step };
+  const { owner } = value;
+  if (owner !== undefined && (typeof owner !== 'string' || !loginPattern.test(owner))) {
+    errors.push({ path: 'automerge.owner', message: 'Expected a GitHub login such as eggdev.' });
+    return;
+  }
+  return {
+    mode: value.mode,
+    ...(value.step === undefined ? {} : { step: value.step }),
+    ...(owner === undefined ? {} : { owner }),
+  };
 }
 
 function readPr(value: unknown, errors: Errors) {
