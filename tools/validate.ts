@@ -1,3 +1,5 @@
+import { availableParallelism } from 'node:os';
+
 import { changedFiles, findBase } from '@tools/check-base';
 import { isDocsOnly } from '@tools/hooks/paths.mjs';
 
@@ -26,6 +28,9 @@ export const validateTargets = [
  * run warns. Provisional until CL-303 measures the p50 on a CI runner.
  */
 export const changedBudgetSeconds = 60;
+
+/** The cores at which `validate --changed` runs its steps at once. */
+const parallelCores = 8;
 
 /** The quick subset that `check` runs. */
 export const checkTargets = ['typecheck', 'lint', 'format-check'];
@@ -91,15 +96,23 @@ async function validateChanged(root: string, explicitBase: string | undefined) {
   console.log(`validate --changed: ${why}.`);
   const started = performance.now();
   const env = { ...process.env, CI: '1' };
-  // The steps run at once, and each runs to the end, so one report shows each failure.
-  const runs = plan.steps.map((step) =>
+  // Each step runs to the end, so one report shows each failure. On a machine
+  // with many cores the steps run at once. On a small CI runner they would
+  // starve each other, and a timed test fails, so they run in turn.
+  const start = (step: Array<string>) =>
     Bun.spawn([process.execPath, 'x', 'nx', ...step], {
       env,
       stdout: 'inherit',
       stderr: 'inherit',
-    }),
-  );
-  const exits = await Promise.all(runs.map((proc) => proc.exited));
+    });
+  const exits: Array<number> = [];
+  if (availableParallelism() >= parallelCores) {
+    exits.push(...(await Promise.all(plan.steps.map((step) => start(step).exited))));
+  } else {
+    for (const step of plan.steps) {
+      exits.push(await start(step).exited);
+    }
+  }
   const code = exits.find((exit) => exit !== 0) ?? 0;
   const seconds = Math.round((performance.now() - started) / 1000);
   console.log(`validate --changed took ${seconds} s (budget ${changedBudgetSeconds} s).`);

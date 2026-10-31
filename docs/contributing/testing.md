@@ -50,7 +50,8 @@ instead. A helper that asserts has a name that starts with `expect` or
 
 `check-test-integrity` compares the working tree with the base commit. CI
 sets the base in `CHECK_BASE`. Locally, the base is the merge base with
-`origin/main`. The check fails when a change does any of these:
+`origin/HEAD`, or with `origin/main` when the clone has no `origin/HEAD`. See
+[`tools/check-base.ts`](../../tools/check-base.ts). The check fails when a change does any of these:
 
 - It deletes a test file.
 - It renames a test file to a name that no test runner runs.
