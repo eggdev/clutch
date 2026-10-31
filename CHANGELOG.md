@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.27.0 (2026-10-31)
+
+### Features
+
+- feat(cli): add clutch worktree new and list (CL-201)
+- feat(cli): add clutch worktree rm and dev --stop (CL-201b)
+
+### Fixes and maintenance
+
+- fix(pr): act on the checkout's head in pr sync and pr wait (CL-122)
+- fix(pr): refuse a merge that waits for a code owner (CL-138)
+- docs(worktree): document per-checkout isolation (CL-202)
+
 ## 0.26.2 (2026-10-31)
 
 ### Fixes and maintenance
