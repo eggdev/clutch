@@ -14,7 +14,7 @@ import type { PullShape } from '@/metrics/pulls';
 const dryRunMarker = '<!-- automerge-dry-run:';
 
 /** How the Grade verdicts workflow's reply starts. Its author is the grading bot. */
-export const gradedReply = "Graded on the owner's instruction";
+const gradedReply = "Graded on the owner's instruction";
 
 /** A person or a bot, as the GitHub API reports one. */
 type Account = { login?: string; type?: string } | null | undefined;

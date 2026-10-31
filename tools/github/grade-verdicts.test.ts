@@ -101,6 +101,7 @@ test("the owner's agree with all adds a 👍 to each listed verdict, and keeps t
     'repos/acme/shop/issues/comments/70/reactions -f content=+1',
     'repos/acme/shop/issues/comments/80/reactions -f content=+1',
   ]);
+  // apps/cli/src/metrics/collect.ts trusts a bot as a grader by this reply's start. Change both together.
   expect(calls).toContain(
     "gh issue comment 41 --body Graded on the owner's instruction: 👍 on 2 verdicts, 👎 on 0.",
   );
