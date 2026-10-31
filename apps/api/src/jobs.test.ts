@@ -3,7 +3,7 @@ import { expect, test } from 'bun:test';
 import { sign } from '@repo/notes/service/webhook-signature';
 import { webhookTestSecret } from '@repo/notes/testing/webhook';
 import { SyncRpcs } from '@repo/sync/types/protocol';
-import { Effect, Fiber, Stream } from 'effect';
+import { Deferred, Effect, Fiber, Stream } from 'effect';
 import { HttpServer } from 'effect/http';
 import { RpcClient } from 'effect/rpc';
 
@@ -16,7 +16,9 @@ test('a signed webhook reaches each client, and the job runner then sends the sp
       const url = `${address.replace('http', 'ws')}/sync`;
       return yield* Effect.gen(function* () {
         const rpc = yield* RpcClient.make(SyncRpcs);
+        const connected = yield* Deferred.make<boolean>();
         const reading = yield* rpc.Pull({ lastSyncId: 0, groups: ['space:general'] }).pipe(
+          Stream.tap(() => Deferred.succeed(connected, true)),
           Stream.map(deltasOnly),
           Stream.flatMap((deltas) => Stream.fromIterable(deltas)),
           Stream.flatMap((delta) => Stream.fromIterable(delta.changes)),
@@ -25,7 +27,8 @@ test('a signed webhook reaches each client, and the job runner then sends the sp
           Stream.runCollect,
           Effect.forkChild,
         );
-        yield* Effect.sleep('100 millis');
+        // The first message comes after the subscription, so the webhook's note cannot be missed.
+        yield* Deferred.await(connected);
         const body = JSON.stringify({
           eventId: 'evt-api',
           organizationId: 'org-test',

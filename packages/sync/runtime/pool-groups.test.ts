@@ -42,11 +42,14 @@ test('losing a group deletes its records, and a record still in another group st
 test('the purge reaches the local database through the next save', async () => {
   const pool = loadedPool();
   const database = memoryLocalDatabase();
+  const saves: Array<Promise<void>> = [];
   pool.onChange(() => {
-    void database.write(pool.snapshot());
+    saves.push(database.write(pool.snapshot()));
   });
   pool.applyGroups(['org:a'], []);
-  await Bun.sleep(0);
+  // Wait for the save that the purge started, not for a guessed tick.
+  expect(saves.length).toBeGreaterThan(0);
+  await Promise.all(saves);
   const saved = await database.read();
   expect(saved?.tables.Card).toEqual([]);
   expect(Object.keys(saved?.meta ?? {})).toEqual([]);
@@ -79,7 +82,11 @@ test('a gate waits for a group until the engine loads it, and a loaded group res
   const waiting = pool.loadGroup('space:x').then(() => {
     done = true;
   });
-  await Bun.sleep(0);
+  // setImmediate runs after every pending promise callback, so a gate that
+  // resolved on its own would have set done by then.
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
   expect(done).toBe(false);
   expect(asked).toEqual(['space:x']);
   expect(pool.requestedGroups()).toEqual(['space:x']);

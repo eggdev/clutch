@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 
 import { Sessions } from '@repo/sync/service/sessions';
 import { SyncRpcs } from '@repo/sync/types/protocol';
-import { Effect, Fiber, Stream } from 'effect';
+import { Deferred, Effect, Fiber, Stream } from 'effect';
 import { HttpServer } from 'effect/http';
 import { RpcClient } from 'effect/rpc';
 
@@ -16,14 +16,17 @@ test('the sender gets the delta of its own transaction over the socket', async (
       );
       return yield* Effect.gen(function* () {
         const rpc = yield* RpcClient.make(SyncRpcs);
+        const connected = yield* Deferred.make<boolean>();
         const reading = yield* rpc.Pull({ lastSyncId: 0, groups: ['space:general'] }).pipe(
+          Stream.tap(() => Deferred.succeed(connected, true)),
           Stream.map(deltasOnly),
           Stream.filter((deltas) => deltas.length > 0),
           Stream.take(1),
           Stream.runCollect,
           Effect.forkChild,
         );
-        yield* Effect.sleep('100 millis');
+        // The first message comes after the subscription, so the push cannot be missed.
+        yield* Deferred.await(connected);
         const outcomes = yield* rpc.Push({
           transactions: [
             {
@@ -64,32 +67,38 @@ const create = (id: string) => ({
   input: { id, spaceId: 'general', title: id, at: '2026-10-28T12:00:00.000Z' },
 });
 
-test('another client gets the first delta live, with no second change', async () => {
+test('another client gets the first delta live, and no copy of it', async () => {
   const received = await Effect.runPromise(
     Effect.gen(function* () {
       const url = yield* HttpServer.addressFormattedWith((address) =>
         Effect.succeed(`${address.replace('http', 'ws')}/sync`),
       );
-      const sender = Effect.gen(function* () {
-        const rpc = yield* RpcClient.make(SyncRpcs);
-        return yield* rpc.Push({ transactions: [create('n1')] });
-      }).pipe(Effect.scoped, Effect.provide(client(url)));
+      const send = (id: string) =>
+        Effect.gen(function* () {
+          const rpc = yield* RpcClient.make(SyncRpcs);
+          return yield* rpc.Push({ transactions: [create(id)] });
+        }).pipe(Effect.scoped, Effect.provide(client(url)));
       return yield* Effect.gen(function* () {
         const rpc = yield* RpcClient.make(SyncRpcs);
+        const connected = yield* Deferred.make<boolean>();
+        // Read up to a second note. Events arrive in order, so a copy of the
+        // first delta would show up before the second one.
         const reading = yield* rpc.Pull({ lastSyncId: 0, groups: ['space:general'] }).pipe(
+          Stream.tap(() => Deferred.succeed(connected, true)),
           Stream.map(deltasOnly),
           Stream.filter((deltas) => deltas.length > 0),
-          Stream.take(1),
+          Stream.takeUntil((deltas) => deltas.some((delta) => delta.transactionId === 't-n2')),
           Stream.runCollect,
           Effect.forkChild,
         );
-        yield* Effect.sleep('100 millis');
-        yield* sender;
-        return yield* Fiber.join(reading).pipe(Effect.timeout('1 second'));
+        yield* Deferred.await(connected);
+        yield* send('n1');
+        yield* send('n2');
+        return yield* Fiber.join(reading).pipe(Effect.timeout('2 seconds'));
       }).pipe(Effect.scoped, Effect.provide(client(url)));
     }).pipe(Effect.provide(server)),
   );
-  expect(received.flat().map((delta) => delta.transactionId)).toEqual(['t-n1']);
+  expect(received.flat().map((delta) => delta.transactionId)).toEqual(['t-n1', 't-n2']);
 });
 
 test('a sign-out closes each socket of the user with code 4401', async () => {
