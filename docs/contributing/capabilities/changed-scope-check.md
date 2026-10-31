@@ -12,7 +12,7 @@ Rank 17 of the researched practices. More than four in five of the leading repos
 
 ## Adopt
 
-A project from Clutch has steps 1 to 5 already: `ci.yml` runs `bun run validate --changed` with `CHECK_BASE` on a pull request, and `bun run validate` on a push to the default branch. To build it elsewhere:
+A project from Clutch has steps 1 to 5 already. Its `ci.yml` runs `bun run validate --changed` with `CHECK_BASE` on a pull request. A push to the default branch runs `bun run validate`. To build it elsewhere:
 
 1. In the CI workflow, find the base commit of each pull request. Use the merge base with the default branch, or the `nrwl/nx-set-shas` action.
 2. Run `nx affected -t` with the same targets as the canonical check command.
