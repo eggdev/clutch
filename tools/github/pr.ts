@@ -297,7 +297,15 @@ export async function runPr(
     wait: [
       1,
       async ([number]) => {
-        const options = { timeout: timeout('30m'), interval: 20_000 };
+        const [branch, sha] = await Promise.all([
+          run(['git', 'branch', '--show-current']),
+          run(['git', 'rev-parse', 'HEAD']),
+        ]);
+        const local =
+          branch.out.trim() && sha.out.trim()
+            ? { branch: branch.out.trim(), sha: sha.out.trim() }
+            : undefined;
+        const options = { timeout: timeout('30m'), interval: 20_000, local };
         const { status, code } = await waitForChecks(run, number, clock, options);
         print({ ...status, timedOut: code === 2 });
         if (code === 2) {

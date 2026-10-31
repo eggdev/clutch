@@ -396,3 +396,49 @@ test('failures reports a job log that GitHub no longer has', async () => {
   }
   expect(logged.join('\n')).toContain('The log is not available: gh: HTTP 404');
 });
+
+test('wait keeps waiting while GitHub still shows an older head than the checkout', async () => {
+  const old = {
+    ...JSON.parse(view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out),
+    headRefName: 'clutch/cl-122-x',
+  };
+  const fresh = { ...old, headRefOid: 'new9999' };
+  const gh = fake([
+    ['gh pr view 7', [{ out: JSON.stringify(old) }, { out: JSON.stringify(fresh) }]],
+    rules,
+    comments('## Agent review\n\nBlocking findings: 0'),
+    ['git branch --show-current', { out: 'clutch/cl-122-x\n' }],
+    ['git rev-parse HEAD', { out: 'new9999\n' }],
+  ]);
+  const clock = fakeClock();
+  const original = console.log;
+  console.log = () => {};
+  try {
+    expect(await runPr(['wait', '7'], gh.run, noWrite, clock)).toBe(0);
+  } finally {
+    console.log = original;
+  }
+  // The first poll saw the old head, so wait slept once before it trusted the checks.
+  expect(clock.slept).toBe(20_000);
+});
+
+test('sync drops a fork point that the branch no longer contains', async () => {
+  const gh = syncAnswers(
+    [{ ok: true }],
+    [{ out: '' }],
+    [
+      ['git config --get branch.clutch/cl-117-pr-lifecycle.clutchForkPoint', { out: 'gone123\n' }],
+      ['git merge-base --is-ancestor gone123 HEAD', { ok: false }],
+      ['git merge-base HEAD origin/main', { out: 'new5678\n' }],
+    ],
+  );
+  const original = console.log;
+  console.log = () => {};
+  try {
+    expect(await runPr(['sync', '7'], gh.run, noWrite)).toBe(0);
+  } finally {
+    console.log = original;
+  }
+  expect(gh.calls).toContain('git rebase origin/main');
+  expect(gh.calls.some((call) => call.startsWith('git rebase --onto'))).toBe(false);
+});
