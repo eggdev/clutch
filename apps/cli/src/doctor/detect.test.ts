@@ -63,4 +63,7 @@ test('detection on the template tree gives one result for each capability', asyn
   expect(found.map((item) => item.id)).toEqual(
     (registry.capabilities ?? []).map((capability) => capability.id),
   );
+  expect(
+    found.filter((item) => !['present', 'partial', 'missing', 'unknown'].includes(item.status)),
+  ).toEqual([]);
 });

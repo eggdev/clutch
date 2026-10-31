@@ -5,6 +5,7 @@ import path from 'node:path';
 import { parse } from 'yaml';
 
 import { doctorCommand } from '@/doctor-command';
+import { gitOrThrow } from '@/git';
 import { initCommand } from '@/init-command';
 import { lineagePath } from '@/sync/source';
 import { gitRepo } from '@/testing/git-repo';
@@ -15,8 +16,8 @@ const editorconfig = 'root = true\n';
  * A Clutch checkout with one release tag, so init does not depend on the tags
  * of the clone that runs the test. A shallow clone or a fork has none.
  */
-const template = () =>
-  gitRepo(
+async function template() {
+  const clutch = await gitRepo(
     {
       'clutch.files.yaml': [
         'version: 1',
@@ -36,8 +37,11 @@ const template = () =>
       '.clutch/risk.yaml': 'tiers: []\n',
       '.changeset/README.md': '# Changesets\n',
     },
-    { name: 'clutch', tags: ['v0.1.0'] },
+    { name: 'clutch' },
   );
+  await gitOrThrow(clutch.root, 'tag', 'v0.1.0');
+  return clutch;
+}
 
 /** Runs `fn` with console.log captured. */
 async function quiet<T>(fn: () => Promise<T>) {
