@@ -15,11 +15,12 @@ async function writeFiles(root: string, files: Record<string, string>) {
  * Makes a temporary folder that holds a git repo with one commit of `files` on
  * `main`. The folder can also hold siblings of the repo. The
  * repo has its own identity and no commit signing, so the user's git config
- * does not change the result. Pass `git: false` for a plain folder.
+ * does not change the result. Pass `git: false` for a plain folder, and
+ * `tags` to tag the commit, such as a `v0.1.0` release.
  */
 export async function gitRepo(
   files: Record<string, string>,
-  options: { git?: boolean; name?: string } = {},
+  options: { git?: boolean; name?: string; tags?: Array<string> } = {},
 ) {
   const parent = await realpath(await mkdtemp(path.join(tmpdir(), 'cli-repo-')));
   const root = path.join(parent, options.name ?? 'project');
@@ -32,6 +33,9 @@ export async function gitRepo(
     await gitOrThrow(root, 'config', 'commit.gpgsign', 'false');
     await gitOrThrow(root, 'add', '--all');
     await gitOrThrow(root, 'commit', '--quiet', '--allow-empty', '--message', 'Initial commit');
+    for (const tag of options.tags ?? []) {
+      await gitOrThrow(root, 'tag', tag);
+    }
   }
   return {
     root,

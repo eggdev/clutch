@@ -99,13 +99,19 @@ test('without a terminal, sync lists the decisions and exits 2 without waiting',
   await using _target = target;
   const output: Array<string> = [];
   const { log } = console;
+  const tty = { stdin: process.stdin.isTTY, stdout: process.stdout.isTTY };
   console.log = (line: string) => output.push(line);
+  // No terminal, even when a person runs the tests in one.
+  process.stdin.isTTY = false;
+  process.stdout.isTTY = false;
   try {
     expect(
       await syncCommand(['--root', target.root, '--to', second], target.root, template.root),
     ).toBe(2);
   } finally {
     console.log = log;
+    process.stdin.isTTY = tty.stdin;
+    process.stdout.isTTY = tty.stdout;
   }
   expect(output.join('\n')).toContain('Then run sync again with --keep <file> or --take <file>');
   expect(await read(target.root, 'tools/knip.jsonc')).toBe('ours\n');

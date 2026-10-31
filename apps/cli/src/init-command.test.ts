@@ -5,10 +5,39 @@ import path from 'node:path';
 import { parse } from 'yaml';
 
 import { doctorCommand } from '@/doctor-command';
-import { cliRoot } from '@/format';
 import { initCommand } from '@/init-command';
 import { lineagePath } from '@/sync/source';
 import { gitRepo } from '@/testing/git-repo';
+
+const editorconfig = 'root = true\n';
+
+/**
+ * A Clutch checkout with one release tag, so init does not depend on the tags
+ * of the clone that runs the test. A shallow clone or a fork has none.
+ */
+const template = () =>
+  gitRepo(
+    {
+      'clutch.files.yaml': [
+        'version: 1',
+        'files:',
+        '  - path: .editorconfig',
+        '    rule: managed',
+        '  - path: .oxfmtrc.json',
+        '    rule: managed',
+        '  - path: .clutch/risk.yaml',
+        '    rule: seed',
+        '  - path: .changeset/README.md',
+        '    rule: seed',
+        '',
+      ].join('\n'),
+      '.editorconfig': editorconfig,
+      '.oxfmtrc.json': '{}\n',
+      '.clutch/risk.yaml': 'tiers: []\n',
+      '.changeset/README.md': '# Changesets\n',
+    },
+    { name: 'clutch', tags: ['v0.1.0'] },
+  );
 
 /** Runs `fn` with console.log captured. */
 async function quiet<T>(fn: () => Promise<T>) {
@@ -23,7 +52,8 @@ async function quiet<T>(fn: () => Promise<T>) {
 
 test('init writes clutch.yaml, the tracker and the baseline, and doctor --check then passes', async () => {
   await using repo = await gitRepo({ 'AGENTS.md': '# Agents\n', 'package.json': '{}' });
-  expect(await quiet(() => initCommand(['--yes'], repo.root))).toBe(0);
+  await using clutch = await template();
+  expect(await quiet(() => initCommand(['--yes'], repo.root, clutch.root))).toBe(0);
   const config = parse(await readFile(path.join(repo.root, 'clutch.yaml'), 'utf-8'));
   expect(config).toMatchObject({
     schemaVersion: 1,
@@ -48,7 +78,7 @@ test('init refuses a repository that already has clutch.yaml', async () => {
   const { error } = console;
   console.error = (line: string) => errors.push(line);
   try {
-    expect(await initCommand(['--yes'], repo.root)).toBe(1);
+    expect(await initCommand(['--yes'], repo.root, '/nonexistent-clutch-checkout')).toBe(1);
   } finally {
     console.error = error;
   }
@@ -59,9 +89,12 @@ test('init refuses a repository that already has clutch.yaml', async () => {
 
 test('doctor mode writes no lineage, even with --adopt', async () => {
   await using repo = await gitRepo({ 'package.json': '{}' });
-  expect(await quiet(() => initCommand(['--yes', '--mode', 'doctor', '--adopt'], repo.root))).toBe(
-    0,
-  );
+  await using clutch = await template();
+  expect(
+    await quiet(() =>
+      initCommand(['--yes', '--mode', 'doctor', '--adopt'], repo.root, clutch.root),
+    ),
+  ).toBe(0);
   expect(parse(await readFile(path.join(repo.root, 'clutch.yaml'), 'utf-8')).template.mode).toBe(
     'doctor',
   );
@@ -69,13 +102,13 @@ test('doctor mode writes no lineage, even with --adopt', async () => {
 });
 
 test('--adopt records a file that matches an earlier Clutch version, and leaves an edited one out', async () => {
-  const editorconfig = await readFile(path.join(cliRoot, '.editorconfig'), 'utf-8');
+  await using clutch = await template();
   await using repo = await gitRepo({
     '.editorconfig': editorconfig,
     '.oxfmtrc.json': '{ "printWidth": 80 }\n',
     'package.json': '{}',
   });
-  expect(await quiet(() => initCommand(['--yes', '--adopt'], repo.root))).toBe(0);
+  expect(await quiet(() => initCommand(['--yes', '--adopt'], repo.root, clutch.root))).toBe(0);
   const { files } = JSON.parse(await readFile(path.join(repo.root, lineagePath), 'utf-8'));
   expect(Object.keys(files)).toContain('.editorconfig');
   expect(Object.keys(files)).not.toContain('.oxfmtrc.json');

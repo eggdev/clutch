@@ -54,7 +54,12 @@ test('a missing field, a missing frontmatter and a wrong file name are errors', 
   expect(parseIssue('.clutch/issues/CL-003.md', text(noDeps)).errors).toEqual([
     { file: '.clutch/issues/CL-003.md', field: 'depends_on', message: 'Missing field.' },
   ]);
-  expect(parseIssue('.clutch/issues/CL-003.md', '# No frontmatter\n').errors).toHaveLength(1);
+  expect(parseIssue('.clutch/issues/CL-003.md', '# No frontmatter\n').errors).toEqual([
+    {
+      file: '.clutch/issues/CL-003.md',
+      message: 'The file does not start with a --- frontmatter block.',
+    },
+  ]);
   expect(parseIssue('.clutch/issues/CL-004.md', text(valid)).errors).toEqual([
     { file: '.clutch/issues/CL-004.md', field: 'id', message: 'The file name must be CL-003.md.' },
   ]);
