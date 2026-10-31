@@ -289,3 +289,29 @@ test('wait keeps waiting while GitHub still shows an older head than the checkou
   // The first poll saw the old head, so wait slept once before it trusted the checks.
   expect(clock.slept).toBe(20_000);
 });
+
+test('a required code-owner review keeps a green PR from ready', async () => {
+  const blocked = {
+    ...JSON.parse(view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out),
+    reviewDecision: 'REVIEW_REQUIRED',
+  };
+  const gh = fake([
+    ['gh pr view 7', { out: JSON.stringify(blocked) }],
+    rules,
+    comments('## Agent review\n\nBlocking findings: 0'),
+  ]);
+  expect(await prStatus(gh.run, '7')).toMatchObject({ review: 'REVIEW_REQUIRED', ready: false });
+});
+
+test('a merge state that a rule blocks keeps a green PR from ready', async () => {
+  const blocked = {
+    ...JSON.parse(view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out),
+    mergeStateStatus: 'BLOCKED',
+  };
+  const gh = fake([
+    ['gh pr view 7', { out: JSON.stringify(blocked) }],
+    rules,
+    comments('## Agent review\n\nBlocking findings: 0'),
+  ]);
+  expect(await prStatus(gh.run, '7')).toMatchObject({ review: 'BLOCKED by a rule', ready: false });
+});
