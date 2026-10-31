@@ -9,6 +9,7 @@ import { formatWorktrees, listWorktrees } from '@/worktree/list';
 import type { FindPr } from '@/worktree/list';
 import { newWorktree } from '@/worktree/new';
 import type { NewWorktreeSteps } from '@/worktree/new';
+import { removeWorktree } from '@/worktree/remove';
 import { worktreeSettings } from '@/worktree/settings';
 
 /**
@@ -68,6 +69,23 @@ function realSteps(repoRoot: string, base: string): NewWorktreeSteps {
   };
 }
 
+/**
+ * Stops the dev servers of the checkout at `cwd` through its own `dev --stop`,
+ * as a command, never an import. It runs only when a dev run there left its
+ * record, because a `dev` script without `--stop` would start servers instead.
+ */
+async function stopServers(cwd: string) {
+  const bun = Bun.which('bun');
+  if (!bun || !(await Bun.file(path.join(cwd, '.data/dev-run.json')).exists())) {
+    return false;
+  }
+  const result = await run([bun, 'run', 'dev', '--stop'], cwd);
+  if (result.code !== 0) {
+    throw new Error(`bun run dev --stop failed in ${cwd}: ${result.err || result.out}`);
+  }
+  return true;
+}
+
 /** The PR of `branch` from gh, or null when gh is missing, signed out, or finds none. */
 const findPr =
   (repoRoot: string): FindPr =>
@@ -102,6 +120,23 @@ async function runCommand(args: Array<string>, cwd: string): Promise<number> {
     );
     return 0;
   }
+  if (action === 'rm') {
+    const { values, positionals } = parseArgs({
+      args: rest,
+      allowPositionals: true,
+      options: { force: { type: 'boolean' }, base: { type: 'string' } },
+    });
+    await removeWorktree(
+      {
+        slug: positionals[0],
+        force: values.force ?? false,
+        base: values.base ?? (await defaultBase(repoRoot)),
+        settings: await worktreeSettings(repoRoot),
+      },
+      { backend: gitBackend(repoRoot), stopServers, log: (line) => console.log(line) },
+    );
+    return 0;
+  }
   if (action === 'list') {
     const { values } = parseArgs({ args: rest, options: { json: { type: 'boolean' } } });
     const worktrees = await listWorktrees(gitBackend(repoRoot), findPr(repoRoot));
@@ -109,7 +144,7 @@ async function runCommand(args: Array<string>, cwd: string): Promise<number> {
     return 0;
   }
   throw new Error(
-    'Run clutch worktree new <slug> [--issue CL-NNN] [--base REF], or clutch worktree list [--json].',
+    'Run clutch worktree new <slug> [--issue CL-NNN] [--base REF], clutch worktree list [--json], or clutch worktree rm <slug> [--force].',
   );
 }
 

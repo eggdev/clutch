@@ -54,5 +54,23 @@ export function gitBackend(root: string): WorktreeBackend {
     async remove({ path, force }) {
       await gitOrThrow(root, 'worktree', 'remove', ...(force ? ['--force'] : []), path);
     },
+    async state({ path, branch, base }) {
+      // Commits that neither the base nor any remote branch holds.
+      const ahead = await gitOrThrow(
+        path,
+        'rev-list',
+        '--count',
+        'HEAD',
+        '--not',
+        base,
+        '--remotes',
+      );
+      const merged = await git(root, 'merge-base', '--is-ancestor', branch, base);
+      return { unpushed: Number(ahead), merged: merged.ok };
+    },
+    async deleteBranch(branch) {
+      // The caller checked that the branch is merged into its base, which -D does not re-check.
+      await gitOrThrow(root, 'branch', '-D', branch);
+    },
   };
 }
