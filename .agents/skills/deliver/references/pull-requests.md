@@ -123,7 +123,9 @@ mise exec -- bun run pr merge <number>
 ```
 
 `merge` refuses while GitHub reports that the PR needs a review
-(`REVIEW_REQUIRED`) or has changes requested, and it names the reviewer. The
+(`REVIEW_REQUIRED`) or has changes requested, and it names the reviewer. A
+ruleset's code owner review leaves that decision empty, so `merge` also
+refuses a PR that GitHub reports as blocked while a review is still requested. The
 owner's admin login can bypass the ruleset, so this keeps an agent that runs
 `merge` with the owner's login from merging past the approval.
 
