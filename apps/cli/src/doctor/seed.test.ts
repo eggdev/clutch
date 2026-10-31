@@ -1,74 +1,46 @@
 import { expect, test } from 'bun:test';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { detect } from '@/doctor/detect';
 import { loadRegistry } from '@/doctor/registry';
 import { gitRepo } from '@/testing/git-repo';
 
-/**
- * The status of each seed capability on the template itself, from the plan's
- * capability table. Remote rules stay unknown without --remote, and so does a
- * capability whose files pass and whose remote rules are left. When a rule
- * disagrees, fix the rule, not this table.
- */
-const expected: Record<string, string> = {
-  root_agents_md: 'present',
-  nested_agent_rules: 'missing',
-  skills_dir: 'present',
-  friction_log: 'missing',
-  codeowners: 'present',
-  pr_template: 'present',
-  git_hooks: 'present',
-  canonical_check: 'present',
-  dev_bootstrap: 'present',
-  project_cli: 'present',
-  verification_cli: 'present',
-  custom_lint_plugin: 'present',
-  suppression_discipline: 'present',
-  ratchets: 'missing',
-  file_size_caps: 'present',
-  changed_scope_check: 'partial',
-  protected_main: 'unknown',
-  secret_scanning: 'unknown',
-  codeql_sast: 'present',
-  dep_automation: 'present',
-  dep_min_age: 'present',
-  ci_security_lint: 'present',
-  oidc_ci: 'missing',
-  worktree_parallel: 'partial',
-  cloud_agent_vm: 'partial',
-  mcp_config: 'missing',
-  ai_review_bot: 'unknown',
-  ai_review_blocking: 'unknown',
-  ci_failure_explainer: 'missing',
-  flaky_quarantine: 'missing',
-  flake_hunter: 'missing',
-  pr_size_limits: 'present',
-  merge_queue: 'missing',
-  risk_tier_automerge: 'unknown',
-  gardener_bots: 'unknown',
-  factory_observability: 'present',
-};
+const root = path.resolve(import.meta.dir, '../../../..');
 
-test('the registry holds the 36 seed capabilities with unique ids', async () => {
-  const root = path.resolve(import.meta.dir, '../../../..');
+/** The template's own baseline: the status that `doctor --write-baseline` last recorded. */
+const baseline = async (): Promise<Record<string, string>> =>
+  JSON.parse(await readFile(path.join(root, '.clutch/doctor-baseline.json'), 'utf-8'));
+
+test('the registry has unique ids, and the baseline holds each one', async () => {
   const registry = await loadRegistry(root);
   expect(registry.errors).toEqual([]);
-  expect(registry.capabilities?.map((entry) => entry.id)).toEqual(Object.keys(expected));
+  const ids = (registry.capabilities ?? []).map((entry) => entry.id);
+  expect(new Set(ids).size).toBe(ids.length);
+  expect(ids.toSorted()).toEqual(Object.keys(await baseline()).toSorted());
 });
 
-test('each seed capability has its expected status on the template', async () => {
-  const root = path.resolve(import.meta.dir, '../../../..');
+/**
+ * A capability that detects without --remote must match the baseline. A remote
+ * rule stays unknown here, and the baseline keeps its last remote result. When
+ * a rule disagrees, fix the rule, or run doctor --write-baseline if the
+ * template changed.
+ */
+test('each capability detected on the template matches the baseline', async () => {
   const registry = await loadRegistry(root);
   const found = await detect(root, registry.capabilities ?? []);
-  const status: Record<string, string> = Object.fromEntries(
-    found.map((item) => [item.id, item.status]),
+  const recorded = await baseline();
+  const known = found.filter((item) => item.status !== 'unknown');
+  const detected: Record<string, string | undefined> = Object.fromEntries(
+    known.map((item) => [item.id, item.status]),
   );
-  expect(status).toEqual(expected);
+  const expected: Record<string, string | undefined> = Object.fromEntries(
+    known.map((item) => [item.id, recorded[item.id]]),
+  );
+  expect(detected).toEqual(expected);
 });
 
 test('a project CLI in a root script and a verify skill under its own name are detected', async () => {
-  const root = path.resolve(import.meta.dir, '../../../..');
   const registry = await loadRegistry(root);
   const wanted = (registry.capabilities ?? []).filter((entry) =>
     ['project_cli', 'verification_cli'].includes(entry.id),

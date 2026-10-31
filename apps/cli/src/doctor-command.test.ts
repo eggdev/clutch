@@ -1,9 +1,17 @@
 import { expect, test } from 'bun:test';
 import path from 'node:path';
 
+import { loadRegistry } from '@/doctor/registry';
+import { cliRoot } from '@/format';
 import { gitRepo } from '@/testing/git-repo';
 
 const main = path.join(import.meta.dir, 'main.ts');
+
+/** The capabilities that doctor reports: the registry of this checkout, not a fixed count. */
+async function capabilities() {
+  const registry = await loadRegistry(cliRoot);
+  return registry.capabilities ?? [];
+}
 
 async function doctor(...args: Array<string>) {
   const proc = Bun.spawn([process.execPath, main, 'doctor', ...args], {
@@ -47,7 +55,8 @@ test('--json reports every registry capability with its detected and declared st
     'rulesets',
   ]);
   expect(report).toMatchObject({ schemaVersion: 1, root: repo.root, templateRelease: 'v0.2.0' });
-  expect(report.results).toHaveLength(36);
+  const all = await capabilities();
+  expect(report.results).toHaveLength(all.length);
   const row = (id: string) => report.results.find((item: { id: string }) => item.id === id);
   expect(row('root_agents_md')).toEqual({
     id: 'root_agents_md',
@@ -68,7 +77,12 @@ test('--json reports every registry capability with its detected and declared st
     reason: 'Lands in CL-102.',
     issue: 'CL-102',
   });
-  expect(report.summary.declared).toEqual({ adopted: 1, waived: 1, 'n/a': 0, undeclared: 34 });
+  expect(report.summary.declared).toEqual({
+    adopted: 1,
+    waived: 1,
+    'n/a': 0,
+    undeclared: all.length - 2,
+  });
   expect(report.sast).toMatchObject({ choice: 'auto', engine: null, problem: null });
   expect(report.rulesets).toBeNull();
 });
@@ -78,8 +92,10 @@ test('a repository without Clutch files reports every capability as undeclared',
   const result = await doctor('--root', repo.root);
   expect(result.code).toBe(0);
   const lines = result.stdout.trim().split('\n');
-  expect(lines.filter((line) => line.startsWith('  '))).toHaveLength(36);
-  expect(lines.at(-2)).toContain('Declared: 0 adopted, 0 waived, 0 n/a, 36 undeclared.');
+  const all = await capabilities();
+  const count = all.length;
+  expect(lines.filter((line) => line.startsWith('  '))).toHaveLength(count);
+  expect(lines.at(-2)).toContain(`Declared: 0 adopted, 0 waived, 0 n/a, ${count} undeclared.`);
   expect(lines.at(-1)).toBe('SAST: auto -> ? (code scanning not checked without --remote)');
 });
 
@@ -94,8 +110,8 @@ test('--phase narrows the report, and a bad clutch.yaml exits 1 with its path', 
   await repo.write({ 'clutch.yaml': config });
   const p2 = await doctor('--root', repo.root, '--phase', 'P2', '--json');
   const { results } = JSON.parse(p2.stdout);
-  expect(results.map((item: { id: string }) => item.id)).toEqual([
-    'ai_review_blocking',
-    'risk_tier_automerge',
-  ]);
+  const all = await capabilities();
+  const p2ids = all.filter((entry) => entry.phase === 'P2').map((entry) => entry.id);
+  expect(p2ids.length).toBeGreaterThan(0);
+  expect(results.map((item: { id: string }) => item.id)).toEqual(p2ids);
 });

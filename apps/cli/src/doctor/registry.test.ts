@@ -74,7 +74,9 @@ test('each bad rule names its path inside the entry', () => {
 });
 
 test('a file without version 1 and a capabilities list is one error', () => {
-  expect(validateRegistry({ capabilities: [] }).errors).toHaveLength(1);
+  expect(validateRegistry({ capabilities: [] }).errors).toEqual([
+    { id: '', field: '', message: 'Expected version: 1 and a capabilities list.' },
+  ]);
 });
 
 test('a capability without a page, and a page without a capability, are errors', () => {
