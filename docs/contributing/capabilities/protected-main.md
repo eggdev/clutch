@@ -17,8 +17,12 @@ protection is a reviewed change to a file. Sync manages the file, so a new
 required check reaches each project. This repository's file is the example.
 
 1. Require a pull request before each merge. Dismiss stale approvals after a
-   push. With one maintainer, require 0 approvals, because nobody can approve
-   their own pull request.
+   push. Require 0 approvals, and require code owner review
+   (`require_code_owner_review: true`). Then only a pull request that changes
+   a path in `.github/CODEOWNERS`, the one-way-door paths, waits for the
+   owner's approval. The release bot opens agent pull requests, so the owner
+   can approve them. See
+   [approval](../../../.agents/skills/deliver/references/pull-requests.md#approval).
 2. Allow merge commits only, so the rule matches `bun run pr merge`.
 3. Require the status checks that run the canonical check command. This
    repository requires `validate`, `journeys`, `secrets` and `commits`, plus

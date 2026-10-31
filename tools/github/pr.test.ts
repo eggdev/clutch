@@ -248,3 +248,121 @@ test('an added .changeset/README.md is not a changeset', async () => {
   await runPr(['open', '--title', 'feat: add it', '--body-file', 'b.md'], gh.run, noWrite);
   expect(written).toEqual(['.changeset/cl-032b.md']);
 });
+
+const clock = { now: () => 0, sleep: () => Promise.resolve() };
+const botSetUp: Array<[string, Partial<Result>]> = [
+  ['gh api repos/{owner}/{repo}/actions/variables/CLUTCH_APP_ID', { out: '42\n' }],
+  ['gh api repos/{owner}/{repo}/contents/.github/workflows/open-pr.yml?ref=main', {}],
+];
+
+test('open asks the Open PR workflow on main to open the PR as the bot, then sets the body', async () => {
+  const gh = fake([trunk, ['git branch --show-current', { out: 'cl-024\n' }], ...botSetUp]);
+  let dispatched = false;
+  const run: Run = (command, options) => {
+    const line = command.join(' ');
+    if (line.startsWith('gh workflow run open-pr.yml')) {
+      dispatched = true;
+    }
+    if (line.startsWith('gh pr list --state open --head cl-024')) {
+      gh.calls.push(line);
+      return Promise.resolve({
+        ok: true,
+        out: dispatched
+          ? '[{"number":12,"baseRefName":"main","url":"https://github.com/o/r/pull/12","isDraft":false}]'
+          : '[]',
+        err: '',
+      });
+    }
+    return gh.run(command, options);
+  };
+  expect(
+    await runPr(['open', '--title', 'feat: add it', '--body-file', 'body.md'], run, noWrite, clock),
+  ).toBe(0);
+  expect(gh.calls).toContain(
+    'gh workflow run open-pr.yml --ref main -f head=cl-024 -f base=main -f title=feat: add it',
+  );
+  expect(gh.calls).toContain(
+    'gh api --method PATCH repos/{owner}/{repo}/pulls/12 --field body=@body.md --silent',
+  );
+  expect(gh.calls.some((call) => call.startsWith('gh pr create'))).toBe(false);
+});
+
+test('open falls back to the user when the bot opens no PR in time', async () => {
+  let now = 0;
+  const ticking = {
+    now: () => now,
+    sleep: (ms: number) => {
+      now += ms;
+      return Promise.resolve();
+    },
+  };
+  const gh = fake([
+    trunk,
+    ['git branch --show-current', { out: 'cl-024\n' }],
+    ...botSetUp,
+    ['gh run list --workflow open-pr.yml', { out: 'https://github.com/o/r/actions/runs/9\n' }],
+  ]);
+  let created = false;
+  const run: Run = (command, options) => {
+    const line = command.join(' ');
+    if (line.startsWith('gh pr create')) {
+      created = true;
+    }
+    if (line.startsWith('gh pr list --state open --head cl-024')) {
+      gh.calls.push(line);
+      return Promise.resolve({
+        ok: true,
+        out: created ? '[{"number":13,"baseRefName":"main","url":"u","isDraft":false}]' : '[]',
+        err: '',
+      });
+    }
+    return gh.run(command, options);
+  };
+  expect(
+    await runPr(['open', '--title', 'fix: x', '--body-file', 'body.md'], run, noWrite, ticking),
+  ).toBe(0);
+  expect(gh.calls.some((call) => call.startsWith('gh workflow run open-pr.yml'))).toBe(true);
+  expect(gh.calls).toContain(
+    'gh pr create --base main --head cl-024 --title fix: x --body-file body.md',
+  );
+});
+
+test('merge refuses while GitHub wants a review, and names who must review', async () => {
+  const pending = fake([
+    trunk,
+    [
+      'gh pr view 14',
+      {
+        out: JSON.stringify({
+          baseRefName: 'main',
+          headRefName: 'cl-024',
+          reviewDecision: 'REVIEW_REQUIRED',
+          reviewRequests: [{ login: 'eggdev' }, { slug: 'core' }],
+          latestReviews: [],
+        }),
+      },
+    ],
+  ]);
+  await expect(runPr(['merge', '14'], pending.run, noWrite, clock)).rejects.toThrow(
+    '#14 needs an approving review from @eggdev, the core team before it merges.',
+  );
+  expect(pending.calls.some((call) => call.startsWith('gh pr merge'))).toBe(false);
+  const changes = fake([
+    trunk,
+    [
+      'gh pr view 15',
+      {
+        out: JSON.stringify({
+          baseRefName: 'main',
+          headRefName: 'cl-025',
+          reviewDecision: 'CHANGES_REQUESTED',
+          reviewRequests: [],
+          latestReviews: [{ author: { login: 'eggdev' }, state: 'CHANGES_REQUESTED' }],
+        }),
+      },
+    ],
+  ]);
+  await expect(runPr(['merge', '15'], changes.run, noWrite, clock)).rejects.toThrow(
+    '#15 has changes requested by @eggdev.',
+  );
+});

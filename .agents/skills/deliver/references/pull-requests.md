@@ -37,9 +37,40 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - After you rebase your own branch, run `open` again with `--force`. It pushes
   with `--force-with-lease`, which refuses when someone else pushed to the branch.
 - To change only the body, run `bun run pr body <number> <file>`.
+- `open` asks the release bot to open a new PR. See
+  [who opens the pull request](#who-opens-the-pull-request).
 - After the first green push, run `bun run pr ready <id> <number>`. The merge
   makes `done` true. A PR that waits on a lower PR in a stack uses `review`
   until it is ready to merge.
+
+### Who opens the pull request
+
+GitHub never lets a PR's author approve it. So that the owner can approve an
+agent's PR, the release bot opens it, and the owner stays the author of each
+commit:
+
+1. The agent commits as the owner, with the owner's git identity and a
+   `Co-Authored-By` trailer that names the agent. The contribution graph
+   credits the owner.
+2. `open` pushes the branch, then runs
+   `gh workflow run open-pr.yml --ref <default branch>` with the head, the base
+   and the title. That workflow mints the bot token in the `release`
+   environment, so the key stays limited to the default branch. It never checks
+   out or runs code from the branch. It only calls the pull request API.
+3. `open` waits up to 3 minutes for the PR, then sets the body as the owner.
+
+When the repository has no `CLUTCH_APP_ID` variable, or the default branch has
+no `open-pr.yml`, or the bot opens no PR in time, `open` opens the PR as the
+user. See [the release bot](../../../../docs/contributing/setup/releases.md#the-release-bot).
+
+### Approval
+
+`.github/CODEOWNERS` lists the `one-way-door` paths of `.clutch/risk.yaml`, and
+the main ruleset requires a code owner's approval. So GitHub requires the
+owner's approval on a PR that changes one of those paths, and on no other PR.
+`tools/codeowners.ts` generates the file, and `check-agent-hooks` fails when it
+drifts. After a change to the one-way-door tier, run
+`mise exec -- bun tools/codeowners.ts --write`.
 
 ## Follow a pull request to green
 
@@ -91,6 +122,11 @@ workflow queues under `automerge.mode: on` in `clutch.yaml`, within the reach of
 mise exec -- bun run pr merge <number>
 ```
 
+`merge` refuses while GitHub reports that the PR needs a review
+(`REVIEW_REQUIRED`) or has changes requested, and it names the reviewer. The
+owner's admin login can bypass the ruleset, so this keeps an agent that runs
+`merge` with the owner's login from merging past the approval.
+
 For a PR in a stack, `merge` merges every PR from the bottom up to that one,
 with merge commits. When one merge fails, none of them merge. For a PR that is
 not in a stack, it merges that PR with a merge commit. GitHub can still count a
@@ -111,8 +147,8 @@ closes without a merge, set its task back to `todo` in the next branch.
 
 The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges agent and
 bot PRs. An agent PR's head branch starts with `clutch/cl-`. Only an agent opens
-such a branch: `pr open` runs under the operator's login, so the author cannot
-tell an agent from a person. A bot PR's branch starts with `renovate/` or
+such a branch. The release bot opens most agent PRs, and the user opens the
+rest, so the author cannot tell an agent from a person. A bot PR's branch starts with `renovate/` or
 `gardening/`, and its author is a bot.
 
 `automerge.step` in `clutch.yaml` sets how far auto-merge reaches. Each step

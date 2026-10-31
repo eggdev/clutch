@@ -7,7 +7,9 @@
 #   medium:       product code and the lockfile. Agent review reads it.
 #   high:         any path that no rule names.
 #   one-way-door: the automation and its gates, agent steering, auth,
-#                 migrations, billing, and infra and secrets. A person reviews it.
+#                 migrations, billing, and infra and secrets. A person reviews it:
+#                 tools/codeowners.ts writes these paths to .github/CODEOWNERS,
+#                 and the main ruleset requires a code owner's approval.
 # The tiers follow Brendan's rule and the published risk policies that
 # .clutch/PLAN.md#decisions cites.
 schemaVersion: 1

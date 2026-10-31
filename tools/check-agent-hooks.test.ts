@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 
-import { checkAgentHooks, configs, ownerPattern } from '@tools/check-agent-hooks';
+import { checkAgentHooks, configs } from '@tools/check-agent-hooks';
+import { codeownersText } from '@tools/codeowners';
 import { inRepo } from '@tools/testing/in-repo';
 
 const command = (name: string, agent: string) =>
@@ -25,13 +26,11 @@ const valid = {
   '.agents/hooks/guard-guardrails.ts': '',
   '.agents/hooks/end-of-turn.ts': '',
   'tools/guardrail-files.json': JSON.stringify({ patterns: ['nx.json', 'tools/lint/**'] }),
-  '.github/CODEOWNERS': '# Owners\n/nx.json @owner\n/tools/lint/ @owner\n',
+  '.github/CODEOWNERS': codeownersText(['nx.json', 'tools/lint/**'], ['@owner']),
 };
 
 test('two configs that run the same scripts, and full CODEOWNERS, pass', async () => {
   expect(await inRepo(valid, checkAgentHooks)).toEqual([]);
-  expect(ownerPattern('tools/lint/**')).toBe('/tools/lint/');
-  expect(ownerPattern('tools/check-*.ts')).toBe('/tools/check-*.ts');
 });
 
 test('a hook in one config only, a wrong agent, and a missing or unused script fail', async () => {
@@ -71,10 +70,16 @@ test('a hook in one config only, a wrong agent, and a missing or unused script f
   ]);
 });
 
-test('CODEOWNERS must name an owner for each guardrail pattern', async () => {
+test('CODEOWNERS must match the generated file and name an owner', async () => {
+  expect(
+    await inRepo({ ...valid, '.github/CODEOWNERS': '/nx.json @owner\n' }, checkAgentHooks),
+  ).toEqual([
+    '.github/CODEOWNERS: it does not match the one-way-door paths in .clutch/risk.yaml. Run: mise exec -- bun tools/codeowners.ts --write',
+  ]);
+  const extra = `${valid['.github/CODEOWNERS']}/docs/ @owner\n`;
+  expect(await inRepo({ ...valid, '.github/CODEOWNERS': extra }, checkAgentHooks)).toHaveLength(1);
   expect(await inRepo({ ...valid, '.github/CODEOWNERS': '/nx.json\n' }, checkAgentHooks)).toEqual([
-    '.github/CODEOWNERS: `/nx.json` has no owner. Add a handle or a team.',
-    '.github/CODEOWNERS: add `/tools/lint/` with an owner. tools/guardrail-files.json lists `tools/lint/**`.',
+    '.github/CODEOWNERS names no owner. Add a line such as `/AGENTS.md @owner`.',
   ]);
   const { '.github/CODEOWNERS': _, ...withoutOwners } = valid;
   expect(await inRepo(withoutOwners, checkAgentHooks)).toEqual([

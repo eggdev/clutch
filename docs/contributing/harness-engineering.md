@@ -87,7 +87,9 @@ Codex runs a project hook only after you trust it. Open `/hooks` in Codex,
 and trust each hook once.
 
 `check-agent-hooks` fails when the two configs run different hooks. It also
-fails when `.github/CODEOWNERS` has no owner for a guardrail file.
+fails when `.github/CODEOWNERS` drifts from the one-way-door tier of
+`.clutch/risk.yaml`, which holds each guardrail file.
+`mise exec -- bun tools/codeowners.ts --write` regenerates it.
 
 ## Guardrail files
 
@@ -96,7 +98,8 @@ agent hook. A loosened guardrail lets drift in, so a person reviews each
 change to one.
 
 - [`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them,
-  and `.github/CODEOWNERS` names an owner for each.
+  and `.github/CODEOWNERS`, generated from the one-way-door tier, names an
+  owner for each.
 - `check-guardrail-coverage` finds the tool scripts that the root targets,
   the lint config and the hook configs run. It follows their `@tools/`
   imports, and reads each file path in them. It fails when no guardrail
@@ -126,7 +129,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | Files kept out of the PR size count                       | `clutch.yaml`, `pr_size.exclude`                                                |
 | Lockfiles, snapshots and `.clutch/` out of the size count | `apps/cli/src/labels/compute.ts`, `sizeExcluded` (a guardrail file)             |
 
-<!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS. -->
+<!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS; tools/codeowners.ts keeps it when it regenerates the file. -->
 
 ## Working agreements
 

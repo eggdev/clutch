@@ -16,7 +16,7 @@ Rank 27 of the researched practices. Almost two thirds of the leading repositori
 2. Add a script that counts the violations and compares each count with the baseline. Make it fail when a count goes up.
 3. Make the update step lower counts only. A higher count needs a person's review.
 4. Add the root target `check-ratchets`, and run it in the canonical check command.
-5. List the baseline as a guardrail file, with an owner in `.github/CODEOWNERS`.
+5. List the baseline as a guardrail file in `tools/guardrail-files.json`. Then run `mise exec -- bun tools/codeowners.ts --write`, so `.github/CODEOWNERS` names its owner.
 6. Set `ratchets` to `adopted` in `clutch.yaml`.
 
 ## Waive

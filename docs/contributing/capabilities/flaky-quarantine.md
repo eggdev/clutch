@@ -13,7 +13,7 @@ Rank 46 of the researched practices. About half of the leading repositories use 
 ## Adopt
 
 1. Add a registry file, such as `flaky-tests.json` in `tools/`. Give each entry the file, the test name, an issue and an expiry date.
-2. List the registry as a guardrail file, with an owner in `.github/CODEOWNERS`.
+2. List the registry as a guardrail file in `tools/guardrail-files.json`. Then run `mise exec -- bun tools/codeowners.ts --write`, so `.github/CODEOWNERS` names its owner.
 3. Add a root target that fails on an expired entry, or on an entry with no issue. Run it in the canonical check command.
 4. Run the quarantined tests in a separate, optional CI step. Retry each one, and report the result.
 5. Set `flaky_quarantine` to `adopted` in `clutch.yaml`.

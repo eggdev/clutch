@@ -27,7 +27,7 @@ It reports these numbers for the pull requests merged in the window:
 - The hours from open to merge, and from the last passing check on the head commit to merge, as p50 and p90.
 - Main-red minutes: the time a required check of the default branch was failing. Main turns red when a required check concludes as a failure on a first-parent commit. It turns green when the latest run of each required check on that commit, or a later one, passes.
 - Reverts: merged PRs whose title starts with `Revert`, as a rate of the merged PRs, and revert commits on the default branch.
-- Agent share: the PRs and commits with a `Co-authored-by` trailer that names Claude, Codex, Cursor or Copilot. `agents.branch` also counts the PRs whose head branch starts with `pr.branchPrefix` from `clutch.yaml`, `clutch/cl-` by default. `pr open` runs under the operator's login, so the branch tells an agent apart, not the author.
+- Agent share: the PRs and commits with a `Co-authored-by` trailer that names Claude, Codex, Cursor or Copilot. `agents.branch` also counts the PRs whose head branch starts with `pr.branchPrefix` from `clutch.yaml`, `clutch/cl-` by default. The release bot or the operator opens each agent PR, so the branch tells an agent apart, not the author.
 - PR size (`prSize`): the changed lines of each merged PR as p50 and p90, and the count of each `size/` label. It counts as `clutch labels` does: lockfiles, snapshots, `.clutch/` and the checkout's `pr_size.exclude` do not count.
 - CI: the completed workflow runs, their failure rate, and their p50 and p90 duration.
 - Issues done: the `.clutch/issues` set to `done` by a PR merged in the window. It is counted only for the checkout, so `--repo` for another repository leaves it null.

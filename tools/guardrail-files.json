@@ -14,6 +14,7 @@
     "tools/file-size-budgets.json",
     "tools/dependency-overrides.yaml",
     "tools/guardrail-files.json",
+    "tools/codeowners.ts",
     "tools/agent-hooks/**",
     "tools/hooks/**",
     ".agents/hooks/**",

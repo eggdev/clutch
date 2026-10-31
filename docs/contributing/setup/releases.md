@@ -68,6 +68,9 @@ gardening workflow opens its pull request with the same token, so CI runs on
 that PR. The Auto-merge workflow merges with it, so the release runs after an
 auto-merge. The Revert workflow pushes and opens each revert PR with it, for the
 same reason. The Grade verdicts workflow adds the owner's grades as the bot.
+The Open PR workflow opens each agent PR with it, so the owner
+can approve it. See
+[who opens the pull request](../../../.agents/skills/deliver/references/pull-requests.md#who-opens-the-pull-request).
 Self-hosted Renovate signs in with it too. See
 [Renovate](./dependencies.md#renovate).
 
