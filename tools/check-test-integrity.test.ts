@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { findBase } from '@tools/check-migrations';
+import { findBase } from '@tools/check-base';
 import { checkTestIntegrity, countsOf, modulesOf } from '@tools/check-test-integrity';
 
 function git(root: string, ...args: Array<string>) {

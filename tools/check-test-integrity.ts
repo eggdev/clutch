@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { findBase } from '@tools/check-migrations';
+import { findBase } from '@tools/check-base';
 
 /**
  * A change may not weaken the tests quietly. This check compares the working

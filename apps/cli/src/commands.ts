@@ -1,3 +1,4 @@
+import { checksCommand } from '@/checks-command';
 import { doctorCommand } from '@/doctor-command';
 import { initCommand } from '@/init-command';
 import { installCommand } from '@/install-command';
@@ -23,6 +24,12 @@ export const commands: Record<string, Command> = {
     summary: 'Install Clutch into this project, then run or hand off the kickoff stages.',
     run: installCommand,
     clone: true,
+  },
+  checks: {
+    usage: 'clutch checks --changed [--base REF]',
+    summary:
+      'Run the validate targets of only the projects that the change affects, and the root checks.',
+    run: checksCommand,
   },
   doctor: {
     usage:

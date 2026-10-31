@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { checkMigrations, findBase } from '@tools/check-migrations';
+import { findBase } from '@tools/check-base';
+import { checkMigrations } from '@tools/check-migrations';
 
 function git(root: string, ...args: Array<string>) {
   const run = Bun.spawnSync(['git', '-C', root, ...args]);

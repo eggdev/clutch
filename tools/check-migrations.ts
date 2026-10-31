@@ -1,3 +1,5 @@
+import { findBase } from '@tools/check-base';
+
 /**
  * A migration that reached `main` never changes. Migration `.sql` files live
  * in a folder named `migrations` under apps/, features/ or packages/. This check compares
@@ -5,33 +7,15 @@
  * deletion of a migration that the base already has. A new migration passes.
  * Other files in the folder, such as the migration tool's journal, can change.
  *
- * The base is `CHECK_BASE` when it is set, as CI does. Otherwise it is the
- * merge base with `origin/main`. A repository with no `origin/main` has nothing
- * on `main` yet, so the check passes. So does the first push to `main`, whose
- * base is the zero commit.
+ * The base comes from tools/check-base.ts. A repository with no remote default
+ * branch has nothing on `main` yet, so the check passes. So does the first
+ * push to `main`, whose base is the zero commit.
  */
 const migration = /^(?:apps|features|packages)\/(?:.+\/)?migrations\/.+\.sql$/u;
 
 function git(root: string, ...args: Array<string>): string | null {
   const run = Bun.spawnSync(['git', '-C', root, ...args]);
   return run.exitCode === 0 ? run.stdout.toString().trim() : null;
-}
-
-export function findBase(root: string, env?: string): string | null {
-  if (env && /^0+$/u.test(env)) {
-    return null;
-  }
-  if (env) {
-    const base = git(root, 'rev-parse', '--verify', `${env}^{commit}`);
-    if (!base) {
-      throw new Error(`CHECK_BASE is ${env}, which is not a commit here. Fetch it first.`);
-    }
-    return base;
-  }
-  if (!git(root, 'rev-parse', '--verify', 'origin/main^{commit}')) {
-    return null;
-  }
-  return git(root, 'merge-base', 'origin/main', 'HEAD');
 }
 
 function describe(status: string, after: string | undefined): string {
