@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.1 (2026-10-31)
+
+### Fixes and maintenance
+
+- ci: check only the affected scope on each PR (CL-303)
+
 ## 0.26.0 (2026-10-31)
 
 ### Features
