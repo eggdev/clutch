@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.0 (2026-10-31)
+
+### Features
+
+- feat(pr): open agent PRs as the release bot (CL-137)
+
 ## 0.24.0 (2026-10-31)
 
 ### Features
