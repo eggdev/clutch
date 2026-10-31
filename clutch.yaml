@@ -23,7 +23,7 @@ capabilities:
   suppression_discipline: adopted
   ratchets: { status: waived, reason: Lands in CL-302b., issue: CL-302b }
   file_size_caps: adopted
-  changed_scope_check: { status: waived, reason: Lands in CL-303., issue: CL-303 }
+  changed_scope_check: adopted
   protected_main: adopted
   secret_scanning: adopted
   codeql_sast: adopted
