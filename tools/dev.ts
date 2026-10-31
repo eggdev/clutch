@@ -14,7 +14,8 @@ import path from 'node:path';
  * `http://<project>.localhost:1355`. A server that already answers is used
  * again, and only a missing one starts. A lock file stops two runs from
  * starting the same server. `--check` prints the state and exits 1 when a
- * server is down. See docs/contributing/setup/local-development.md.
+ * server is down. `--stop` stops the servers that a run in this checkout
+ * started, and no others. See docs/contributing/setup/local-development.md.
  */
 
 export type DevApp = {
@@ -140,6 +141,67 @@ export function urlOf(root: string, name: string): string {
   return url;
 }
 
+/** The record of a run that started servers, so `--stop` finds that run and only that run. */
+export const runRecordPath = (root: string) => path.join(root, '.data/dev-run.json');
+
+type RunRecord = { readonly pid: number; readonly children: ReadonlyArray<number> };
+
+function writeRunRecord(root: string, children: ReadonlyArray<Bun.Subprocess>) {
+  mkdirSync(path.dirname(runRecordPath(root)), { recursive: true });
+  const record: RunRecord = { pid: process.pid, children: children.map((child) => child.pid) };
+  writeFileSync(runRecordPath(root), JSON.stringify(record));
+}
+
+function removeRunRecord(root: string) {
+  try {
+    unlinkSync(runRecordPath(root));
+  } catch {
+    // Already gone.
+  }
+}
+
+/** The command line of `pid`, or an empty string when no process has it. */
+export function commandOf(pid: number): string {
+  const run = Bun.spawnSync(['ps', '-p', String(pid), '-o', 'command='], { stdout: 'pipe' });
+  return run.exitCode === 0 ? run.stdout.toString().trim() : '';
+}
+
+/**
+ * Stops the run that `.data/dev-run.json` names: SIGTERM to the dev run, which
+ * stops each server it started, then SIGKILL to any server left after
+ * `timeoutMs`. It checks each process's command line first, so a reused PID
+ * is never signalled. Returns false when no record names a live run.
+ */
+export async function stopRun(
+  root: string,
+  { timeoutMs = 10_000, identify = commandOf } = {},
+): Promise<boolean> {
+  const file = runRecordPath(root);
+  if (!existsSync(file)) {
+    return false;
+  }
+  const record = JSON.parse(readFileSync(file, 'utf-8')) as RunRecord;
+  const ours = (pid: number, marker: string) => identify(pid).includes(marker);
+  const runner = ours(record.pid, 'tools/dev.ts');
+  const servers = () => record.children.filter((pid) => ours(pid, 'portless'));
+  if (!runner && servers().length === 0) {
+    removeRunRecord(root);
+    return false;
+  }
+  if (runner) {
+    process.kill(record.pid, 'SIGTERM');
+  }
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until && (ours(record.pid, 'tools/dev.ts') || servers().length > 0)) {
+    await Bun.sleep(100);
+  }
+  for (const pid of servers()) {
+    process.kill(pid, 'SIGKILL');
+  }
+  removeRunRecord(root);
+  return true;
+}
+
 async function waitUntilUp(url: string, health: string, child: Bun.Subprocess): Promise<void> {
   const until = Date.now() + 120_000;
   while (Date.now() < until) {
@@ -155,6 +217,14 @@ async function waitUntilUp(url: string, health: string, child: Bun.Subprocess): 
 }
 
 async function main(root: string, check: boolean): Promise<number> {
+  if (process.argv.includes('--stop')) {
+    console.log(
+      (await stopRun(root))
+        ? 'Stopped the dev servers that this checkout started.'
+        : 'No dev run in this checkout. Nothing to stop.',
+    );
+    return 0;
+  }
   const apps = devApps(root);
   const urls = new Map(apps.map((app) => [app.name, urlOf(root, app.name)]));
   const urlFor = (folder: string) =>
@@ -200,6 +270,7 @@ async function main(root: string, check: boolean): Promise<number> {
         stderr: 'inherit',
       });
       children.push(child);
+      writeRunRecord(root, children);
       await waitUntilUp(url, app.health, child);
       console.log(`started  ${url}  (${app.folder})`);
     }
@@ -207,6 +278,7 @@ async function main(root: string, check: boolean): Promise<number> {
     for (const child of children) {
       child.kill();
     }
+    removeRunRecord(root);
     throw error;
   } finally {
     release();
@@ -216,6 +288,7 @@ async function main(root: string, check: boolean): Promise<number> {
     return 0;
   }
   const codes = await Promise.all(children.map((child) => child.exited));
+  removeRunRecord(root);
   return codes.find((code) => code !== 0) ?? 0;
 }
 

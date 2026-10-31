@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { acquireLock, devApps, isUp } from '@tools/dev';
+import { acquireLock, devApps, isUp, runRecordPath, stopRun } from '@tools/dev';
 import { inRepo } from '@tools/testing/in-repo';
 
 const app = (dev: string | null, tags: Array<string> = []) =>
@@ -75,5 +75,64 @@ test('a second run waits for the lock, and a lock from an ended process is taken
     writeFileSync(file, String(2 ** 22));
     const again = await acquireLock(file, 300);
     again();
+  });
+});
+
+/** A process that sleeps until it is killed, standing in for a dev run or a server. */
+const sleeper = () => Bun.spawn(['sleep', '30']);
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Writes the run record that a dev run leaves while its servers run. */
+function record(root: string, pid: number, children: Array<number>) {
+  mkdirSync(path.dirname(runRecordPath(root)), { recursive: true });
+  writeFileSync(runRecordPath(root), JSON.stringify({ pid, children }));
+}
+
+test('--stop stops the run and the servers that its record names, then removes the record', async () => {
+  await inRepo({}, async (root) => {
+    const runner = sleeper();
+    const server = sleeper();
+    record(root, runner.pid, [server.pid]);
+    // The run stops its own servers on SIGTERM. Here the server is killed when the runner exits.
+    void runner.exited.then(() => server.kill());
+    const identify = (pid: number) =>
+      ({ [runner.pid]: 'bun tools/dev.ts', [server.pid]: 'portless run --name web' })[pid] ?? '';
+    const live = (pid: number) => (alive(pid) ? identify(pid) : '');
+    expect(await stopRun(root, { timeoutMs: 5000, identify: live })).toBe(true);
+    await Promise.all([runner.exited, server.exited]);
+    expect([alive(runner.pid), alive(server.pid)]).toEqual([false, false]);
+    expect(existsSync(runRecordPath(root))).toBe(false);
+  });
+});
+
+test('--stop never signals a PID that another program reuses, and a checkout with no record stops nothing', async () => {
+  await inRepo({}, async (root) => {
+    expect(await stopRun(root)).toBe(false);
+    const stranger = sleeper();
+    record(root, stranger.pid, [stranger.pid]);
+    expect(await stopRun(root, { identify: () => 'vim notes.md' })).toBe(false);
+    expect(alive(stranger.pid)).toBe(true);
+    expect(existsSync(runRecordPath(root))).toBe(false);
+    stranger.kill();
+    await stranger.exited;
+  });
+});
+
+test('--stop kills a server that outlived a killed dev run', async () => {
+  await inRepo({}, async (root) => {
+    const server = sleeper();
+    // PID 2 to the power 22 is above the macOS and Linux limits, so the run is gone.
+    record(root, 2 ** 22, [server.pid]);
+    const identify = (pid: number) => (pid === server.pid && alive(pid) ? 'portless run' : '');
+    expect(await stopRun(root, { timeoutMs: 300, identify })).toBe(true);
+    await server.exited;
+    expect(alive(server.pid)).toBe(false);
   });
 });

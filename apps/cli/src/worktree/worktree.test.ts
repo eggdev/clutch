@@ -11,6 +11,7 @@ import { formatWorktrees, listWorktrees } from '@/worktree/list';
 import { branchName, issueOf } from '@/worktree/names';
 import { newWorktree } from '@/worktree/new';
 import type { NewWorktreeSteps } from '@/worktree/new';
+import { removeWorktree } from '@/worktree/remove';
 import { defaultSetup, worktreeSettings } from '@/worktree/settings';
 
 const config = [
@@ -159,6 +160,8 @@ test('the commands work on any backend, so they do not call git themselves', asy
     },
     list: () => Promise.resolve(records),
     remove: () => Promise.resolve(),
+    state: () => Promise.resolve({ unpushed: 0, merged: false }),
+    deleteBranch: () => Promise.resolve(),
   };
   await using folder = await gitRepo({}, { git: false });
   const { value } = steps(fake);
@@ -213,4 +216,70 @@ test('worktree list --json prints the checkouts, and a bad slug or action exits 
   ]);
   expect(errors[0]).toContain('Give a slug of lower case letters');
   expect(errors[1]).toContain('clutch worktree new <slug>');
+});
+
+/** A repository with one task checkout, `task`, and the steps of `rm` with the server stop recorded. */
+async function withTask() {
+  const repo = await gitRepo({
+    'clutch.yaml': config.replace("setup: ['touch setup-ran']", 'setup: []'),
+  });
+  const settings = await worktreeSettings(repo.root);
+  const backend = gitBackend(repo.root);
+  const made = await newWorktree(
+    { repoRoot: repo.root, slug: 'task', base: 'main', settings },
+    steps(backend).value,
+  );
+  const stopped: Array<string> = [];
+  const log: Array<string> = [];
+  const rm = (force = false) =>
+    removeWorktree(
+      { slug: 'task', force, base: 'main', settings },
+      {
+        backend,
+        stopServers: (cwd) => {
+          stopped.push(cwd);
+          return Promise.resolve(true);
+        },
+        log: (line) => log.push(line),
+      },
+    );
+  const branches = () => gitOrThrow(repo.root, 'branch', '--list', 'clutch/task');
+  return { repo, made, rm, stopped, log, branches };
+}
+
+test('rm refuses a dirty checkout without --force, and stops nothing', async () => {
+  const { repo, made, rm, stopped } = await withTask();
+  await using _repo = repo;
+  await writeFile(path.join(made.path, 'scratch.txt'), 'dirty\n');
+  await expect(rm()).rejects.toThrow('has uncommitted changes');
+  expect(stopped).toEqual([]);
+  expect(await Bun.file(path.join(made.path, 'scratch.txt')).exists()).toBe(true);
+});
+
+test('rm refuses commits that no remote holds, and --force removes the checkout but keeps the branch', async () => {
+  const { repo, made, rm, stopped, log, branches } = await withTask();
+  await using _repo = repo;
+  await writeFile(path.join(made.path, 'work.txt'), 'work\n');
+  await gitOrThrow(made.path, 'add', '--all');
+  await gitOrThrow(made.path, 'commit', '--quiet', '--message', 'Work');
+  await expect(rm()).rejects.toThrow('clutch/task has 1 commit(s) that no remote holds');
+  await rm(true);
+  expect(stopped).toEqual([made.path]);
+  expect(await Bun.file(path.join(made.path, 'work.txt')).exists()).toBe(false);
+  expect(await branches()).toContain('clutch/task');
+  expect(log).toContain('Kept clutch/task, which is not merged into main.');
+});
+
+test('rm stops the servers, removes a clean checkout, and deletes a merged branch', async () => {
+  const { repo, made, rm, stopped, log, branches } = await withTask();
+  await using _repo = repo;
+  await writeFile(path.join(made.path, 'done.txt'), 'done\n');
+  await gitOrThrow(made.path, 'add', '--all');
+  await gitOrThrow(made.path, 'commit', '--quiet', '--message', 'Done');
+  await gitOrThrow(repo.root, 'merge', '--quiet', '--ff-only', 'clutch/task');
+  await rm();
+  expect(stopped).toEqual([made.path]);
+  expect(await branches()).toBe('');
+  expect(log).toContain('Deleted clutch/task, which is merged into main.');
+  await expect(rm()).rejects.toThrow('No checkout at');
 });

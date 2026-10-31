@@ -22,4 +22,15 @@ export type WorktreeBackend = {
   }) => Promise<WorktreeRecord>;
   readonly list: () => Promise<Array<WorktreeRecord>>;
   readonly remove: (options: { readonly path: string; readonly force: boolean }) => Promise<void>;
+  /**
+   * The commits of the checkout at `path` that neither `base` nor a remote
+   * branch holds, and whether its branch is merged into `base`.
+   */
+  readonly state: (options: {
+    readonly path: string;
+    readonly branch: string;
+    readonly base: string;
+  }) => Promise<{ readonly unpushed: number; readonly merged: boolean }>;
+  /** Deletes a merged branch once its checkout is gone. */
+  readonly deleteBranch: (branch: string) => Promise<void>;
 };
