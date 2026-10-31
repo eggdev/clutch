@@ -16,7 +16,7 @@ Rank 3 of the researched practices. More than three quarters of the leading repo
 2. In `copy`, list the untracked files to copy into each worktree, such as `.env.local`.
 3. In `setup`, list the commands that prepare each worktree, such as `mise exec -- bun install`.
 4. Make sure each checkout uses its own ports and data. A fixed port or a shared temporary folder breaks parallel runs.
-5. Document how to create and remove a worktree. [Local development](../setup/local-development.md) shows how the dev URLs of this repository differ in a linked worktree.
+5. Use `clutch worktree new`, `list` and `rm` to make and remove the checkouts. Document what each checkout has of its own, as [Worktrees](../setup/worktrees.md) does.
 6. Set `worktree_parallel` to `adopted` in `clutch.yaml`.
 
 ## Waive
