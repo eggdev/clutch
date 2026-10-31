@@ -25,7 +25,9 @@ export const validateTargets = [
 
 /**
  * The time a `validate --changed` run should take, in seconds. Above it, the
- * run warns. Provisional until CL-303 measures the p50 on a CI runner.
+ * run warns. Measured on the 4-core GitHub runner on 2026-10-31 (CL-303): the
+ * validate step's p50 was 64 s for the full run over 5 PRs, and 50 s for
+ * --changed on a small PR. The budget leaves 20% over that.
  */
 export const changedBudgetSeconds = 60;
 

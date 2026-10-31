@@ -1,3 +1,5 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
 
@@ -75,24 +77,39 @@ export async function bundleProblems(
   return { problems, gzip, brotli };
 }
 
-/** Builds the web app, then measures its first screen. */
-export function checkBundle(
+/**
+ * Builds the web app into a folder of its own, then measures its first screen.
+ * `web:build` writes `apps/web/dist` and can run at the same time inside one
+ * Nx run, so a shared folder would race.
+ */
+export async function checkBundle(
   root: string,
 ): Promise<{ problems: Array<string>; gzip: number; brotli: number }> {
-  const build = Bun.spawnSync(
-    [path.join(root, 'node_modules/.bin/vite'), 'build', '--logLevel', 'error'],
-    {
-      cwd: path.join(root, app),
-    },
-  );
-  if (build.exitCode !== 0) {
-    return Promise.resolve({
-      problems: [`vite build failed in ${app}:\n${build.stderr.toString()}`],
-      gzip: 0,
-      brotli: 0,
-    });
+  const out = await mkdtemp(path.join(tmpdir(), 'check-bundle-'));
+  try {
+    const build = Bun.spawnSync(
+      [
+        path.join(root, 'node_modules/.bin/vite'),
+        'build',
+        '--logLevel',
+        'error',
+        '--outDir',
+        out,
+        '--emptyOutDir',
+      ],
+      { cwd: path.join(root, app) },
+    );
+    if (build.exitCode !== 0) {
+      return {
+        problems: [`vite build failed in ${app}:\n${build.stderr.toString()}`],
+        gzip: 0,
+        brotli: 0,
+      };
+    }
+    return await bundleProblems(out);
+  } finally {
+    await rm(out, { recursive: true, force: true });
   }
-  return bundleProblems(path.join(root, app, 'dist'));
 }
 
 if (import.meta.main) {

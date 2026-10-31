@@ -8,7 +8,8 @@ Run every command from the repository root through [Nx](./nx.md).
 mise exec -- bun run validate
 ```
 
-Run it before you say a change is done. CI runs the same command on each PR.
+Run it before you say a change is done. CI runs it on each push to `main`, and
+`validate --changed` on each PR. See [CI](#ci).
 Nx caches results, so a second run with no changes takes seconds. A failure
 names its target and prints that task's full output. A passing or cached task
 prints one line.
@@ -239,7 +240,12 @@ mise exec -- bun run format   # write formatting
 
 ## CI
 
-GitHub Actions runs `validate` on each PR. A second job, `journeys`, runs
+GitHub Actions runs the `validate` job on each PR and each push to `main`. On a
+PR it runs `bun run validate --changed` against the PR's target branch, so it
+checks only what the PR affects. See [only what changed](#only-what-changed).
+A push to `main` runs the full `validate`, and so does a PR whose base is all
+zeros. The job keeps the name `validate`, so the ruleset's required check still
+matches. A second job, `journeys`, runs
 every web journey in Chromium. See
 [`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml) and
 [journeys](./verification.md#where-journeys-run).

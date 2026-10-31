@@ -255,7 +255,7 @@ capabilities:
     doc: docs/contributing/capabilities/changed-scope-check.md
     detect:
       - workflow:
-          run: nx affected|affected -t|nx-set-shas
+          run: nx affected|affected -t|nx-set-shas|validate --changed
       # The shared base of the change, which the hooks and validate --changed use.
       - grep:
           files: tools/check-base.ts
