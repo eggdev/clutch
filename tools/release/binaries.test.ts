@@ -121,7 +121,11 @@ test('a project runs the clutch commands through the launcher and the release bi
     const doctor = clutch('doctor', '--json');
     expect(doctor.code).toBe(0);
     expect(JSON.parse(doctor.out)).toMatchObject({ templateRelease: 'v0.2.0' });
-    expect(JSON.parse(doctor.out).results).toHaveLength(36);
+    // The binary reports each capability of the registry that it carries.
+    const registry = Bun.YAML.parse(
+      await readFile(path.join(root, 'docs/contributing/capabilities/registry.yaml'), 'utf-8'),
+    ) as { capabilities: Array<unknown> };
+    expect(JSON.parse(doctor.out).results).toHaveLength(registry.capabilities.length);
 
     const install = clutch('install', '--yes');
     expect(install.code).toBe(1);
