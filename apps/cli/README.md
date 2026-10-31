@@ -121,6 +121,7 @@ PGlite database, and its own dev server names.
 ```sh
 mise exec -- bun run clutch worktree new cart-total --issue CL-201
 mise exec -- bun run clutch worktree list
+mise exec -- bun run clutch worktree rm cart-total
 ```
 
 - `new <slug>` fetches the base, then makes the branch and its checkout in
@@ -140,6 +141,12 @@ mise exec -- bun run clutch worktree list
   and the setup is `mise trust --quiet` then `mise exec -- bun install`. mise
   refuses a config file in a new folder until it is trusted, and the install
   also installs the git hooks.
+- `rm <slug> [--force] [--base REF]` refuses a checkout with uncommitted
+  changes, or with commits that neither the base nor a remote branch holds.
+  `--force` removes it anyway. It first stops that checkout's dev servers with
+  `bun run dev --stop`, and only when a dev run there left
+  `.data/dev-run.json`. Then it removes the checkout. It deletes the branch
+  only when the branch is merged into the base.
 - Run it from the main checkout or from a task checkout. Both use the main
   checkout's settings.
 - The commands call a backend interface (`worktree/backend.ts`). Git is the

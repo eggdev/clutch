@@ -15,6 +15,7 @@ its options, and so does `bun run pr --help`.
 | `bun run clutch issues --write`                                                   | `TRACKER.md` conflicts after a rebase.              | Resolving tracker conflicts line by line.       |
 | `bun run clutch worktree new <slug> [--issue <id>]`                               | You start a task beside other work in this repository. | `git worktree add`, copying env files and `bun install` by hand. |
 | `bun run clutch worktree list [--json]`                                           | You want each checkout's branch, issue, PR and dirty state. | `git worktree list` and matching branches to PRs by hand. |
+| `bun run clutch worktree rm <slug> [--force]`                                     | A task's checkout is done, or abandoned.            | Stopping its servers and `git worktree remove` by hand. |
 
 ## Check
 
