@@ -42,10 +42,11 @@ preparation. Read them in sequence. Missing optional skills do not excuse
 skipping verification, and explicit-only skills keep their invocation policy.
 
 The project's commands own repeatable setup and checks. The agent owns
-investigation and judgment. Sprig owns task environments and version control
-when configured; the host owns scheduling, delegated tasks and wakeups when
-those are requested and supported. Delivery works with the project's existing
-tools when Sprig or T3 is absent.
+investigation and judgment. `clutch worktree` owns task environments. It uses
+plain git worktrees. Sprig is a possible later backend. See
+`.clutch/issues/CL-901.md`. The host owns scheduling, delegated tasks and
+wakeups when those are requested and supported. Delivery works with the
+project's existing tools when T3 is absent.
 
 For repository-specific proof, use the committed
 [`verify` skill](../../.agents/skills/verify/SKILL.md). Only

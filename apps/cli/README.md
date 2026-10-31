@@ -111,6 +111,40 @@ mise exec -- bun run clutch issues --check
   file has a bad value. The message names the file and the field.
 - `--json` prints the issues and the errors as JSON.
 
+## Worktree
+
+`clutch worktree` makes a separate checkout for one task, so several agents or
+people work in one repository at once. It uses plain git worktrees. Each
+checkout has its own `node_modules`, its own `.data` folder with its own
+PGlite database, and its own dev server names.
+
+```sh
+mise exec -- bun run clutch worktree new cart-total --issue CL-201
+mise exec -- bun run clutch worktree list
+```
+
+- `new <slug>` fetches the base, then makes the branch and its checkout in
+  `<root>/<slug>`. The branch is `clutch/cl-NNN-<slug>` with `--issue`, or
+  `clutch/<slug>` without it. `--base` defaults to the remote default branch,
+  such as `origin/main`. A failed fetch only warns, so the command works
+  offline.
+- It copies each `worktree.copy` file that exists, such as `.env.local`, from
+  the main checkout. Then it runs each `worktree.setup` command in the new
+  checkout. With `--issue`, it sets the issue to `in_progress` there.
+- It prints the path, the branch, and the dev server names from
+  `bun run dev --check` when the project has a `dev` script.
+- `list [--json]` shows each checkout with its branch, its dirty state, the
+  issue in its branch name, and its PR when `gh` is signed in.
+- The `worktree` block of `clutch.yaml` sets `root`, `copy` and `setup`.
+  Without it, the checkouts go in `../<repo>.worktrees`, nothing is copied,
+  and the setup is `mise trust --quiet` then `mise exec -- bun install`. mise
+  refuses a config file in a new folder until it is trusted, and the install
+  also installs the git hooks.
+- Run it from the main checkout or from a task checkout. Both use the main
+  checkout's settings.
+- The commands call a backend interface (`worktree/backend.ts`). Git is the
+  only backend. Sprig is a possible later one (`.clutch/issues/CL-901.md`).
+
 ## Labels
 
 `clutch labels` prints the labels of a change. `kind/<type>` comes from the
