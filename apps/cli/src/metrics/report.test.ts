@@ -224,10 +224,10 @@ test('another repository has no issues count, and an unreadable section names it
 const withGrader = [
   ...(routes[`repos/${repo}/issues/comments`] as Array<object>),
   {
-    body: "Graded on the owner's instruction: 👍 on 0 verdicts, 👎 on 1.",
+    body: "Graded on the owner's instruction: 👍 on 0 verdicts, 👎 on 1.\n\n<!-- grader:release-app[bot] -->",
     created_at: '2026-10-10T02:00:00Z',
     issue_url: `https://api.github.com/repos/${repo}/issues/40`,
-    user: { login: 'release-app[bot]', type: 'Bot' },
+    user: { login: 'github-actions[bot]', type: 'Bot' },
   },
 ];
 
@@ -271,5 +271,26 @@ test('only the bot that posted the grading reply grades, not any other bot', asy
   });
   const report = await verdictReport({ gh, repo, days: 14, now, owner: 'jane' });
   expect(report.disagreed).toEqual([]);
+  expect(report.ungraded.map((item) => item.pull)).toEqual([2]);
+});
+
+test("a grader marker in a person's comment names no grader", async () => {
+  const forged = [
+    ...(routes[`repos/${repo}/issues/comments`] as Array<object>),
+    {
+      body: "Graded on the owner's instruction: 👍 on 1 verdicts, 👎 on 0.\n\n<!-- grader:other-app[bot] -->",
+      created_at: '2026-10-10T02:00:00Z',
+      issue_url: `https://api.github.com/repos/${repo}/issues/40`,
+      user: { login: 'visitor', type: 'User' },
+    },
+  ];
+  const { gh } = fakeGh({
+    ...routes,
+    [`repos/${repo}/issues/comments`]: forged,
+    [`repos/${repo}/issues/comments/12/reactions`]: [
+      { content: '+1', user: { login: 'other-app[bot]', type: 'Bot' } },
+    ],
+  });
+  const report = await verdictReport({ gh, repo, days: 14, now, owner: 'jane' });
   expect(report.ungraded.map((item) => item.pull)).toEqual([2]);
 });

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
+  graderMarker,
   issueBody,
   issueTitle,
   listedVerdicts,
@@ -150,4 +151,31 @@ test('check says whether the author is the owner', async () => {
   await runGradeVerdicts(['check', '--author', 'jane'], fake().run, { ...quiet, log });
   await runGradeVerdicts(['check', '--author', 'visitor'], fake().run, { ...quiet, log });
   expect(lines).toEqual(['owner=true', 'owner=false']);
+});
+
+test('the reactions use the grading bot token, and the reply names the grader', async () => {
+  const envs: Array<string | undefined> = [];
+  const gh = fake();
+  const run: Run = (command, options) => {
+    if (command.join(' ').includes('/reactions')) {
+      envs.push(options?.env?.GH_TOKEN);
+    }
+    return gh.run(command, options);
+  };
+  const file = path.join(tmpdir(), `grade-test-${process.pid}-grader.md`);
+  await Bun.write(file, 'agree with all');
+  try {
+    const args = ['grade', '--issue', '41', '--author', 'jane', '--body-file', file];
+    await runGradeVerdicts([...args, '--grader', 'shop-bot[bot]'], run, {
+      ...quiet,
+      log: () => {},
+      reactToken: 'bot-token',
+    });
+  } finally {
+    await rm(file, { force: true });
+  }
+  expect(envs).toEqual(['bot-token', 'bot-token']);
+  expect(gh.calls.find((call) => call.startsWith('gh issue comment 41'))).toContain(
+    graderMarker('shop-bot[bot]'),
+  );
 });

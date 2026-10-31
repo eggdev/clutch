@@ -58,9 +58,9 @@ jobs:
           AUTHOR: ${{ github.event.comment.user.login }}
         run: bun tools/github/grade-verdicts.ts check --author "$AUTHOR" >> "$GITHUB_OUTPUT"
 
-  # The release bot reacts and replies, so its login marks it as the grading
-  # bot that clutch metrics trusts. Its key lives in the release environment,
-  # which only the default branch may use. An issue_comment run is on it.
+  # The release bot reacts, and the reply names its login, so clutch metrics
+  # trusts exactly that bot. Its key lives in the release environment, which
+  # only the default branch may use. An issue_comment run is on it.
   grade:
     needs: check
     if: needs.check.outputs.owner == 'true'
@@ -80,8 +80,8 @@ jobs:
         with:
           app-id: ${{ vars.CLUTCH_APP_ID }}
           private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
-          # Only the reactions, the reply and the issue body. The app has more permissions.
-          permission-issues: write
+          # Only the reactions on the PR verdict comments. The reply and the issue
+          # body use the default token, so the app needs no Issues permission.
           permission-pull-requests: write
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -90,13 +90,17 @@ jobs:
       - run: bun install --frozen-lockfile --ignore-scripts
       - name: Grade the listed verdicts
         env:
-          GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
+          GH_TOKEN: ${{ github.token }}
+          # The grading bot reacts. Its login, from the app token, goes into the
+          # reply, which is how clutch metrics knows whose reactions are grades.
+          REACT_TOKEN: ${{ steps.bot.outputs.token || github.token }}
+          GRADER: ${{ steps.bot.outputs.app-slug && format('{0}[bot]', steps.bot.outputs.app-slug) || 'github-actions[bot]' }}
           ISSUE: ${{ github.event.issue.number }}
           AUTHOR: ${{ github.event.comment.user.login }}
           BODY: ${{ github.event.comment.body }}
         run: |
           printf '%s' "$BODY" > "$RUNNER_TEMP/comment.md"
-          bun tools/github/grade-verdicts.ts grade --issue "$ISSUE" --author "$AUTHOR" --body-file "$RUNNER_TEMP/comment.md"
+          bun tools/github/grade-verdicts.ts grade --issue "$ISSUE" --author "$AUTHOR" --body-file "$RUNNER_TEMP/comment.md" --grader "$GRADER"
 
   # A manual run opens or updates the calibration issue. The weekly gardening
   # workflow runs the same step.

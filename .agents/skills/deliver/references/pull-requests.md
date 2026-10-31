@@ -176,8 +176,9 @@ link. In that issue, the owner comments:
 
 The Grade verdicts workflow (`.github/workflows/grade-verdicts.yml`) reads only
 the owner's comments. The owner is `automerge.owner` in `clutch.yaml`, else the
-default owner in CODEOWNERS. The release bot adds the reactions, and replies
-"Graded on the owner's instruction" on the issue. `clutch metrics` counts the
-owner's reactions, and the reactions of each bot that posted such a reply on a
-calibration issue. It ignores anyone else's. `clutch metrics --verdicts` lists the ungraded verdicts
+default owner in CODEOWNERS. The release bot adds the reactions. The workflow
+then replies "Graded on the owner's instruction" and names the bot's login,
+which it reads from the app token. `clutch metrics` counts the owner's
+reactions, and those of each bot that a bot's reply names. It ignores anyone
+else's. `clutch metrics --verdicts` lists the ungraded verdicts
 and the agreement streak.

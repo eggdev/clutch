@@ -16,7 +16,7 @@ import type { Run } from '@tools/github/stack';
 const usage = [
   'Usage: bun tools/github/grade-verdicts.ts calibrate [--date YYYY-MM-DD]',
   '       bun tools/github/grade-verdicts.ts check --author LOGIN',
-  '       bun tools/github/grade-verdicts.ts grade --issue N --author LOGIN --body-file FILE',
+  '       bun tools/github/grade-verdicts.ts grade --issue N --author LOGIN --body-file FILE [--grader LOGIN]',
 ].join('\n');
 
 const root = path.resolve(import.meta.dir, '../..');
@@ -171,8 +171,14 @@ async function calibrate(run: Run, date: string, write: Write, retitle: boolean)
   return Number(url.split('/').at(-1));
 }
 
-/** Adds the grades that an owner's comment asks for. Returns a summary line. */
-async function grade(run: Run, issue: string, text: string) {
+/** The marker in the grading reply that names the bot whose reactions are grades. */
+export const graderMarker = (login: string) => `<!-- grader:${login} -->`;
+
+/**
+ * Adds the grades that an owner's comment asks for. Each reaction uses
+ * `reactToken` when given, the grading bot's. Returns a summary line.
+ */
+async function grade(run: Run, issue: string, text: string, reactToken?: string) {
   const { agreeAll, disagree } = parseGrade(text);
   const body = await must(run, ['gh', 'issue', 'view', issue, '--json', 'body', '--jq', '.body']);
   const repo = await must(run, [
@@ -184,8 +190,8 @@ async function grade(run: Run, issue: string, text: string) {
     '--jq',
     '.nameWithOwner',
   ]);
-  const react = (commentId: number, content: '+1' | '-1') =>
-    must(run, [
+  const react = async (commentId: number, content: '+1' | '-1') => {
+    const command = [
       'gh',
       'api',
       '--method',
@@ -193,7 +199,12 @@ async function grade(run: Run, issue: string, text: string) {
       `repos/${repo}/issues/comments/${commentId}/reactions`,
       '-f',
       `content=${content}`,
-    ]);
+    ];
+    const result = await run(command, reactToken ? { env: { GH_TOKEN: reactToken } } : undefined);
+    if (!result.ok) {
+      throw new Error(`${command.join(' ')} failed: ${result.err || result.out}`);
+    }
+  };
   let agreed = 0;
   let disagreed = 0;
   for (const verdict of listedVerdicts(body)) {
@@ -214,13 +225,54 @@ const writeFile: Write = async (file, text) => {
   await Bun.write(file, text);
 };
 
+/** Grades the verdicts that the owner's comment in `input.file` asks for, and refreshes the issue. */
+async function gradeComment(
+  run: Run,
+  input: {
+    issue: string;
+    author: string;
+    file: string;
+    grader?: string;
+    reactToken?: string;
+    write: Write;
+    log: (text: string) => void;
+    today: Date;
+  },
+) {
+  const { reactToken, write, log, today } = input;
+  const { owner, isOwner } = await ownerCheck(run, input.author);
+  if (!isOwner) {
+    log(`Only @${owner ?? 'the owner'} grades verdicts. @${input.author} is not the owner.`);
+    return;
+  }
+  const text = await Bun.file(input.file).text();
+  const { agreeAll, disagree } = parseGrade(text);
+  if (!agreeAll && disagree.length === 0) {
+    log('The comment asks for no grade.');
+    return;
+  }
+  const summary = await grade(run, input.issue, text, reactToken);
+  // `clutch metrics` trusts the grader that a bot's reply names here.
+  const grader = input.grader ? `\n\n${graderMarker(input.grader)}` : '';
+  await must(run, ['gh', 'issue', 'comment', input.issue, '--body', `${summary}${grader}`]);
+  const number = await calibrate(run, today.toISOString().slice(0, 10), write, false);
+  log(`${summary} Calibration issue #${number} is up to date.`);
+}
+
 /** Runs one mode. Returns the exit code. */
 export async function runGradeVerdicts(
   args: Array<string>,
   run: Run,
-  options: { write?: Write; log?: (text: string) => void; today?: Date } = {},
+  options: {
+    write?: Write;
+    log?: (text: string) => void;
+    today?: Date;
+    /** The grading bot's token for the reactions. Defaults to `REACT_TOKEN`. */
+    reactToken?: string;
+  } = {},
 ): Promise<number> {
   const { write = writeFile, log = console.log, today = new Date() } = options;
+  const reactToken = options.reactToken ?? (process.env.REACT_TOKEN || undefined);
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,
@@ -229,6 +281,7 @@ export async function runGradeVerdicts(
       issue: { type: 'string' },
       author: { type: 'string' },
       'body-file': { type: 'string' },
+      grader: { type: 'string' },
     },
   });
   const [mode] = positionals;
@@ -244,28 +297,16 @@ export async function runGradeVerdicts(
     return 0;
   }
   if (mode === 'grade' && values.issue && values.author && values['body-file']) {
-    const { owner, isOwner } = await ownerCheck(run, values.author);
-    if (!isOwner) {
-      log(`Only @${owner ?? 'the owner'} grades verdicts. @${values.author} is not the owner.`);
-      return 0;
-    }
-    const text = await Bun.file(values['body-file']).text();
-    const { agreeAll, disagree } = parseGrade(text);
-    if (!agreeAll && disagree.length === 0) {
-      log('The comment asks for no grade.');
-      return 0;
-    }
-    const summary = await grade(run, values.issue, text);
-    await must(run, ['gh', 'issue', 'comment', values.issue, '--body', summary]);
-    const number = await calibrate(run, today.toISOString().slice(0, 10), write, false);
-    log(`${summary} Calibration issue #${number} is up to date.`);
+    const input = { issue: values.issue, author: values.author, file: values['body-file'] };
+    await gradeComment(run, { ...input, grader: values.grader, reactToken, write, log, today });
     return 0;
   }
   throw new Error(usage);
 }
 
-const spawn: Run = async (command) => {
-  const proc = Bun.spawn(command, { cwd: root, stdout: 'pipe', stderr: 'pipe' });
+const spawn: Run = async (command, options) => {
+  const env = options?.env ? { ...process.env, ...options.env } : undefined;
+  const proc = Bun.spawn(command, { cwd: root, env, stdout: 'pipe', stderr: 'pipe' });
   const [out, err, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),

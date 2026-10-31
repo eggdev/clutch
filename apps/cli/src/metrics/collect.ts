@@ -13,8 +13,11 @@ import type { PullShape } from '@/metrics/pulls';
 /** The marker that starts each dry-run comment of `tools/github/auto-merge.ts`. */
 const dryRunMarker = '<!-- automerge-dry-run:';
 
-/** How the Grade verdicts workflow's reply starts. Its author is the grading bot. */
+/** How the Grade verdicts workflow's reply starts. */
 const gradedReply = "Graded on the owner's instruction";
+
+/** The grading bot that a reply names: the login of the workflow's app token. */
+const graderMarker = /<!-- grader:(\S+) -->/u;
 
 /** A person or a bot, as the GitHub API reports one. */
 type Account = { login?: string; type?: string } | null | undefined;
@@ -230,11 +233,10 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
 
     /**
      * The dry-run verdicts commented on or after `since`, an ISO time. With an
-     * `owner`, only the owner's reactions count as grades, and those of each bot
-     * that replied `Graded on the owner's instruction` on an issue. That reply
-     * comes from the Grade verdicts workflow's app token, so the bot is the
-     * project's own, and GitHub sets the reply's author. Without an owner, every
-     * reaction counts.
+     * `owner`, only the owner's reactions count as grades, and those of each
+     * grading bot. The Grade verdicts workflow names that bot, the login of its
+     * app token, in its `Graded on the owner's instruction` reply. Only a reply
+     * that a bot posted counts. Without an owner, every reaction counts.
      */
     async dryRunVerdicts(since: string, owner?: string | null): Promise<Array<DryRunVerdict>> {
       const comments = await list<{
@@ -254,7 +256,8 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
           .filter(
             (comment) => comment.user?.type === 'Bot' && comment.body?.startsWith(gradedReply),
           )
-          .map((comment) => comment.user?.login),
+          .map((comment) => graderMarker.exec(comment.body ?? '')?.[1])
+          .filter(Boolean),
       );
       return Promise.all(
         verdicts.map((comment) =>
