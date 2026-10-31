@@ -24,6 +24,7 @@ its options, and so does `bun run pr --help`.
 | `bun run clutch risk [--base <ref>]`     | You want a change's risk tier before a PR.     | Judging the tier from the file list.         |
 | `bun run clutch labels [--title <title>]` | You want a change's kind, area and size labels, or its size warning, before a PR. | Choosing `kind/`, `area/` and `size/` labels by hand. |
 | `bun run clutch ruleset [--apply]`       | A file in `.github/rulesets/` changed, or you want to know if GitHub matches it. | `gh api` POST or PUT on the rulesets endpoint. |
+| `bun tools/codeowners.ts --write` | The `one-way-door` tier in `.clutch/risk.yaml` changed. | Editing `.github/CODEOWNERS` by hand. |
 
 `validate` prints the output of each failed task inline, so read it there.
 

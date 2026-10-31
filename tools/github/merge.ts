@@ -61,11 +61,39 @@ async function awaitRelease(
   }
 }
 
+type Review = {
+  reviewDecision: string | null;
+  reviewRequests: Array<{ login?: string; slug?: string; name?: string }>;
+  latestReviews: Array<{ author: { login: string }; state: string }>;
+};
+
+/**
+ * Why GitHub still wants a person's review, or nothing. The owner's admin
+ * login can bypass the ruleset, so `pr merge` checks this itself: a PR that
+ * needs a code owner's approval waits for it, even when an agent merges.
+ */
+function reviewProblem(number: string, pr: Review) {
+  if (pr.reviewDecision === 'CHANGES_REQUESTED') {
+    const who = pr.latestReviews
+      .filter((review) => review.state === 'CHANGES_REQUESTED')
+      .map((review) => `@${review.author.login}`);
+    return `#${number} has changes requested by ${who.join(', ') || 'a reviewer'}. Address them, and ask for a new review.`;
+  }
+  if (pr.reviewDecision === 'REVIEW_REQUIRED') {
+    const who = pr.reviewRequests.map((request) =>
+      request.login ? `@${request.login}` : `the ${request.slug ?? request.name} team`,
+    );
+    return `#${number} needs an approving review from ${who.join(', ') || 'a code owner'} before it merges. Ask them to approve it.`;
+  }
+  return null;
+}
+
 /**
  * Merges a PR with a merge commit. A PR in a stack merges with `gh stack
  * merge`, bottom up. GitHub can still count a PR as stacked after the PRs
  * below it merged, so a plain merge that GitHub refuses for its stack retries
- * through the stack. Then it waits for the release of the merge.
+ * through the stack. Then it waits for the release of the merge. It refuses
+ * while GitHub reports that the PR needs a review.
  */
 export async function merge(
   run: Run,
@@ -73,11 +101,24 @@ export async function merge(
   clock: Clock,
   timing: { timeout: number; interval: number },
 ) {
-  const out = await must(run, ['gh', 'pr', 'view', number, '--json', 'baseRefName,headRefName']);
-  const { baseRefName, headRefName } = JSON.parse(out) as {
-    baseRefName: string;
-    headRefName: string;
-  };
+  const out = await must(run, [
+    'gh',
+    'pr',
+    'view',
+    number,
+    '--json',
+    'baseRefName,headRefName,reviewDecision,reviewRequests,latestReviews',
+  ]);
+  const pr = JSON.parse(out) as Review & { baseRefName: string; headRefName: string };
+  const { baseRefName, headRefName } = pr;
+  const problem = reviewProblem(number, {
+    reviewDecision: pr.reviewDecision ?? null,
+    reviewRequests: pr.reviewRequests ?? [],
+    latestReviews: pr.latestReviews ?? [],
+  });
+  if (problem) {
+    throw new Error(problem);
+  }
   const trunk = await defaultBranch(run);
   const above = await must(run, [
     'gh',

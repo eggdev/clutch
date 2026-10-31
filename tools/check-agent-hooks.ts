@@ -1,18 +1,17 @@
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
-import { guardrailList, guardrailPatterns } from '@tools/agent-hooks/guard-guardrails';
 import { simulatorTools } from '@tools/agent-hooks/simulator-tools';
+import { codeownersFile, expectedCodeowners } from '@tools/codeowners';
 
 /**
  * Claude Code and Codex run the same agent hooks. Each tool has its own
  * config file, and both call the scripts in `.agents/hooks/`. This check
  * keeps the two files in step, and keeps .github/CODEOWNERS in step with the
- * guardrail list. See docs/contributing/harness-engineering.md#agent-hooks.
+ * one-way-door tier of .clutch/risk.yaml, which holds the guardrail list. See docs/contributing/harness-engineering.md#agent-hooks.
  */
 export const configs = { claude: '.claude/settings.json', codex: '.codex/hooks.json' } as const;
 const scripts = '.agents/hooks';
-const codeowners = '.github/CODEOWNERS';
 const script = /\.agents\/hooks\/([\w-]+)\.ts\s+(\w+)/u;
 
 type Config = {
@@ -61,34 +60,20 @@ function simulatorProblems(config: Config): Array<string> {
     );
 }
 
-/** The CODEOWNERS pattern for a guardrail glob: `tools/lint/**` becomes `/tools/lint/`. */
-export const ownerPattern = (glob: string) => `/${glob.endsWith('/**') ? glob.slice(0, -2) : glob}`;
-
 async function codeownerProblems(root: string): Promise<Array<string>> {
-  const file = path.join(root, codeowners);
-  if (!existsSync(file)) {
-    return [`${codeowners}: the file is missing. Restore it from Clutch.`];
+  if (!existsSync(path.join(root, codeownersFile))) {
+    return [`${codeownersFile}: the file is missing. Restore it from Clutch.`];
   }
-  const owned = new Map<string, Array<string>>();
-  const text = await Bun.file(file).text();
-  for (const line of text.split('\n')) {
-    const [pattern, ...owners] = line.trim().split(/\s+/u);
-    if (pattern && !pattern.startsWith('#')) {
-      owned.set(pattern, owners);
-    }
+  const expected = expectedCodeowners(root);
+  if ('problem' in expected) {
+    return [expected.problem];
   }
-  const problems: Array<string> = [];
-  for (const glob of guardrailPatterns(root)) {
-    const pattern = ownerPattern(glob);
-    if (!owned.has(pattern)) {
-      problems.push(
-        `${codeowners}: add \`${pattern}\` with an owner. ${guardrailList} lists \`${glob}\`.`,
-      );
-    } else if (!owned.get(pattern)?.length) {
-      problems.push(`${codeowners}: \`${pattern}\` has no owner. Add a handle or a team.`);
-    }
-  }
-  return problems;
+  const actual = await Bun.file(path.join(root, codeownersFile)).text();
+  return actual === expected.text
+    ? []
+    : [
+        `${codeownersFile}: it does not match the one-way-door paths in .clutch/risk.yaml. Run: mise exec -- bun tools/codeowners.ts --write`,
+      ];
 }
 
 export async function checkAgentHooks(root: string): Promise<Array<string>> {
@@ -141,7 +126,7 @@ if (import.meta.main) {
     console.error(
       [
         `Agent hook check failed (${problems.length}).`,
-        'Claude Code and Codex must run the same hooks, and CODEOWNERS must cover each guardrail file.',
+        'Claude Code and Codex must run the same hooks, and CODEOWNERS must match the one-way-door paths.',
         'See docs/contributing/harness-engineering.md#agent-hooks.',
         '',
         ...problems,
@@ -150,7 +135,7 @@ if (import.meta.main) {
     process.exitCode = 1;
   } else {
     console.log(
-      'Claude Code and Codex run the same agent hooks, and CODEOWNERS covers each guardrail file.',
+      'Claude Code and Codex run the same agent hooks, and CODEOWNERS matches the one-way-door paths.',
     );
   }
 }

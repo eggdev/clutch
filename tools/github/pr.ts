@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { openAsBot } from '@tools/github/bot-open';
 import { ready, recordForkPoint, sync } from '@tools/github/branch';
 import { failures, renderFailures } from '@tools/github/failures';
 import { defaultBranch, duration, must, prWithHead, realClock } from '@tools/github/github';
@@ -140,10 +141,51 @@ async function ensureChangeset(
   ]);
 }
 
+/**
+ * Opens a new PR. The release bot opens it when it is set up, so the owner can
+ * approve it, and the owner sets the body. Otherwise the user opens it.
+ */
+async function createPr(
+  run: Run,
+  clock: Clock,
+  pr: { trunk: string; branch: string; base: string; title: string; bodyFile: string },
+) {
+  const { branch, base, title, bodyFile } = pr;
+  if (await openAsBot(run, clock, pr)) {
+    const opened = await prWithHead(run, branch);
+    if (opened) {
+      await setBody(run, String(opened.number), bodyFile);
+    }
+    return opened;
+  }
+  const created = await run([
+    'gh',
+    'pr',
+    'create',
+    '--base',
+    base,
+    '--head',
+    branch,
+    '--title',
+    title,
+    '--body-file',
+    bodyFile,
+  ]);
+  const opened = await prWithHead(run, branch);
+  // A late bot run can open the PR first. Then only the body is left to set.
+  if (!created.ok && opened) {
+    await setBody(run, String(opened.number), bodyFile);
+  } else if (!created.ok) {
+    throw new Error(`gh pr create failed: ${created.err || created.out}`);
+  }
+  return opened;
+}
+
 async function open(
   run: Run,
   options: { title?: string; 'body-file'?: string; base?: string; force?: boolean },
   write: Write,
+  clock: Clock,
 ) {
   const { title, 'body-file': bodyFile } = options;
   if (!title || !bodyFile) {
@@ -184,20 +226,7 @@ async function open(
   if (existing) {
     await setBody(run, String(existing.number), bodyFile);
   } else {
-    await must(run, [
-      'gh',
-      'pr',
-      'create',
-      '--base',
-      base,
-      '--head',
-      branch,
-      '--title',
-      title,
-      '--body-file',
-      bodyFile,
-    ]);
-    opened = await prWithHead(run, branch);
+    opened = await createPr(run, clock, { trunk, branch, base, title, bodyFile });
   }
   if (!opened) {
     throw new Error(`GitHub has no open PR for ${branch} after the create.`);
@@ -250,7 +279,7 @@ export async function runPr(
   /** Each command, with the count of arguments it takes. */
   const commands: Record<string, [number, (rest: Array<string>) => Promise<number>]> = {
     doctor: [0, () => doctor(run, values.fix === true)],
-    open: [0, () => open(run, values, write)],
+    open: [0, () => open(run, values, write, clock)],
     body: [
       2,
       async ([number, file]) => {
@@ -285,7 +314,7 @@ export async function runPr(
         return 0;
       },
     ],
-    sync: [1, ([target]) => sync(run, root, target, (options) => open(run, options, write))],
+    sync: [1, ([target]) => sync(run, root, target, (options) => open(run, options, write, clock))],
     ready: [2, ([id, number]) => ready(run, root, id, number)],
     merge: [
       1,

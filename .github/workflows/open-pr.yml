@@ -1,0 +1,73 @@
+# Opens a pull request as the release bot, for `bun run pr open`. GitHub never
+# lets a PR's author approve it, so a PR that the bot opens can take the
+# owner's approval, while the owner stays the author of each commit. `pr open`
+# then sets the body as the owner. See
+# .agents/skills/deliver/references/pull-requests.md#who-opens-the-pull-request.
+#
+# The bot's key lives in the release environment, which only the default
+# branch may deploy to, so `pr open` starts this with --ref <default branch>.
+# The job never checks out or runs code from the PR's branch. It only calls
+# the pull request API.
+name: Open PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      head:
+        description: The branch to open the pull request from.
+        type: string
+        required: true
+      base:
+        description: The branch to merge into.
+        type: string
+        required: true
+      title:
+        description: The pull request title.
+        type: string
+        required: true
+
+# Least privilege. The bot's token does the work.
+permissions:
+  contents: read
+
+concurrency:
+  group: open-pr-${{ inputs.head }}
+  cancel-in-progress: false
+
+jobs:
+  open:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    environment: release
+    steps:
+      - name: Get the release bot token
+        id: bot
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          # Only the pull request. The app has more permissions.
+          permission-pull-requests: write
+          permission-contents: read
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          HEAD: ${{ inputs.head }}
+          BASE: ${{ inputs.base }}
+          TITLE: ${{ inputs.title }}
+        run: |
+          # The head must be a branch of this repository, not the default branch.
+          if [ "$HEAD" = "$BASE" ] || ! gh api "repos/$GITHUB_REPOSITORY/branches/$HEAD" --silent; then
+            echo "::error title=No such branch::$HEAD is not a branch of $GITHUB_REPOSITORY, or it is the base."
+            exit 1
+          fi
+          open="$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=${GITHUB_REPOSITORY_OWNER}:${HEAD}" --jq 'length')"
+          if [ "$open" != 0 ]; then
+            echo "::notice title=Already open::$HEAD already has an open pull request."
+            exit 0
+          fi
+          # pr open replaces this body as the owner.
+          gh api --method POST "repos/$GITHUB_REPOSITORY/pulls" \
+            -f head="$HEAD" -f base="$BASE" -f title="$TITLE" \
+            -f body='Opened by the release bot. The author sets the description next.' \
+            --jq .html_url

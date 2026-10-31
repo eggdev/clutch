@@ -7,7 +7,7 @@ import { botKind } from '@tools/github/bot-rule';
  * acts on them.
  */
 
-/** Only an agent opens a branch with this prefix. `pr open` runs under the operator's login, so the author cannot tell. */
+/** Only an agent opens a branch with this prefix. The release bot or the operator opens its PR, so the author cannot tell. */
 const agentBranch = 'clutch/cl-';
 
 export const modes = ['off', 'dry-run', 'on'] as const;
