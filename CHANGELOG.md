@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.1 (2026-10-31)
+
+### Fixes and maintenance
+
+- docs(tracker): survey Neighborhood for upstream (CL-605)
+
 ## 0.25.0 (2026-10-31)
 
 ### Features
