@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.0 (2026-10-31)
+
+### Features
+
+- feat(validate): add validate --changed and clutch checks (CL-204)
+
 ## 0.25.3 (2026-10-31)
 
 ### Fixes and maintenance
