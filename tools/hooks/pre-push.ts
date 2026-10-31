@@ -1,3 +1,4 @@
+import { defaultBranchBase } from '@tools/check-base';
 import { isDocsOnly } from '@tools/hooks/paths.mjs';
 import { runTargets } from '@tools/validate';
 
@@ -28,9 +29,7 @@ export function changedPaths(refs: Array<PushedRef>): Array<string> | null {
     if (zero.test(localSha)) {
       continue;
     }
-    const base = zero.test(remoteSha)
-      ? (git('merge-base', localSha, 'origin/HEAD') ?? git('merge-base', localSha, 'origin/main'))
-      : remoteSha;
+    const base = zero.test(remoteSha) ? defaultBranchBase(process.cwd(), localSha) : remoteSha;
     const listed = base
       ? git('diff', '--name-only', base, localSha)
       : git('ls-tree', '-r', '--name-only', localSha);

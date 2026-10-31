@@ -111,6 +111,14 @@ mise exec -- bun run clutch issues --check
   file has a bad value. The message names the file and the field.
 - `--json` prints the issues and the errors as JSON.
 
+## Checks
+
+`clutch checks --changed [--base <ref>]` runs the project's
+`tools/validate.ts --changed`: the validate targets of the affected Nx
+projects, and the root checks. See
+[only what changed](../../docs/contributing/setup/checks.md#only-what-changed).
+It exits with the check's own code.
+
 ## Labels
 
 `clutch labels` prints the labels of a change. `kind/<type>` comes from the

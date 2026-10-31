@@ -8,7 +8,7 @@ Rank 17 of the researched practices. More than four in five of the leading repos
 
 ## Detection
 
-`clutch doctor` reports this capability as present when two rules pass. A workflow runs `nx affected`, `affected -t` or `nx-set-shas`. A file in `tools/hooks/` mentions `CHECK_BASE` or `merge-base`. It is partial when only one rule passes. See the `changed_scope_check` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when two rules pass. A workflow runs `nx affected`, `affected -t` or `nx-set-shas`. `tools/check-base.ts`, the base helper that the hooks and `validate --changed` share, mentions `CHECK_BASE` or `merge-base`. It is partial when only one rule passes. See the `changed_scope_check` entry in [the registry](./registry.yaml).
 
 ## Adopt
 
@@ -16,7 +16,7 @@ Rank 17 of the researched practices. More than four in five of the leading repos
 2. Run `nx affected -t` with the same targets as the canonical check command.
 3. Run the root checks on each pull request, because they read the whole repository.
 4. Run the full canonical check command on each push to the default branch.
-5. In a local hook, compare with the merge base in the same way. In this repository, [`tools/hooks/pre-push.ts`](../../../tools/hooks/pre-push.ts) uses `git merge-base`.
+5. In a local hook, compare with the merge base in the same way. In this repository, [`tools/check-base.ts`](../../../tools/check-base.ts) finds the base for the pre-push hook, the base checks and `bun run validate --changed`.
 6. Set `changed_scope_check` to `adopted` in `clutch.yaml`.
 
 ## Waive

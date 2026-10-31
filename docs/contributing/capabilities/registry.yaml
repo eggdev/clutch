@@ -256,8 +256,9 @@ capabilities:
     detect:
       - workflow:
           run: nx affected|affected -t|nx-set-shas
+      # The shared base of the change, which the hooks and validate --changed use.
       - grep:
-          files: tools/hooks/**
+          files: tools/check-base.ts
           pattern: CHECK_BASE|merge-base
   - id: protected_main
     name: Protected default branch (PR-only, required checks)

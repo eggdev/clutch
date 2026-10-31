@@ -49,11 +49,11 @@ To see a change before you write it, run
 rejects a change, a rename or a deletion of a migration that the base has. A new
 migration passes. It runs in `validate`, in the pre-push hook and in CI.
 
-| Where      | Base                              |
-| ---------- | --------------------------------- |
-| Local      | The merge base with `origin/main` |
-| CI, PR     | The PR's target branch            |
-| CI, `main` | The commit before the push        |
+| Where      | Base                                                       |
+| ---------- | ---------------------------------------------------------- |
+| Local      | The merge base with `origin/HEAD`, else with `origin/main` |
+| CI, PR     | The PR's target branch                                     |
+| CI, `main` | The commit before the push                                 |
 
 When `check-migrations` fails, restore the merged migration and write a new one.
 
