@@ -167,6 +167,7 @@ all of them, set `automerge.mode` to `dry-run`.
 
 The owner grades verdicts after the fact, in one place. Each week the gardening
 workflow opens or updates the issue "Auto-merge calibration: week of <date>".
+`gh workflow run grade-verdicts.yml` opens or updates it now.
 It lists each verdict that the owner has not graded, with its reasons and a
 link. In that issue, the owner comments:
 

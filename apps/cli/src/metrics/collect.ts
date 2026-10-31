@@ -6,12 +6,15 @@ import type {
   MergedPull,
   WorkflowRun,
 } from '@/metrics/compute';
+import { verdictReasons } from '@/metrics/compute';
 import { enabledMarker } from '@/metrics/pulls';
 import type { PullShape } from '@/metrics/pulls';
-import { verdictReasons } from '@/metrics/compute';
 
 /** The marker that starts each dry-run comment of `tools/github/auto-merge.ts`. */
 const dryRunMarker = '<!-- automerge-dry-run:';
+
+/** How the Grade verdicts workflow's reply starts. Its author is the grading bot. */
+export const gradedReply = "Graded on the owner's instruction";
 
 /** A person or a bot, as the GitHub API reports one. */
 type Account = { login?: string; type?: string } | null | undefined;
@@ -227,9 +230,11 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
 
     /**
      * The dry-run verdicts commented on or after `since`, an ISO time. With an
-     * `owner`, only the owner's reactions and a bot's count as grades. The
-     * grading workflow is the only bot that reacts to a verdict, and it reacts
-     * only on the owner's instruction. Without one, every reaction counts.
+     * `owner`, only the owner's reactions count as grades, and those of each bot
+     * that replied `Graded on the owner's instruction` on an issue. That reply
+     * comes from the Grade verdicts workflow's app token, so the bot is the
+     * project's own, and GitHub sets the reply's author. Without an owner, every
+     * reaction counts.
      */
     async dryRunVerdicts(since: string, owner?: string | null): Promise<Array<DryRunVerdict>> {
       const comments = await list<{
@@ -238,10 +243,18 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
         body?: string;
         created_at: string;
         issue_url: string;
+        user?: Account;
         reactions?: Record<string, number>;
       }>(`repos/${repo}/issues/comments?since=${encodeURIComponent(since)}`);
       const verdicts = comments.filter(
         (comment) => comment.body?.startsWith(dryRunMarker) && comment.created_at >= since,
+      );
+      const graders = new Set(
+        comments
+          .filter(
+            (comment) => comment.user?.type === 'Bot' && comment.body?.startsWith(gradedReply),
+          )
+          .map((comment) => comment.user?.login),
       );
       return Promise.all(
         verdicts.map((comment) =>
@@ -253,7 +266,7 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
                 `repos/${repo}/issues/comments/${comment.id}/reactions`,
               );
               const graded = reactions.filter(
-                (reaction) => reaction.user?.login === owner || reaction.user?.type === 'Bot',
+                (reaction) => reaction.user?.login === owner || graders.has(reaction.user?.login),
               );
               thumbsUp = graded.filter((reaction) => reaction.content === '+1').length;
               thumbsDown = graded.filter((reaction) => reaction.content === '-1').length;

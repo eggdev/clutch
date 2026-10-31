@@ -12,21 +12,27 @@ on:
   # issue_comment runs with this repository's token. The grade job runs the
   # default branch's code, passes the comment body through a file, and mints
   # the bot token only after the owner check. No other trigger sees a comment.
-  issue_comment: # zizmor: ignore[dangerous-triggers]
+  issue_comment: # zizmor: ignore[dangerous-triggers] -- checks out main only, acts only on the owner's comment
     types: [created]
+  # Opens or updates this week's calibration issue now, outside the weekly
+  # gardening run.
+  workflow_dispatch:
 
 # Least privilege. The grade job grants what it needs in its own block.
 permissions:
   contents: read
 
 concurrency:
-  group: grade-verdicts-${{ github.event.issue.number }}
+  group: grade-verdicts-${{ github.event.issue.number || 'calibrate' }}
   cancel-in-progress: false
 
 jobs:
-  grade:
+  # Holds no secret: confirms that the owner wrote the comment, with the
+  # default branch's code, before any job touches the bot's key.
+  check:
     # A calibration issue, not a pull request, and a comment from a person.
     if: >-
+      github.event_name == 'issue_comment' &&
       github.event.issue.pull_request == null &&
       contains(github.event.issue.labels.*.name, 'automerge-calibration') &&
       github.event.comment.user.type != 'Bot'
@@ -34,8 +40,10 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      issues: write
-      pull-requests: write
+      issues: read
+      pull-requests: read
+    outputs:
+      owner: ${{ steps.owner.outputs.owner }}
     steps:
       # The default branch's code decides who the owner is, so no comment can change it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,11 +57,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           AUTHOR: ${{ github.event.comment.user.login }}
         run: bun tools/github/grade-verdicts.ts check --author "$AUTHOR" >> "$GITHUB_OUTPUT"
-      # The release bot reacts, so a grade is never a reaction from a person's token.
+
+  # The release bot reacts and replies, so its login marks it as the grading
+  # bot that clutch metrics trusts. Its key lives in the release environment,
+  # which only the default branch may use. An issue_comment run is on it.
+  grade:
+    needs: check
+    if: needs.check.outputs.owner == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
       # Without the app, the default token reacts as github-actions[bot].
       - name: Get the release bot token
         id: bot
-        if: steps.owner.outputs.owner == 'true' && vars.CLUTCH_APP_ID != ''
+        if: vars.CLUTCH_APP_ID != ''
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.CLUTCH_APP_ID }}
@@ -61,8 +83,12 @@ jobs:
           # Only the reactions, the reply and the issue body. The app has more permissions.
           permission-issues: write
           permission-pull-requests: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile --ignore-scripts
       - name: Grade the listed verdicts
-        if: steps.owner.outputs.owner == 'true'
         env:
           GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
           ISSUE: ${{ github.event.issue.number }}
@@ -71,3 +97,24 @@ jobs:
         run: |
           printf '%s' "$BODY" > "$RUNNER_TEMP/comment.md"
           bun tools/github/grade-verdicts.ts grade --issue "$ISSUE" --author "$AUTHOR" --body-file "$RUNNER_TEMP/comment.md"
+
+  # A manual run opens or updates the calibration issue. The weekly gardening
+  # workflow runs the same step.
+  calibrate:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Open or update the calibration issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun tools/github/grade-verdicts.ts calibrate
