@@ -70,9 +70,9 @@ export const commands: Record<string, Command> = {
   },
   worktree: {
     usage:
-      'clutch worktree new <slug> [--issue CL-NNN] [--base REF]\nclutch worktree list [--json]',
+      'clutch worktree new <slug> [--issue CL-NNN] [--base REF]\nclutch worktree list [--json]\nclutch worktree rm <slug> [--force] [--base REF]',
     summary:
-      'Make a separate checkout for one task, with its own branch, copied files and setup, or list the checkouts.',
+      'Make a separate checkout for one task, with its own branch, copied files and setup. List the checkouts, or remove one.',
     run: worktreeCommand,
   },
   ruleset: {
