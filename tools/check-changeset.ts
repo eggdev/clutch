@@ -1,4 +1,4 @@
-import { findBase } from '@tools/check-migrations';
+import { findBase } from '@tools/check-base';
 import { changesetDir, packageName, parseChangeset } from '@tools/release/changeset';
 
 /**

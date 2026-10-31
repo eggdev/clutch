@@ -19,6 +19,7 @@ its options, and so does `bun run pr --help`.
 | Command                                  | Use it when                                    | It replaces                                  |
 | ---------------------------------------- | ---------------------------------------------- | -------------------------------------------- |
 | `bun run validate`                       | Before each push and before you say "done".    | Running checks one by one.                   |
+| `bun run validate --changed`             | While you work, to check only what the change affects. | Waiting for the full `validate` after each edit. |
 | `bun run clutch doctor [--remote]`       | You want each capability's state, or GitHub's. | Reading workflows and settings by hand.      |
 | `bun run clutch doctor --check`          | You changed `clutch.yaml` or a capability.     | Guessing whether a waiver still holds.       |
 | `bun run clutch risk [--base <ref>]`     | You want a change's risk tier before a PR.     | Judging the tier from the file list.         |

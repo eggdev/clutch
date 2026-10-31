@@ -20,6 +20,29 @@ style when an AI agent runs it. That style prints only the path of each failing
 task's log under `~/.nx`. Clutch syncs `tools/`, so a project gets a change to
 the list or the flags without a decision on its `package.json` scripts.
 
+### Only what changed
+
+```sh
+mise exec -- bun run validate --changed
+mise exec -- bun run clutch checks --changed --base origin/main
+```
+
+`validate --changed` checks only what the change affects. It is fast enough
+to run while you work. `validate` stays the gate before you say "done".
+
+- The base comes from [`tools/check-base.ts`](../../../tools/check-base.ts):
+  `CHECK_BASE` when it is set, or else the merge base with `origin/HEAD` or
+  `origin/main`. The pre-push hook and the base checks use the same helper.
+- The change is every file that differs from the base: commits, edits and
+  untracked files.
+- A docs-only change runs the root `checks`. Any other change runs the
+  validate targets of the affected Nx projects, then the root `checks`, which
+  read the whole tree.
+- With no base, such as an all-zero `CHECK_BASE`, everything runs.
+- It prints its time and warns above the budget in `changedBudgetSeconds`.
+- `clutch checks --changed` runs the same mode from the release binary, through
+  the project's `tools/validate.ts`.
+
 ## Git hooks
 
 `bun install` runs the root `prepare` script,
