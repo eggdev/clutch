@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.2 (2026-10-31)
+
+### Fixes and maintenance
+
+- test(release): read the capability count (CL-127)
+
 ## 0.26.1 (2026-10-31)
 
 ### Fixes and maintenance
