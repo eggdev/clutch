@@ -8,7 +8,8 @@ Run every command from the repository root through [Nx](./nx.md).
 mise exec -- bun run validate
 ```
 
-Run it before you say a change is done. CI runs the same command on each PR.
+Run it before you say a change is done. CI runs it on each push to `main`, and
+`validate --changed` on each PR. See [CI](#ci).
 Nx caches results, so a second run with no changes takes seconds. A failure
 names its target and prints that task's full output. A passing or cached task
 prints one line.
