@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.24.0 (2026-10-31)
+
+### Features
+
+- feat(metrics): grade dry-run verdicts in one place (CL-130)
+
 ## 0.23.0 (2026-10-30)
 
 ### Features
