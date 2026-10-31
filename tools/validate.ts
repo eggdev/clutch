@@ -79,7 +79,7 @@ export function changedPlan(base: string | null, files: Array<string> | null) {
 }
 
 /** Runs the plan for the change at `root` and reports the time against the budget. */
-function validateChanged(root: string, explicitBase: string | undefined) {
+async function validateChanged(root: string, explicitBase: string | undefined) {
   const base = findBase(root, explicitBase ?? process.env.CHECK_BASE);
   const plan = changedPlan(base, base === null ? null : changedFiles(root, base));
   const why = {
@@ -91,12 +91,16 @@ function validateChanged(root: string, explicitBase: string | undefined) {
   console.log(`validate --changed: ${why}.`);
   const started = performance.now();
   const env = { ...process.env, CI: '1' };
-  let code = 0;
-  // Every step runs, so one report shows each failure.
-  for (const step of plan.steps) {
-    const exit = runNx(step, env) ?? 1;
-    code ||= exit;
-  }
+  // The steps run at once, and each runs to the end, so one report shows each failure.
+  const runs = plan.steps.map((step) =>
+    Bun.spawn([process.execPath, 'x', 'nx', ...step], {
+      env,
+      stdout: 'inherit',
+      stderr: 'inherit',
+    }),
+  );
+  const exits = await Promise.all(runs.map((proc) => proc.exited));
+  const code = exits.find((exit) => exit !== 0) ?? 0;
   const seconds = Math.round((performance.now() - started) / 1000);
   console.log(`validate --changed took ${seconds} s (budget ${changedBudgetSeconds} s).`);
   if (seconds > changedBudgetSeconds) {
@@ -111,7 +115,7 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
   if (args.includes('--changed')) {
     const at = args.indexOf('--base');
-    process.exit(validateChanged(process.cwd(), at === -1 ? undefined : args[at + 1]));
+    process.exit(await validateChanged(process.cwd(), at === -1 ? undefined : args[at + 1]));
   }
   const quick = args.includes('--quick');
   // CI=1 for validate, so its Nx cache keys match CI's. See docs/contributing/setup/nx.md#cache-keys.
