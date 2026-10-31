@@ -8,9 +8,11 @@ Rank 17 of the researched practices. More than four in five of the leading repos
 
 ## Detection
 
-`clutch doctor` reports this capability as present when two rules pass. A workflow runs `nx affected`, `affected -t` or `nx-set-shas`. `tools/check-base.ts`, the base helper that the hooks and `validate --changed` share, mentions `CHECK_BASE` or `merge-base`. It is partial when only one rule passes. See the `changed_scope_check` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when two rules pass. A workflow runs `nx affected`, `affected -t`, `nx-set-shas` or `validate --changed`. `tools/check-base.ts`, the base helper that the hooks and `validate --changed` share, mentions `CHECK_BASE` or `merge-base`. It is partial when only one rule passes. See the `changed_scope_check` entry in [the registry](./registry.yaml).
 
 ## Adopt
+
+A project from Clutch has steps 1 to 5 already: `ci.yml` runs `bun run validate --changed` with `CHECK_BASE` on a pull request, and `bun run validate` on a push to the default branch. To build it elsewhere:
 
 1. In the CI workflow, find the base commit of each pull request. Use the merge base with the default branch, or the `nrwl/nx-set-shas` action.
 2. Run `nx affected -t` with the same targets as the canonical check command.
