@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.2 (2026-10-31)
+
+### Fixes and maintenance
+
+- test(cli): stop CLI tests needing tags or a fixed count (CL-310)
+
 ## 0.25.1 (2026-10-31)
 
 ### Fixes and maintenance
