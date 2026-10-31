@@ -81,7 +81,7 @@ export async function metricsReport(options: Options) {
     agreement = dryRunAgreement(await reader.dryRunVerdicts(since, options.owner));
     if (!options.owner) {
       unavailable.verdictOwner =
-        'No owner in clutch.yaml automerge.owner or CODEOWNERS, so every reaction counts.';
+        'No owner in clutch.yaml automerge.owner or CODEOWNERS, so no reaction counts as a grade.';
     }
   } catch (error) {
     unavailable.dryRunAgreement = reason(error);

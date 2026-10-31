@@ -236,7 +236,7 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
      * `owner`, only the owner's reactions count as grades, and those of each
      * grading bot. The Grade verdicts workflow names that bot, the login of its
      * app token, in its `Graded on the owner's instruction` reply. Only a reply
-     * that a bot posted counts. Without an owner, every reaction counts.
+     * that a bot posted counts. Without an owner, no reaction counts.
      */
     async dryRunVerdicts(since: string, owner?: string | null): Promise<Array<DryRunVerdict>> {
       const comments = await list<{
@@ -262,8 +262,9 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
       return Promise.all(
         verdicts.map((comment) =>
           limit(async () => {
-            let thumbsUp = comment.reactions?.['+1'] ?? 0;
-            let thumbsDown = comment.reactions?.['-1'] ?? 0;
+            // With no owner, no reaction is a grade, so nobody else moves the streak.
+            let thumbsUp = 0;
+            let thumbsDown = 0;
             if (owner) {
               const reactions = await list<{ content: string; user: Account }>(
                 `repos/${repo}/issues/comments/${comment.id}/reactions`,

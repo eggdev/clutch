@@ -294,3 +294,12 @@ test("a grader marker in a person's comment names no grader", async () => {
   const report = await verdictReport({ gh, repo, days: 14, now, owner: 'jane' });
   expect(report.ungraded.map((item) => item.pull)).toEqual([2]);
 });
+
+test('with no owner, no reaction is a grade, and the report says why', async () => {
+  const { gh } = fakeGh(routes);
+  const verdicts = await verdictReport({ gh, repo, days: 14, now, owner: null });
+  expect(verdicts.ungraded.map((item) => item.pull)).toEqual([1, 2]);
+  expect(verdicts.agreement).toMatchObject({ agreed: 0, streak: 0 });
+  const report = await metricsReport({ gh, repo, days: 14, now, owner: null });
+  expect(report.unavailable.verdictOwner).toContain('no reaction counts as a grade');
+});
