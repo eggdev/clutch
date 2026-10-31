@@ -2,48 +2,11 @@ import { expect, test } from 'bun:test';
 
 import { marker } from '@tools/github/auto-merge-rules';
 import { readJobLog } from '@tools/github/failures';
-import type { Clock } from '@tools/github/github';
+import { fake, fakeClock, noWrite, trunk } from '@tools/github/fake-run';
 import { runPr } from '@tools/github/pr';
-import type { Result, Run } from '@tools/github/stack';
+import type { Result } from '@tools/github/stack';
 import { blockingCount, prStatus } from '@tools/github/status';
 
-/**
- * A fake runner for `gh` and `git`. Each answer matches a command by prefix,
- * the first match wins, and a list of answers is used in turn. Calls are kept.
- */
-function fake(answers: Array<[string, Partial<Result> | Array<Partial<Result>>]>) {
-  const calls: Array<string> = [];
-  const used = new Map<string, number>();
-  const run: Run = (command) => {
-    const line = command.join(' ');
-    calls.push(line);
-    const found = answers.find(([prefix]) => line.startsWith(prefix));
-    let answer: Partial<Result> = {};
-    if (found) {
-      const [prefix, value] = found;
-      const index = used.get(prefix) ?? 0;
-      used.set(prefix, index + 1);
-      answer = Array.isArray(value) ? (value[Math.min(index, value.length - 1)] ?? {}) : value;
-    }
-    return Promise.resolve({ ok: true, out: '', err: '', ...answer });
-  };
-  return { run, calls };
-}
-
-/** A clock that moves forward on each sleep and never waits. */
-function fakeClock(): Clock & { slept: number } {
-  const clock = {
-    slept: 0,
-    now: () => clock.slept,
-    sleep: (ms: number) => {
-      clock.slept += ms;
-      return Promise.resolve();
-    },
-  };
-  return clock;
-}
-
-const noWrite = () => Promise.resolve();
 const head = 'abc1234def';
 const check = (name: string, conclusion: string, status = 'COMPLETED') => ({
   __typename: 'CheckRun',
@@ -193,7 +156,6 @@ test('failures reads the log of each failed job only', async () => {
   );
 });
 
-const trunk: [string, Partial<Result>] = ['gh repo view', { out: 'main\n' }];
 const release = (status: string, conclusion: string) => ({
   out: JSON.stringify([
     { headSha: 'm3rge', status, conclusion, url: 'https://github.com/o/r/actions/runs/9' },
@@ -269,76 +231,6 @@ test('ready marks the issue done through tools/clutch.ts, commits and pushes', a
   ]);
 });
 
-const syncAnswers = (
-  rebase: Array<Partial<Result>>,
-  conflicted: Array<Partial<Result>>,
-  extra: Array<[string, Partial<Result>]> = [],
-) =>
-  fake([
-    ...extra,
-    trunk,
-    [
-      'gh pr view 7',
-      {
-        out: JSON.stringify({
-          number: 7,
-          url: 'https://github.com/o/r/pull/7',
-          title: 'feat: x (CL-117)',
-          body: 'Body',
-          headRefName: 'clutch/cl-117-pr-lifecycle',
-          baseRefName: 'main',
-        }),
-      },
-    ],
-    [
-      'gh pr list --state open --head clutch/cl-117-pr-lifecycle',
-      {
-        out: '[{"number":7,"baseRefName":"main","url":"https://github.com/o/r/pull/7","isDraft":false}]',
-      },
-    ],
-    ['git branch --show-current', { out: 'clutch/cl-117-pr-lifecycle\n' }],
-    ['git rebase origin/main', rebase],
-    ['git -c core.editor=true rebase --continue', { ok: true }],
-    ['git diff --name-only --diff-filter=U', conflicted],
-    ['git diff --name-only --diff-filter=A', { out: '.changeset/x.md' }],
-  ]);
-
-test('sync regenerates a conflicted tracker, validates and pushes with a lease', async () => {
-  const gh = syncAnswers([{ ok: false, err: 'CONFLICT' }], [{ out: '.clutch/TRACKER.md\n' }]);
-  const logged: Array<string> = [];
-  const original = console.log;
-  console.log = (text: string) => logged.push(text);
-  try {
-    expect(await runPr(['sync', '7'], gh.run, noWrite)).toBe(0);
-  } finally {
-    console.log = original;
-  }
-  const order = [
-    'git fetch --prune origin',
-    'git rebase origin/main',
-    'bun tools/clutch.ts issues --write',
-    'git add .clutch/TRACKER.md',
-    'git -c core.editor=true rebase --continue',
-    'bun run validate',
-    'git push --set-upstream --force-with-lease origin HEAD',
-  ];
-  const positions = order.map((call) => gh.calls.indexOf(call));
-  expect(positions.every((position) => position !== -1)).toBe(true);
-  expect(positions).toEqual(positions.toSorted((a, b) => a - b));
-  expect(logged).toContain('https://github.com/o/r/pull/7');
-});
-
-test('sync stops on a conflict outside the tracker', async () => {
-  const gh = syncAnswers(
-    [{ ok: false, err: 'CONFLICT' }],
-    [{ out: '.clutch/TRACKER.md\ntools/github/pr.ts\n' }],
-  );
-  await expect(runPr(['sync', '7'], gh.run, noWrite)).rejects.toThrow(
-    'The rebase stopped on tools/github/pr.ts.',
-  );
-  expect(gh.calls).not.toContain('bun run validate');
-});
-
 const releaseLookup = (err: string) =>
   fake([
     trunk,
@@ -353,30 +245,6 @@ test('merge passes without release.yml, and fails when it cannot read the releas
   expect(await runPr(['merge', '12'], missing.run, noWrite, fakeClock())).toBe(0);
   const offline = releaseLookup('error connecting to api.github.com');
   expect(await runPr(['merge', '12'], offline.run, noWrite, fakeClock())).toBe(1);
-});
-
-test('sync replays only its own commits when the stack base moved under it', async () => {
-  const gh = syncAnswers(
-    [{ ok: true }],
-    [{ out: '' }],
-    [
-      ['git config --get branch.clutch/cl-117-pr-lifecycle.clutchForkPoint', { out: 'old1234\n' }],
-      ['git merge-base --is-ancestor old1234 origin/main', { ok: false }],
-      ['git merge-base HEAD origin/main', { out: 'new5678\n' }],
-    ],
-  );
-  const original = console.log;
-  console.log = () => {};
-  try {
-    expect(await runPr(['sync', '7'], gh.run, noWrite)).toBe(0);
-  } finally {
-    console.log = original;
-  }
-  expect(gh.calls).toContain('git rebase --onto origin/main old1234');
-  expect(gh.calls).not.toContain('git rebase origin/main');
-  expect(gh.calls).toContain(
-    'git config branch.clutch/cl-117-pr-lifecycle.clutchForkPoint new5678',
-  );
 });
 
 test('failures reports a job log that GitHub no longer has', async () => {
@@ -395,4 +263,55 @@ test('failures reports a job log that GitHub no longer has', async () => {
     console.log = original;
   }
   expect(logged.join('\n')).toContain('The log is not available: gh: HTTP 404');
+});
+
+test('wait keeps waiting while GitHub still shows an older head than the checkout', async () => {
+  const old = {
+    ...JSON.parse(view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out),
+    headRefName: 'clutch/cl-122-x',
+  };
+  const fresh = { ...old, headRefOid: 'new9999' };
+  const gh = fake([
+    ['gh pr view 7', [{ out: JSON.stringify(old) }, { out: JSON.stringify(fresh) }]],
+    rules,
+    comments('## Agent review\n\nBlocking findings: 0'),
+    ['git branch --show-current', { out: 'clutch/cl-122-x\n' }],
+    ['git rev-parse HEAD', { out: 'new9999\n' }],
+  ]);
+  const clock = fakeClock();
+  const original = console.log;
+  console.log = () => {};
+  try {
+    expect(await runPr(['wait', '7'], gh.run, noWrite, clock)).toBe(0);
+  } finally {
+    console.log = original;
+  }
+  // The first poll saw the old head, so wait slept once before it trusted the checks.
+  expect(clock.slept).toBe(20_000);
+});
+
+test('a required code-owner review keeps a green PR from ready', async () => {
+  const blocked = {
+    ...JSON.parse(view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out),
+    reviewDecision: 'REVIEW_REQUIRED',
+  };
+  const gh = fake([
+    ['gh pr view 7', { out: JSON.stringify(blocked) }],
+    rules,
+    comments('## Agent review\n\nBlocking findings: 0'),
+  ]);
+  expect(await prStatus(gh.run, '7')).toMatchObject({ review: 'REVIEW_REQUIRED', ready: false });
+});
+
+test('a merge state that a rule blocks keeps a green PR from ready', async () => {
+  const blocked = {
+    ...JSON.parse(view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out),
+    mergeStateStatus: 'BLOCKED',
+  };
+  const gh = fake([
+    ['gh pr view 7', { out: JSON.stringify(blocked) }],
+    rules,
+    comments('## Agent review\n\nBlocking findings: 0'),
+  ]);
+  expect(await prStatus(gh.run, '7')).toMatchObject({ review: 'BLOCKED by a rule', ready: false });
 });

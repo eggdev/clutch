@@ -102,14 +102,17 @@ export async function prStatus(run: Run, number: string) {
     'view',
     number,
     '--json',
-    'number,url,state,headRefOid,baseRefName,mergeable,mergeStateStatus,statusCheckRollup',
+    'number,url,state,headRefOid,headRefName,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup',
   ]);
   const pr = JSON.parse(out) as {
     number: number;
     url: string;
     state: string;
     headRefOid: string;
+    headRefName?: string;
     baseRefName: string;
+    /** APPROVED, CHANGES_REQUESTED or REVIEW_REQUIRED, or empty when no review is required. */
+    reviewDecision?: string;
     mergeable: string;
     mergeStateStatus: string;
     statusCheckRollup: Array<Rollup> | null;
@@ -125,32 +128,43 @@ export async function prStatus(run: Run, number: string) {
   // Only a bot posts the review and the dry run. A person's comment that quotes one does not count.
   const posted = await comments(run, number);
   const notes = posted.filter((note) => note.login.endsWith('[bot]'));
-  const review = notes.findLast((note) => note.body.trimStart().startsWith('## Agent review'));
+  const reviewComment = notes.findLast((note) =>
+    note.body.trimStart().startsWith('## Agent review'),
+  );
   const dryRun = notes.findLast((note) => note.body.includes(marker(pr.headRefOid)));
   const count = (state: State) => all.filter((check) => check.state === state).length;
-  const blocking = review ? blockingCount(review.body) : null;
+  const blocking = reviewComment ? blockingCount(reviewComment.body) : null;
   // A repository without agent review has no review to wait for.
   const reviewed =
     blocking === 0 || (blocking === null && !all.some((check) => check.name === 'agent-review'));
+  // A rule such as a code-owner review can still hold the merge after every check passes.
+  // A ruleset's code-owner review leaves reviewDecision empty, but GitHub
+  // still reports the merge state as BLOCKED.
+  const review =
+    pr.reviewDecision || (pr.mergeStateStatus === 'BLOCKED' ? 'BLOCKED by a rule' : '');
+  const approved = review === '' || review === 'APPROVED';
   const ready =
     pr.state === 'OPEN' &&
     pr.mergeable === 'MERGEABLE' &&
     count('fail') === 0 &&
     count('pending') === 0 &&
     required.every((check) => check.state === 'pass' || check.state === 'skipped') &&
-    reviewed;
+    reviewed &&
+    approved;
   return {
     number: pr.number,
     url: pr.url,
     state: pr.state,
     head: pr.headRefOid,
+    headRef: pr.headRefName ?? '',
     base: pr.baseRefName,
     mergeable: pr.mergeable,
     mergeState: pr.mergeStateStatus,
     required,
     checks: all,
     counts: { pass: count('pass'), fail: count('fail'), pending: count('pending') },
-    agentReview: { posted: review !== undefined, blocking },
+    agentReview: { posted: reviewComment !== undefined, blocking },
+    review: review || 'none required',
     dryRun: dryRun ? verdict(dryRun.body) : null,
     ready,
   };
@@ -177,7 +191,7 @@ export function renderStatus(status: PrStatus) {
     `Head ${status.head.slice(0, 7)} into ${status.base}. ${status.state}, ${status.mergeable} (${status.mergeState}).`,
     `Required: ${status.required.map((check) => `${check.name} ${check.state}`).join(', ') || 'none'}`,
     `Checks: ${status.counts.pass} pass, ${status.counts.fail} fail, ${status.counts.pending} pending${failing.length > 0 ? ` (failed: ${failing.join(', ')})` : ''}`,
-    `Agent review: ${reviewLine(status.agentReview)}`,
+    `Agent review: ${reviewLine(status.agentReview)}. Review decision: ${status.review}.`,
     `Dry run: ${status.dryRun ? `${status.dryRun} auto-merge at ${status.head.slice(0, 7)}` : 'no verdict for this head'}`,
     `Ready to merge: ${status.ready ? 'yes' : 'no'}`,
   ].join('\n');
@@ -191,12 +205,18 @@ export async function waitForChecks(
   run: Run,
   number: string,
   clock: Clock,
-  options: { timeout: number; interval: number },
+  options: { timeout: number; interval: number; local?: { branch: string; sha: string } },
 ) {
   const end = clock.now() + options.timeout;
   for (;;) {
     const status = await prStatus(run, number);
-    if (status.counts.pending === 0) {
+    // Right after a push, GitHub can still report the old head and its green
+    // checks. Wait until it shows the commit that this checkout has.
+    const behind =
+      options.local !== undefined &&
+      status.headRef === options.local.branch &&
+      status.head !== options.local.sha;
+    if (status.counts.pending === 0 && !behind) {
       return { status, code: status.ready ? 0 : 1 };
     }
     if (clock.now() >= end) {

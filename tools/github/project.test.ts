@@ -184,6 +184,8 @@ test('the pr commands run in a project made by clutch init', async () => {
       `pr: '${pull.url}'`,
     );
 
+    // GitHub reports the commit that ready pushed, so pr wait sees its own head.
+    const pushed = git(dir, 'rev-parse', 'HEAD').out.trim();
     await writeFile(
       env.FAKE_GH,
       JSON.stringify({
@@ -193,7 +195,7 @@ test('the pr commands run in a project made by clutch init', async () => {
           out: JSON.stringify({
             ...pull,
             state: 'OPEN',
-            headRefOid: 'abc',
+            headRefOid: pushed,
             mergeable: 'MERGEABLE',
             mergeStateStatus: 'CLEAN',
             statusCheckRollup: [
