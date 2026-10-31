@@ -26,11 +26,20 @@ jobs:
       - name: Check review-helper Python prerequisite
         run: python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11+ is required"'
       - run: bun install --frozen-lockfile
-      - run: bun run validate
+      # A PR checks only what it affects, against its target branch. A push to
+      # main checks everything. validate --changed runs everything when the base
+      # is all zeros. The job keeps the name validate, so the ruleset matches.
+      - name: validate
         env:
           # A PR compares with its target branch. A push to main compares with
           # the commit before the push.
           CHECK_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            bun run validate --changed
+          else
+            bun run validate
+          fi
 
   # Checks each commit subject of a PR against Conventional Commits. The
   # commit-msg hook checks them too, but --no-verify or another machine skips it.
