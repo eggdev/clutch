@@ -4,6 +4,8 @@ How to run, check and ship the project. Open only the page you need.
 
 - [Local development](./local-development.md): tools, `bun run dev`, services,
   configuration
+- [Worktrees](./worktrees.md): a separate checkout for each task, with its own
+  ports, data and test output
 - [Verification setup](./verification.md): full-stack access, platform checks,
   representative data and evidence for delivery
 - [Environment variables](./environment-variables.md): Effect `Config`, each

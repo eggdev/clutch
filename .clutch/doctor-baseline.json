@@ -34,5 +34,5 @@
   "skills_dir": "present",
   "suppression_discipline": "present",
   "verification_cli": "present",
-  "worktree_parallel": "partial"
+  "worktree_parallel": "present"
 }

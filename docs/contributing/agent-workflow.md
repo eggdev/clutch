@@ -105,8 +105,9 @@ missing platform does not prevent work that does not depend on it.
   environment. One real task demonstrates phases 3 through 6.
 - **Parallel work:** each worker has isolated code and mutable runtime state,
   including ports, profiles and data. Exercise concurrent instances before
-  enabling concurrent delivery. Use Sprig when configured and host delegation
-  when requested. A separate checkout alone does not isolate the database.
+  enabling concurrent delivery. Use `clutch worktree new` for each worker, and
+  host delegation when requested. A separate checkout alone does not isolate
+  an external database.
 - **Triggered delivery:** configure [`deliver-linear`](../../.agents/skills/deliver-linear/SKILL.md)
   with the actual project, status identifiers, integration base and destination.
   Exercise duplicate and stale events, claims, resume and failure reporting.
@@ -117,7 +118,8 @@ missing platform does not prevent work that does not depend on it.
   that grant changes. Independent review must actually complete on the relevant
   revision; requesting a review is not a passing result.
 
-Sprig owns configured version control and environments. T3 or another capable
+`clutch worktree` owns task environments. It uses plain git worktrees. Sprig is
+a possible later backend. See `.clutch/issues/CL-901.md`. T3 or another capable
 host owns requested delegation, scheduling and wakeups. Repository commands own
 repeatable setup and proof. Keep those responsibilities separate so the workflow
 survives a change of host or model.

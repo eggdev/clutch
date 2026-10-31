@@ -8,6 +8,7 @@ import { metricsCommand } from '@/metrics-command';
 import { riskCommand } from '@/risk-command';
 import { rulesetCommand } from '@/ruleset-command';
 import { syncCommand } from '@/sync-command';
+import { worktreeCommand } from '@/worktree-command';
 
 type Command = {
   usage: string;
@@ -73,6 +74,13 @@ export const commands: Record<string, Command> = {
     summary:
       'Print the risk tier of the change from the merge base of --base to --head, by the paths in .clutch/risk.yaml.',
     run: riskCommand,
+  },
+  worktree: {
+    usage:
+      'clutch worktree new <slug> [--issue CL-NNN] [--base REF]\nclutch worktree list [--json]\nclutch worktree rm <slug> [--force] [--base REF]',
+    summary:
+      'Make a separate checkout for one task, with its own branch, copied files and setup. List the checkouts, or remove one.',
+    run: worktreeCommand,
   },
   ruleset: {
     usage: 'clutch ruleset [--apply] [--root DIR] [--repo OWNER/NAME] [--json]',

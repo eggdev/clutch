@@ -57,6 +57,14 @@ started its servers. The second run then finds them and uses them again.
 `mise exec -- bun run dev --check` prints `up` or `down` for each app. It exits
 1 when an app is down.
 
+`mise exec -- bun run dev --stop` stops the servers that a dev run in this
+checkout started, and no others. While a run starts servers, it keeps
+`.data/dev-run.json` with its own process id and each server's. `--stop` checks
+each process's command line before it signals it, so a reused process id is
+never hit. It stops the run, then kills any server left after 10 seconds.
+`clutch worktree rm` runs it before it removes a checkout. See
+[Worktrees](./worktrees.md).
+
 An agent hook refuses commands that start a server directly: `vite`,
 `bun --watch`, an Nx `dev` target, `portless run`, `expo start` and `one dev`.
 Its message points to the dev command. See

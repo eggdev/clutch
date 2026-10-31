@@ -79,10 +79,10 @@ It decides what to do with each failure, on top of the commands below.
 
 | Command                                 | When to use it                                                                                                              |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `bun run pr status <number> [--json]`   | Before each decision. It shows the required checks, the agent review's blocking count, the dry-run verdict and the mergeable state at the head commit. |
-| `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
+| `bun run pr status <number> [--json]`   | Before each decision. It shows the required checks, the agent review's blocking count, the dry-run verdict, the review decision and the mergeable state at the head commit. A PR that a rule still blocks, such as one waiting on a code-owner review, is not ready. |
+| `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending and GitHub shows the commit that the checkout has, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
 | `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. |
-| `bun run pr sync <number, branch or id>` | When the base moved or the tracker conflicts. It rebases on the PR's base, regenerates a conflicted `.clutch/TRACKER.md`, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits. |
+| `bun run pr sync <number, branch or id>` | When the base moved or the tracker conflicts. It rebases on the PR's base, regenerates a conflicted `.clutch/TRACKER.md`, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits. After a rebase that you finished by hand, it rebases as usual. |
 | `bun run pr ready <id> <number>`        | When the PR is green and ready to merge. It sets the issue to `done` with the PR link, regenerates the tracker, commits `chore(tracker): mark <id> done` and pushes. |
 
 Each command reads the repository from the `origin` remote. `sync` takes an
@@ -123,7 +123,9 @@ mise exec -- bun run pr merge <number>
 ```
 
 `merge` refuses while GitHub reports that the PR needs a review
-(`REVIEW_REQUIRED`) or has changes requested, and it names the reviewer. The
+(`REVIEW_REQUIRED`) or has changes requested, and it names the reviewer. A
+ruleset's code owner review leaves that decision empty, so `merge` also
+refuses a PR that GitHub reports as blocked while a review is still requested. The
 owner's admin login can bypass the ruleset, so this keeps an agent that runs
 `merge` with the owner's login from merging past the approval.
 

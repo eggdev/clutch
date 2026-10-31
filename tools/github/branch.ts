@@ -90,7 +90,14 @@ async function conflicts(run: Run) {
  */
 async function rebase(run: Run, branch: string, base: string) {
   const recorded = await run(['git', 'config', '--get', forkKey(branch)]);
-  const point = recorded.ok ? recorded.out.trim() : '';
+  let point = recorded.ok ? recorded.out.trim() : '';
+  // A point that the branch no longer contains is stale: someone rebased the
+  // branch by hand, such as after pr sync stopped on a conflict. The branch
+  // then sits on the base it was rebased onto.
+  if (point !== '') {
+    const kept = await run(['git', 'merge-base', '--is-ancestor', point, 'HEAD']);
+    point = kept.ok ? point : '';
+  }
   // A fork point that the new base does not contain means the base moved under
   // the branch, so the commits below the point are not the branch's own.
   const contains =
