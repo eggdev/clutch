@@ -5,6 +5,9 @@
 # changes one of these paths waits for the owner, and every other pull request
 # stays delegated. check-agent-hooks fails when this file drifts. Kickoff
 # replaces @eggdev with the owner of the project.
+#
+# Escape hatches live in these files. A reviewer checks each one against the
+# table in docs/contributing/harness-engineering.md#guardrail-files.
 
 /oxlint.config.ts @eggdev
 /stylelint.config.ts @eggdev
