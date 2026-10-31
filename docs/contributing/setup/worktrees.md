@@ -37,9 +37,9 @@ worktree:
   setup: ['mise trust --quiet', 'mise exec -- bun install']
 ```
 
-Without the block, the checkouts go in `../<repo>.worktrees`, nothing is
-copied, and the setup is the two commands above. mise refuses a config file
-in a new folder until it is trusted.
+Without the block, the checkouts go in `../<repo>.worktrees`, and nothing is
+copied. The setup is the two commands above. mise refuses a config file in a
+new folder until it is trusted.
 
 ## Remove a checkout
 
