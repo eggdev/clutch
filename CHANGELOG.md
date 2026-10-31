@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.3 (2026-10-31)
+
+### Fixes and maintenance
+
+- test: wait for the event instead of a fixed sleep (CL-309)
+
 ## 0.25.2 (2026-10-31)
 
 ### Fixes and maintenance
