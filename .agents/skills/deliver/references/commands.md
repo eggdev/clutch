@@ -13,6 +13,8 @@ its options, and so does `bun run pr --help`.
 | `bun run clutch issues new --phase <P> --title <title> [--range CL-NNN..CL-NNN]` | You file a new issue, or a lane has a reserved range. | Picking the next id by hand.                    |
 | `bun run clutch issues set <id> <status> [--pr <url>]`                            | An issue starts, waits or goes to review.           | Editing frontmatter and the tracker by hand.    |
 | `bun run clutch issues --write`                                                   | `TRACKER.md` conflicts after a rebase.              | Resolving tracker conflicts line by line.       |
+| `bun run clutch worktree new <slug> [--issue <id>]`                               | You start a task beside other work in this repository. | `git worktree add`, copying env files and `bun install` by hand. |
+| `bun run clutch worktree list [--json]`                                           | You want each checkout's branch, issue, PR and dirty state. | `git worktree list` and matching branches to PRs by hand. |
 
 ## Check
 
