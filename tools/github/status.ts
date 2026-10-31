@@ -102,13 +102,14 @@ export async function prStatus(run: Run, number: string) {
     'view',
     number,
     '--json',
-    'number,url,state,headRefOid,baseRefName,mergeable,mergeStateStatus,statusCheckRollup',
+    'number,url,state,headRefOid,headRefName,baseRefName,mergeable,mergeStateStatus,statusCheckRollup',
   ]);
   const pr = JSON.parse(out) as {
     number: number;
     url: string;
     state: string;
     headRefOid: string;
+    headRefName?: string;
     baseRefName: string;
     mergeable: string;
     mergeStateStatus: string;
@@ -144,6 +145,7 @@ export async function prStatus(run: Run, number: string) {
     url: pr.url,
     state: pr.state,
     head: pr.headRefOid,
+    headRef: pr.headRefName ?? '',
     base: pr.baseRefName,
     mergeable: pr.mergeable,
     mergeState: pr.mergeStateStatus,
@@ -191,12 +193,18 @@ export async function waitForChecks(
   run: Run,
   number: string,
   clock: Clock,
-  options: { timeout: number; interval: number },
+  options: { timeout: number; interval: number; local?: { branch: string; sha: string } },
 ) {
   const end = clock.now() + options.timeout;
   for (;;) {
     const status = await prStatus(run, number);
-    if (status.counts.pending === 0) {
+    // Right after a push, GitHub can still report the old head and its green
+    // checks. Wait until it shows the commit that this checkout has.
+    const behind =
+      options.local !== undefined &&
+      status.headRef === options.local.branch &&
+      status.head !== options.local.sha;
+    if (status.counts.pending === 0 && !behind) {
       return { status, code: status.ready ? 0 : 1 };
     }
     if (clock.now() >= end) {
