@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { expect, test } from 'bun:test';
+import { afterEach, expect, setSystemTime, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -21,6 +21,14 @@ function store() {
 function review(requestId: string, owner = 'agent-a') {
   return { owner, requestId, project: 'pilot', workspace: '/disposable/pilot', revision: 'abc123' };
 }
+
+// The expiry tests move the clock with setSystemTime. Each test starts on the real clock.
+afterEach(() => {
+  setSystemTime();
+});
+
+/** Moves the clock `ms` ahead, so a lease expires without a real wait. */
+const later = (ms: number) => setSystemTime(new Date(Date.now() + ms));
 
 function grant(queue: SessionQueue, leaseMs = 60_000): Lease {
   const lease = queue.claim({ leaseMs, maxRunMs: 120_000 });
@@ -197,13 +205,13 @@ test('cancellation checks ownership, skips queued work, and fences active intera
   expectErrorCode(() => queue.authorize(lease), 'stale_lease');
 });
 
-test('expired leases cannot act or renew, and claiming does not bypass expired cleanup', async () => {
+test('expired leases cannot act or renew, and claiming does not bypass expired cleanup', () => {
   using files = store();
   using queue = new SessionQueue(files.path);
   const first = queue.enqueue(review('expires'));
   queue.enqueue(review('next'));
-  const lease = grant(queue, 1);
-  await Bun.sleep(10);
+  const lease = grant(queue, 1000);
+  later(2000);
   expectErrorCode(() => queue.authorize(lease), 'stale_lease');
   expectErrorCode(() => queue.renew(lease, 60_000), 'stale_lease');
   expect(queue.claim({ leaseMs: 60_000, maxRunMs: 120_000 })).toBeNull();
@@ -254,13 +262,13 @@ test('reopening does not interrupt another controller; explicit recovery fences 
   expect(queue.authorize(grant(queue)).requestId).toBe('preserved');
 });
 
-test('owner disappearance expires into durable cleanup that survives reopening', async () => {
+test('owner disappearance expires into durable cleanup that survives reopening', () => {
   using files = store();
   {
     using queue = new SessionQueue(files.path);
     queue.enqueue(review('owner-lost'));
-    grant(queue, 1);
-    await Bun.sleep(10);
+    grant(queue, 1000);
+    later(2000);
     expect(queue.expire()).not.toBeNull();
   }
   using queue = new SessionQueue(files.path);

@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { afterEach, expect, test } from 'bun:test';
 
 import { EventLog, EventLogLive } from '@repo/sync/service/event-log';
 import { feed } from '@repo/sync/service/feed';
@@ -22,14 +22,27 @@ function run<A, E>(program: Effect.Effect<A, E, EventLog>) {
   );
 }
 
-/** The groups each actor may load now. A test changes it to take a group away. */
-const access = { granted: { eager: ['org:a', 'user:u'], lazy: ['space:x', 'space:y'] } as Granted };
+const everything = (): Granted => ({ eager: ['org:a', 'user:u'], lazy: ['space:x', 'space:y'] });
 
-/** Opens a feed for user `u` in `org-a` and takes `count` messages. */
+/** The groups each actor may load now. A test changes it to take a group away. */
+const access = { granted: everything() };
+
+// Each test starts with full access, whatever the test before it changed.
+afterEach(() => {
+  access.granted = everything();
+});
+
+/**
+ * Opens a feed for user `u` in `org-a` and takes `count` messages. Each message
+ * also goes to `seen`, so a test waits for the one it needs with
+ * `Queue.take(seen)` instead of a fixed sleep. The feed subscribes before its
+ * first message, so a commit after that message reaches it.
+ */
 function open(
   log: Context.Service.Shape<typeof EventLog>,
   options: { readonly loaded: ReadonlyArray<string>; readonly lastSyncId?: number },
   requests: Queue.Queue<string>,
+  seen: Queue.Queue<SyncMessage>,
   count: number,
 ) {
   return feed(log, {
@@ -39,7 +52,12 @@ function open(
     loaded: options.loaded,
     granted: Effect.sync(() => access.granted),
     requests,
-  }).pipe(Stream.take(count), Stream.runCollect, Effect.forkChild);
+  }).pipe(
+    Stream.take(count),
+    Stream.tap((message) => Queue.offer(seen, message)),
+    Stream.runCollect,
+    Effect.forkChild,
+  );
 }
 
 /** A short form of each message, for one assertion. */
@@ -58,8 +76,9 @@ test('a client gets only the changes of its loaded groups, from the backlog and 
       yield* log.commit('org-a', 't1', () => Effect.succeed([change('a', ['space:x'])]));
       yield* log.commit('org-a', 't2', () => Effect.succeed([change('b', ['space:y'])]));
       const requests = yield* Queue.unbounded<string>();
-      const reading = yield* open(log, { loaded: ['org:a', 'space:x'] }, requests, 3);
-      yield* Effect.sleep('50 millis');
+      const seen = yield* Queue.unbounded<SyncMessage>();
+      const reading = yield* open(log, { loaded: ['org:a', 'space:x'] }, requests, seen, 3);
+      yield* Queue.take(seen);
       yield* log.commit('org-a', 't3', () =>
         Effect.succeed([change('c', ['space:y']), change('d', ['space:x'])]),
       );
@@ -76,10 +95,12 @@ test('loading a group sends its past changes once, then its live changes', async
       const log = yield* EventLog;
       yield* log.commit('org-a', 't1', () => Effect.succeed([change('a', ['space:y'])]));
       const requests = yield* Queue.unbounded<string>();
-      const reading = yield* open(log, { loaded: ['org:a'] }, requests, 3);
-      yield* Effect.sleep('50 millis');
+      const seen = yield* Queue.unbounded<SyncMessage>();
+      const reading = yield* open(log, { loaded: ['org:a'] }, requests, seen, 3);
+      yield* Queue.take(seen);
       yield* Queue.offer(requests, 'space:y');
-      yield* Effect.sleep('50 millis');
+      // The backfill message: the group is loaded before the live change.
+      yield* Queue.take(seen);
       yield* log.commit('org-a', 't2', () => Effect.succeed([change('b', ['space:y'])]));
       return yield* Fiber.join(reading).pipe(Effect.timeout('2 seconds'));
     }),
@@ -96,30 +117,38 @@ test('a group the actor may not load is not loaded', async () => {
     Effect.gen(function* () {
       const log = yield* EventLog;
       const requests = yield* Queue.unbounded<string>();
-      const reading = yield* open(log, { loaded: ['org:a'] }, requests, 2);
-      yield* Effect.sleep('50 millis');
+      const seen = yield* Queue.unbounded<SyncMessage>();
+      const reading = yield* open(log, { loaded: ['org:a'] }, requests, seen, 2);
+      yield* Queue.take(seen);
+      // Requests run in order. The allowed group's message comes after the
+      // refused one was handled, so it shows the refused group was not added.
       yield* Queue.offer(requests, 'space:secret');
-      yield* log.commit('org-a', 't1', () => Effect.succeed([change('a', ['org:a'])]));
+      yield* Queue.offer(requests, 'space:x');
       return yield* Fiber.join(reading).pipe(Effect.timeout('2 seconds'));
     }),
   );
-  expect(summary(messages)).toEqual(['groups org:a backfill ', 'deltas a']);
+  expect(summary(messages)).toEqual(['groups org:a backfill ', 'groups org:a+space:x backfill ']);
 });
 
 test('a change to the user group asks access again, and a lost group leaves the loaded set', async () => {
-  access.granted = { eager: ['org:a', 'user:u'], lazy: ['space:x', 'space:y'] };
   const messages = await run(
     Effect.gen(function* () {
       const log = yield* EventLog;
       const requests = yield* Queue.unbounded<string>();
-      const reading = yield* open(log, { loaded: ['org:a', 'user:u', 'space:x'] }, requests, 3);
-      yield* Effect.sleep('50 millis');
+      const seen = yield* Queue.unbounded<SyncMessage>();
+      const reading = yield* open(
+        log,
+        { loaded: ['org:a', 'user:u', 'space:x'] },
+        requests,
+        seen,
+        3,
+      );
+      yield* Queue.take(seen);
       access.granted = { eager: ['org:a', 'user:u'], lazy: ['space:y'] };
       yield* log.commit('org-a', 't1', () => Effect.succeed([change('m', ['user:u'])]));
       return yield* Fiber.join(reading).pipe(Effect.timeout('2 seconds'));
     }),
   );
-  access.granted = { eager: ['org:a', 'user:u'], lazy: ['space:x', 'space:y'] };
   expect(summary(messages)).toEqual([
     'groups org:a+space:x+user:u backfill ',
     'deltas m',

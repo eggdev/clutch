@@ -23,10 +23,21 @@ test('the pool loads from any local database adapter, and each change is written
   const database = memoryLocalDatabase(
     poolState({ lastSyncId: 2, tables: { Card: [{ id: 'a', title: 'Saved' }] } }),
   );
-  const pool = await loadPool(database, [rename]);
+  // Resolves when the pool's save finishes, so the test waits for the write itself.
+  const written = Promise.withResolvers<null>();
+  const pool = await loadPool(
+    {
+      ...database,
+      write: async (state) => {
+        await database.write(state);
+        written.resolve(null);
+      },
+    },
+    [rename],
+  );
   expect(pool.get(card, 'a')?.title).toBe('Saved');
   pool.run(rename, { id: 'a', title: 'Changed' });
-  await Bun.sleep(0);
+  await written.promise;
   const saved = await database.read();
   expect(saved?.pending).toHaveLength(1);
   expect(saved?.lastSyncId).toBe(2);
