@@ -157,7 +157,7 @@ function fake(answers: Array<[string, Partial<Result>]> = [], pr: Partial<Facts[
     ['gh api --paginate repos/eggdev/clutch/issues/7/comments', { out: 'LGTM\n' }],
     [
       'gh api --paginate repos/eggdev/clutch/pulls/7/files',
-      { out: JSON.stringify({ filename: 'bun.lock' }) },
+      { out: JSON.stringify({ filename: 'bun.lock', patch: '-a\n+b' }) },
     ],
   ];
   const run: Run = (command) => {
