@@ -75,3 +75,14 @@ worktree:
   root: ../clutch.worktrees
   copy: [.env.local]
   setup: ['mise trust --quiet', 'mise exec -- bun install']
+# The repositories that .github/workflows/weekly-digest.yml reads each Monday. The release
+# bot reads each one, so it must be installed on it. See
+# docs/contributing/capabilities/factory-observability.md#weekly-digest.
+fleet:
+  - repo: eggdev/clutch
+    ref: main
+  - repo: eggdev/neighborhood
+    ref: main
+  # epic/refactor until CL-705 moves Bar Savvy to main.
+  - repo: blockmen-group/bar-savvy-web
+    ref: epic/refactor

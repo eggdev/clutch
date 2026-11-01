@@ -35,6 +35,38 @@ It reports these numbers for the pull requests merged in the window:
 
 `--json` prints the same report for a digest. A field that GitHub does not answer is null, and `unavailable` names the reason. A reader ignores fields it does not know, so later releases can add fields.
 
+## Weekly digest
+
+`.github/workflows/weekly-digest.yml` runs every Monday, and from the Actions
+tab. For each repository in `fleet` in `clutch.yaml`, it checks the repository
+out at its `ref` and writes `clutch doctor --remote` and `clutch metrics` to the
+job summary.
+
+```yaml
+fleet:
+  - repo: eggdev/neighborhood # owner/name
+    ref: main # the branch to read
+```
+
+The release bot reads each repository, so no personal token is needed. Each
+job mints an installation token for one repository, with Contents, Metadata,
+Administration, Actions and Pull requests, each read only. The bot's key sits
+in the `release` environment, which only the default branch may use. See
+[the release bot](../setup/releases.md#the-release-bot).
+
+To add a repository:
+
+1. Give the bot those five read permissions in its app settings, if it lacks
+   any. Each account that installed it then accepts the change.
+2. Install the bot on the repository. A repository in another account, such
+   as an organization, needs the app to be installable by any account, under
+   "Make public" in its settings. That lets other accounts install it. It gives
+   nobody access to your own repositories.
+3. Add the repository to `fleet`.
+
+A repository that the bot cannot read is skipped with a notice in the
+summary. Without the bot or without `fleet`, the run passes with a notice.
+
 ## Adopt
 
 1. Run `mise exec -- bun run clutch metrics --json | jq . > .clutch/metrics-baseline.json` and commit it, so later changes have a number to beat.

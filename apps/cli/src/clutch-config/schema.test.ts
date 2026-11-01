@@ -71,11 +71,11 @@ test('each top-level and template problem names its YAML path', () => {
       ...valid,
       schemaVersion: 2,
       project: '',
-      fleet: [],
+      repos: [],
       template: { repo: 'clutch', commit: 'abc123', mode: 'copy', branch: 'main' },
     }),
   ).toEqual([
-    'fleet',
+    'repos',
     'schemaVersion',
     'project',
     'template.branch',
@@ -190,4 +190,17 @@ test('agentReview is optional and takes missingCredential notice or fail', () =>
     'agentReview.missingCredential',
   ]);
   expect(paths({ ...valid, agentReview: 'fail' })).toEqual(['agentReview']);
+});
+
+test('fleet is optional and takes a list of repo and ref', () => {
+  expect(validateClutchConfig(valid).config?.fleet).toBeUndefined();
+  const fleet = [
+    { repo: 'eggdev/clutch', ref: 'main' },
+    { repo: 'blockmen-group/bar-savvy-web', ref: 'epic/refactor' },
+  ];
+  expect(validateClutchConfig({ ...valid, fleet }).config?.fleet).toEqual(fleet);
+  expect(
+    paths({ ...valid, fleet: [{ repo: 'nope', ref: 'has space', branch: 'x' }, 'shop'] }),
+  ).toEqual(['fleet[0].branch', 'fleet[0].repo', 'fleet[0].ref', 'fleet[1]']);
+  expect(paths({ ...valid, fleet: { repo: 'eggdev/clutch' } })).toEqual(['fleet']);
 });

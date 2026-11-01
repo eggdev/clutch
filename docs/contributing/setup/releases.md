@@ -85,7 +85,9 @@ ruleset, the release push then fails, so set the bot up before the ruleset. Set 
 1. Create a private GitHub App with no webhook. Give it the repository
    permissions Contents, Pull requests and Workflows, each read and write.
    Renovate needs Workflows to update action pins. See
-   [Renovate](./dependencies.md#renovate).
+   [Renovate](./dependencies.md#renovate). For the weekly digest, also give it
+   Administration and Actions, each read only. See
+   [weekly digest](../capabilities/factory-observability.md#weekly-digest).
 2. Install the app on the repository.
 3. Set the `CLUTCH_APP_ID` repository variable to the app id.
 4. Create the `release` environment, which only the default branch may deploy
