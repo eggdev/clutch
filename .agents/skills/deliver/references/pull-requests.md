@@ -83,7 +83,7 @@ It decides what to do with each failure, on top of the commands below.
 | `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending and GitHub shows the commit that the checkout has, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
 | `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. |
 | `bun run pr sync <number, branch or id>` | When GitHub reports the PR as conflicting. It rebases on the PR's base, takes the base's copy of `.clutch/TRACKER.md` if an older branch still committed it, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits. After a rebase that you finished by hand, it rebases as usual. |
-| `bun run pr ready <id> <number>`        | When the PR is green and ready to merge. It sets the issue to `done` with the PR link, regenerates the tracker, commits `chore(tracker): mark <id> done` and pushes. |
+| `bun run pr ready <id> <number>`        | When the PR is green and ready to merge. It sets the issue to `done` with the PR link, commits only `.clutch/issues` as `chore(tracker): mark <id> done`, and pushes. The release regenerates `.clutch/TRACKER.md` on `main`. |
 
 Each command reads the repository from the `origin` remote. `sync` takes an
 issue id, such as `CL-117`, and finds the branch with the prefix that
