@@ -125,3 +125,13 @@ Brendan, 2026-10-30:
    steering, auth, migrations, billing, and infra and secrets. Product code
    and the lockfile are `medium`, and a dependency-only bot PR follows the
    bot rule (CL-405).
+
+Brendan, 2026-11-01:
+
+7. Clutch is the primary driver of the workflow (CL-902). In Brendan's words:
+   "I'm presently not paying much attention, but it can drive most. I'd like
+   to see it be the primary driver I guess." A workflow step belongs in a
+   `clutch` command that the release binary carries. `package.json` scripts
+   keep the work on the code that CI runs without Clutch. The follow-ups wait
+   in `later`: CL-912 (`clutch pr`), CL-913 (a delivery loop), CL-914 (skills
+   name a command for each step) and CL-915 (`clutch brief`).
