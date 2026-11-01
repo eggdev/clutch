@@ -1,0 +1,5 @@
+{
+  "install": "bash tools/cloud-env.sh",
+  "start": "",
+  "terminals": []
+}

@@ -28,6 +28,13 @@ files:
     capability: dep_automation
   - path: .github/actionlint.yaml
     rule: managed
+  # The dev container and the Cursor cloud agent setup. Both run tools/cloud-env.sh.
+  - path: .devcontainer/
+    rule: managed
+    capability: cloud_agent_vm
+  - path: .cursor/environment.json
+    rule: managed
+    capability: cloud_agent_vm
   # The main ruleset. Managed, so a new required check reaches each project.
   # `clutch ruleset --apply` sends it to GitHub. See docs/contributing/capabilities/protected-main.md.
   - path: .github/rulesets/

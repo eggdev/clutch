@@ -36,7 +36,7 @@ capabilities:
       reason: 'CI deploys to no cloud provider. The Claude plan token has no OIDC exchange, and the release bot needs its GitHub App key. See docs/contributing/setup/ci-credentials.md.',
     }
   worktree_parallel: adopted
-  cloud_agent_vm: { status: waived, reason: Lands in CL-203., issue: CL-203 }
+  cloud_agent_vm: adopted
   mcp_config: { status: waived, reason: Lands in CL-205., issue: CL-205 }
   ai_review_bot: adopted
   ai_review_blocking: adopted

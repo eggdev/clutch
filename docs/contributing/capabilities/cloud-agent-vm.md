@@ -12,10 +12,20 @@ Rank 79 of the researched practices. More than one third of the leading reposito
 
 ## Adopt
 
-1. Add `.devcontainer/devcontainer.json` on a Debian base image.
-2. In its `postCreateCommand`, install mise. Then run `mise install && mise exec -- bun install`.
-3. For Cursor background agents, add `.cursor/environment.json`. Its install step installs mise and the packages. Its start step runs nothing long-lived.
-4. Confirm that the canonical check command passes inside the environment.
+Clutch ships both files, and sync manages them. Each one runs [`tools/cloud-env.sh`](../../../tools/cloud-env.sh). The script installs one pinned mise, the tools that `mise.toml` pins, Python when it is missing, and the packages. It adds mise to `~/.bashrc`, and it is safe to run again.
+
+1. `.devcontainer/devcontainer.json` uses the Debian `devcontainers/base` image, pinned by digest, and runs the script as its `postCreateCommand`. It passes your `GITHUB_TOKEN` into the container as `MISE_GITHUB_TOKEN`, which only mise reads. An unset variable then stays harmless: tools such as zizmor refuse an empty `GITHUB_TOKEN`.
+2. `.cursor/environment.json` runs the script as its `install` step, for Cursor background agents. Its `start` step runs nothing long-lived.
+3. Set a `GITHUB_TOKEN` secret in the cloud agent's settings. For the dev container, set it in your shell. mise downloads several tools from GitHub releases, such as the clutch binary. An anonymous download can hit GitHub's rate limit.
+4. Confirm that the canonical check command passes inside the environment:
+
+   ```sh
+   npx --yes @devcontainers/cli up --workspace-folder .
+   npx --yes @devcontainers/cli exec --workspace-folder . mise exec -- bun run validate
+   ```
+
+   Run it in a full clone. A git worktree's `.git` file points outside the folder that the container mounts, so git does not work inside.
+
 5. Set `cloud_agent_vm` to `adopted` in `clutch.yaml`.
 
 ## Waive

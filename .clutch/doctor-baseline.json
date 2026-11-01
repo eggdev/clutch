@@ -5,7 +5,7 @@
   "changed_scope_check": "present",
   "ci_failure_explainer": "missing",
   "ci_security_lint": "present",
-  "cloud_agent_vm": "partial",
+  "cloud_agent_vm": "present",
   "codeowners": "present",
   "codeql_sast": "present",
   "custom_lint_plugin": "present",
