@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.28.1 (2026-11-01)
+
+### Fixes and maintenance
+
+- docs(tracker): record that clutch drives the workflow (CL-902)
+
 ## 0.28.0 (2026-11-01)
 
 ### Features
