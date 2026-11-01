@@ -1,0 +1,144 @@
+# Every Monday, writes a doctor and metrics digest for each repository in
+# `fleet` in clutch.yaml to the job summary. See
+# docs/contributing/capabilities/factory-observability.md#weekly-digest.
+#
+# It reads the other repositories as the release bot: each job mints an
+# installation token for one repository, read-only, from the bot's key in the
+# release environment, which only the default branch may use. No personal
+# token is involved. A repository that the bot is not installed on is skipped
+# with a notice, and so is the whole run without the bot or without `fleet`.
+name: Weekly digest
+
+on:
+  schedule:
+    - cron: '0 13 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-digest
+  cancel-in-progress: false
+
+jobs:
+  fleet:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      fleet: ${{ steps.fleet.outputs.fleet }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: clutch.yaml
+          sparse-checkout-cone-mode: false
+      - name: Read the fleet
+        id: fleet
+        env:
+          APP_ID: ${{ vars.CLUTCH_APP_ID }}
+        run: |
+          fleet='[]'
+          if [ -f clutch.yaml ]; then
+            fleet="$(yq -o=json -I=0 '.fleet // []' clutch.yaml)"
+          fi
+          if [ "$fleet" = '[]' ]; then
+            echo "::notice title=Weekly digest off::clutch.yaml lists no fleet, so there is nothing to read."
+          elif [ -z "$APP_ID" ]; then
+            echo "::notice title=Weekly digest off::Set up the release bot (CLUTCH_APP_ID and CLUTCH_APP_PRIVATE_KEY) to read the fleet. See docs/contributing/setup/releases.md#the-release-bot."
+            fleet='[]'
+          fi
+          echo "fleet=$fleet" >> "$GITHUB_OUTPUT"
+
+  digest:
+    needs: fleet
+    if: needs.fleet.outputs.fleet != '[]'
+    name: digest (${{ matrix.repo }})
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    # The bot's key lives in the release environment, which only the default
+    # branch may deploy to.
+    environment: release
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.fleet.outputs.fleet) }}
+    steps:
+      - name: Split the repository name
+        id: repo
+        env:
+          REPO: ${{ matrix.repo }}
+        run: |
+          echo "owner=${REPO%%/*}" >> "$GITHUB_OUTPUT"
+          echo "name=${REPO#*/}" >> "$GITHUB_OUTPUT"
+      # One repository, read only. The token step fails when the bot is not
+      # installed on that repository, and the next step turns that into a notice.
+      - name: Get a read-only token for the repository
+        id: bot
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          owner: ${{ steps.repo.outputs.owner }}
+          repositories: ${{ steps.repo.outputs.name }}
+          permission-contents: read
+          permission-metadata: read
+          permission-administration: read
+          permission-actions: read
+          permission-pull-requests: read
+      - name: Skip without access
+        if: steps.bot.outcome != 'success'
+        env:
+          REPO: ${{ matrix.repo }}
+        run: |
+          message="The release bot cannot read $REPO with Contents, Metadata, Administration, Actions and Pull requests (read). Install the bot on it, and grant those permissions. See docs/contributing/capabilities/factory-observability.md#weekly-digest."
+          echo "::notice title=Skipped $REPO::$message"
+          printf '## %s\n\nSkipped. %s\n' "$REPO" "$message" >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.bot.outcome == 'success'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: clutch
+          persist-credentials: false
+      # doctor's detect rules read local files, so the repository is checked out at its ref.
+      - if: steps.bot.outcome == 'success'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ matrix.repo }}
+          ref: ${{ matrix.ref }}
+          token: ${{ steps.bot.outputs.token }}
+          path: target
+          persist-credentials: false
+      - if: steps.bot.outcome == 'success'
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          working_directory: clutch
+      - if: steps.bot.outcome == 'success'
+        working-directory: clutch
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Write the digest
+        if: steps.bot.outcome == 'success'
+        working-directory: clutch
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          REPO: ${{ matrix.repo }}
+          REF: ${{ matrix.ref }}
+        run: |
+          bun tools/clutch.ts doctor --root ../target --remote --repo "$REPO" > "$RUNNER_TEMP/doctor.txt"
+          bun tools/clutch.ts doctor --root ../target --remote --repo "$REPO" --json > "$RUNNER_TEMP/doctor.json"
+          bun tools/clutch.ts metrics --root ../target --repo "$REPO" > "$RUNNER_TEMP/metrics.txt"
+          fence="$(printf '\140\140\140')"
+          {
+            printf '## %s (%s)\n\n### Doctor\n\n%stext\n' "$REPO" "$REF" "$fence"
+            cat "$RUNNER_TEMP/doctor.txt"
+            printf '%s\n\n### Metrics\n\n%stext\n' "$fence" "$fence"
+            cat "$RUNNER_TEMP/metrics.txt"
+            printf '%s\n\n<details><summary>doctor --json</summary>\n\n%sjson\n' "$fence" "$fence"
+            cat "$RUNNER_TEMP/doctor.json"
+            printf '\n%s\n\n</details>\n' "$fence"
+          } >> "$GITHUB_STEP_SUMMARY"

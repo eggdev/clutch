@@ -33,6 +33,8 @@ export type ClutchConfig = {
   };
   /** How `bun run pr` finds an agent's branch: its prefix, `clutch/cl-` by default. */
   pr?: { branchPrefix: string };
+  /** The repositories that the weekly digest reads: each `owner/name` and the branch to read. */
+  fleet?: Array<{ repo: string; ref: string }>;
   /**
    * The engine that `sast.yml` runs. auto, the default, runs CodeQL where code
    * scanning takes results and Semgrep elsewhere.
@@ -61,6 +63,7 @@ const topKeys = [
   'worktree',
   'automerge',
   'pr',
+  'fleet',
   'sast',
   'pr_size',
   'agentReview',
@@ -235,6 +238,31 @@ function readAutomerge(value: unknown, errors: Errors) {
   };
 }
 
+function readFleet(value: unknown, errors: Errors) {
+  if (!Array.isArray(value)) {
+    errors.push({ path: 'fleet', message: 'Expected a list of { repo, ref }.' });
+    return;
+  }
+  const before = errors.length;
+  const fleet: Array<{ repo: string; ref: string }> = [];
+  for (const [index, entry] of value.entries()) {
+    const at = `fleet[${index}]`;
+    if (!isObject(entry)) {
+      errors.push({ path: at, message: 'Expected a map with repo and ref.' });
+      continue;
+    }
+    unknownKeys(entry, ['repo', 'ref'], at, errors);
+    if (typeof entry.repo !== 'string' || !repoPattern.test(entry.repo)) {
+      errors.push({ path: `${at}.repo`, message: 'Expected owner/name.' });
+    }
+    if (typeof entry.ref !== 'string' || !/^[\w./-]+$/u.test(entry.ref)) {
+      errors.push({ path: `${at}.ref`, message: 'Expected a branch name, such as main.' });
+    }
+    fleet.push({ repo: entry.repo as string, ref: entry.ref as string });
+  }
+  return errors.length === before ? fleet : undefined;
+}
+
 function readPr(value: unknown, errors: Errors) {
   if (!isObject(value)) {
     errors.push({ path: 'pr', message: 'Expected a map with branchPrefix.' });
@@ -286,6 +314,16 @@ function readAgentReview(value: unknown, errors: Errors) {
   return { missingCredential: value.missingCredential };
 }
 
+/** The optional sections. Each reader returns the typed value, or nothing after an error. */
+const optionalSections: Record<string, (value: unknown, errors: Errors) => unknown> = {
+  worktree: readWorktree,
+  automerge: readAutomerge,
+  pr: readPr,
+  fleet: readFleet,
+  agentReview: readAgentReview,
+  pr_size: readPrSize,
+};
+
 /** Checks parsed `clutch.yaml` data. Returns the typed config only when there is no error. */
 export function validateClutchConfig(data: unknown): { config?: ClutchConfig; errors: Errors } {
   const errors: Errors = [];
@@ -301,16 +339,16 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
   }
   const template = readTemplate(data.template, errors);
   const capabilities = readCapabilities(data.capabilities, errors);
-  const worktree = data.worktree === undefined ? undefined : readWorktree(data.worktree, errors);
-  const automerge =
-    data.automerge === undefined ? undefined : readAutomerge(data.automerge, errors);
-  const pr = data.pr === undefined ? undefined : readPr(data.pr, errors);
-  const agentReview =
-    data.agentReview === undefined ? undefined : readAgentReview(data.agentReview, errors);
+  const sections: Record<string, unknown> = {};
+  for (const [key, read] of Object.entries(optionalSections)) {
+    const value = data[key] === undefined ? undefined : read(data[key], errors);
+    if (value !== undefined) {
+      sections[key] = value;
+    }
+  }
   if (data.sast !== undefined && !oneOf(sastEngines, data.sast)) {
     errors.push({ path: 'sast', message: `Expected ${sastEngines.join(', ')}.` });
   }
-  const prSize = data.pr_size === undefined ? undefined : readPrSize(data.pr_size, errors);
   if (errors.length > 0 || !template) {
     return { errors };
   }
@@ -319,24 +357,10 @@ export function validateClutchConfig(data: unknown): { config?: ClutchConfig; er
     project: data.project as string,
     template,
     capabilities,
+    ...sections,
   };
-  if (worktree) {
-    config.worktree = worktree;
-  }
-  if (automerge) {
-    config.automerge = automerge;
-  }
-  if (pr) {
-    config.pr = pr;
-  }
-  if (agentReview) {
-    config.agentReview = agentReview;
-  }
   if (oneOf(sastEngines, data.sast)) {
     config.sast = data.sast;
-  }
-  if (prSize) {
-    config.pr_size = prSize;
   }
   return { config, errors };
 }
