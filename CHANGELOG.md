@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.32.0 (2026-11-01)
+
+### Features
+
+- feat(ci): turn auto-merge on for low-risk agent PRs (CL-405)
+
 ## 0.31.0 (2026-11-01)
 
 ### Features
