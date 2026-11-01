@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.30.0 (2026-11-01)
+
+### Features
+
+- feat(env): add a dev container and the Cursor cloud setup (CL-203)
+- feat(agents): add the repo MCP config for agents (CL-205)
+
 ## 0.29.0 (2026-11-01)
 
 ### Features
