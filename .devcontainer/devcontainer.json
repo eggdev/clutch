@@ -1,0 +1,21 @@
+{
+  // The repository's dev container. tools/cloud-env.sh installs mise, the
+  // pinned tools and the packages. See docs/contributing/capabilities/cloud-agent-vm.md.
+  "name": "${localWorkspaceFolderBasename}",
+  // Debian, pinned by digest.
+  "image": "mcr.microsoft.com/devcontainers/base:2.2.5-trixie@sha256:71b6fe7c4e07ec747a94a72b2a17f2f8c286eaa7b1c59862888df764efb8b6c6",
+  "remoteUser": "vscode",
+  "remoteEnv": {
+    "PATH": "/home/vscode/.local/bin:/home/vscode/.local/share/mise/shims:${containerEnv:PATH}",
+    // Lifts GitHub's rate limit for the tools that mise downloads. Only mise
+    // reads this name, so an unset GITHUB_TOKEN leaves no empty token for
+    // other tools, such as zizmor, which refuse one.
+    "MISE_GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+  },
+  "postCreateCommand": "bash tools/cloud-env.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["oxc.oxc-vscode"]
+    }
+  }
+}
