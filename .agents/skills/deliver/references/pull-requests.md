@@ -183,8 +183,10 @@ takes the PRs of the steps before it:
 The bot rule:
 
 - A Renovate PR may change only versions: `package.json` dependency versions,
-  pinned action SHAs in workflows, tool versions in `mise.toml`, lockfiles and
-  changesets. Renovate already waits out the 3-day release age.
+  pinned action SHAs in workflows, tool versions in `mise.toml`, the lockfile
+  and its own changeset. Each package the lockfile adds must come from the npm
+  registry, or from a workspace folder of this repository. Renovate already
+  waits out the 3-day release age.
 - A gardening PR's `clutch risk` tier must be `low`.
 
 At each step, the PR also needs all of these:

