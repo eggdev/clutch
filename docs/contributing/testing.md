@@ -63,6 +63,34 @@ in [`tools/test-integrity-allow.json`](../../tools/test-integrity-allow.json)
 with the reason. That file is a guardrail file, so a person reviews the
 entry. Delete the entry after the change merges.
 
+## Flaky tests
+
+A flaky test passes and fails on the same code. Fix it. When the fix takes
+longer than the PR at hand, quarantine the test: never delete it, and never
+skip it in the file. The lint rule `repo-tests/no-hidden-tests` refuses
+`test.skip` and `test.skipIf`.
+
+The quarantine is [`tools/flaky-tests.json`](../../tools/flaky-tests.json).
+Each entry names one test:
+
+| Field    | What it holds                                                    |
+| -------- | ---------------------------------------------------------------- |
+| `file`   | The `bun test` file, such as `tools/check-db.test.ts`.           |
+| `name`   | The exact name in the test call, also inside a `describe` block. |
+| `issue`  | The open issue that owns the fix. Its `owner` owns the test.     |
+| `until`  | The last day of the quarantine, at most 30 days ahead.           |
+| `reason` | What failed and where, such as the CI run.                       |
+
+- `tools/test-budget.ts` runs each `bun test` target. It leaves the
+  quarantined tests out, so they cannot block a merge.
+- The CI step `quarantined tests` runs each one on its own, up to 3 times. It
+  writes a table to the job summary: passed, flaky, or failed every attempt.
+  It never fails the job.
+- `check-flaky-tests` fails on an expired entry, or an entry whose issue is
+  missing or `done`. It also fails on a name that is not in the file, and on an
+  expiry more than 30 days ahead. A new date needs a new reason in review.
+- Remove the entry in the PR that fixes the test.
+
 ## Console output
 
 An unexpected `console.error` or `console.warn` fails the test. Stray output

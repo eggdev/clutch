@@ -228,6 +228,13 @@
         },
         "cache": false
       },
+      "check-flaky-tests": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-flaky-tests.ts"
+        },
+        "cache": false
+      },
       "check-workflows": {
         "executor": "nx:run-commands",
         "options": {
@@ -276,6 +283,7 @@
           "check-primitives",
           "check-workflows",
           "check-workflow-lint",
+          "check-flaky-tests",
           "check-dependency-overrides",
           "check-user-docs",
           "knip",

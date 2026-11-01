@@ -41,7 +41,7 @@ capabilities:
   ai_review_bot: adopted
   ai_review_blocking: adopted
   ci_failure_explainer: { status: waived, reason: Lands in CL-305., issue: CL-305 }
-  flaky_quarantine: { status: waived, reason: Lands in CL-304., issue: CL-304 }
+  flaky_quarantine: adopted
   flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
   pr_size_limits: adopted
   merge_queue: { status: waived, reason: Waits for its trigger in CL-906., issue: CL-906 }

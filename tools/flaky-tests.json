@@ -1,0 +1,12 @@
+{
+  "description": "Quarantined flaky tests. Each one has an open issue that owns its fix, a reason, and an expiry at most 30 days ahead. The blocking test runs leave these tests out, and a non-blocking CI step runs each one 3 times and reports. check-flaky-tests fails on an expired entry, on a missing or done issue, and on a name that is not in the file. See docs/contributing/testing.md#flaky-tests.",
+  "tests": [
+    {
+      "file": "tools/check-db.test.ts",
+      "name": "a schema change with no migration fails, and passes once drizzle-kit writes one",
+      "issue": "CL-128",
+      "until": "2026-11-28",
+      "reason": "Five real drizzle-kit runs hit the 5 s test timeout on a loaded CI runner (CI run 41198473156, PR #109). It passed on the rerun."
+    }
+  ]
+}

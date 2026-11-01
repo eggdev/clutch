@@ -15,7 +15,7 @@
   "factory_observability": "present",
   "file_size_caps": "present",
   "flake_hunter": "missing",
-  "flaky_quarantine": "missing",
+  "flaky_quarantine": "present",
   "friction_log": "missing",
   "gardener_bots": "present",
   "git_hooks": "present",
