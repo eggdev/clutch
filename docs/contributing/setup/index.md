@@ -16,6 +16,8 @@ How to run, check and ship the project. Open only the page you need.
 - [Native builds and devices](./native.md): the device host, the device lock,
   and `native:build`, which builds only when the native fingerprint changed
 - [Checks](./checks.md): `validate`, each check, CI
+- [Agent tools](./agent-tools.md): the MCP servers that coding agents use, and
+  how to change one
 - [CI credentials](./ci-credentials.md): each secret a workflow reads, its
   scope, and the OIDC decision
 - [Releases](./releases.md): changesets, the version and `CHANGELOG.md`

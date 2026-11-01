@@ -77,6 +77,8 @@
 **/AGENTS.md @eggdev
 /.agents/skills/ @eggdev
 /.claude/skills/ @eggdev
+/.mcp.json @eggdev
+/.cursor/mcp.json @eggdev
 **/auth/ @eggdev
 /packages/access/ @eggdev
 /packages/identity/ @eggdev

@@ -35,6 +35,13 @@ files:
   - path: .cursor/environment.json
     rule: managed
     capability: cloud_agent_vm
+  # The MCP servers for agents. A project adds its own, so it owns them after install.
+  - path: .mcp.json
+    rule: seed
+    capability: mcp_config
+  - path: .cursor/mcp.json
+    rule: seed
+    capability: mcp_config
   # The main ruleset. Managed, so a new required check reaches each project.
   # `clutch ruleset --apply` sends it to GitHub. See docs/contributing/capabilities/protected-main.md.
   - path: .github/rulesets/

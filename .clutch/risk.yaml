@@ -28,6 +28,9 @@ rules:
       - '**/AGENTS.md'
       - .agents/skills/**
       - .claude/skills/**
+      # The MCP servers that agents get. See docs/contributing/setup/agent-tools.md.
+      - .mcp.json
+      - .cursor/mcp.json
       # Auth: who an actor is and what it may see.
       - '**/auth/**'
       - packages/access/**

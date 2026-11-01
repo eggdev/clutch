@@ -37,7 +37,7 @@ capabilities:
     }
   worktree_parallel: adopted
   cloud_agent_vm: adopted
-  mcp_config: { status: waived, reason: Lands in CL-205., issue: CL-205 }
+  mcp_config: adopted
   ai_review_bot: adopted
   ai_review_blocking: adopted
   ci_failure_explainer: { status: waived, reason: Lands in CL-305., issue: CL-305 }

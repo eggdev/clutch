@@ -19,7 +19,7 @@
   "friction_log": "missing",
   "gardener_bots": "present",
   "git_hooks": "present",
-  "mcp_config": "missing",
+  "mcp_config": "present",
   "merge_queue": "missing",
   "nested_agent_rules": "missing",
   "oidc_ci": "missing",
