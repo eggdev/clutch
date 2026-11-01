@@ -26,12 +26,12 @@
       "parameters": {
         "strict_required_status_checks_policy": false,
         "required_status_checks": [
-          { "context": "validate" },
-          { "context": "journeys" },
-          { "context": "secrets" },
-          { "context": "commits" },
-          { "context": "sast" },
-          { "context": "agent-review" }
+          { "context": "validate", "integration_id": 15368 },
+          { "context": "journeys", "integration_id": 15368 },
+          { "context": "secrets", "integration_id": 15368 },
+          { "context": "commits", "integration_id": 15368 },
+          { "context": "sast", "integration_id": 15368 },
+          { "context": "agent-review", "integration_id": 15368 }
         ]
       }
     }

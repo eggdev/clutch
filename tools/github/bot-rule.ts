@@ -19,13 +19,46 @@ export function botKind(headRefName: string) {
 }
 
 /**
- * The files that skip the line-by-line version check in `renovateProblems`.
- * The lockfile is generated: CI's `bun install --frozen-lockfile` fails unless
- * it matches the package.json versions, which this rule does check. Renovate's
- * own changeset, `.changeset/renovate-*.md`, is release-note text that runs no
- * code.
+ * The file that skips the line-by-line version check in `renovateProblems`:
+ * Renovate's own changeset, `.changeset/renovate-*.md`, is release-note text
+ * that runs no code.
  */
-const free = [/^bun\.lock$/u, /^\.changeset\/renovate-[\w.-]+\.md$/u];
+const free = [/^\.changeset\/renovate-[\w.-]+\.md$/u];
+
+/** The lockfile, whose package entries `lockfileProblems` checks. */
+const lockfile = /^bun\.lock$/u;
+
+/** The npm registry. A package entry with no registry uses it. */
+const npmRegistry = 'https://registry.npmjs.org/';
+
+/** A package entry: `"name": ["name@1.2.3", "<registry>", ...`. */
+const lockEntry = /^\s*"[^"]+":\s*\["([^"]+)"(?:,\s*"([^"]*)")?/u;
+
+/**
+ * Why an added lockfile line points a package away from the npm registry.
+ * CI's `bun install --frozen-lockfile` checks that the lockfile matches the
+ * package.json versions, but not where a package comes from. So each added
+ * package entry must name a version from the npm registry, or a workspace
+ * folder of this repository. A git, URL, file or link source fails.
+ */
+function lockfileProblems(file: string, patch: string) {
+  const problems: Array<string> = [];
+  for (const line of patch.split('\n').filter((row) => row.startsWith('+'))) {
+    const entry = lockEntry.exec(line.slice(1));
+    if (!entry) {
+      continue;
+    }
+    const [, spec, registry = ''] = entry;
+    const source = spec.slice(spec.lastIndexOf('@') + 1);
+    const version = /^v?\d[\w.+-]*$/u.test(source) || source.startsWith('workspace:');
+    if (!version) {
+      problems.push(`${file} takes ${spec} from outside the npm registry.`);
+    } else if (registry !== '' && !registry.startsWith(npmRegistry)) {
+      problems.push(`${file} takes ${spec} from ${registry}, not ${npmRegistry}.`);
+    }
+  }
+  return problems;
+}
 
 /** A file that may change only on lines that each set a version, and how such a line looks. */
 const versionOnly: Array<[RegExp, RegExp]> = [
@@ -56,6 +89,14 @@ export function renovateProblems(files: Array<ChangedFile>) {
   const problems: Array<string> = [];
   for (const file of files) {
     if (free.some((pattern) => pattern.test(file.filename))) {
+      continue;
+    }
+    if (lockfile.test(file.filename)) {
+      problems.push(
+        ...(file.patch === undefined
+          ? [`${file.filename} has no diff to check.`]
+          : lockfileProblems(file.filename, file.patch)),
+      );
       continue;
     }
     const rule = versionOnly.find(([pattern]) => pattern.test(file.filename));

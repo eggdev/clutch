@@ -80,7 +80,13 @@ async function requiredChecks(run: Run, repo: string, branch: string) {
   return [...new Set([...(JSON.parse(out) as Array<string>), agentReview])];
 }
 
-/** The conclusion of the latest run of each check in `names` on commit `sha`. */
+/** The app that runs the workflows, and so reports each required check. */
+const actionsApp = 'github-actions';
+
+/**
+ * The conclusion of the latest run of each check in `names` on commit `sha`,
+ * counting only runs that the GitHub Actions app reported.
+ */
 async function checkConclusions(run: Run, repo: string, sha: string, names: Array<string>) {
   const out = await gh(
     run,
@@ -88,7 +94,7 @@ async function checkConclusions(run: Run, repo: string, sha: string, names: Arra
     '--paginate',
     `repos/${repo}/commits/${sha}/check-runs?per_page=100`,
     '--jq',
-    '.check_runs[] | {id, name, status, conclusion}',
+    '.check_runs[] | {id, name, status, conclusion, app: .app.slug}',
   );
   const latest = new Map<string, { id: number; status: string; conclusion: string | null }>();
   for (const line of out.split('\n').filter(Boolean)) {
@@ -97,7 +103,13 @@ async function checkConclusions(run: Run, repo: string, sha: string, names: Arra
       name: string;
       status: string;
       conclusion: string | null;
+      app: string | null;
     };
+    // Only the GitHub Actions app reports the required checks. A run with the
+    // same name from another app, or from a token with checks: write, is no proof.
+    if (runInfo.app !== actionsApp) {
+      continue;
+    }
     if ((latest.get(runInfo.name)?.id ?? -1) < runInfo.id) {
       latest.set(runInfo.name, runInfo);
     }
