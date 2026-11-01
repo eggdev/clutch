@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.28.2 (2026-11-01)
+
+### Fixes and maintenance
+
+- docs(tracker): record the Neighborhood starting branch (CL-601)
+
 ## 0.28.1 (2026-11-01)
 
 ### Fixes and maintenance
