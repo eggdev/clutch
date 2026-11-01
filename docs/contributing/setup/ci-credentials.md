@@ -8,8 +8,8 @@ OIDC. Change a secret only with the owner. `clutch.yaml` records the
 
 | Name                      | Kind                                | Read by                                                                                                             | Provider                    | GitHub OIDC                               |
 | ------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------- | ----------------------------------------- |
-| `CLAUDE_CODE_OAUTH_TOKEN` | secret                              | `agent-review.yml`, `gardening.yml`                                                                                 | Anthropic, Claude plan      | No. A plan token has no OIDC exchange     |
-| `ANTHROPIC_API_KEY`       | secret                              | `agent-review.yml`, `gardening.yml`                                                                                 | Anthropic, Claude API       | Yes, through workload identity federation |
+| `CLAUDE_CODE_OAUTH_TOKEN` | secret                              | `agent-review.yml`, `gardening.yml`, `ci-explain.yml`                                                               | Anthropic, Claude plan      | No. A plan token has no OIDC exchange     |
+| `ANTHROPIC_API_KEY`       | secret                              | `agent-review.yml`, `gardening.yml`, `ci-explain.yml`                                                               | Anthropic, Claude API       | Yes, through workload identity federation |
 | `CLUTCH_APP_PRIVATE_KEY`  | secret in the `release` environment | `release.yml`, `gardening.yml`, `renovate.yml`, `revert.yml`, `auto-merge.yml`, `grade-verdicts.yml`, `open-pr.yml` | GitHub App, the release bot | No. The key signs the app's own login     |
 | `CLUTCH_APP_ID`           | variable                            | the same workflows                                                                                                  | GitHub App, the release bot | Not a secret                              |
 
@@ -20,7 +20,7 @@ and it ends with the job. Each job's `permissions` block sets its scope.
 
 - `CLAUDE_CODE_OAUTH_TOKEN` signs in to the owner's Claude plan, so a job's
   usage counts against that plan. It reaches Claude only, not GitHub. Agent
-  review and the weekly gardening pass read it.
+  review, the weekly gardening pass and the CI failure explainer read it.
 - `ANTHROPIC_API_KEY` is the alternative for a project that pays for the
   Claude API. A workflow uses whichever of the two is set, and turns itself off
   with a notice when neither is. Clutch sets only the plan token.

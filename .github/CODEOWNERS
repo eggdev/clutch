@@ -51,6 +51,9 @@
 /tools/audit-prod.ts @eggdev
 /tools/accepted-advisories.yaml @eggdev
 /tools/test-budget.ts @eggdev
+/tools/flaky-tests.json @eggdev
+/tools/flaky.ts @eggdev
+/tools/run-quarantined.ts @eggdev
 /tools/validate.ts @eggdev
 /tools/dev.ts @eggdev
 /tools/native/ @eggdev

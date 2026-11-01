@@ -40,6 +40,13 @@ jobs:
           else
             bun run validate
           fi
+      # The quarantined tests in tools/flaky-tests.json run here on their own,
+      # up to 3 times each. The step never fails the job, so a flaky test
+      # cannot block a merge, and its result shows in the job summary.
+      - name: quarantined tests
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: bun tools/run-quarantined.ts
 
   # Checks each commit subject of a PR against Conventional Commits. The
   # commit-msg hook checks them too, but --no-verify or another machine skips it.
