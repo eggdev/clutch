@@ -38,7 +38,7 @@ const syncAnswers = (
     ['git diff --name-only --diff-filter=A', { out: '.changeset/x.md' }],
   ]);
 
-test('sync regenerates a conflicted tracker, validates and pushes with a lease', async () => {
+test('sync takes the base copy of a conflicted tracker, validates and pushes with a lease', async () => {
   const gh = syncAnswers([{ ok: false, err: 'CONFLICT' }], [{ out: '.clutch/TRACKER.md\n' }]);
   const logged: Array<string> = [];
   const original = console.log;
@@ -51,7 +51,7 @@ test('sync regenerates a conflicted tracker, validates and pushes with a lease',
   const order = [
     'git fetch --prune origin',
     'git rebase origin/main',
-    'bun tools/clutch.ts issues --write',
+    'git checkout --ours -- .clutch/TRACKER.md',
     'git add .clutch/TRACKER.md',
     'git -c core.editor=true rebase --continue',
     'bun run validate',
@@ -60,6 +60,7 @@ test('sync regenerates a conflicted tracker, validates and pushes with a lease',
   const positions = order.map((call) => gh.calls.indexOf(call));
   expect(positions.every((position) => position !== -1)).toBe(true);
   expect(positions).toEqual(positions.toSorted((a, b) => a - b));
+  expect(gh.calls).not.toContain('bun tools/clutch.ts issues --write');
   expect(logged).toContain('https://github.com/o/r/pull/7');
 });
 
@@ -117,4 +118,65 @@ test('sync drops a fork point that the branch no longer contains', async () => {
   }
   expect(gh.calls).toContain('git rebase origin/main');
   expect(gh.calls.some((call) => call.startsWith('git rebase --onto'))).toBe(false);
+});
+
+/** PR 9 on branch mid, in the stack 8 (low) -> 9 (mid) -> 11 (top). */
+const middleOfStack = (extra: Array<[string, Partial<Result>]>) =>
+  fake([
+    ...extra,
+    trunk,
+    [
+      'gh pr view 9',
+      {
+        out: JSON.stringify({
+          number: 9,
+          url: 'https://github.com/o/r/pull/9',
+          title: 'feat: mid (CL-311)',
+          body: 'Body',
+          headRefName: 'mid',
+          baseRefName: 'low',
+        }),
+      },
+    ],
+    [
+      'gh pr list --state open --head mid',
+      { out: '[{"number":9,"baseRefName":"low","url":"u9","isDraft":false}]' },
+    ],
+    [
+      'gh pr list --state open --head low',
+      { out: '[{"number":8,"baseRefName":"main","url":"u8","isDraft":false}]' },
+    ],
+    ['gh pr list --state open --base mid', { out: '[{"number":11,"headRefName":"top"}]' }],
+    ['gh pr list --state open --base top', { out: '[]' }],
+    ['git branch --show-current', { out: 'mid\n' }],
+    ['git diff --name-only --diff-filter=A', { out: '.changeset/x.md' }],
+  ]);
+
+const quietly = async (work: () => Promise<number>) => {
+  const original = console.log;
+  console.log = () => {};
+  try {
+    return await work();
+  } finally {
+    console.log = original;
+  }
+};
+
+test('sync on the middle PR of a stack links the whole stack, the PRs above it too', async () => {
+  const gh = middleOfStack([]);
+  expect(await quietly(() => runPr(['sync', '9'], gh.run, noWrite))).toBe(0);
+  expect(gh.calls).toContain('gh stack link 8 9 11 --open');
+});
+
+test('sync finds the fork point in the base PR force pushes when this clone recorded none', async () => {
+  const gh = middleOfStack([
+    // The PR below was rebased: its head before the force push is old1111.
+    ['gh api graphql', { out: 'old1111\n' }],
+    ['git merge-base --fork-point', { ok: false }],
+    ['git merge-base --is-ancestor old1111 HEAD', { ok: true }],
+    ['git merge-base --is-ancestor old1111 origin/low', { ok: false }],
+  ]);
+  expect(await quietly(() => runPr(['sync', '9'], gh.run, noWrite))).toBe(0);
+  expect(gh.calls).toContain('git rebase --onto origin/low old1111');
+  expect(gh.calls).not.toContain('git rebase origin/low');
 });

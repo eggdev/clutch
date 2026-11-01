@@ -82,8 +82,8 @@ It decides what to do with each failure, on top of the commands below.
 | `bun run pr status <number> [--json]`   | Before each decision. It shows the required checks, the agent review's blocking count, the dry-run verdict, the review decision and the mergeable state at the head commit. A PR that a rule still blocks, such as one waiting on a code-owner review, is not ready. |
 | `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending and GitHub shows the commit that the checkout has, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
 | `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. |
-| `bun run pr sync <number, branch or id>` | When the base moved or the tracker conflicts. It rebases on the PR's base, regenerates a conflicted `.clutch/TRACKER.md`, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits. After a rebase that you finished by hand, it rebases as usual. |
-| `bun run pr ready <id> <number>`        | When the PR is green and ready to merge. It sets the issue to `done` with the PR link, regenerates the tracker, commits `chore(tracker): mark <id> done` and pushes. |
+| `bun run pr sync <number, branch or id>` | When GitHub reports the PR as conflicting. It rebases on the PR's base, takes the base's copy of `.clutch/TRACKER.md` if an older branch still committed it, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits, even when another clone rewrote the base. On a PR in the middle of a stack, it keeps the PRs above it linked. After a rebase that you finished by hand, it rebases as usual. |
+| `bun run pr ready <id> <number>`        | When the PR is green and ready to merge. It sets the issue to `done` with the PR link, commits only `.clutch/issues` as `chore(tracker): mark <id> done`, and pushes. The release regenerates `.clutch/TRACKER.md` on `main`. |
 
 Each command reads the repository from the `origin` remote. `sync` takes an
 issue id, such as `CL-117`, and finds the branch with the prefix that
@@ -103,13 +103,31 @@ uses that branch as its base.
 3. Run `open` with `--base <top branch>`. It adds the new PR to the top of the
    stack.
 
+`open` links the whole stack each time: the PRs below, the PR itself and the
+PRs above it. So `open --force` or `sync` on a PR in the middle of a stack
+keeps the PRs above it in the stack. `gh stack link` refuses a list that
+leaves one out.
+
 Never give two open PRs the same base branch, except the default branch. Two PRs
 on one base cannot form a linear stack, and they can conflict in generated
 files. To join such PRs, rebase the second branch onto the first one. Then run
 `open` for it again with the new base.
 
-Keep a stack to three open PRs or fewer. At three, ask the owner to merge the
-lower PRs before you add another one.
+### One approval round per batch
+
+A push to an approved PR drops the approval, because the ruleset dismisses
+stale reviews. So the owner approves a batch once:
+
+1. Before you ask the owner for approval, put your finished PRs in one stack
+   with `open --base`, so `gh stack` links them bottom to top. Each PR is green,
+   with 0 blocking findings and its done commit last.
+2. Ask the owner to approve every PR in the stack in one sitting.
+3. Run `bun run pr merge <top>`. It merges the whole stack, bottom up, in one
+   step.
+4. After the approval, never push to a PR unless GitHub reports it as `DIRTY`
+   (`pr status` shows the merge state). A `CLEAN` PR merges as it is, since the
+   ruleset does not require an up-to-date branch. A `DIRTY` PR needs
+   `pr sync`, and then a new approval.
 
 ## Merge
 

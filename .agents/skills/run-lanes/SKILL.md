@@ -28,9 +28,9 @@ each issue changes, not by topic.
    file another lane owns asks the coordinator first.
 4. Three lanes is a good start. More lanes mean more rebases on `main`.
 
-Shared generated files always conflict: `.clutch/TRACKER.md`, the changelog and
-release commits. That is expected. Lanes rebase and regenerate them, as the
-brief says.
+Lanes never commit `.clutch/TRACKER.md`: the release regenerates it on `main`
+with the changelog. Each PR commits only its own issue files, so the tracker
+never conflicts between lanes.
 
 ## 2. Reserve issue ids
 
@@ -69,11 +69,10 @@ in your own git worktree. Do the work yourself.
   Fill every section of the PR template. Conventional commits. Never `--no-verify`.
 - Run `mise exec -- bun run validate` before each push.
 - When the PR is green and ready, its last commit runs
-  `clutch issues set CL-NNN done --pr <url>` and `clutch issues --write`.
+  `bun run pr ready CL-NNN <number>`, which commits only the issue file.
 - Merge rules: see "Merge" below.
 - File new issues with `clutch issues new --range <your block>`.
-- Expect `.clutch/TRACKER.md` conflicts. Rebase on `origin/main`, run
-  `clutch issues --write`, and push with `pr open --force`.
+- Never commit `.clutch/TRACKER.md`. The release writes it on `main`.
 - <Known flakes, and what to do: rerun a failed job once before you debug.>
 
 ## Lane boundaries
@@ -102,8 +101,9 @@ of these hold:
 - Every required check passed, and agent review passed with 0 blocking
   findings.
 - The last commit marks the issue `done`.
-- `main` has not moved since the last green run, or the lane ran the train
-  steps below.
+- The owner approved it, when the ruleset requires a code owner review. A lane
+  asks once for its whole stack. See
+  [one approval round per batch](../deliver/references/pull-requests.md#one-approval-round-per-batch).
 - The coordinator has not put the PR on hold.
 
 Agent review often blocks on docs that did not move with the behavior. The lane
@@ -117,13 +117,19 @@ For example, one lane adds a workflow while another adds a workflow lint. Each
 PR is green. Merged minutes apart, the lint fails on the new workflow, and
 `main` is red for every lane.
 
-Before a lane merges, it checks whether `main` moved since its last green run:
+Before a lane asks the owner for approval, it checks whether `main` moved
+since its last green run:
 
-1. Run `git fetch origin` and compare the PR's base with `origin/main`.
-2. When `main` moved, run `mise exec -- bun run pr sync` if the project's `pr`
-   tool has it. Otherwise rebase on `origin/main`, run `clutch issues --write`
-   and `validate`, and push with `pr open --force`.
-3. Wait for the new run to pass, then merge.
+1. Run `git fetch origin` and compare each PR's base with `origin/main`.
+2. When `main` moved, run `mise exec -- bun run pr sync` on the bottom PR of the
+   stack, and wait for the new runs to pass.
+3. Then ask the owner to approve the whole stack in one round.
+
+After the approval, a lane pushes only to a PR that GitHub reports as `DIRTY`.
+A push drops the approval. A `CLEAN` PR merges as it is with
+`bun run pr merge <top>`, even when `main` moved, because the ruleset does not
+require an up-to-date branch. The push to `main` runs the full `validate`, so a
+break between two PRs shows there, and the coordinator fixes forward.
 
 When `main` turns red anyway, the coordinator names one lane to fix it, and the
 other lanes stop merging until it is green. Record each such incident in the
