@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.31.0 (2026-11-01)
+
+### Features
+
+- feat(tools): quarantine flaky tests with an expiry (CL-304)
+- feat(ci): explain a failed CI run on its PR (CL-305)
+
 ## 0.30.0 (2026-11-01)
 
 ### Features
