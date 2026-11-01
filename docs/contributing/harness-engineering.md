@@ -121,6 +121,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | Agent review of a PR that a bot opened                    | `agent-review.yml`, `allowed_bots`                                              |
 | A path kept out of a risk tier                            | `.clutch/risk.yaml`, a rule's `except`                                          |
 | A zizmor finding the owner accepted                       | `# zizmor: ignore[<audit>]` in the workflow                                     |
+| A flaky test kept out of the blocking runs                | `tools/flaky-tests.json`, with an issue and an expiry                           |
 | A Semgrep false positive                                  | `nosemgrep: rule-id -- reason` on the line, which `check-suppressions` enforces |
 | A Semgrep rule off for the whole repository               | `sast.yml`, `--exclude-rule`                                                    |
 | A file that tooling reads but sets no rule                | `tools/guardrail-files.json`, `exempt`                                          |
