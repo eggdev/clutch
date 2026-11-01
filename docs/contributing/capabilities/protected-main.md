@@ -27,7 +27,10 @@ required check reaches each project. This repository's file is the example.
 3. Require the status checks that run the canonical check command. This
    repository requires `validate`, `journeys`, `secrets` and `commits`, plus
    `sast` (see [CodeQL / SAST](./codeql-sast.md)) and `agent-review` (see
-   [review](../review.md)).
+   [review](../review.md)). Pin each one to the GitHub Actions app with
+   `"integration_id": 15368`. Then a check run with the same name from another
+   app, or from a token with `checks: write`, cannot pass the rule. Auto-merge
+   counts only those runs too.
 4. Block force pushes and branch deletion.
 5. Add bypass actors. The release bot bypasses always, so the release commit
    can reach the default branch. See [releases](../setup/releases.md#the-release-bot).

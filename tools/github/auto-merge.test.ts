@@ -140,7 +140,7 @@ const runs = (conclusion: string) =>
     { id: 2, name: 'validate', status: 'completed', conclusion },
     { id: 3, name: 'agent-review', status: 'completed', conclusion: 'success' },
   ]
-    .map((line) => JSON.stringify(line))
+    .map((line) => JSON.stringify({ ...line, app: 'github-actions' }))
     .join('\n');
 
 /** A fake runner for a green, low-risk agent PR on a green main. `answers` override by prefix. */
@@ -229,6 +229,7 @@ test('on never queues while a required check is red on main', async () => {
             name: 'validate',
             status: 'completed',
             conclusion: 'failure',
+            app: 'github-actions',
           }),
         },
       ],
@@ -329,11 +330,51 @@ test('no dry-run comment while a required check is still running', async () => {
   const running = fake([
     [
       'gh api --paginate repos/eggdev/clutch/commits/a1b2',
-      { out: JSON.stringify({ id: 1, name: 'validate', status: 'in_progress', conclusion: null }) },
+      {
+        out: JSON.stringify({
+          id: 1,
+          name: 'validate',
+          status: 'in_progress',
+          conclusion: null,
+          app: 'github-actions',
+        }),
+      },
     ],
   ]);
   const [line] = await decide(running, { mode: 'dry-run', step: 'low' });
   expect(line).toContain('- The required check validate is pending.');
   expect(line).toEndWith('No dry-run comment: Waiting for validate, agent-review to finish.');
   expect([...merges(running.calls), ...comments(running.calls)]).toEqual([]);
+});
+
+test('a same-named check from another app is no proof, so the Actions run decides', async () => {
+  const spoofed = fake([
+    [
+      'gh api --paginate repos/eggdev/clutch/commits/a1b2',
+      {
+        out: [
+          {
+            id: 1,
+            name: 'validate',
+            status: 'completed',
+            conclusion: 'failure',
+            app: 'github-actions',
+          },
+          { id: 9, name: 'validate', status: 'completed', conclusion: 'success', app: 'other-app' },
+          {
+            id: 3,
+            name: 'agent-review',
+            status: 'completed',
+            conclusion: 'success',
+            app: 'github-actions',
+          },
+        ]
+          .map((line) => JSON.stringify(line))
+          .join('\n'),
+      },
+    ],
+  ]);
+  const [line] = await decide(spoofed, { mode: 'on', step: 'low' });
+  expect(line).toContain('- The required check validate is failure.');
+  expect(merges(spoofed.calls)).toEqual([]);
 });

@@ -154,3 +154,34 @@ test('compare reports matches and missing, skips keys the file does not name, an
   const [unnamed] = await compareRulesets(project.root, repo, drifted.gh);
   expect(unnamed.state).toBe('matches');
 });
+
+test('a required check pinned to an app differs from an unpinned one on GitHub', () => {
+  const want = {
+    rules: [
+      {
+        type: 'required_status_checks',
+        parameters: { required_status_checks: [{ context: 'validate', integration_id: 15_368 }] },
+      },
+    ],
+  };
+  const unpinned = {
+    rules: [
+      {
+        type: 'required_status_checks',
+        parameters: { required_status_checks: [{ context: 'validate' }] },
+      },
+    ],
+  };
+  expect(rulesetDifferences(want, unpinned)).toEqual([
+    'rules[required_status_checks].parameters.required_status_checks[validate].integration_id: null, want 15368',
+  ]);
+  const pinned = {
+    rules: [
+      {
+        type: 'required_status_checks',
+        parameters: { required_status_checks: [{ context: 'validate', integration_id: 15_368 }] },
+      },
+    ],
+  };
+  expect(rulesetDifferences(want, pinned)).toEqual([]);
+});
