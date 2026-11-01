@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.28.0 (2026-11-01)
+
+### Features
+
+- feat(tracker): generate the tracker on main, never in a PR (CL-123)
+
+### Fixes and maintenance
+
+- docs(skills): ask the owner for one approval round per batch (CL-124)
+- fix(pr): keep the whole stack and only the PR's commits in sync (CL-311)
+
 ## 0.27.0 (2026-10-31)
 
 ### Features
