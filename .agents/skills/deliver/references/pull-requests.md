@@ -103,6 +103,11 @@ uses that branch as its base.
 3. Run `open` with `--base <top branch>`. It adds the new PR to the top of the
    stack.
 
+`open` links the whole stack each time: the PRs below, the PR itself and the
+PRs above it. So `open --force` or `sync` on a PR in the middle of a stack
+keeps the PRs above it in the stack. `gh stack link` refuses a list that
+leaves one out.
+
 Never give two open PRs the same base branch, except the default branch. Two PRs
 on one base cannot form a linear stack, and they can conflict in generated
 files. To join such PRs, rebase the second branch onto the first one. Then run
