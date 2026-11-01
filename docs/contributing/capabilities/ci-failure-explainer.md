@@ -18,6 +18,9 @@ Rank 63 of the researched practices. More than one third of the leading reposito
 4. Download the failed logs with `gh run view --log-failed`, and trim them.
 5. Pass the logs to `anthropics/claude-code-action` with a prompt that asks for a short answer.
 6. When no API secret exists, pass with a notice, like the agent review workflow.
+   On a pull request, keep one comment and edit it. On the default branch, keep
+   one tracking issue and comment on it, so a red branch cannot open an issue
+   for every run.
 7. Set `ci_failure_explainer` to `adopted` in `clutch.yaml`.
 
 ## Waive

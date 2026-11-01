@@ -314,3 +314,24 @@ environment. See
   [Nx](./nx.md#cache-keys).
 
 <!-- kickoff: Each CI step that the project adds: native journeys, migration dry runs, preview deploys, the one-way-door label check. -->
+
+## CI failure explainer
+
+When CI fails, [`ci-explain.yml`](../../../.github/workflows/ci-explain.yml)
+explains the failure. It runs after each failed `CI` run of a branch in this
+repository, never a fork. A run that passed starts no job.
+
+- It downloads the failed job logs with `gh run view --log-failed`, and keeps
+  the last 20,000 characters.
+- An agent reads the logs and this page, and returns the failing step, the
+  likely cause and the fix command. It uses the cheapest model, unless the
+  `CLUTCH_AGENT_MODEL` repository variable names another one. It can only read
+  files, and the workflow posts its answer.
+- On a pull request, the workflow keeps one comment and edits it on each new
+  failure.
+- On the default branch, it opens one issue with the label `ci-red-main`, then
+  comments on that issue for each later failure. An issue that the job's token
+  opens starts no workflow, so the explainer cannot loop.
+- It checks out the default branch, never the failed code.
+- Without the `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` secret, it
+  passes with a notice.

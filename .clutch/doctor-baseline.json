@@ -3,7 +3,7 @@
   "ai_review_bot": "present",
   "canonical_check": "present",
   "changed_scope_check": "present",
-  "ci_failure_explainer": "missing",
+  "ci_failure_explainer": "present",
   "ci_security_lint": "present",
   "cloud_agent_vm": "partial",
   "codeowners": "present",

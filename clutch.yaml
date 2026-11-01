@@ -40,7 +40,7 @@ capabilities:
   mcp_config: { status: waived, reason: Lands in CL-205., issue: CL-205 }
   ai_review_bot: adopted
   ai_review_blocking: adopted
-  ci_failure_explainer: { status: waived, reason: Lands in CL-305., issue: CL-305 }
+  ci_failure_explainer: adopted
   flaky_quarantine: adopted
   flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
   pr_size_limits: adopted
