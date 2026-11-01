@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.29.0 (2026-11-01)
+
+### Features
+
+- feat(ci): keep lockfile packages on the npm registry (CL-133)
+- feat(ci): pin each required check to the Actions app (CL-134)
+
 ## 0.28.2 (2026-11-01)
 
 ### Fixes and maintenance
