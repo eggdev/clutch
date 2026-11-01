@@ -194,7 +194,9 @@ At each step, the PR also needs all of these:
 - It is open, not a draft, and its base is the default branch. A stacked PR
   waits.
 - The latest run of each required check of the default branch, and of
-  `agent-review`, succeeded on its head commit.
+  `agent-review`, succeeded on its head commit. Only runs that the GitHub
+  Actions app reported count, as in the main ruleset. A run with the same name
+  from another app or token counts for nothing.
 - No required check is red on the default branch's latest commit. A red
   `main` stops every auto-merge until it is green again.
 
