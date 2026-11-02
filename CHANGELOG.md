@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.39.0 (2026-11-02)
+
+### Features
+
+- feat(ci): merge 80% of PRs with no human (CL-209)
+
 ## 0.38.0 (2026-11-02)
 
 ### Features
