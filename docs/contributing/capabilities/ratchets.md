@@ -12,10 +12,12 @@ Rank 27 of the researched practices. Almost two thirds of the leading repositori
 
 ## Adopt
 
-1. Add `.clutch/ratchets.json` with a `ratchets` object. Give each ratchet a name, a pattern or a command, a file glob and the count for each file.
-2. Add a script that counts the violations and compares each count with the baseline. Make it fail when a count goes up.
-3. Make the update step lower counts only. A higher count needs a person's review.
-4. Add the root target `check-ratchets`, and run it in the canonical check command.
+A project from Clutch has the engine and the commands. See decision 0001 (CL-301).
+
+1. Run `mise exec -- bun run clutch ratchet add <name> --pattern <regex> --files <glob>`. It writes the ratchet to `.clutch/ratchets.json` with today's count for each file. A `--command` that prints `path:count` lines works instead of a pattern, such as for lint output.
+2. `clutch ratchet check` fails when a count goes up, against the baseline or against the merge base for a file the change touches. It exits 2 when a count went down and the baseline did not.
+3. `clutch ratchet update` lowers the baseline to the counts today. It refuses a higher count.
+4. Add the root target `check-ratchets` (`bun tools/clutch.ts ratchet check`), and run it in the canonical check command.
 5. List the baseline as a guardrail file in `tools/guardrail-files.json`. Then run `mise exec -- bun tools/codeowners.ts --write`, so `.github/CODEOWNERS` names its owner.
 6. Set `ratchets` to `adopted` in `clutch.yaml`.
 

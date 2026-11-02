@@ -298,6 +298,7 @@
           "check-journeys",
           "check-clutch",
           "check-clutch-issues",
+          "check-ratchets",
           "check-changeset"
         ]
       },
@@ -368,6 +369,13 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/clutch.ts doctor --check"
+        },
+        "cache": false
+      },
+      "check-ratchets": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/clutch.ts ratchet check"
         },
         "cache": false
       },

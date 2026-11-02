@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "ratchets": {
+    "no-double-cast": {
+      "pattern": "\\bas (unknown as|any\\b)",
+      "files": "{apps,packages,features,tools}/**/*.{ts,tsx,mts}",
+      "counts": {}
+    }
+  }
+}

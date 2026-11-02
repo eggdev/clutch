@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /** Where a repository keeps its ratchets. It is a guardrail file. */
-const ratchetsFile = '.clutch/ratchets.json';
+export const ratchetsFile = '.clutch/ratchets.json';
 
 /**
  * One ratchet: the violations of one rule, counted for each file. `pattern` is

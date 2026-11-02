@@ -27,7 +27,7 @@
   "pr_template": "present",
   "project_cli": "present",
   "protected_main": "present",
-  "ratchets": "missing",
+  "ratchets": "present",
   "risk_tier_automerge": "present",
   "root_agents_md": "present",
   "secret_scanning": "present",

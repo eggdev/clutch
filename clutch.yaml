@@ -21,7 +21,7 @@ capabilities:
   verification_cli: adopted
   custom_lint_plugin: adopted
   suppression_discipline: adopted
-  ratchets: { status: waived, reason: Lands in CL-302b., issue: CL-302b }
+  ratchets: adopted
   file_size_caps: adopted
   changed_scope_check: adopted
   protected_main: adopted
