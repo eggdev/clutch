@@ -90,6 +90,11 @@ Each entry names one test:
   missing or `done`. It also fails on a name that is not in the file, and on an
   expiry more than 30 days ahead. A new date needs a new reason in review.
 - Remove the entry in the PR that fixes the test.
+- The nightly [flake hunt](../../.github/workflows/flake-hunt.yml) runs the
+  tools tests 20 times on the same code. Each test that passes on some runs and
+  fails on others gets a 14-day entry and a new issue, in one PR. The release
+  bot opens it, so CI runs on it. The hunt uses no agent. While its PR is open,
+  the next hunt skips.
 
 ## Console output
 

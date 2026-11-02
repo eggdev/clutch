@@ -1,5 +1,6 @@
 import { checksCommand } from '@/checks-command';
 import { doctorCommand } from '@/doctor-command';
+import { frictionCommand } from '@/friction-command';
 import { initCommand } from '@/init-command';
 import { installCommand } from '@/install-command';
 import { issuesCommand } from '@/issues-command';
@@ -57,6 +58,13 @@ export const commands: Record<string, Command> = {
       'clutch issues [--write | --check] [--json]\nclutch issues next [--stack] [--json]\nclutch issues set <id> <status> [--pr URL] [--owner NAME]\nclutch issues new --phase P --title TEXT [--depends CL-NNN,...] [--owner NAME] [--range CL-NNN..CL-NNN]',
     summary: 'List, pick and update the issues in .clutch/issues, and render .clutch/TRACKER.md.',
     run: issuesCommand,
+  },
+  friction: {
+    usage:
+      'clutch friction add "<text>" [--issue CL-NNN] [--kind tooling|docs|check|flake] [--file PATH]\nclutch friction list [--since 7d] [--json] [--file PATH]',
+    summary:
+      'Record friction that slowed a task, in .clutch/friction.jsonl, or list it for the gardening pass.',
+    run: (args, cwd) => frictionCommand(args, cwd),
   },
   metrics: {
     usage:

@@ -201,6 +201,12 @@ The pass:
 4. Delete each rule from [`review.md`](./review.md) that a check covers.
 5. Close each cleanup issue whose "Ready when" criterion is true, in the PR
    that removes the leftover.
+6. Read the week's friction with `clutch friction list --since 7d --json`,
+   and [`tools/flaky-tests.json`](../../tools/flaky-tests.json) for tests that
+   expire within 7 days. Fix at most 3 of them, the ones that cost the most or
+   repeat. A fixed friction entry leaves `.clutch/friction.jsonl` in the same
+   PR, and the body names it by its `at` time. A fixed flaky test leaves the
+   quarantine.
 
 Many small cleanups cost less than one large rewrite.
 

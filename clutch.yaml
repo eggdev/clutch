@@ -11,7 +11,7 @@ capabilities:
   root_agents_md: adopted
   nested_agent_rules: { status: waived, reason: Lands in CL-307., issue: CL-307 }
   skills_dir: adopted
-  friction_log: { status: waived, reason: Lands in CL-306., issue: CL-306 }
+  friction_log: adopted
   codeowners: adopted
   pr_template: adopted
   git_hooks: adopted
@@ -44,7 +44,7 @@ capabilities:
   ci_failure_explainer: adopted
   flaky_quarantine: adopted
   a11y_checks: adopted
-  flake_hunter: { status: waived, reason: Lands in CL-502., issue: CL-502 }
+  flake_hunter: adopted
   pr_size_limits: adopted
   merge_queue: { status: waived, reason: Waits for its trigger in CL-906., issue: CL-906 }
   risk_tier_automerge: adopted

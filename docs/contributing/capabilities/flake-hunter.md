@@ -15,7 +15,7 @@ Rank 26 of the researched practices. About one third of the leading repositories
 1. Add a workflow file `flake-hunt.yml` in `.github/workflows/`, with a nightly `schedule` trigger.
 2. Run the tests with a repeat flag, such as `bun test --rerun-each 20` or `playwright test --repeat-each 20`.
 3. Report each test that passes on some runs and not on others. Open an issue, or add the test to the [flaky-test quarantine](./flaky-quarantine.md).
-4. Grant the job only the permissions it needs.
+4. Grant the job only the permissions it needs. Open the PR with a token that starts CI, such as a GitHub App token, because a PR from the default token starts no workflows.
 5. Set `flake_hunter` to `adopted` in `clutch.yaml`.
 
 ## Waive

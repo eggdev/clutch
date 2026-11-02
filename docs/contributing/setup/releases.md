@@ -77,7 +77,9 @@ The Open PR workflow opens each agent PR with it, so the owner
 can approve it. See
 [who opens the pull request](../../../.agents/skills/deliver/references/pull-requests.md#who-opens-the-pull-request).
 Self-hosted Renovate signs in with it too. See
-[Renovate](./dependencies.md#renovate).
+[Renovate](./dependencies.md#renovate). The nightly flake hunt opens its
+quarantine PR with it, so CI runs on that PR. See
+[flaky tests](../testing.md#flaky-tests).
 
 Without the app, these workflows use the default token. Once `main` has a
 ruleset, the release push then fails, so set the bot up before the ruleset. Set the bot up once per repository:
