@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { autoMerged } from '@tools/github/auto-revert';
 import type { Run } from '@tools/github/stack';
 import { changesetDir, changesetText, packageName } from '@tools/release/changeset';
 
@@ -10,6 +11,11 @@ import { changesetDir, changesetText, packageName } from '@tools/release/changes
  * to a merged PR. It pushes and opens the PR with the token in `PUSH_TOKEN` and
  * `GH_TOKEN`, the release bot's, so CI runs on the revert PR. See
  * docs/contributing/operations/rollback.md#revert-a-merged-pull-request.
+ *
+ * When auto-merge merged the reverted PR, it also files a `risk-tighten` issue
+ * that lists the PR's files and their risk tiers, and proposes to tighten the
+ * path that broke. It files the issue with `ISSUE_TOKEN`, the workflow's own
+ * token, because the release bot has no Issues permission.
  */
 const usage =
   'Usage: bun tools/github/revert.ts --pr <number> --sha <merge commit> --title <title> --base <branch>';
@@ -31,12 +37,66 @@ const writeFile: Write = async (file, text) => {
   await Bun.write(file, text);
 };
 
-async function must(run: Run, command: Array<string>) {
-  const result = await run(command);
+async function must(run: Run, command: Array<string>, env?: Record<string, string>) {
+  const result = await run(command, env ? { env } : undefined);
   if (!result.ok) {
     throw new Error(`${command.join(' ')} failed: ${result.err || result.out}`);
   }
   return result.out.trim();
+}
+
+/** The label of the issues that propose to tighten a risk path after a revert. */
+export const tightenLabel = 'risk-tighten';
+
+type RiskFile = { path: string; tier: string; pattern?: string };
+
+/** The body of the issue that proposes to tighten the path of an auto-merged PR that was reverted. */
+export function tightenBody(pr: string, url: string, files: Array<RiskFile>) {
+  return [
+    `Auto-merge merged #${pr}, and it was reverted in ${url}. Its files and their risk tiers:`,
+    '',
+    ...files.map((file) => `- \`${file.path}\`: ${file.tier} (${file.pattern ?? 'unmatched'})`),
+    '',
+    'If one of these paths caused the break, tighten it: add it to a one-way-door rule in `.clutch/risk.yaml`, or add a check that catches the break. If the path did not cause it, such as a flaky test, close this issue with the reason.',
+    '',
+    'See docs/contributing/operations/rollback.md#tighten-after-a-revert.',
+  ].join('\n');
+}
+
+async function fileTightenIssue(
+  run: Run,
+  { pr, sha, url }: { pr: string; sha: string; url: string },
+  token?: string,
+) {
+  const risk = JSON.parse(
+    await must(run, [
+      'bun',
+      'tools/clutch.ts',
+      'risk',
+      '--base',
+      `${sha}^1`,
+      '--head',
+      sha,
+      '--json',
+    ]),
+  ) as { files?: Array<RiskFile> };
+  const env = token ? { GH_TOKEN: token } : undefined;
+  await must(run, ['gh', 'label', 'create', tightenLabel, '--force', '--color', 'd93f0b'], env);
+  return must(
+    run,
+    [
+      'gh',
+      'issue',
+      'create',
+      '--title',
+      `Tighten risk? #${pr} was reverted after auto-merge`,
+      '--label',
+      tightenLabel,
+      '--body',
+      tightenBody(pr, url, risk.files ?? []),
+    ],
+    env,
+  );
 }
 
 /** Runs the revert. Returns the exit code. */
@@ -127,11 +187,16 @@ export async function runRevert(
     `Reverted in ${url}. Reply here with the reason for the revert, so the next change avoids it.`,
   ]);
   log(`Opened ${url}.`);
+  if (repo && (await autoMerged(run, repo, pr))) {
+    const issue = await fileTightenIssue(run, { pr, sha, url }, env.ISSUE_TOKEN);
+    log(`Auto-merge merged #${pr}. Filed ${issue} to tighten its path.`);
+  }
   return 0;
 }
 
-const spawn: Run = async (command) => {
-  const proc = Bun.spawn(command, { cwd: root, stdout: 'pipe', stderr: 'pipe' });
+const spawn: Run = async (command, options) => {
+  const env = options?.env ? { ...process.env, ...options.env } : undefined;
+  const proc = Bun.spawn(command, { cwd: root, env, stdout: 'pipe', stderr: 'pipe' });
   const [out, err, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),

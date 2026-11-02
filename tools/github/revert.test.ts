@@ -82,6 +82,26 @@ test('a merged PR is reverted on revert/<n> with a changeset, pushed with the bo
   expect(lines).toEqual(['Opened https://github.com/acme/shop/pull/90.']);
 });
 
+test('an auto-merged PR that is reverted gets a risk-tighten issue with its files and tiers', async () => {
+  const risk = {
+    tier: 'medium',
+    files: [{ path: 'apps/web/src/a.ts', tier: 'medium', pattern: 'apps/**' }],
+  };
+  const gh = fake([
+    ['gh api --paginate repos/acme/shop/issues/75/comments', { out: '901\n' }],
+    ['bun tools/clutch.ts risk', { out: JSON.stringify(risk) }],
+    ['gh issue create', { out: 'https://github.com/acme/shop/issues/91\n' }],
+  ]);
+  const { lines } = await revert(gh);
+  expect(gh.calls).toContain(`bun tools/clutch.ts risk --base ${sha}^1 --head ${sha} --json`);
+  const issue = gh.calls.find((call) => call.startsWith('gh issue create')) ?? '';
+  expect(issue).toContain('--label risk-tighten');
+  expect(issue).toContain('- `apps/web/src/a.ts`: medium (apps/**)');
+  expect(lines.at(-1)).toBe(
+    'Auto-merge merged #75. Filed https://github.com/acme/shop/issues/91 to tighten its path.',
+  );
+});
+
 test('a single-parent commit reverts without -m, and an existing branch is left alone', async () => {
   const squash = fake([['git rev-list', { out: `${sha} p1\n` }]]);
   await revert(squash);
