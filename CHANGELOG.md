@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.34.0 (2026-11-02)
+
+### Features
+
+- Journeys fail on serious accessibility violations: an axe check in `@repo/journeys`, and the `a11y_checks` capability (CL-505).
+
 ## 0.33.0 (2026-11-02)
 
 ### Features
