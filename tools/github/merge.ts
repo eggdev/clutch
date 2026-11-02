@@ -1,6 +1,7 @@
 import { defaultBranch, must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
+import { ownerFindings, waitsForOwner } from '@tools/github/status';
 
 type ReleaseRun = { headSha: string; status: string; conclusion: string; url: string };
 
@@ -98,7 +99,8 @@ function reviewProblem(number: string, pr: Review) {
  * merge`, bottom up. GitHub can still count a PR as stacked after the PRs
  * below it merged, so a plain merge that GitHub refuses for its stack retries
  * through the stack. Then it waits for the release of the merge. It refuses
- * while GitHub reports that the PR needs a review.
+ * while GitHub reports that the PR needs a review, and while agent review's
+ * owner findings wait for the owner's approval.
  */
 export async function merge(
   run: Run,
@@ -125,6 +127,12 @@ export async function merge(
   });
   if (problem) {
     throw new Error(problem);
+  }
+  const owner = await ownerFindings(run, number);
+  if (waitsForOwner(owner, pr.reviewDecision)) {
+    throw new Error(
+      `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. The owner approves it before it merges.`,
+    );
   }
   const trunk = await defaultBranch(run);
   const above = await must(run, [
