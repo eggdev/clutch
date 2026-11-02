@@ -67,6 +67,7 @@
 /.agents/skills/verify/verification.json @eggdev
 /clutch.yaml @eggdev
 /.clutch/risk.yaml @eggdev
+/.clutch/ratchets.json @eggdev
 /tools/github/ @eggdev
 /apps/cli/src/labels/ @eggdev
 /docs/contributing/capabilities/registry.yaml @eggdev

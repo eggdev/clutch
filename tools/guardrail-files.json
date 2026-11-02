@@ -57,6 +57,7 @@
     ".agents/skills/verify/verification.json",
     "clutch.yaml",
     ".clutch/risk.yaml",
+    ".clutch/ratchets.json",
     "tools/github/**",
     "apps/cli/src/labels/**",
     "docs/contributing/capabilities/registry.yaml",
