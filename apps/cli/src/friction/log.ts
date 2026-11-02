@@ -4,7 +4,7 @@ import path from 'node:path';
 /** The friction log of a repository, one JSON object on each line. See docs/contributing/capabilities/friction-log.md. */
 export const frictionFile = '.clutch/friction.jsonl';
 
-export const frictionKinds = ['tooling', 'docs', 'check', 'flake'] as const;
+const frictionKinds = ['tooling', 'docs', 'check', 'flake'] as const;
 export type FrictionKind = (typeof frictionKinds)[number];
 
 /** One entry. `at` is an ISO time and the entry's key: gardening names a handled entry by it. */
@@ -19,7 +19,7 @@ export type FrictionEntry = {
 const issuePattern = /^CL-\d{3}[a-z]?$/u;
 
 /** Throws with the fix when an entry's fields are not valid. */
-export function checkEntry(entry: FrictionEntry): FrictionEntry {
+function checkEntry(entry: FrictionEntry): FrictionEntry {
   if (!entry.text.trim()) {
     throw new Error('Give the friction as text: clutch friction add "<what slowed you down>".');
   }
@@ -63,7 +63,7 @@ export async function readEntries(file: string): Promise<Array<FrictionEntry>> {
 }
 
 /** The milliseconds in a span such as `7d` or `12h`. */
-export function spanMs(span: string): number {
+function spanMs(span: string): number {
   const match = /^(\d+)([dh])$/u.exec(span);
   if (!match) {
     throw new Error(`--since takes a span such as 7d or 12h, not ${span}.`);
