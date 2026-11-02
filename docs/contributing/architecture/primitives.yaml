@@ -58,6 +58,7 @@ primitives:
     summary: The checks, Git hooks, import policy and test helpers that every project shares.
     code:
       - tools/
+      - packages/journeys/
     docs:
       - docs/contributing/setup/checks.md
       - docs/contributing/import-boundaries.md

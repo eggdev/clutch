@@ -19,6 +19,9 @@
   ],
   "references": [
     {
+      "path": "../../packages/journeys"
+    },
+    {
       "path": "../../packages/design-system/tsconfig.lib.json"
     },
     {

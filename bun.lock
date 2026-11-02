@@ -5,6 +5,7 @@
     "": {
       "name": "project-template",
       "devDependencies": {
+        "@axe-core/playwright": "4.14.0",
         "@babel/core": "8.0.9",
         "@nx/js": "23.3.0",
         "@nx/oxlint": "23.3.0",
@@ -82,6 +83,7 @@
         "react": "19.3.1",
       },
       "devDependencies": {
+        "@repo/journeys": "workspace:*",
         "@types/react": "19.3.0",
       },
     },
@@ -111,6 +113,9 @@
       "dependencies": {
         "effect": "4.0.7",
       },
+    },
+    "packages/journeys": {
+      "name": "@repo/journeys",
     },
     "packages/notes": {
       "name": "@repo/notes",
@@ -161,6 +166,8 @@
     "undici": "7.29.1",
   },
   "packages": {
+    "@axe-core/playwright": ["@axe-core/playwright@4.14.0", "", { "dependencies": { "axe-core": "~4.14.0" }, "peerDependencies": { "playwright-core": ">= 1.0.0" } }, "sha512-SGUhG5PIHd2eMdpgBF2PyQLOhX+qyDR2PT4cmoS4Qk2ak+jX/rrSvst9l0PGv5WTHolKpUMvVmoHpr4cZgf1RQ=="],
+
     "@babel/code-frame": ["@babel/code-frame@8.0.6", "", { "dependencies": { "@babel/helper-validator-identifier": "^8.0.6", "js-tokens": "^10.0.0" } }, "sha512-uMHhvmDmwFiLuiozaoRYTZHqMFuu3fem/X9JY78lohAuLoh8LSGGC8JqUzo2cVuBsBxkjMZNk56CE7ock8Xxkw=="],
 
     "@babel/compat-data": ["@babel/compat-data@8.0.5", "", {}, "sha512-YLsYoQMvL8l8WrGpN3Zj7O1wK5LEBN+cQtux7BcuHyxIXve724XG+zuJ1n3U1cUweRtTzQOA4IHbuQw3N34SZw=="],
@@ -643,6 +650,8 @@
 
     "@repo/identity": ["@repo/identity@workspace:packages/identity"],
 
+    "@repo/journeys": ["@repo/journeys@workspace:packages/journeys"],
+
     "@repo/notes": ["@repo/notes@workspace:packages/notes"],
 
     "@repo/runtime": ["@repo/runtime@workspace:packages/runtime"],
@@ -814,6 +823,8 @@
     "argparse": ["argparse@2.0.1", "", {}, "sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q=="],
 
     "astral-regex": ["astral-regex@2.0.0", "", {}, "sha512-Z7tMw1ytTXt5jqMcOP+OQteU1VuNK9Y02uuJtKQ1Sv69jXQKKg5cibLwGJow8yzZP+eAc18EmLGPal0bp36rvQ=="],
+
+    "axe-core": ["axe-core@4.14.0", "", {}, "sha512-9WTZxEjsZ7b13TH8JPmbV2z8CHbl80/2hm3XPEG4JgNdQLK81IBRXmSxHfMAOkSqQeRxT/0dwNDz2GOm3zzpcQ=="],
 
     "babel-plugin-const-enum": ["babel-plugin-const-enum@1.2.0", "", { "dependencies": { "@babel/helper-plugin-utils": "^7.0.0", "@babel/plugin-syntax-typescript": "^7.3.3", "@babel/traverse": "^7.16.0" }, "peerDependencies": { "@babel/core": "^7.0.0-0" } }, "sha512-o1m/6iyyFnp9MRsK1dHF3bneqyf3AlM2q3A/YbgQr2pCat6B6XJVDv2TXqzfY2RYUi4mak6WAksSBPlyYGx9dg=="],
 

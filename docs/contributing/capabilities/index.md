@@ -62,6 +62,7 @@ A remote rule reads the repository settings on GitHub. Doctor checks it only wit
 | [Repo-owned agent verification CLI (drives the running app)](./verification-cli.md)          | Verification      | core  |
 | [Changed-files / affected-scope check](./changed-scope-check.md)                             | Verification      | core  |
 | [Flaky-test quarantine / registry](./flaky-quarantine.md)                                    | Verification      | core  |
+| [Accessibility checks in journeys (axe)](./a11y-checks.md)                                   | Verification      | extra |
 | [In-repo custom lint plugin / rules](./custom-lint-plugin.md)                                | Lint & guardrails | extra |
 | [Lint-suppression discipline (reason required / no-disable)](./suppression-discipline.md)    | Lint & guardrails | core  |
 | [Ratchets / shrink-only baselines](./ratchets.md)                                            | Lint & guardrails | core  |

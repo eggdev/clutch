@@ -517,6 +517,17 @@ capabilities:
       - any:
           - file: tools/flaky-tests.json
           - file: .clutch/flaky.json
+  - id: a11y_checks
+    name: Accessibility checks in journeys (axe)
+    category: Verification
+    phase: P4
+    level: extra
+    effort: S
+    doc: docs/contributing/capabilities/a11y-checks.md
+    detect:
+      - grep:
+          files: features/*/journeys/*.pw.ts
+          pattern: '@repo/journeys/testing/a11y'
   - id: flake_hunter
     name: Flake hunters / test audit loops
     category: Scale loops
