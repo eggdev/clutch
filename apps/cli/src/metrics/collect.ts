@@ -185,6 +185,19 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
       return { name, required: [...required] };
     },
 
+    /** The open issues with `label`, without pull requests. */
+    async openIssues(label: string) {
+      const items = await list<{
+        number: number;
+        title: string;
+        html_url: string;
+        pull_request?: unknown;
+      }>(`repos/${repo}/issues?labels=${encodeURIComponent(label)}&state=open`);
+      return items
+        .filter((item) => !item.pull_request)
+        .map((item) => ({ number: item.number, title: item.title, url: item.html_url }));
+    },
+
     /** The numbers of the pull requests merged on or after `since`, a date. */
     async mergedNumbers(since: string) {
       const query = encodeURIComponent(`repo:${repo} is:pr is:merged merged:>=${since}`);

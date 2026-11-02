@@ -141,6 +141,11 @@ const routes = {
     ],
   },
   [`repos/${repo}`]: { default_branch: 'main' },
+  // The open risk-tighten issues. A pull request with the label is not one.
+  [`repos/${repo}/issues`]: [
+    { number: 7, title: 'Tighten risk? #2 was reverted', html_url: 'u7' },
+    { number: 8, title: 'A PR', html_url: 'u8', pull_request: {} },
+  ],
   [`repos/${repo}/issues/comments`]: [
     {
       id: 11,
@@ -204,8 +209,17 @@ test('the report reads only gh api GET routes and fills every field', async () =
       labels: { 'size/S': 0, 'size/M': 2, 'size/L': 0, 'size/XL': 0 },
     },
     dryRunAgreement: { verdicts: 2, wouldMerge: 1, agreed: 1, unanswered: 1, streak: 1 },
+    watch: {
+      noHumanBelowTarget: true,
+      revertsOverLimit: true,
+      mainRedMinutes: 75,
+      tighten: [{ number: 7, title: 'Tighten risk? #2 was reverted', url: 'u7' }],
+    },
   });
   expect(Object.keys(report.unavailable)).toEqual([]);
+  expect(renderMetrics(report)).toContain(
+    'no human action 50%, under the 80% target; reverts 50%, over the 2% limit; main red 75 min; tighten #7',
+  );
   expect(renderMetrics(report)).toContain('Main red');
   expect(renderMetrics(report)).toContain('1 agreed, 0 disagreed, 1 unanswered of 2; streak 1');
 });

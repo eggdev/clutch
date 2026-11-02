@@ -10,6 +10,16 @@ import {
 } from '@/metrics/compute';
 import { agentBranchShare, byStep, prSize } from '@/metrics/pulls';
 
+/**
+ * The P2 exit in .clutch/PLAN.md: the share of PRs that merge with no human
+ * action, and the revert rate that may not be passed. The Watch row flags each
+ * one that misses.
+ */
+const watchTargets = { noHumanShare: 0.8, revertRate: 0.02 };
+
+/** The label of the issues that propose to tighten a risk path after a revert. */
+const tightenLabel = 'risk-tighten';
+
 /** The issues that the checkout tracks, for the issues-done count. */
 type LocalIssue = { status: string; pr: string };
 
@@ -31,6 +41,25 @@ type Options = {
 type Unavailable = Record<string, string>;
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/** What needs a look: each P2 target that misses, main-red minutes and the open tighten issues. */
+function watchOf(
+  flow: ReturnType<typeof flowMetrics>,
+  revertPulls: number,
+  redMinutes: number | null,
+  tighten: Array<{ number: number; title: string; url: string }> | null,
+) {
+  const revertRate = flow.merged === 0 ? null : revertPulls / flow.merged;
+  const noHumanShare = flow.noHumanAction.share;
+  return {
+    noHumanShare,
+    noHumanBelowTarget: noHumanShare !== null && noHumanShare < watchTargets.noHumanShare,
+    revertRate,
+    revertsOverLimit: revertRate !== null && revertRate > watchTargets.revertRate,
+    mainRedMinutes: redMinutes,
+    tighten,
+  };
+}
 
 /**
  * The metrics of `repo` for the `days` days up to `now`. A section that GitHub
@@ -87,6 +116,13 @@ export async function metricsReport(options: Options) {
     unavailable.dryRunAgreement = reason(error);
   }
 
+  let tighten: Array<{ number: number; title: string; url: string }> | null = null;
+  try {
+    tighten = await reader.openIssues(tightenLabel);
+  } catch (error) {
+    unavailable.tighten = reason(error);
+  }
+
   let issuesDone: number | null = null;
   if (options.issues) {
     const merged = new Set(pulls.map((pull) => `https://github.com/${repo}/pull/${pull.number}`));
@@ -123,6 +159,7 @@ export async function metricsReport(options: Options) {
     issuesDone,
     prSize: prSize(pulls, options.sizeExclude ?? []),
     dryRunAgreement: agreement,
+    watch: watchOf(flow, revertPulls, mainRed?.minutes ?? null, tighten),
     unavailable,
   };
 }
@@ -135,6 +172,23 @@ const percent = (share: number | null) =>
   share === null ? 'n/a' : `${Math.round(share * 1000) / 10}%`;
 const spread = (value: { p50: number | null; p90: number | null; count: number }, unit: string) =>
   `p50 ${show(value.p50, unit)}, p90 ${show(value.p90, unit)} (${value.count})`;
+
+/** One line: each P2 target that misses, main-red minutes and the open tighten issues. */
+function watchLine(watch: MetricsReport['watch']) {
+  const flags = [
+    watch.noHumanBelowTarget
+      ? `no human action ${percent(watch.noHumanShare)}, under the ${percent(watchTargets.noHumanShare)} target`
+      : null,
+    watch.revertsOverLimit
+      ? `reverts ${percent(watch.revertRate)}, over the ${percent(watchTargets.revertRate)} limit`
+      : null,
+    watch.mainRedMinutes ? `main red ${watch.mainRedMinutes} min` : null,
+    watch.tighten && watch.tighten.length > 0
+      ? `tighten ${watch.tighten.map((issue) => `#${issue.number}`).join(' ')}`
+      : null,
+  ].filter(Boolean);
+  return flags.length > 0 ? flags.join('; ') : 'nothing';
+}
 
 /** The report as a two-column table. */
 export function renderMetrics(report: MetricsReport) {
@@ -194,6 +248,7 @@ export function renderMetrics(report: MetricsReport) {
         ? `${report.dryRunAgreement.agreed} agreed, ${report.dryRunAgreement.disagreed} disagreed, ${report.dryRunAgreement.unanswered} unanswered of ${report.dryRunAgreement.verdicts}; streak ${report.dryRunAgreement.streak}`
         : 'n/a',
     ],
+    ['Watch', watchLine(report.watch)],
   ];
   const width = Math.max(...rows.map(([label]) => label.length));
   const lines = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`);
