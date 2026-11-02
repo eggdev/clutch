@@ -99,6 +99,15 @@ function latestReview(posted: Array<Comment>) {
     .findLast((note) => note.body.trimStart().startsWith('## Agent review'));
 }
 
+/**
+ * Whether an `owner` finding still waits for the owner: the one rule that
+ * `pr status` and `pr merge` both apply. It waits until the PR is approved,
+ * even where no GitHub rule asks for an approval.
+ */
+export function waitsForOwner(owner: number, reviewDecision: string | null | undefined) {
+  return owner > 0 && reviewDecision !== 'APPROVED';
+}
+
 /** The `owner` findings of the latest agent review on PR `number`. `pr merge` asks here too. */
 export async function ownerFindings(run: Run, number: string) {
   const review = latestReview(await comments(run, number));
@@ -167,8 +176,8 @@ export async function prStatus(run: Run, number: string) {
   // still reports the merge state as BLOCKED.
   const review =
     pr.reviewDecision || (pr.mergeStateStatus === 'BLOCKED' ? 'BLOCKED by a rule' : '');
-  // An owner finding waits for the owner's approval, even where no rule asks for one.
-  const approved = owner > 0 ? review === 'APPROVED' : review === '' || review === 'APPROVED';
+  const approved =
+    !waitsForOwner(owner, pr.reviewDecision) && (review === '' || review === 'APPROVED');
   const ready =
     pr.state === 'OPEN' &&
     pr.mergeable === 'MERGEABLE' &&

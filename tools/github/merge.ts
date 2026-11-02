@@ -1,7 +1,7 @@
 import { defaultBranch, must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
-import { ownerFindings } from '@tools/github/status';
+import { ownerFindings, waitsForOwner } from '@tools/github/status';
 
 type ReleaseRun = { headSha: string; status: string; conclusion: string; url: string };
 
@@ -128,9 +128,8 @@ export async function merge(
   if (problem) {
     throw new Error(problem);
   }
-  // An owner finding waits for the owner's approval, even where no rule asks for one.
   const owner = await ownerFindings(run, number);
-  if (owner > 0 && pr.reviewDecision !== 'APPROVED') {
+  if (waitsForOwner(owner, pr.reviewDecision)) {
     throw new Error(
       `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. The owner approves it before it merges.`,
     );
