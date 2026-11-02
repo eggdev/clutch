@@ -3,7 +3,8 @@
 # no rule matches gets `unmatched`. A file that matches a rule's `except`
 # does not match that rule. Auto-merge reads the tier, so this file is a
 # guardrail file. See apps/cli/README.md#risk.
-#   low:          docs, tests and tracker files. Auto-merge may take it.
+#   low:          docs, tests, including tests of the gates, and tracker
+#                 files. Auto-merge may take it.
 #   medium:       product code and the lockfile. Agent review reads it.
 #   high:         any path that no rule names.
 #   one-way-door: the automation and its gates, agent steering, auth,
@@ -22,6 +23,17 @@ rules:
     paths:
       # The main ruleset as applied on GitHub.
       - .github/rulesets/**
+    # A test of a gate is not the gate: changing it changes no check, and the
+    # gate's own code stays here. check-test-integrity fails a change that
+    # deletes a test or lowers its test or assertion count, and its allow list
+    # stays here. So these tests are low, like every other test. Only this
+    # first rule may have `except`, which tools/codeowners.ts writes as
+    # CODEOWNERS lines with no owner.
+    except:
+      - '**/*.test.ts'
+      - '**/*.test.tsx'
+  - tier: one-way-door
+    paths:
       # Agent steering. Every agent reads these.
       - AGENTS.md
       - CLAUDE.md

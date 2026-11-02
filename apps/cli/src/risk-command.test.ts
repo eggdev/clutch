@@ -78,6 +78,15 @@ test('the automation, agent steering, auth and migrations are a one-way door', a
   }
 });
 
+test('a test of a gate is low, and a test of auth stays a one-way door', async () => {
+  expect(await tierOf(['tools/github/auto-merge.test.ts', 'tools/release/binaries.test.ts'])).toBe(
+    'low',
+  );
+  expect(await tierOf(['tools/github/auto-merge.ts'])).toBe('one-way-door');
+  expect(await tierOf(['packages/access/service/access.test.ts'])).toBe('one-way-door');
+  expect(await tierOf(['apps/api/src/auth/session.test.ts'])).toBe('one-way-door');
+});
+
 test('product code, the sync engine and the lockfile are medium', async () => {
   for (const file of ['apps/web/src/app.tsx', 'packages/sync/service/push.ts', 'bun.lock']) {
     expect(await tierOf([file, 'docs/a.md'])).toBe('medium');

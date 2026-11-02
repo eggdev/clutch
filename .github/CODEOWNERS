@@ -4,7 +4,9 @@
 # The main ruleset requires a code owner's approval, so each pull request that
 # changes one of these paths waits for the owner, and every other pull request
 # stays delegated. check-agent-hooks fails when this file drifts. Kickoff
-# replaces @eggdev with the owner of the project.
+# replaces @eggdev with the owner of the project. A line with no owner comes
+# from a rule's except list: the last matching line wins, so those files need no
+# owner's approval.
 #
 # Escape hatches live in these files. A reviewer checks each one against the
 # table in docs/contributing/harness-engineering.md#guardrail-files.
@@ -75,6 +77,8 @@
 /.gitleaks.toml @eggdev
 /.gitleaksignore @eggdev
 /.github/rulesets/ @eggdev
+**/*.test.ts
+**/*.test.tsx
 /AGENTS.md @eggdev
 /CLAUDE.md @eggdev
 **/AGENTS.md @eggdev
