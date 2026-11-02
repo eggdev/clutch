@@ -5,7 +5,7 @@ import { readJobLog } from '@tools/github/failures';
 import { fake, fakeClock, noWrite, trunk } from '@tools/github/fake-run';
 import { runPr } from '@tools/github/pr';
 import type { Result } from '@tools/github/stack';
-import { blockingCount, prStatus } from '@tools/github/status';
+import { blockingCount, ownerCount, prStatus } from '@tools/github/status';
 
 const head = 'abc1234def';
 const check = (name: string, conclusion: string, status = 'COMPLETED') => ({
@@ -38,6 +38,20 @@ const comments = (...bodies: Array<string>) =>
     { out: bodies.map(comment).join('\n') },
   ] as [string, Partial<Result>];
 
+test('the owner count reads each owner bullet of the summary', () => {
+  const body = [
+    '## Agent review',
+    '',
+    'Findings: 3, 2 `owner`. No `blocking` findings.',
+    '',
+    '- `owner`: **weaker check**. x',
+    '- **owner**: weaker test. y',
+    '- `note`: z, not an owner finding',
+  ].join('\n');
+  expect(ownerCount(body)).toBe(2);
+  expect(ownerCount('## Agent review\n\nNo findings.')).toBe(0);
+});
+
 test('the blocking count reads each way the agent words it', () => {
   expect(blockingCount('## Agent review\n\n**Blocking findings: 0**')).toBe(0);
   expect(blockingCount('## Agent review\n\nFindings: 3 (2 blocking)')).toBe(2);
@@ -48,6 +62,9 @@ test('the blocking count reads each way the agent words it', () => {
   expect(blockingCount('## Agent review\n\nFindings, 0 blocking:\n\n- 2 notes')).toBe(0);
   expect(blockingCount('## Agent review\n\nNo findings.')).toBe(0);
   expect(blockingCount('## Agent review\n\nSomething else.')).toBeNull();
+  expect(
+    blockingCount('## Agent review\n\nFindings: 5, all `owner`. No `blocking` findings.'),
+  ).toBe(0);
 });
 
 test('status reads the checks, the latest review, the dry run and the merge state', async () => {
@@ -302,6 +319,21 @@ test('a required code-owner review keeps a green PR from ready', async () => {
     comments('## Agent review\n\nBlocking findings: 0'),
   ]);
   expect(await prStatus(gh.run, '7')).toMatchObject({ review: 'REVIEW_REQUIRED', ready: false });
+});
+
+test('an owner finding keeps a green PR from ready until the owner approves', async () => {
+  const green = JSON.parse(
+    view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out,
+  );
+  const review = comments('## Agent review\n\nNo `blocking` findings.\n\n- `owner`: weaker check.');
+  const status = (reviewDecision: string) =>
+    prStatus(
+      fake([['gh pr view 7', { out: JSON.stringify({ ...green, reviewDecision }) }], rules, review])
+        .run,
+      '7',
+    );
+  expect(await status('')).toMatchObject({ agentReview: { blocking: 0, owner: 1 }, ready: false });
+  expect(await status('APPROVED')).toMatchObject({ ready: true });
 });
 
 test('a merge state that a rule blocks keeps a green PR from ready', async () => {

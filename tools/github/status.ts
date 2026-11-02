@@ -43,13 +43,19 @@ function checkOf(item: Rollup): Check {
   return { name, state: failed.has(result ?? '') ? 'fail' : 'pending', url };
 }
 
+/** The review text without Markdown emphasis or code marks, which the agent words around levels. */
+const plain = (body: string) => body.replaceAll(/[*`]/gu, '');
+
 /**
  * The blocking count in an agent review comment. The agent words it in several
- * ways: "Blocking findings: 0", "Blocking: 0", "Findings: 1 (0 blocking)" or
- * "0 blocking".
+ * ways: "Blocking findings: 0", "Blocking: 0", "Findings: 1 (0 blocking)",
+ * "0 blocking" or "No `blocking` findings".
  */
 export function blockingCount(body: string) {
-  const text = body.replaceAll('*', '');
+  const text = plain(body);
+  if (/\bno blocking\b/iu.test(text)) {
+    return 0;
+  }
   const match =
     /blocking(?: findings)?:\s*(\d+)/iu.exec(text) ??
     /blocking findings\s+(\d+)/iu.exec(text) ??
@@ -59,6 +65,15 @@ export function blockingCount(body: string) {
     return Number(match[1]);
   }
   return /\bno findings\b/iu.test(text) ? 0 : null;
+}
+
+/**
+ * The `owner` findings in an agent review comment: the summary lists each
+ * finding as a bullet that starts with its level, such as "- `owner`: ...".
+ * Auto-merge leaves a PR with one for the owner. See docs/contributing/review.md.
+ */
+export function ownerCount(body: string) {
+  return [...plain(body).matchAll(/^\s*-\s*owner\b/gimu)].length;
 }
 
 type Comment = { body: string; login: string };
@@ -134,6 +149,7 @@ export async function prStatus(run: Run, number: string) {
   const dryRun = notes.findLast((note) => note.body.includes(marker(pr.headRefOid)));
   const count = (state: State) => all.filter((check) => check.state === state).length;
   const blocking = reviewComment ? blockingCount(reviewComment.body) : null;
+  const owner = reviewComment ? ownerCount(reviewComment.body) : 0;
   // A repository without agent review has no review to wait for.
   const reviewed =
     blocking === 0 || (blocking === null && !all.some((check) => check.name === 'agent-review'));
@@ -142,7 +158,8 @@ export async function prStatus(run: Run, number: string) {
   // still reports the merge state as BLOCKED.
   const review =
     pr.reviewDecision || (pr.mergeStateStatus === 'BLOCKED' ? 'BLOCKED by a rule' : '');
-  const approved = review === '' || review === 'APPROVED';
+  // An owner finding waits for the owner's approval, even where no rule asks for one.
+  const approved = owner > 0 ? review === 'APPROVED' : review === '' || review === 'APPROVED';
   const ready =
     pr.state === 'OPEN' &&
     pr.mergeable === 'MERGEABLE' &&
@@ -163,7 +180,7 @@ export async function prStatus(run: Run, number: string) {
     required,
     checks: all,
     counts: { pass: count('pass'), fail: count('fail'), pending: count('pending') },
-    agentReview: { posted: reviewComment !== undefined, blocking },
+    agentReview: { posted: reviewComment !== undefined, blocking, owner },
     review: review || 'none required',
     dryRun: dryRun ? verdict(dryRun.body) : null,
     ready,
@@ -172,13 +189,17 @@ export async function prStatus(run: Run, number: string) {
 
 export type PrStatus = Awaited<ReturnType<typeof prStatus>>;
 
-function reviewLine(review: { posted: boolean; blocking: number | null }) {
+function reviewLine(review: { posted: boolean; blocking: number | null; owner: number }) {
   if (!review.posted) {
     return 'no review yet';
   }
-  return review.blocking === null
-    ? 'posted, but its blocking count is unreadable'
-    : `${review.blocking} blocking`;
+  const blocking =
+    review.blocking === null
+      ? 'posted, but its blocking count is unreadable'
+      : `${review.blocking} blocking`;
+  return review.owner > 0
+    ? `${blocking}, ${review.owner} owner (the owner approves and merges it)`
+    : blocking;
 }
 
 /** The status as a short block. */

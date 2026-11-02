@@ -79,7 +79,7 @@ Two kinds of PR wait for the owner without a GitHub approval rule:
   the PR by its `one-way-door` tier.
 - A PR with an `owner` finding from agent review. Auto-merge holds it.
 
-Do not merge either kind with `pr merge` until the owner says so.
+Do not merge either kind with `pr merge` until the owner says so. `pr status` counts the `owner` findings, and reports a PR with one as not ready until the owner approves it.
 
 ## Follow a pull request to green
 
