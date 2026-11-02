@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.40.0 (2026-11-02)
+
+### Features
+
+- A project behind a new Clutch release only warns for `template.grace_days` days, and `clutch-sync.yml` opens a sync PR that auto-merges under a new bot rule. Sync now ships `packages/journeys`.
+
+### Fixes and maintenance
+
+- fix(pr): read owner findings and every review wording (CL-210)
+
 ## 0.39.0 (2026-11-02)
 
 ### Features
