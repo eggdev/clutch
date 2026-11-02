@@ -260,6 +260,9 @@ pr_size: # optional
   exclude: [] # globs whose lines do not count, such as generated code
 agentReview: # optional
   missingCredential: notice # notice (the default) or fail
+fleet: # optional: the repositories the weekly digest reads
+  - repo: eggdev/neighborhood # owner/name
+    ref: main # the branch to read
 ```
 
 `automerge.mode` tells the Auto-merge workflow what to do, and `automerge.step`
@@ -269,6 +272,10 @@ how far it reaches: bot PRs, then low-risk agent PRs, then medium-risk ones. See
 `agentReview.missingCredential` tells `agent-review.yml` what to do without an
 Anthropic credential: pass with a notice, or fail. Set `fail` once
 `agent-review` is a required check. See [review](../../docs/contributing/review.md).
+
+`fleet` lists the repositories that `.github/workflows/weekly-digest.yml`
+reads each Monday, as the release bot. See
+[weekly digest](../../docs/contributing/capabilities/factory-observability.md#weekly-digest).
 
 `sast` picks the static analysis engine that `.github/workflows/sast.yml` runs.
 `auto` runs CodeQL where code scanning takes results and Semgrep elsewhere.
