@@ -21,6 +21,9 @@
     },
     {
       "path": "../../packages/sync/tsconfig.spec.json"
+    },
+    {
+      "path": "../../packages/journeys/tsconfig.spec.json"
     }
   ]
 }

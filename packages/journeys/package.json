@@ -1,0 +1,10 @@
+{
+  "name": "@repo/journeys",
+  "private": true,
+  "type": "module",
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

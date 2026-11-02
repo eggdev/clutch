@@ -68,6 +68,11 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
 - A journey that `verification.json` does not register, and a flow that runs a
   journey that does not exist.
 
+Each web journey also calls `accessible(page, 'where')` from
+`@repo/journeys/testing/a11y` after each step that renders a page. It fails on
+a `serious` or `critical` axe violation. See
+[accessibility checks](../capabilities/a11y-checks.md).
+
 The `feature` generator writes a draft journey and its flow. Replace the draft
 goal with the real one before the feature ships.
 
