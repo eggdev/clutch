@@ -1,0 +1,211 @@
+name: Security
+
+# Once a day, a security agent triages new vulnerability reports and checks
+# the dependencies, the git history, the code scanning, Dependabot and secret
+# scanning alerts, and the project's logs. It follows
+# .agents/skills/audit-codebase/references/security-agent.md, and it edits
+# files only. The steps after it add its triage note to each new private
+# report, then commit its edits to a security/<date> branch and open one
+# pull request. Nothing here pushes to the default branch or publishes an
+# advisory. See docs/contributing/capabilities/security-agent-loop.md.
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+# Least privilege. The security job grants what it needs in its own block.
+permissions:
+  contents: read
+
+concurrency:
+  group: security
+  cancel-in-progress: false
+
+jobs:
+  security:
+    runs-on: ubuntu-26.04
+    # The bot's key lives in the release environment, which only main may
+    # deploy to. See docs/contributing/setup/releases.md#the-release-bot.
+    environment: release
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      security-events: read
+    steps:
+      - name: Find the Anthropic credential
+        id: credential
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::notice title=Security agent off::Add the ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret to turn on the daily security agent."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      # One security PR at a time. A person reviews the open one first.
+      - name: Find an open security pull request
+        id: open
+        if: steps.credential.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("security/"))] | length')"
+          if [ "$open" != 0 ]; then
+            echo "::notice title=Security agent skipped::A security pull request is still open. Review and merge or close it first."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.open.outputs.run == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # gitleaks and bun, for the history scan and the dependency audit.
+      - if: steps.open.outputs.run == 'true'
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - if: steps.open.outputs.run == 'true'
+        run: bun install --frozen-lockfile --ignore-scripts
+      # Read only. The job's own token cannot read advisories, Dependabot
+      # alerts or secret scanning alerts, so the agent reads them as the bot.
+      # Without the bot, or without these permissions, the agent reads what
+      # the job's token allows and says what it could not read.
+      - name: Get a read-only token for the security inputs
+        id: reader
+        if: steps.open.outputs.run == 'true' && vars.CLUTCH_APP_ID != ''
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-security-events: read
+          permission-vulnerability-alerts: read
+          permission-secret-scanning-alerts: read
+          permission-repository-advisories: read
+      - name: Run the security agent
+        id: agent
+        if: steps.open.outputs.run == 'true'
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.reader.outputs.token || github.token }}
+          prompt: |
+            REPO: ${{ github.repository }}
+
+            Do the daily security pass. Follow
+            .agents/skills/audit-codebase/references/security-agent.md. The
+            default branch is checked out.
+
+            Return a pull request title, a body in Markdown, and a triage note
+            for each private report in the triage state. The title is a
+            Conventional Commit of 72 characters or fewer, such as
+            "fix(deps): update a package with a known vulnerability". When the
+            day needs no edit, return an empty title.
+          # The cheapest model: the pass runs every day, and it reads more than it writes.
+          # The gh paths are read only, and the token is read only too.
+          claude_args: |
+            --model claude-haiku-5-5
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(bun tools/audit-prod.ts),Bash(gitleaks git --redact:*),Bash(bun run security-logs),Bash(gh api repos/${{ github.repository }}/security-advisories?state=triage:*),Bash(gh api repos/${{ github.repository }}/code-scanning/alerts?state=open:*),Bash(gh api repos/${{ github.repository }}/dependabot/alerts?state=open:*),Bash(gh api repos/${{ github.repository }}/secret-scanning/alerts?state=open&hide_secret=true:*),Bash(gh pr list:*)"
+            --json-schema '{"type":"object","properties":{"title":{"type":"string"},"body":{"type":"string"},"advisories":{"type":"array","items":{"type":"object","properties":{"ghsa_id":{"type":"string"},"severity":{"type":"string","enum":["critical","high","medium","low"]},"note":{"type":"string"}},"required":["ghsa_id","severity","note"]}}},"required":["title","body","advisories"]}'
+      # The triage note goes inside the private report, never in a log or a
+      # pull request. Only this step can write to advisories, and it changes
+      # only the description and an empty severity. It never changes the
+      # state, so it cannot publish one.
+      - name: Get the advisory token
+        id: advisories
+        if: steps.open.outputs.run == 'true' && vars.CLUTCH_APP_ID != '' && steps.agent.outputs.structured_output != '' && fromJSON(steps.agent.outputs.structured_output).advisories[0] != null
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          permission-repository-advisories: write
+      - name: Add the triage notes to the reports
+        if: steps.advisories.outcome == 'success'
+        env:
+          RESULT: ${{ steps.agent.outputs.structured_output }}
+          GH_TOKEN: ${{ steps.advisories.outputs.token }}
+        run: |
+          marker='<!-- security-agent triage -->'
+          added=0
+          while IFS= read -r item; do
+            id="$(printf '%s' "$item" | jq -r '.ghsa_id')"
+            case "$id" in
+              GHSA-*) ;;
+              *) echo "::warning title=Skipped a triage note::The agent named an advisory id that is not a GHSA id."; continue ;;
+            esac
+            current="$(gh api "repos/$GITHUB_REPOSITORY/security-advisories/$id")"
+            if [ "$(printf '%s' "$current" | jq -r '.state')" != triage ] \
+              || printf '%s' "$current" | jq -r '.description // ""' | grep -qF "$marker"; then
+              continue
+            fi
+            printf '%s' "$current" | jq --argjson item "$item" --arg marker "$marker" --arg day "$(date -u +%Y-%m-%d)" '
+              {description: ((.description // "") + "\n\n" + $marker + "\n## Triage by the security agent, " + $day + "\n\n" + $item.note)}
+              + (if .severity == null then {severity: $item.severity} else {} end)' \
+              > "$RUNNER_TEMP/advisory.json"
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/security-advisories/$id" \
+              --input "$RUNNER_TEMP/advisory.json" --silent
+            added=$((added + 1))
+          done < <(printf '%s' "$RESULT" | jq -c '.advisories[]')
+          echo "::notice title=Reports triaged::Added a triage note to $added private report(s). Read them in the Security tab."
+      # A PR that the default token opens starts no workflows, so CI and agent
+      # review would not run on it. The release bot's token does start them.
+      - name: Get the release bot token
+        id: bot
+        if: steps.open.outputs.run == 'true' && vars.CLUTCH_APP_ID != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          # Only the branch push and the pull request. The app has more permissions.
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Open the security pull request
+        if: steps.open.outputs.run == 'true'
+        env:
+          RESULT: ${{ steps.agent.outputs.structured_output }}
+          GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ -z "$RESULT" ]; then
+            echo "::error title=The security agent gave no result::The agent step returned no structured output. Read its log."
+            exit 1
+          fi
+          title="$(printf '%s' "$RESULT" | jq -r '.title')"
+          if [ -z "$title" ] || [ -z "$(git status --porcelain)" ]; then
+            echo "::notice title=Security agent found nothing to fix::The pass made no edits today."
+            exit 0
+          fi
+          printf '%s' "$RESULT" | jq -r '.body' > "$RUNNER_TEMP/security-body.md"
+          # A private report stays private until the owner publishes it.
+          for id in $(printf '%s' "$RESULT" | jq -r '.advisories[].ghsa_id'); do
+            if printf '%s\n' "$title" | cat - "$RUNNER_TEMP/security-body.md" | grep -qF "$id"; then
+              echo "::error title=Private report in the pull request::The pull request names a private report. Nothing was pushed. Read the agent's log."
+              exit 1
+            fi
+          done
+          branch="security/$(date -u +%Y-%m-%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$branch"
+          # Each PR carries a changeset, as tools/github/pr.ts writes it: feat is
+          # a minor bump, "!" is a major one, and the rest are a patch.
+          bump='patch'
+          case "$title" in
+            *'!:'*) bump=major ;;
+            feat*) bump=minor ;;
+          esac
+          printf -- '---\n"%s": %s\n---\n\n%s\n' "$(jq -r .name package.json)" "$bump" "$title" \
+            > ".changeset/security-$(date -u +%Y-%m-%d).md"
+          git add --all
+          git commit --message "$title"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE" \
+            --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/security-body.md"

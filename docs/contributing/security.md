@@ -73,6 +73,15 @@ When a rule can be a check, add the check. See
 A change that weakens a rule is a one-way door. See
 [two-way and one-way doors](../principles/two-way-doors.md).
 
+## Logs
+
+The [daily security agent](./capabilities/security-agent-loop.md) reads the
+project's logs for signs of abuse. It runs `bun run security-logs` when
+`package.json` has that script. The script prints the last day of logs and
+changes nothing. Without it, the agent skips the logs.
+
+<!-- kickoff: The log source for the security agent, such as the host's log drain, and the read-only command that the security-logs script in package.json runs. Delete this section when the project has no logs yet. -->
+
 ## Accepted risks
 
 Each entry states:

@@ -88,6 +88,11 @@ ruleset, the release push then fails, so set the bot up before the ruleset. Set 
    [Renovate](./dependencies.md#renovate). For the weekly digest, also give it
    Administration and Actions, each read only. See
    [weekly digest](../capabilities/factory-observability.md#weekly-digest).
+   The
+   [daily security agent](../capabilities/security-agent-loop.md) needs four
+   more. Give it Code scanning alerts, Dependabot alerts and Secret scanning
+   alerts, each read only. Give it Repository security advisories, read and
+   write.
 2. Install the app on the repository.
 3. Set the `CLUTCH_APP_ID` repository variable to the app id.
 4. Create the `release` environment, which only the default branch may deploy

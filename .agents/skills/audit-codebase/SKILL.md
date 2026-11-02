@@ -20,6 +20,7 @@ The task's configured tracker owns findings; use
    could disprove the suspicion. For performance compare equivalent measured
    conditions; for UI check actual interaction, not only rendered strings.
    For analytics on PostHog follow [the analytics audit](references/analytics.md).
+   The daily security agent follows [the security pass](references/security-agent.md).
 4. Separate an observed defect from a hypothesis or missing runtime prerequisite.
    Investigate technical uncertainty; ask the owner only for a product decision.
    Do not turn an unproven suspicion into a confirmed finding.

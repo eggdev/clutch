@@ -393,6 +393,20 @@ capabilities:
       - grep:
           files: .github/workflows/*.y*ml
           pattern: role-to-assume|workload_identity_provider|azure/login
+  - id: security_agent_loop
+    name: Daily security agent (triage, audit, fix PR)
+    category: Trust
+    phase: P4
+    level: extra
+    effort: M
+    doc: docs/contributing/capabilities/security-agent-loop.md
+    detect:
+      # A workflow that runs the agent on the security pass.
+      - grep:
+          files: .github/workflows/*.y*ml
+          pattern: references/security-agent\.md
+      # Proof that the agent can run: the credential that the Claude action needs.
+      - remote: actions_secret:ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN
   - id: worktree_parallel
     name: Worktree / parallel-agent workspace setup
     category: Parallel work
