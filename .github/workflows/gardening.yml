@@ -64,6 +64,11 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      # The pass reads the friction log through clutch, which needs mise and the dependencies.
+      - if: steps.open.outputs.run == 'true'
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - if: steps.open.outputs.run == 'true'
+        run: bun install --frozen-lockfile
       - name: Do the gardening pass
         id: garden
         if: steps.open.outputs.run == 'true'
@@ -84,6 +89,19 @@ jobs:
               `gh pr list --state merged` and `gh pr view --comments`.
             - Read open cleanup issues with `gh issue list` and
               `gh issue view`.
+            - Read the friction of the last 7 days with
+              `mise exec -- bun run clutch friction list --since 7d --json`.
+              Each entry has an `at` time, which names it.
+            - Read `tools/flaky-tests.json`. When the file is missing, the
+              list is empty. A test whose `until` date is within 7 days is
+              about to expire.
+            - Pick at most 3 items from the friction and the expiring flaky
+              tests, the ones that cost the most or repeat. Fix each one with
+              a doc, a check, a tool fix or a test fix. A flaky test that you
+              fix leaves `tools/flaky-tests.json` in the same edit.
+            - A friction entry is handled when your edit fixes it. Delete its
+              line from `.clutch/friction.jsonl`, and list its `at` value
+              under "Handled friction" in the body. Leave every other line.
             - Make small edits to files only. Do not run git, and do not
               push. A later step commits your edits and opens one pull request.
             - A guardrail that needs a person's decision goes in the pull
@@ -99,7 +117,7 @@ jobs:
           # The cheapest model unless the CLUTCH_AGENT_MODEL repository variable names another one.
           claude_args: |
             --model ${{ vars.CLUTCH_AGENT_MODEL || 'claude-haiku-5-5' }}
-            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*)"
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(mise exec -- bun run clutch friction:*)"
             --json-schema '{"type":"object","properties":{"title":{"type":"string"},"body":{"type":"string"}},"required":["title","body"]}'
       # A PR that the default token opens starts no workflows, so CI and agent
       # review would not run on it. The release bot's token does start them.
