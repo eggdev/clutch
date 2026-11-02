@@ -1,7 +1,9 @@
 # Runs clutch doctor --check, and sync --check in sync mode, for another
 # repository. It uses the latest release of the Clutch repository that the
-# caller's clutch.yaml names, so sync --check fails when the project is behind
-# that release. A caller adds one job:
+# caller's clutch.yaml names. sync --check warns when the project is behind
+# that release within the grace window (template.grace_days, 14 days by
+# default, and the same major version), and fails after it. The Clutch sync
+# workflow opens the PR that takes each release. A caller adds one job:
 #
 #   jobs:
 #     clutch:
@@ -74,6 +76,8 @@ jobs:
           ref: ${{ steps.clutch.outputs.release }}
           path: .clutch-checkout
           persist-credentials: false
+          # The release tags and their dates, for the grace window of sync --check.
+          fetch-depth: 0
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           working_directory: ${{ steps.clutch.outputs.cli }}

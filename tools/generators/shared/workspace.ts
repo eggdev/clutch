@@ -116,7 +116,11 @@ export function writeProject(tree: Tree, project: Project) {
       ...(journeys ? ['journeys/**/*.pw.ts'] : []),
     ],
     exclude: ['out-tsc/**', 'node_modules/**'],
-    references: [{ path: './tsconfig.lib.json' }],
+    references: [
+      { path: './tsconfig.lib.json' },
+      // The accessibility check that the journeys import.
+      ...(journeys ? [{ path: '../../packages/journeys/tsconfig.spec.json' }] : []),
+    ],
   });
 }
 

@@ -78,7 +78,7 @@ test('a bot branch needs a bot author and a diff that passes the bot rule', () =
     ),
   ).toEqual(['tools/x.ts is not a dependency file.']);
   expect(blockers(facts({}, { headRefName: 'fix/typo' }), 'medium')).toEqual([
-    "The head branch is neither an agent's (clutch/cl-) nor a bot's (renovate/, gardening/).",
+    "The head branch is neither an agent's (clutch/cl-) nor a bot's (renovate/, gardening/, clutch-sync/).",
   ]);
 });
 
@@ -300,7 +300,7 @@ test('dry-run comments the verdict at its step, once per head, and merges nothin
 test('a person branch, a moved head or off mode acts on nothing', async () => {
   const person = fake([], { headRefName: 'fix/typo' });
   expect(await decide(person, { mode: 'on', step: 'medium' })).toEqual([
-    "Not judged: The head branch is neither an agent's (clutch/cl-) nor a bot's (renovate/, gardening/).",
+    "Not judged: The head branch is neither an agent's (clutch/cl-) nor a bot's (renovate/, gardening/, clutch-sync/).",
   ]);
   const moved = fake([], { headRefOid: 'ffff' });
   expect(await decide(moved, { mode: 'on', step: 'medium' })).toEqual([

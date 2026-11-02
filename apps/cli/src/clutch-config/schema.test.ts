@@ -53,6 +53,18 @@ test('an older file that pins template.commit still loads, and the pin is not re
   expect(validateClutchConfig(older).config?.template).not.toHaveProperty('commit');
 });
 
+test('template.grace_days takes a whole number of days', () => {
+  const at = (days: unknown) => ({ ...valid, template: { ...valid.template, grace_days: days } });
+  expect(validateClutchConfig(at(7)).config?.template.grace_days).toBe(7);
+  expect(validateClutchConfig(at(0)).config?.template.grace_days).toBe(0);
+  expect(validateClutchConfig(valid).config?.template).not.toHaveProperty('grace_days');
+  for (const bad of [-1, 1.5, '7']) {
+    expect(validateClutchConfig(at(bad)).errors).toEqual([
+      { path: 'template.grace_days', message: 'Expected a whole number of days, 0 or more.' },
+    ]);
+  }
+});
+
 test('worktree is optional, and copy and setup default to empty lists', () => {
   const { worktree: _, ...noWorktree } = valid;
   expect(validateClutchConfig(noWorktree).config?.worktree).toBeUndefined();

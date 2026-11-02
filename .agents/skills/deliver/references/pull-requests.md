@@ -142,7 +142,7 @@ stale reviews. So the owner approves a batch once:
 
 Merge only when the owner says so. The one exception is a PR that the Auto-merge
 workflow queues under `automerge.mode: on` in `clutch.yaml`, within the reach of
-`automerge.step`. At `bots`, only Renovate and gardening PRs merge this way. See
+`automerge.step`. At `bots`, only Renovate, gardening and Clutch sync PRs merge this way. See
 [Auto-merge](#auto-merge).
 
 ```sh
@@ -177,8 +177,8 @@ closes without a merge, set its task back to `todo` in the next branch.
 The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges agent and
 bot PRs. An agent PR's head branch starts with `clutch/cl-`. Only an agent opens
 such a branch. The release bot opens most agent PRs, and the user opens the
-rest, so the author cannot tell an agent from a person. A bot PR's branch starts with `renovate/` or
-`gardening/`, and its author is a bot.
+rest, so the author cannot tell an agent from a person. A bot PR's branch starts with `renovate/`,
+`gardening/` or `clutch-sync/`, and its author is a bot.
 
 `automerge.step` in `clutch.yaml` sets how far auto-merge reaches. Each step
 takes the PRs of the steps before it:
@@ -197,6 +197,12 @@ The bot rule:
   registry, or from a workspace folder of this repository. Renovate already
   waits out the 3-day release age.
 - A gardening PR's `clutch risk` tier must be `low`.
+- A Clutch sync PR, which `clutch-sync.yml` opens, may change only what
+  `clutch sync` writes: the managed files that its `.clutch/lineage.json`
+  lists, the lineage, its changeset, `clutch.yaml`, the merged files such as
+  `package.json`, the TypeScript configs and the lockfile. The lockfile rule is
+  the same as Renovate's. The required `clutch / doctor` check proves that the
+  managed files match the release.
 
 At each step, the PR also needs all of these:
 

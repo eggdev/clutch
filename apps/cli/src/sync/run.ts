@@ -34,6 +34,8 @@ export type SyncResult = {
   release: string | null;
   /** The sync targets the latest release, not a `--to` revision. */
   latest: boolean;
+  /** The Clutch release of the last sync, from `.clutch/lineage.json`, or null. */
+  from: string | null;
   changes: Array<Change>;
   /** Managed files that the project edited. A person keeps or takes each one with --keep or --take. */
   decisions: Array<string>;
@@ -47,7 +49,13 @@ async function readLineage(root: string) {
   const legacy = current ? null : await localFile(root, reviewRecord);
   const record = current ?? legacy;
   const parsed = record ? (JSON.parse(record.content.toString()) as Partial<Lineage>) : {};
-  return { previous: current, legacy, files: parsed.files ?? {}, kept: parsed.kept ?? {} };
+  return {
+    previous: current,
+    legacy,
+    files: parsed.files ?? {},
+    kept: parsed.kept ?? {},
+    release: parsed.release ?? null,
+  };
 }
 
 /**
@@ -309,6 +317,7 @@ export async function runSync(options: {
     templateCommit: source.commit,
     release: source.release,
     latest: options.to === undefined,
+    from: lineage.release,
     changes,
     decisions: [...managed.conflicts, ...merges.decisions],
     mergeClashes: merges.clashes,
