@@ -5,7 +5,7 @@ import { parseArgs } from 'node:util';
 import { parse } from 'yaml';
 
 import { git, gitOrThrow } from '@/git';
-import { changeTier, classify, validateRiskConfig } from '@/risk/tiers';
+import { changeTier, classify, needsLines, validateRiskConfig } from '@/risk/tiers';
 import type { RiskConfig } from '@/risk/tiers';
 
 const riskFile = '.clutch/risk.yaml';
@@ -59,6 +59,31 @@ async function changedFiles(root: string, base: string, head: string) {
   return out ? out.split('\n') : [];
 }
 
+/** The added and removed lines of each file that a `lines` rule reads, without `+` or `-`. */
+async function changedLines(root: string, config: RiskConfig, files: Array<string>, range: string) {
+  const changed = new Map<string, Array<string>>();
+  for (const file of files.filter((candidate) => needsLines(config, candidate))) {
+    const diff = await gitOrThrow(
+      root,
+      'diff',
+      '-U0',
+      '--no-color',
+      '--no-renames',
+      range,
+      '--',
+      file,
+    );
+    changed.set(
+      file,
+      diff
+        .split('\n')
+        .filter((line) => /^[+-]/u.test(line) && !/^(?:\+\+\+|---) /u.test(line))
+        .map((line) => line.slice(1)),
+    );
+  }
+  return changed;
+}
+
 async function run(args: Array<string>, cwd: string): Promise<number> {
   const { values } = parseArgs({
     args,
@@ -71,7 +96,9 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
   const root = await repoRoot(cwd);
   const config = await loadRiskConfig(root);
   const base = values.base ?? (await defaultBase(root));
-  const files = classify(config, await changedFiles(root, base, values.head));
+  const paths = await changedFiles(root, base, values.head);
+  const range = `${base}...${values.head}`;
+  const files = classify(config, paths, await changedLines(root, config, paths, range));
   const tier = changeTier(files);
   if (values.json) {
     console.log(JSON.stringify({ schemaVersion: 1, tier, base, head: values.head, files }));
