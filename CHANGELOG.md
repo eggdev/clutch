@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.32.2 (2026-11-02)
+
+### Fixes and maintenance
+
+- docs(decisions): allow shrink-only ratchets for adopted repos (CL-301)
+
 ## 0.32.1 (2026-11-02)
 
 ### Fixes and maintenance
