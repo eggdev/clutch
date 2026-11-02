@@ -32,6 +32,7 @@
   "risk_tier_automerge": "present",
   "root_agents_md": "present",
   "secret_scanning": "present",
+  "security_agent_loop": "missing",
   "skills_dir": "present",
   "suppression_discipline": "present",
   "verification_cli": "present",

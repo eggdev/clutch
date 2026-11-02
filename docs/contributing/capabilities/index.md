@@ -82,6 +82,7 @@ A remote rule reads the repository settings on GitHub. Doctor checks it only wit
 | [Dependency minimum release age / update cooldown](./dep-min-age.md)                         | Trust             | core  |
 | [GitHub Actions security lint (zizmor / actionlint / pinned actions)](./ci-security-lint.md) | Trust             | core  |
 | [OIDC / keyless credentials in CI (id-token)](./oidc-ci.md)                                  | Trust             | extra |
+| [Daily security agent (triage, audit, fix PR)](./security-agent-loop.md)                     | Trust             | extra |
 | [Worktree / parallel-agent workspace setup](./worktree-parallel.md)                          | Parallel work     | core  |
 | [Cloud-agent VM / sandbox setup in repo](./cloud-agent-vm.md)                                | Parallel work     | core  |
 | [Repo MCP config for agents](./mcp-config.md)                                                | Parallel work     | extra |
