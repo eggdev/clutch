@@ -147,7 +147,7 @@ stale reviews. So the owner approves a batch once:
 
 Merge only when the owner says so. The one exception is a PR that the Auto-merge
 workflow queues under `automerge.mode: on` in `clutch.yaml`, within the reach of
-`automerge.step`. At `bots`, only Renovate, gardening and Clutch sync PRs merge this way. See
+`automerge.step`. At `bots`, only Renovate, gardening, Clutch sync and revert PRs merge this way. See
 [Auto-merge](#auto-merge).
 
 ```sh
@@ -179,20 +179,29 @@ merge, set its task back to `todo` in the next branch.
 
 ## Auto-merge
 
-The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges agent and
-bot PRs. An agent PR's head branch starts with `clutch/cl-`. Only an agent opens
-such a branch. The release bot opens most agent PRs, and the user opens the
-rest, so the author cannot tell an agent from a person. A bot PR's branch starts with `renovate/`,
-`gardening/` or `clutch-sync/`, and its author is a bot.
+The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges the pull
+requests of this repository, never a fork's. An agent PR is one that the release
+bot opens, so its author is a bot. The workflow also judges a PR on a
+`clutch/cl-NNN-<slug>` branch, which an agent makes, as a fallback for a project
+whose release bot is not set up. A bot PR's branch starts with `renovate/`,
+`gardening/`, `clutch-sync/` or `revert/`, and its author is a bot. Any other
+PR is a person's. The workflow logs that it is not judged, and it posts no
+comment on it.
 
 `automerge.step` in `clutch.yaml` sets how far auto-merge reaches. Each step
 takes the PRs of the steps before it:
 
 | Step     | Takes                                                                                         |
 | -------- | --------------------------------------------------------------------------------------------- |
-| `bots`   | Bot PRs that pass the bot rule.                                                               |
+| `bots`   | Bot PRs that pass the bot rule, and the revert PRs below.                                     |
 | `low`    | Also agent PRs that `clutch risk` gives `low`.                                                |
 | `medium` | Also agent PRs that it gives `medium`. Agent review passed, so they have 0 blocking findings. |
+
+The revert rule: a `revert/<number>` PR, which the Revert workflow opens, merges
+at every step. It merges when auto-merge merged PR `<number>` and the revert's
+own `clutch risk` tier is `low` or `medium`. It may merge while `main` is red,
+because it is the fix. A revert of a PR that a person merged waits for a person.
+See [auto-revert](../../../../docs/contributing/operations/rollback.md#auto-revert).
 
 The bot rule:
 
@@ -218,7 +227,7 @@ At each step, the PR also needs all of these:
   Actions app reported count, as in the main ruleset. A run with the same name
   from another app or token counts for nothing.
 - No required check is red on the default branch's latest commit. A red
-  `main` stops every auto-merge until it is green again.
+  `main` stops every auto-merge until it is green again, except a revert PR.
 - Agent review left no `owner` finding on its head. A change that weakens a
   check, a lint rule, a budget or a test gets one, whatever its path. See
   [review](../../../../docs/contributing/review.md#finding-levels). The owner
@@ -242,7 +251,8 @@ gets this repository's token. `automerge.mode` decides what it does:
   merges it with a merge commit once the required checks pass. A merge made with
   the default token starts no workflow, so the bot's token keeps the release
   and CI running on `main`. Each agent PR also gets the dry-run verdict for the
-  next step, so the owner can grade it before that step turns on.
+  next step, so the owner can grade it before that step turns on. At the last
+  step, `medium`, there is no next step, so `on` posts no verdict.
 
 To stop one queued merge, run `gh pr merge --disable-auto <number>`. To stop
 all of them, set `automerge.mode` to `dry-run`.

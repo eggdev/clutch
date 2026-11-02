@@ -176,7 +176,7 @@ export async function runRevert(
     '--title',
     subject,
     '--body',
-    `Reverts #${pr} (merge commit ${sha}). Someone added the \`revert\` label to it.\n\nMerge this like any PR, once its checks pass.`,
+    `Reverts #${pr} (merge commit ${sha}). Someone added the \`revert\` label to it.\n\nWhen auto-merge merged the original PR and this revert is low or medium risk, auto-merge takes it once its checks pass. Otherwise, a person merges it.`,
   ]);
   await must(run, [
     'gh',

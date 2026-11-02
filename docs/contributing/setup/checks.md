@@ -280,10 +280,11 @@ warns. Size never fails a PR. See
 
 The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
 CI or agent review completes on a branch of this repository, never a fork. It
-judges an agent's `clutch/cl-` branch, and a bot's `renovate/`, `gardening/` or
-`clutch-sync/` branch. It acts on `automerge.mode` and `automerge.step` in `clutch.yaml`. Its
-`merge` job enables GitHub's auto-merge with the release bot, in the `release`
-environment. See
+judges each pull request of this repository, and logs a person's as not judged.
+An agent's PR is one that a bot opens. A bot's PR is on a `renovate/`,
+`gardening/`, `clutch-sync/` or `revert/` branch. It acts on `automerge.mode`
+and `automerge.step` in `clutch.yaml`. Its `merge` job enables GitHub's
+auto-merge with the release bot, in the `release` environment. See
 [auto-merge](../../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
 
 - Each job names its runner image, `ubuntu-26.04`, not `ubuntu-latest`. A

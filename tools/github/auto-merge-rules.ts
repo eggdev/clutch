@@ -1,4 +1,4 @@
-import { botKind } from '@tools/github/bot-rule';
+import { botKind, revertedPr } from '@tools/github/bot-rule';
 
 /**
  * The rules of auto-merge, without any GitHub call: the steps, the kinds of
@@ -7,7 +7,7 @@ import { botKind } from '@tools/github/bot-rule';
  * acts on them.
  */
 
-/** Only an agent opens a branch with this prefix. The release bot or the operator opens its PR, so the author cannot tell. */
+/** An agent's branch starts with this prefix. A person can open a PR from such a branch, so the author counts too. */
 const agentBranch = 'clutch/cl-';
 
 export const modes = ['off', 'dry-run', 'on'] as const;
@@ -19,6 +19,9 @@ export type Step = (typeof steps)[number];
 
 /** The step after `step`, which an `on` run calibrates. The last step calibrates itself. */
 export const nextStep = (step: Step): Step => steps[Math.min(steps.indexOf(step) + 1, 2)];
+
+/** Whether an `on` run is at the last step, which has no next step to calibrate, so it posts no dry-run comment. */
+export const lastStepOn = (mode: Mode, step: Step) => mode === 'on' && nextStep(step) === step;
 
 export type Config = { mode: Mode; step: Step };
 
@@ -43,27 +46,38 @@ export type Facts = {
    * lint rule, a budget or a test. Each one leaves the PR for the owner.
    */
   ownerFindings: Array<string>;
-  /** Why a bot PR's diff fails the bot rule. Empty for an agent PR. */
+  /** Why a bot PR fails its bot rule: a diff that is more than a version, or a revert that may not merge. Empty for an agent PR. */
   botProblems: Array<string>;
   /** Each required check that failed on the default branch's latest commit. */
   mainRed: Array<string>;
 };
 
+/**
+ * Whether the PR is an agent's: its head branch starts with `clutch/cl-`, or a
+ * bot opened it. The release bot opens each agent PR, so the author is a bot.
+ * A PR on a known bot's branch is never an agent's.
+ */
+export function isAgentPr(pr: Pr) {
+  return (
+    botKind(pr.headRefName) === null && (pr.headRefName.startsWith(agentBranch) || pr.author.is_bot)
+  );
+}
+
 /** Why the PR is neither an agent's nor a bot's, or nothing. */
 export function kindProblem(pr: Pr) {
-  if (pr.headRefName.startsWith(agentBranch)) {
-    return null;
-  }
   const bot = botKind(pr.headRefName);
-  if (!bot) {
-    return `The head branch is neither an agent's (${agentBranch}) nor a bot's (renovate/, gardening/, clutch-sync/).`;
+  if (bot) {
+    return pr.author.is_bot ? null : `The author of the ${bot} branch is not a bot.`;
   }
-  return pr.author.is_bot ? null : `The author of the ${bot} branch is not a bot.`;
+  return isAgentPr(pr)
+    ? null
+    : 'A person opened this pull request. Open it with `bun run pr open`, so the release bot opens it.';
 }
 
 /** Why the PR's kind and tier are not in reach at `step`. */
-function stepProblems({ pr, tier, botProblems }: Facts, step: Step): Array<string> {
-  if (!pr.headRefName.startsWith(agentBranch)) {
+function stepProblems(facts: Facts, step: Step): Array<string> {
+  const { pr, tier, botProblems } = facts;
+  if (!isAgentPr(pr)) {
     return botProblems;
   }
   if (step === 'bots') {
@@ -71,6 +85,30 @@ function stepProblems({ pr, tier, botProblems }: Facts, step: Step): Array<strin
   }
   const reach = step === 'low' ? ['low'] : ['low', 'medium'];
   return reach.includes(tier) ? [] : [`The risk tier is ${tier}, not ${reach.join(' or ')}.`];
+}
+
+/**
+ * Why a revert PR may not merge without a person. It may when auto-merge merged
+ * the PR it reverts, and its own risk tier is low or medium. `wasAutoMerged`
+ * asks GitHub whether auto-merge merged a PR, so this file makes no GitHub call.
+ */
+export async function revertProblems(
+  headRefName: string,
+  tier: string,
+  wasAutoMerged: (pr: string) => Promise<boolean>,
+) {
+  const reverted = revertedPr(headRefName);
+  if (!reverted) {
+    return ['The branch does not name the reverted pull request.'];
+  }
+  const problems: Array<string> = [];
+  if (!(await wasAutoMerged(reverted))) {
+    problems.push(`#${reverted} was not merged by auto-merge, so a person merges its revert.`);
+  }
+  if (tier !== 'low' && tier !== 'medium') {
+    problems.push(`The risk tier is ${tier}, not low or medium.`);
+  }
+  return problems;
 }
 
 /** The reasons the pull request may not merge without a person at `step`. None means it may. */
@@ -100,12 +138,22 @@ export function blockers(facts: Facts, step: Step): Array<string> {
   for (const finding of facts.ownerFindings) {
     reasons.push(`Agent review asks the owner: ${finding}`);
   }
-  for (const name of mainRed) {
-    reasons.push(
-      `The required check ${name} is red on ${defaultBranch}. Nothing merges until it is green.`,
-    );
+  // A revert is how a red main turns green, so the red main does not hold it.
+  if (botKind(pr.headRefName) !== 'revert') {
+    for (const name of mainRed) {
+      reasons.push(
+        `The required check ${name} is red on ${defaultBranch}. Nothing merges until it is green.`,
+      );
+    }
   }
   return reasons;
+}
+
+/** The verdict that a run prints: whether the PR would auto-merge at `step`, and the reasons when it would not. */
+export function verdictText(reasons: Array<string>, step: Step) {
+  return reasons.length > 0
+    ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
+    : `Would auto-merge at the step ${step}.`;
 }
 
 /** Marks the dry-run comment for one head commit, so a rerun does not repeat it. */
@@ -156,7 +204,7 @@ export function dryRunComment(facts: Facts, reasons: Array<string>, step: Step) 
  * finished, since the marker allows one verdict for each head commit.
  */
 export function noVerdictYet({ pr, checks }: Facts) {
-  if (pr.state !== 'OPEN' || pr.isDraft || !pr.headRefName.startsWith(agentBranch)) {
+  if (pr.state !== 'OPEN' || pr.isDraft || !isAgentPr(pr)) {
     return 'The pull request is not an open, ready agent PR.';
   }
   const waiting = Object.entries(checks)

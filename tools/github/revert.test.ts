@@ -76,6 +76,7 @@ test('a merged PR is reverted on revert/<n> with a changeset, pushed with the bo
   const create = gh.calls.find((call) => call.startsWith('gh pr create')) ?? '';
   expect(create).toContain('--title revert: docs(skills): add x (CL-119)');
   expect(create).toContain(`Reverts #75 (merge commit ${sha})`);
+  expect(create).toContain('auto-merge takes it once its checks pass');
   expect(gh.calls).toContain(
     'gh pr comment 75 --body Reverted in https://github.com/acme/shop/pull/90. Reply here with the reason for the revert, so the next change avoids it.',
   );

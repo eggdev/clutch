@@ -5,14 +5,18 @@
  * the 3-day release age (`minimumReleaseAge` in renovate.json). A gardening
  * PR may when its risk tier is low. A Clutch sync PR may when it changes only
  * what `clutch sync` writes; the required `clutch / doctor` check proves that
- * the managed files match the release. See
+ * the managed files match the release. A revert PR is judged in auto-merge.ts,
+ * since it needs the reverted PR. See
  * .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 
 /** One changed file of a pull request, as `gh api repos/<repo>/pulls/<n>/files` gives it. */
 export type ChangedFile = { filename: string; patch?: string };
 
-/** The bot whose pull request this is, from its head branch, or null. */
+/**
+ * The bot whose pull request this is, from its head branch, or null. The
+ * Revert workflow opens a `revert/<number>` PR as the release bot.
+ */
 export function botKind(headRefName: string) {
   if (headRefName.startsWith('renovate/')) {
     return 'renovate';
@@ -20,7 +24,15 @@ export function botKind(headRefName: string) {
   if (headRefName.startsWith('clutch-sync/')) {
     return 'clutch-sync';
   }
+  if (headRefName.startsWith('revert/')) {
+    return 'revert';
+  }
   return headRefName.startsWith('gardening/') ? 'gardening' : null;
+}
+
+/** The number of the pull request that a `revert/<number>` branch reverts, or null. */
+export function revertedPr(headRefName: string) {
+  return /^revert\/(\d+)$/u.exec(headRefName)?.[1] ?? null;
 }
 
 /**

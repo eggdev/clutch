@@ -35,20 +35,14 @@ concurrency:
 
 jobs:
   decide:
-    # Only an agent opens a clutch/cl- branch, and only a bot opens renovate/,
-    # gardening/ or clutch-sync/ (the script checks the author too). A push to main also
-    # completes CI, and is no pull request.
+    # Every pull request from this repository, never a fork. The script judges
+    # each one by its author and branch, so a person's PR gets only a refusal. A
+    # push to main also completes CI, and is no pull request.
     if: >-
-      (github.event_name == 'pull_request' && (startsWith(github.event.pull_request.head.ref, 'clutch/cl-') ||
-      startsWith(github.event.pull_request.head.ref, 'renovate/') ||
-      startsWith(github.event.pull_request.head.ref, 'gardening/') ||
-      startsWith(github.event.pull_request.head.ref, 'clutch-sync/'))) ||
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.head_repository.full_name == github.repository &&
-      (startsWith(github.event.workflow_run.head_branch, 'clutch/cl-') ||
-      startsWith(github.event.workflow_run.head_branch, 'renovate/') ||
-      startsWith(github.event.workflow_run.head_branch, 'gardening/') ||
-      startsWith(github.event.workflow_run.head_branch, 'clutch-sync/')))
+      github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
