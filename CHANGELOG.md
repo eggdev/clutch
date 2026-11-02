@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.34.1 (2026-11-02)
+
+### Fixes and maintenance
+
+- test(db): give the drizzle-kit test a measured timeout (CL-128)
+
 ## 0.34.0 (2026-11-02)
 
 ### Features
