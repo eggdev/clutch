@@ -60,8 +60,8 @@ sets the base in `CHECK_BASE`. Locally, the base is the merge base with
 A test file may go in the same change that deletes the module it tests:
 `pool.test.ts` goes with `pool.ts`. For any other reason, list the test file
 in [`tools/test-integrity-allow.json`](../../tools/test-integrity-allow.json)
-with the reason. That file is a guardrail file, so a person reviews the
-entry. Delete the entry after the change merges.
+with the reason. Agent review gives a new entry an `owner` finding, so
+auto-merge leaves the PR for the owner. Delete the entry after the change merges.
 
 ## Flaky tests
 

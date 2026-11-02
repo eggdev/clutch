@@ -133,8 +133,9 @@ casts in apps, features and packages. `as const` stays allowed.
   what it needs.
 - Product code narrows instead. It decodes with a schema at the boundary, or
   checks a record against its model's `fields`, or types the source.
-- Each other escape hatch lives in a guardrail file, so a person reviews it.
-  See [guardrail files](../harness-engineering.md#guardrail-files).
+- Each other escape hatch lives in a guardrail file. Agent review gives a new
+  hatch an `owner` finding, so the owner decides. See
+  [guardrail files](../harness-engineering.md#guardrail-files).
 
 ## Test files
 
