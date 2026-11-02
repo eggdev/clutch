@@ -5,9 +5,9 @@ import type { Page } from '@playwright/test';
 /**
  * The accessibility check of web journeys. A journey calls
  * `accessible(page, 'where')` after each step that renders a page. It runs axe
- * on the whole page and fails on a `serious` or `critical` violation. A
- * journey that must skip a rule passes it in `exclude`, and says why beside
- * the call. See docs/contributing/capabilities/a11y-checks.md.
+ * on the whole page and fails on a `serious` or `critical` violation. It has
+ * no way to skip a rule: fix the defect. See
+ * docs/contributing/capabilities/a11y-checks.md.
  */
 
 /** The impacts that fail a journey. axe also reports `minor` and `moderate`. */
@@ -27,12 +27,8 @@ function describe(violations: Violations) {
 }
 
 /** Fails the journey when axe finds a serious or critical violation on the page, and attaches its report. */
-export async function accessible(
-  page: Page,
-  where: string,
-  options: { exclude?: Array<string> } = {},
-) {
-  const result = await new AxeBuilder({ page }).disableRules(options.exclude ?? []).analyze();
+export async function accessible(page: Page, where: string) {
+  const result = await new AxeBuilder({ page }).analyze();
   const failing = result.violations.filter((violation) =>
     failingImpacts.has(violation.impact ?? ''),
   );

@@ -27,7 +27,7 @@ test('…', async ({ page }) => {
 
 Call it after each step that renders a new page or a new state, once the page shows what the step expects. It fails with one line for each violation, which names the rule, the elements it hit and a link to the rule's page. It also attaches the full axe report to the test, in `test-results/journeys/`.
 
-To skip a rule, pass `{ exclude: ['rule-id'] }`, and give the reason in a comment beside the call. Fix the defect instead whenever you can.
+The check has no way to skip a rule, so fix each defect it reports. A rule that must stay off needs the owner's decision, and a guardrail file that holds it. Add that file to the escape hatch table in [harness engineering](../harness-engineering.md#guardrail-files).
 
 ## Adopt
 
