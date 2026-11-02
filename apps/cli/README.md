@@ -163,6 +163,26 @@ mise exec -- bun run clutch worktree rm cart-total
 - The commands call a backend interface (`worktree/backend.ts`). Git is the
   only backend. Sprig is a possible later one (`.clutch/issues/CL-901.md`).
 
+## Friction
+
+`clutch friction` records what slowed a task down, so the weekly gardening pass
+can turn repeated friction into a doc, a check or a tool fix. `AGENTS.md` asks
+for an entry for any friction that cost more than 5 minutes.
+
+```sh
+mise exec -- bun run clutch friction add "pr open hid the hook output" --issue CL-306 --kind tooling
+mise exec -- bun run clutch friction list --since 7d
+```
+
+- `add "<text>"` appends one JSON line to `.clutch/friction.jsonl` in the
+  current checkout: `{at, issue, kind, text, branch}`. `at` is the time, and it
+  names the entry, so gardening removes a handled entry by its `at`. `--kind` is
+  `tooling` (the default), `docs`, `check` or `flake`.
+- `list [--since 7d] [--json]` prints the entries, oldest first. `--since` takes
+  days or hours, such as `7d` or `12h`. A line that is not a valid entry fails
+  with its line number.
+- `--file <path>` reads or writes another file, for tests.
+
 ## Labels
 
 `clutch labels` prints the labels of a change. `kind/<type>` comes from the

@@ -1,0 +1,3 @@
+{"at":"2026-10-29T00:00:00.000Z","issue":"CL-024","kind":"tooling","text":"bun run pr open could not push a rebased branch (non-fast-forward). Fixed: --force pushes with --force-with-lease.","branch":null}
+{"at":"2026-10-29T00:00:01.000Z","issue":"CL-024","kind":"tooling","text":"When the pre-push checks failed, bun run pr open said to use --force, as if a rebase caused it. Fixed: it says to read the git output and fix the check first.","branch":null}
+{"at":"2026-10-30T00:00:00.000Z","issue":"CL-032b","kind":"tooling","text":"bun run pr open counted an added .changeset/README.md as the changeset, so CL-032b got none. Fixed: it checks the basename.","branch":null}

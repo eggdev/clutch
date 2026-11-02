@@ -17,7 +17,7 @@
   "file_size_caps": "present",
   "flake_hunter": "missing",
   "flaky_quarantine": "present",
-  "friction_log": "missing",
+  "friction_log": "present",
   "gardener_bots": "present",
   "git_hooks": "present",
   "mcp_config": "present",

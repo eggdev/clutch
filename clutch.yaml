@@ -11,7 +11,7 @@ capabilities:
   root_agents_md: adopted
   nested_agent_rules: { status: waived, reason: Lands in CL-307., issue: CL-307 }
   skills_dir: adopted
-  friction_log: { status: waived, reason: Lands in CL-306., issue: CL-306 }
+  friction_log: adopted
   codeowners: adopted
   pr_template: adopted
   git_hooks: adopted

@@ -4,6 +4,8 @@
 
 `mise exec -- bun run validate` runs every check. Run it before you say a change is done.
 
+Record any friction that cost you more than 5 minutes: `mise exec -- bun run clutch friction add "<what slowed you down>" --kind tooling|docs|check|flake`. The weekly gardening pass turns it into fixes.
+
 This file is a map, not the docs. Open the page that owns the task:
 
 - Not defined yet: read [KICKOFF.md](./KICKOFF.md) first. In the template repository, work on the starter and tooling is allowed. In a project, run kickoff first, and ask the owner before product work while `KICKOFF.md` exists.
