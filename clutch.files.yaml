@@ -180,6 +180,10 @@ exclude:
   - .claude/skills/verify
   # The capability registry belongs to Clutch. Projects read the copy in their Clutch checkout.
   - docs/contributing/capabilities/registry.yaml
+  # Tests that compile apps/cli, which only Clutch has, so they cannot pass in a project.
+  - tools/github/project.test.ts
+  - tools/release/binaries.test.ts
+  - tools/release/fresh-project.test.ts
 # Hashes of older Clutch copies, by path. A project file that matches one is unchanged, so sync may replace it.
 known:
   .agents/skills/audit/SKILL.md: e52b63b1e3bf19d187b2a62b528a83461eb69cecbcaaa06bba703a57eeab569c
