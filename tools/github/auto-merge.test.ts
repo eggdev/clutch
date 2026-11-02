@@ -30,6 +30,7 @@ const facts = (fields: Partial<Facts> = {}, pr: Partial<Facts['pr']> = {}): Fact
   defaultBranch: 'main',
   tier: 'low',
   checks: { validate: 'success', 'agent-review': 'success' },
+  ownerFindings: [],
   botProblems: [],
   mainRed: [],
   ...fields,
@@ -262,6 +263,24 @@ test('on at the step low queues a low-risk agent PR, and medium takes a medium o
   expect(merges(medium.calls)).toEqual([
     `gh pr merge 7 --auto --merge --match-head-commit ${head}`,
   ]);
+});
+
+test("agent review's owner finding leaves a green PR for the owner at every step", async () => {
+  const flagged = fake([
+    [
+      `gh api repos/eggdev/clutch/commits/${head}/check-runs?check_name=agent-review`,
+      { out: '3\n9\n' },
+    ],
+    [
+      'gh api repos/eggdev/clutch/check-runs/9/annotations',
+      { out: 'It lowers the file-size budget of a.ts.\n' },
+    ],
+  ]);
+  const lines = await decide(flagged, { mode: 'on', step: 'medium' });
+  expect(merges(flagged.calls)).toEqual([]);
+  expect(lines[0]).toContain(
+    'Agent review asks the owner: It lowers the file-size budget of a.ts.',
+  );
 });
 
 test('dry-run comments the verdict at its step, once per head, and merges nothing', async () => {
