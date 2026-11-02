@@ -186,6 +186,25 @@ prints a warning. It never fails.
 that the command owns, and `one-way-door`, which the Labels workflow creates
 so a person can add it. See [labels](../../docs/contributing/review.md#labels).
 
+## Ratchets
+
+A ratchet counts the old violations of one rule for each file. The counts may
+only go down. See decision 0001 (CL-301).
+
+```sh
+mise exec -- bun run clutch ratchet add no-double-cast --pattern '\bas (unknown as|any\b)' --files '{apps,packages,features,tools}/**/*.{ts,tsx,mts}'
+mise exec -- bun run clutch ratchet check
+mise exec -- bun run clutch ratchet update
+```
+
+- `add` writes the ratchet to `.clutch/ratchets.json` with today's counts.
+  `--command` instead of `--pattern` reads `path:count` lines.
+- `check` exits 1 when a count goes up, against the baseline or against the
+  merge base for a file that the change touches. It exits 2 when a count went
+  down and the baseline did not. The merge base is `--base`, then
+  `CHECK_BASE`, then the remote default branch.
+- `update` lowers the baseline to today's counts, and refuses a raise.
+
 ## Risk
 
 `clutch risk` gives a change a risk tier from the paths it touches: `low`,

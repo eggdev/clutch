@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { Detection } from '@/doctor/detect';
+import { backwardMoves, refuseBackward } from '@/doctor/one-way';
 
 export const baselineFile = '.clutch/doctor-baseline.json';
 
@@ -30,25 +31,20 @@ export function nextBaseline(
   allowDowngrade = false,
 ) {
   const next: Record<string, string> = {};
-  const downgrades: Array<string> = [];
   for (const { id, status } of detections.toSorted((a, b) => a.id.localeCompare(b.id))) {
-    const before = old[id];
-    if (status === 'unknown') {
-      if (before) {
-        next[id] = before;
-      }
-      continue;
+    // An unknown detection keeps its old value.
+    if (status !== 'unknown') {
+      next[id] = status;
+    } else if (old[id]) {
+      next[id] = old[id];
     }
-    if (before && rank[before] > rank[status]) {
-      downgrades.push(`${id} ${before} -> ${status}`);
-    }
-    next[id] = status;
   }
-  if (downgrades.length > 0 && !allowDowngrade) {
-    throw new Error(
-      `The baseline only moves up. These would go down: ${downgrades.join(', ')}. Restore them, or pass --allow-downgrade and ask the owner to review.`,
-    );
-  }
+  refuseBackward(
+    backwardMoves(old, next, (before, after) => rank[before] > rank[after]),
+    allowDowngrade,
+    (list) =>
+      `The baseline only moves up. These would go down: ${list}. Restore them, or pass --allow-downgrade and ask the owner to review.`,
+  );
   return next;
 }
 

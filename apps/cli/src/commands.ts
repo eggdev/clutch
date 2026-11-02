@@ -5,6 +5,7 @@ import { installCommand } from '@/install-command';
 import { issuesCommand } from '@/issues-command';
 import { labelsCommand } from '@/labels-command';
 import { metricsCommand } from '@/metrics-command';
+import { ratchetCommand } from '@/ratchet-command';
 import { riskCommand } from '@/risk-command';
 import { rulesetCommand } from '@/ruleset-command';
 import { syncCommand } from '@/sync-command';
@@ -68,6 +69,13 @@ export const commands: Record<string, Command> = {
     summary:
       'Print the kind label of a PR title and an area label for each part of the repository the change touches.',
     run: labelsCommand,
+  },
+  ratchet: {
+    usage:
+      'clutch ratchet check [--base REF] [--json]\nclutch ratchet update\nclutch ratchet add <name> (--pattern REGEX | --command CMD) --files GLOB',
+    summary:
+      'Check, lower and add the shrink-only counts of old violations in .clutch/ratchets.json.',
+    run: ratchetCommand,
   },
   risk: {
     usage: 'clutch risk [--base REF] [--head REF] [--json]',
