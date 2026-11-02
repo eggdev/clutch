@@ -53,9 +53,6 @@ const plain = (body: string) => body.replaceAll(/[*`]/gu, '');
  */
 export function blockingCount(body: string) {
   const text = plain(body);
-  if (/\bno blocking\b/iu.test(text)) {
-    return 0;
-  }
   const match =
     /blocking(?: findings)?:\s*(\d+)/iu.exec(text) ??
     /blocking findings\s+(\d+)/iu.exec(text) ??
@@ -64,7 +61,8 @@ export function blockingCount(body: string) {
   if (match) {
     return Number(match[1]);
   }
-  return /\bno findings\b/iu.test(text) ? 0 : null;
+  // Only when no count is written: "No blocking findings" or "No findings".
+  return /\bno (?:blocking )?findings\b/iu.test(text) ? 0 : null;
 }
 
 /**
@@ -92,6 +90,19 @@ async function comments(run: Run, number: string): Promise<Array<Comment>> {
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line) as Comment);
+}
+
+/** The bot's latest agent review summary among `posted`, or undefined. */
+function latestReview(posted: Array<Comment>) {
+  return posted
+    .filter((note) => note.login.endsWith('[bot]'))
+    .findLast((note) => note.body.trimStart().startsWith('## Agent review'));
+}
+
+/** The `owner` findings of the latest agent review on PR `number`. `pr merge` asks here too. */
+export async function ownerFindings(run: Run, number: string) {
+  const review = latestReview(await comments(run, number));
+  return review ? ownerCount(review.body) : 0;
 }
 
 /** The status checks that the rules of `branch` require. None when the token cannot read them. */
@@ -143,9 +154,7 @@ export async function prStatus(run: Run, number: string) {
   // Only a bot posts the review and the dry run. A person's comment that quotes one does not count.
   const posted = await comments(run, number);
   const notes = posted.filter((note) => note.login.endsWith('[bot]'));
-  const reviewComment = notes.findLast((note) =>
-    note.body.trimStart().startsWith('## Agent review'),
-  );
+  const reviewComment = latestReview(posted);
   const dryRun = notes.findLast((note) => note.body.includes(marker(pr.headRefOid)));
   const count = (state: State) => all.filter((check) => check.state === state).length;
   const blocking = reviewComment ? blockingCount(reviewComment.body) : null;

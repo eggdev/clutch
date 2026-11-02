@@ -65,6 +65,10 @@ test('the blocking count reads each way the agent words it', () => {
   expect(
     blockingCount('## Agent review\n\nFindings: 5, all `owner`. No `blocking` findings.'),
   ).toBe(0);
+  // A written count wins over a "no blocking" phrase elsewhere in the summary.
+  expect(
+    blockingCount('## Agent review\n\nBlocking findings: 2\n\n- no blocking issues in docs'),
+  ).toBe(2);
 });
 
 test('status reads the checks, the latest review, the dry run and the merge state', async () => {
@@ -347,4 +351,18 @@ test('a merge state that a rule blocks keeps a green PR from ready', async () =>
     comments('## Agent review\n\nBlocking findings: 0'),
   ]);
   expect(await prStatus(gh.run, '7')).toMatchObject({ review: 'BLOCKED by a rule', ready: false });
+});
+
+test('merge refuses an owner finding until the owner approves', async () => {
+  const pr = { baseRefName: 'main', headRefName: 'cl-027', reviewRequests: [], latestReviews: [] };
+  const review = JSON.stringify({ body: '## Agent review\n\n- `owner`: x', login: 'gha[bot]' });
+  const owned = fake([
+    trunk,
+    ['gh pr view 17', { out: JSON.stringify(pr) }],
+    ['gh api --paginate', { out: review }],
+  ]);
+  await expect(runPr(['merge', '17'], owned.run, noWrite, fakeClock())).rejects.toThrow(
+    '#17 has 1 owner finding(s) from agent review',
+  );
+  expect(owned.calls.some((call) => call.startsWith('gh pr merge'))).toBe(false);
 });
