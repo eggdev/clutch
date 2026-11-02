@@ -115,8 +115,8 @@ the same function. That finding is `blocking`. See
 
 ## Tests
 
-Flag a mock of an internal module. Flag a fake that is not typed against the
-vendor SDK. See [test the workflow](../principles/test-the-workflow.md).
+Flag a fake that is not typed against the vendor SDK. See
+[test the workflow](../principles/test-the-workflow.md).
 
 ## Add or remove a rule
 
