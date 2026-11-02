@@ -139,8 +139,10 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 - Update docs in the same change when a workflow or constraint shifts.
 - Document when to use a new pattern in the change that adds it.
 - Turn on a new rule everywhere at once. Fix each violation in the same change,
-  or in a few short sessions before the rule merges. Do not keep a baseline
-  file of old violations. It goes stale.
+  or in a few short sessions before the rule merges. The one exception is a
+  shrink-only ratchet for a rule that an adopted repository turns on late. Its
+  count for each file may only go down. See
+  [decision 0001](./decisions/0001-allow-shrink-only-ratchets.md).
 - On request, the [`pr-recap`](../../.agents/skills/pr-recap/SKILL.md)
   skill writes a PR recap block: the primitives touched, the risk and a diagram.
 

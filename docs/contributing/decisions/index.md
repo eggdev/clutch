@@ -54,6 +54,8 @@ A record amended more than once lists each amending record:
 
 <!-- kickoff: One line for each record that kickoff wrote: the number as a link, then the no in one sentence. -->
 
+- [0001](./0001-allow-shrink-only-ratchets.md): a repository may keep a shrink-only ratchet baseline for a rule it adopts. No other baseline of old violations.
+
 ## Historical
 
 None yet.
