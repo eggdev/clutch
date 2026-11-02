@@ -1,0 +1,53 @@
+# When CI fails on the default branch right after a green run, reverts the
+# auto-merged pull request that broke it. The first failure reruns the failed
+# jobs once, so a flaky test does not revert a PR. A second failure labels the
+# PR `revert` and starts the Revert workflow, which opens the revert PR. A PR
+# that a person merged gets no automatic revert. tools/github/auto-revert.ts
+# holds the rules. See docs/contributing/operations/rollback.md#auto-revert.
+name: Auto-revert
+
+on:
+  # Only CI's push runs on the default branch reach the job, never a pull
+  # request or a fork, and the job runs the default branch's code.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+
+# Least privilege. The job grants what it needs in its own block.
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-revert-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  revert:
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # The rerun, the run list and the Revert workflow dispatch.
+      actions: write
+      # The revert label and the comment on the merged PR.
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      # Without scripts, so the repository's git hooks stay off.
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Revert the auto-merged PR that turned the branch red
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: bun tools/github/auto-revert.ts --sha "$HEAD_SHA" --branch "$BRANCH" --run-id "$RUN_ID" --attempt "$ATTEMPT"

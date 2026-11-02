@@ -38,6 +38,11 @@ export type Facts = {
   tier: string;
   /** Each required check, with the conclusion of its latest run, `pending` or `missing`. */
   checks: Record<string, string>;
+  /**
+   * Agent review's `owner` findings on the head: the change weakens a check, a
+   * lint rule, a budget or a test. Each one leaves the PR for the owner.
+   */
+  ownerFindings: Array<string>;
   /** Why a bot PR's diff fails the bot rule. Empty for an agent PR. */
   botProblems: Array<string>;
   /** Each required check that failed on the default branch's latest commit. */
@@ -91,6 +96,9 @@ export function blockers(facts: Facts, step: Step): Array<string> {
     if (conclusion !== 'success') {
       reasons.push(`The required check ${name} is ${conclusion}.`);
     }
+  }
+  for (const finding of facts.ownerFindings) {
+    reasons.push(`Agent review asks the owner: ${finding}`);
   }
   for (const name of mainRed) {
     reasons.push(

@@ -4,7 +4,8 @@ name: Revert
 # reverts the merge commit on a revert/<number> branch, with a conventional
 # `revert:` title and a changeset, and links the original PR. The release bot
 # pushes and opens it, so CI runs on it. tools/github/revert.ts holds the steps.
-# This is the safety valve for auto-merge. See
+# When auto-merge merged the PR, it also files a risk-tighten issue. This is
+# the safety valve for auto-merge. See
 # docs/contributing/operations/rollback.md#revert-a-merged-pull-request.
 
 on:
@@ -59,6 +60,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      # The risk-tighten issue after a revert of an auto-merged PR. The release
+      # bot has no Issues permission, so this job's own token files it.
+      issues: write
     steps:
       # The dispatch carries only a number, so read the rest from GitHub. Like
       # the labeled run, revert only a merged PR from this repository that
@@ -105,6 +109,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
           PUSH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
+          ISSUE_TOKEN: ${{ github.token }}
           PR: ${{ inputs.pr }}
           SHA: ${{ steps.pr.outputs.sha }}
           BASE: ${{ steps.pr.outputs.base }}

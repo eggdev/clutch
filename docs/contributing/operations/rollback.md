@@ -84,6 +84,32 @@ touches the same lines, the revert conflicts. The workflow then comments on the
 original PR and opens nothing, so revert it by hand or fix forward. Without the
 release bot, the default token opens the PR, and CI does not start on it.
 
+### Auto-revert
+
+The [Auto-revert workflow](../../../.github/workflows/auto-revert.yml) acts
+when CI fails on a push to the default branch:
+
+1. When the last finished CI run before it failed too, the branch was already
+   red, so it does nothing.
+2. On the first attempt, it reruns the failed jobs once, so a flaky test does
+   not revert a PR.
+3. When the rerun fails too, it finds the merged PR. A red release commit
+   blames the merge before it.
+4. When auto-merge merged that PR, it adds the `revert` label, starts the
+   Revert workflow and comments on the PR. A PR that a person merged gets no
+   automatic revert: the person fixes forward or adds the label.
+
+The revert PR still merges like any other, once its checks pass.
+
+### Tighten after a revert
+
+When the Revert workflow reverts a PR that auto-merge merged, it also files a
+`risk-tighten` issue. The issue lists the PR's files with their risk tiers.
+It proposes to tighten the path that broke: a one-way-door rule in
+`.clutch/risk.yaml`, or a check that catches the break. `clutch metrics` lists
+the open `risk-tighten` issues under Watch, so the weekly digest shows them.
+Close one with the reason when the path did not cause the break.
+
 ## 5. After any rollback
 
 1. Check health and the error rate on each service that moved.

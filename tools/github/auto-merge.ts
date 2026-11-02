@@ -125,6 +125,37 @@ async function checkConclusions(run: Run, repo: string, sha: string, names: Arra
   );
 }
 
+/** The title of the annotation that agent review writes for an `owner` finding. */
+export const ownerAnnotation = 'Owner review needed';
+
+/**
+ * The `owner` findings of the latest agent-review run on `sha`: the messages of
+ * its "Owner review needed" annotations. Only the GitHub Actions app's run
+ * counts, and only that job can write its annotations, so an agent cannot
+ * remove one the way it could remove a label.
+ */
+async function ownerFindings(run: Run, repo: string, sha: string) {
+  const ids = await gh(
+    run,
+    'api',
+    `repos/${repo}/commits/${sha}/check-runs?check_name=${agentReview}&per_page=100`,
+    '--jq',
+    `.check_runs[] | select(.app.slug == "${actionsApp}") | .id`,
+  );
+  const latest = Math.max(0, ...ids.split('\n').filter(Boolean).map(Number));
+  if (latest === 0) {
+    return [];
+  }
+  const out = await gh(
+    run,
+    'api',
+    `repos/${repo}/check-runs/${latest}/annotations`,
+    '--jq',
+    `.[] | select(.title == "${ownerAnnotation}") | .message`,
+  );
+  return out.split('\n').filter(Boolean);
+}
+
 async function riskTier(run: Run, defaultBranch: string, sha: string) {
   const out = await must(run, [
     'bun',
@@ -257,6 +288,7 @@ export async function runAutoMerge(
     defaultBranch,
     tier,
     checks: await checkConclusions(run, repo, pr.headRefOid, names),
+    ownerFindings: await ownerFindings(run, repo, pr.headRefOid),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
   };
