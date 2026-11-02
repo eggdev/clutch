@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.34.2 (2026-11-02)
+
+### Fixes and maintenance
+
+- docs(review): drop a rule that a check covers
+
 ## 0.34.1 (2026-11-02)
 
 ### Fixes and maintenance
