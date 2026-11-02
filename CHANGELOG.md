@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.36.0 (2026-11-02)
+
+### Features
+
+- A daily security agent triages new vulnerability reports in private and opens one pull request with fixes (CL-108).
+
 ## 0.35.0 (2026-11-02)
 
 ### Features
