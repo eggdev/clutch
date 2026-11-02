@@ -78,7 +78,7 @@ test('an empty ratchets object reads as missing, and a ratchet with its target a
     'package.json': target,
     '.clutch/ratchets.json': JSON.stringify({
       schemaVersion: 1,
-      ratchets: { cast: { pattern: 'as any', files: '**/*.ts', counts: {} } },
+      ratchets: { hack: { pattern: 'HACK', files: '**/*.ts', counts: {} } },
     }),
   });
   const [fromReal] = await detect(real.root, entry);
