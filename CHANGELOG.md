@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.33.0 (2026-11-02)
+
+### Features
+
+- feat(metrics): add the weekly cross-repo doctor digest (CL-504)
+
 ## 0.32.2 (2026-11-02)
 
 ### Fixes and maintenance
