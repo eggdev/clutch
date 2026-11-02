@@ -34,17 +34,49 @@ test('the one-way-door tier holds its guardrail list and its paths, and nothing 
   expect(globs).toEqual(['nx.json', 'AGENTS.md']);
 });
 
-test('an except on a one-way-door rule fails, because CODEOWNERS cannot express it', async () => {
+test("the first one-way-door rule's except leaves those files without an owner", async () => {
+  const globs = await inRepo(
+    {
+      'tools/guardrail-files.json': JSON.stringify({ patterns: ['tools/lint/**'] }),
+      '.clutch/risk.yaml': [
+        'rules:',
+        '  - tier: one-way-door',
+        '    guardrails: tools/guardrail-files.json',
+        '    paths: []',
+        "    except: ['**/*.test.ts']",
+        '  - tier: one-way-door',
+        '    paths: [packages/access/**]',
+      ].join('\n'),
+    },
+    (root) => Promise.resolve(oneWayDoorGlobs(root)),
+  );
+  expect(globs).toEqual(['tools/lint/**', { unowned: '**/*.test.ts' }, 'packages/access/**']);
+  const lines = codeownersText(globs, ['@a'])
+    .split('\n')
+    .filter((line) => line && !line.startsWith('#'));
+  // A later rule's line comes after, so packages/access tests keep their owner.
+  expect(lines).toEqual(['/tools/lint/ @a', '**/*.test.ts', '/packages/access/ @a']);
+  expect(currentOwners(`**/*.test.ts\n/a @a\n`)).toEqual(['@a']);
+});
+
+test('an except on a later one-way-door rule fails, because CODEOWNERS cannot express it', async () => {
   await expect(
     inRepo(
       {
         'tools/guardrail-files.json': JSON.stringify({ patterns: [] }),
         '.clutch/risk.yaml':
-          'rules:\n  - tier: one-way-door\n    paths: [a/**]\n    except: [a/b]\n',
+          'rules:\n  - tier: one-way-door\n    paths: [b/**]\n  - tier: one-way-door\n    paths: [a/**]\n    except: [a/b]\n',
       },
       (root) => Promise.resolve().then(() => oneWayDoorGlobs(root)),
     ),
   ).rejects.toThrow('CODEOWNERS cannot express');
+});
+
+test('a repeated line keeps its last place, because the last matching line wins', () => {
+  const lines = codeownersText(['a/**', { unowned: 'a/b' }, 'a/**'], ['@o'])
+    .split('\n')
+    .filter((line) => line && !line.startsWith('#'));
+  expect(lines).toEqual(['/a/b', '/a/ @o']);
 });
 
 test('the file keeps its owners and lists each pattern once', () => {
