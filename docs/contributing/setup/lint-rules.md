@@ -16,7 +16,10 @@ is in the same file. See [import boundaries](../import-boundaries.md).
    a comment that gives the reason.
 3. **No suppression comments.** A rule is on everywhere or off everywhere. A
    rule with legitimate exceptions is configured or turned off, with the
-   reason. It is never silenced in one file. The `check-suppressions` target
+   reason. It is never silenced in one file. An adopted repository may ratchet
+   a rule that it turns on late: old violations stay counted per file, and the
+   count may only go down. See
+   [decision 0001](../decisions/0001-allow-shrink-only-ratchets.md). The `check-suppressions` target
    rejects each lint and type suppression comment, `@ts-expect-error` too.
 4. **An Ultracite upgrade is a reviewed change.** Read the preset diff. Run the
    lint, and decide each new rule that fires, as in step 2.
