@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.38.0 (2026-11-02)
+
+### Features
+
+- feat(ci): revert a red auto-merge and watch the revert rate (CL-207)
+- feat(review): route a weakened check to the owner (CL-208)
+
 ## 0.37.0 (2026-11-02)
 
 ### Features
