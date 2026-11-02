@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.32.1 (2026-11-02)
+
+### Fixes and maintenance
+
+- fix(sync): keep Clutch-only tests out of project syncs (CL-139)
+
 ## 0.32.0 (2026-11-01)
 
 ### Features
