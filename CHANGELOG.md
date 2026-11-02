@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.37.0 (2026-11-02)
+
+### Features
+
+- feat(cli): add the friction log and clutch friction (CL-306)
+- feat(ci): feed friction and expiring flakes to gardening (CL-501)
+- feat(ci): add a nightly flake hunt (CL-502)
+
 ## 0.36.0 (2026-11-02)
 
 ### Features
