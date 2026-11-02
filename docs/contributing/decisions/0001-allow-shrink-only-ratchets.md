@@ -1,6 +1,6 @@
 # 0001: Allow shrink-only ratchets for adopted repositories
 
-- **Status:** accepted
+- **Status:** amended by [0002](./0002-merge-most-prs-with-no-human.md)
 - **Date:** 2026-11-02
 
 ## Context

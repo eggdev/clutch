@@ -53,14 +53,16 @@ capabilities:
 # What the Auto-merge workflow does: off, dry-run or on. on queues GitHub's
 # auto-merge, with the release bot, for each PR in reach at the step, and never
 # while main is red. The step is how far it reaches: bots, then low, then
-# medium. Brendan approved the steps on 2026-10-30, and the step low on
-# 2026-11-01. The step medium still needs his go-ahead. See
+# medium. Brendan approved the steps on 2026-10-30, the step low on
+# 2026-11-01, and the step medium on 2026-11-02, with the target of 80% of PRs
+# merging with no human. See
+# docs/contributing/decisions/0002-merge-most-prs-with-no-human.md and
 # .agents/skills/deliver/references/pull-requests.md#auto-merge.
 automerge:
   mode: on
-  # Bot PRs that pass the bot rule, and agent PRs whose risk tier is low. Agent
-  # PRs keep getting a dry-run verdict for the step medium, for the owner to grade.
-  step: low
+  # Bot PRs that pass the bot rule, and agent PRs whose risk tier is low or
+  # medium: all but the one-way-door hard core in .clutch/risk.yaml.
+  step: medium
 # The static analysis engine that .github/workflows/sast.yml runs. auto runs CodeQL where
 # code scanning takes results and Semgrep elsewhere. This repository is public, so auto runs
 # CodeQL. Kickoff asks each project. See docs/contributing/capabilities/codeql-sast.md.
