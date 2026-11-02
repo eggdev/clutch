@@ -14,7 +14,7 @@ test('a risk glob becomes CODEOWNERS patterns', () => {
   ]);
 });
 
-test('the one-way-door tier holds its guardrail list and its paths, and nothing else', async () => {
+test('the one-way-door tier holds its guardrail list and its paths, and no lines rule', async () => {
   const globs = await inRepo(
     {
       'tools/guardrail-files.json': JSON.stringify({ patterns: ['nx.json'] }),
@@ -25,6 +25,9 @@ test('the one-way-door tier holds its guardrail list and its paths, and nothing 
         '    paths: [AGENTS.md]',
         '  - tier: one-way-door',
         '    paths: []',
+        '  - tier: one-way-door',
+        '    paths: [clutch.yaml]',
+        "    lines: ['^automerge:']",
         '  - tier: medium',
         '    paths: [apps/**]',
       ].join('\n'),

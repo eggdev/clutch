@@ -6,80 +6,26 @@
 # stays delegated. check-agent-hooks fails when this file drifts. Kickoff
 # replaces @eggdev with the owner of the project.
 #
-# Escape hatches live in these files. A reviewer checks each one against the
-# table in docs/contributing/harness-engineering.md#guardrail-files.
+# The workflow and clutch.yaml rules of the tier match changed lines, which
+# CODEOWNERS cannot express, so they are not here. Auto-merge leaves those
+# changes for the owner by their tier. A change that weakens a check gets an
+# owner finding from agent review. See docs/contributing/review.md.
 
-/oxlint.config.ts @eggdev
-/stylelint.config.ts @eggdev
-/.oxfmtrc.json @eggdev
-/knip.jsonc @eggdev
-/nx.json @eggdev
-/package.json @eggdev
-/tsconfig.base.json @eggdev
-/docs/contributing/architecture/primitives.yaml @eggdev
-/tools/lint/ @eggdev
-/tools/check-*.ts @eggdev
-/tools/file-size-budgets.json @eggdev
-/tools/dependency-overrides.yaml @eggdev
+/.github/rulesets/ @eggdev
+/.github/CODEOWNERS @eggdev
+/.clutch/risk.yaml @eggdev
 /tools/guardrail-files.json @eggdev
 /tools/codeowners.ts @eggdev
-/tools/agent-hooks/ @eggdev
-/tools/hooks/ @eggdev
-/.agents/hooks/ @eggdev
-/.claude/settings.json @eggdev
-/.codex/hooks.json @eggdev
-/.githooks/ @eggdev
-/.github/workflows/ @eggdev
-/.github/CODEOWNERS @eggdev
-/.github/actionlint.yaml @eggdev
-/KICKOFF.md @eggdev
-/tsconfig.json @eggdev
-/apps/*/tsconfig*.json @eggdev
-/features/*/tsconfig*.json @eggdev
-/packages/*/tsconfig*.json @eggdev
-/tools/tsconfig.json @eggdev
-/apps/*/package.json @eggdev
-/features/*/package.json @eggdev
-/packages/*/package.json @eggdev
-/bunfig.toml @eggdev
-/mise.toml @eggdev
-/renovate.json @eggdev
-/docs/contributing/glossary.md @eggdev
-/tools/docs-files.ts @eggdev
-/tools/testing/ @eggdev
-/tools/generators/ @eggdev
-/tools/audit-prod.ts @eggdev
-/tools/accepted-advisories.yaml @eggdev
-/tools/test-budget.ts @eggdev
-/tools/flaky-tests.json @eggdev
-/tools/flaky.ts @eggdev
-/tools/run-quarantined.ts @eggdev
-/tools/validate.ts @eggdev
-/tools/dev.ts @eggdev
-/tools/native/ @eggdev
-/tools/test-integrity-allow.json @eggdev
-/packages/sync/service/transaction-safe.ts @eggdev
+/tools/github/auto-merge.ts @eggdev
+/tools/github/auto-merge-rules.ts @eggdev
+/tools/github/bot-rule.ts @eggdev
+/.github/workflows/auto-merge.yml @eggdev
+/.github/workflows/agent-review.yml @eggdev
 /docs/contributing/review.md @eggdev
-/.cursor/BUGBOT.md @eggdev
-/tools/journeys/ @eggdev
-/.agents/skills/verify/verification.json @eggdev
-/clutch.yaml @eggdev
-/.clutch/risk.yaml @eggdev
-/tools/github/ @eggdev
-/apps/cli/src/labels/ @eggdev
-/docs/contributing/capabilities/registry.yaml @eggdev
-/.clutch/doctor-baseline.json @eggdev
-/clutch.files.yaml @eggdev
-/tools/release/ @eggdev
-/tools/clutch.ts @eggdev
+/apps/cli/src/risk/tiers.ts @eggdev
+/apps/cli/src/risk-command.ts @eggdev
 /.gitleaks.toml @eggdev
 /.gitleaksignore @eggdev
-/.github/rulesets/ @eggdev
-/AGENTS.md @eggdev
-/CLAUDE.md @eggdev
-**/AGENTS.md @eggdev
-/.agents/skills/ @eggdev
-/.claude/skills/ @eggdev
 /.mcp.json @eggdev
 /.cursor/mcp.json @eggdev
 **/auth/ @eggdev
@@ -88,3 +34,7 @@
 /apps/**/migrations/ @eggdev
 /features/**/migrations/ @eggdev
 /packages/**/migrations/ @eggdev
+/docs/contributing/decisions/ @eggdev
+/docs/principles/ @eggdev
+/docs/contributing/project-intent.md @eggdev
+/.clutch/PLAN.md @eggdev

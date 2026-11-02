@@ -76,8 +76,9 @@ The guard starts when kickoff deletes `KICKOFF.md`.
 - In Claude Code, the guard shows the user a permission prompt.
 - Codex cannot ask from a hook. `guard-guardrails` refuses the edit, and the
   agent asks the user.
-- A shell command that writes a file does not trigger the guard. CODEOWNERS is
-  the control that holds: a person reviews each guardrail file at merge.
+- A shell command that writes a file does not trigger the guard. Agent review
+  is the control that holds. A change that weakens a guardrail file gets an
+  `owner` finding, and auto-merge leaves that PR for the owner.
 
 The end-of-turn hook prints nothing when the checks pass. On a failure, the
 agent continues and fixes it. A turn that the hook already continued ends,
@@ -88,18 +89,22 @@ and trust each hook once.
 
 `check-agent-hooks` fails when the two configs run different hooks. It also
 fails when `.github/CODEOWNERS` drifts from the one-way-door tier of
-`.clutch/risk.yaml`, which holds each guardrail file.
+`.clutch/risk.yaml`.
 `mise exec -- bun tools/codeowners.ts --write` regenerates it.
 
 ## Guardrail files
 
 A guardrail file configures a check, a lint rule, a budget, a test rule or an
 agent hook. A loosened guardrail lets drift in, so a person reviews each
-change to one.
+change that loosens one.
 
-- [`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them,
-  and `.github/CODEOWNERS`, generated from the one-way-door tier, names an
-  owner for each.
+- [`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them.
+  Agent review gives a change that makes one weaker an `owner` finding, and
+  auto-merge leaves that PR for the owner. A change that makes one stronger
+  merges like any other. See
+  [decision record 0002](./decisions/0002-merge-most-prs-with-no-human.md).
+- The list itself, and the merge gate, are in the one-way-door tier of
+  `.clutch/risk.yaml`, so `.github/CODEOWNERS` names an owner for them.
 - `check-guardrail-coverage` finds the tool scripts that the root targets,
   the lint config and the hook configs run. It follows their `@tools/`
   imports, and reads each file path in them. It fails when no guardrail

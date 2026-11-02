@@ -25,19 +25,21 @@ async function clutchRisk(root: string, ...args: Array<string>) {
 const read = (file: string) => readFile(path.join(cliRoot, file), 'utf-8');
 
 /** A repo with Clutch's own risk rules and guardrail list, and a `change` branch that adds `files`. */
-async function changeOf(files: Array<string>) {
+async function changeOf(files: Array<string> | Record<string, string>) {
   const repo = await gitRepo({
     '.clutch/risk.yaml': await read('.clutch/risk.yaml'),
     'tools/guardrail-files.json': await read('tools/guardrail-files.json'),
   });
   await gitOrThrow(repo.root, 'switch', '--quiet', '--create', 'change');
-  await repo.write(Object.fromEntries(files.map((file) => [file, 'changed\n'])));
+  await repo.write(
+    Array.isArray(files) ? Object.fromEntries(files.map((file) => [file, 'changed\n'])) : files,
+  );
   await gitOrThrow(repo.root, 'add', '--all');
   await gitOrThrow(repo.root, 'commit', '--quiet', '--message', 'Change');
   return repo;
 }
 
-async function tierOf(files: Array<string>) {
+async function tierOf(files: Array<string> | Record<string, string>) {
   await using repo = await changeOf(files);
   const result = await clutchRisk(repo.root, '--base', 'main', '--json');
   expect(result.code).toBe(0);
@@ -56,38 +58,62 @@ test('a docs-only change is low', async () => {
 
 test('tests alone are low, and app code is medium', async () => {
   expect(await tierOf(['apps/cli/src/risk/tiers.test.ts'])).toBe('low');
-  expect(await tierOf(['apps/cli/src/risk/tiers.ts', 'docs/a.md'])).toBe('medium');
+  expect(await tierOf(['apps/cli/src/worktree/new.ts', 'docs/a.md'])).toBe('medium');
 });
 
-test('the automation, agent steering, auth and migrations are a one-way door', async () => {
+test('the hard core is a one-way door: the merge gate, auth, migrations and policy docs', async () => {
   for (const file of [
-    '.github/workflows/ci.yml',
-    '.github/CODEOWNERS',
     '.github/rulesets/main.json',
-    'tools/check-workflows.ts',
-    'clutch.yaml',
-    'package.json',
-    'AGENTS.md',
-    '.agents/skills/deliver/SKILL.md',
+    '.github/CODEOWNERS',
+    'tools/github/auto-merge.ts',
+    'tools/github/bot-rule.ts',
+    '.github/workflows/agent-review.yml',
+    'docs/contributing/review.md',
+    'apps/cli/src/risk/tiers.ts',
     'packages/identity/service/actors.ts',
     'packages/access/service/access.ts',
     'apps/api/src/auth/session.ts',
     'packages/access/repo/migrations/20261030000000_x/migration.sql',
+    'docs/contributing/decisions/0001-a.md',
+    'docs/principles/fail-loudly.md',
+    '.clutch/PLAN.md',
   ]) {
     expect(await tierOf([file, 'docs/a.md'])).toBe('one-way-door');
   }
 });
 
-test('product code, the sync engine and the lockfile are medium', async () => {
-  for (const file of ['apps/web/src/app.tsx', 'packages/sync/service/push.ts', 'bun.lock']) {
+test('skills, check scripts, lint config, workflows and any unlisted path are medium or low', async () => {
+  for (const file of [
+    '.github/workflows/ci.yml',
+    'tools/check-workflows.ts',
+    'tools/github/pr.ts',
+    'oxlint.config.ts',
+    'package.json',
+    'clutch.yaml',
+    'apps/web/src/app.tsx',
+    'packages/sync/service/push.ts',
+    'bun.lock',
+    'vite.config.ts',
+  ]) {
     expect(await tierOf([file, 'docs/a.md'])).toBe('medium');
   }
+  expect(await tierOf(['AGENTS.md', '.agents/skills/deliver/SKILL.md'])).toBe('low');
 });
 
-test('an unlisted path is high', async () => {
-  expect(await tierOf(['vite.config.ts'])).toBe('high');
-  expect(await tierOf(['.github/ISSUE_TEMPLATE/bug.yml'])).toBe('high');
-  expect(await tierOf(['apps/web/index.html', 'Dockerfile'])).toBe('high');
+test('a workflow permission or secret, or the automerge section, is a one-way door', async () => {
+  const workflow = '.github/workflows/ci.yml';
+  expect(await tierOf({ [workflow]: 'jobs:\n  a:\n    runs-on: x\n' })).toBe('medium');
+  for (const line of [
+    'permissions:',
+    '      contents: write',
+    '    environment: release',
+    '        token: secrets.T',
+    '  workflow_run:',
+  ]) {
+    expect(await tierOf({ [workflow]: `${line}\n` })).toBe('one-way-door');
+  }
+  expect(await tierOf({ 'clutch.yaml': 'capabilities:\n  ci: adopted\n' })).toBe('medium');
+  expect(await tierOf({ 'clutch.yaml': 'automerge:\n  step: medium\n' })).toBe('one-way-door');
 });
 
 test('the text output names the files at the change tier and the pattern that set it', async () => {
@@ -95,7 +121,7 @@ test('the text output names the files at the change tier and the pattern that se
   const result = await clutchRisk(repo.root, '--base', 'main');
   expect(result).toMatchObject({
     code: 0,
-    stdout: 'risk/medium\n  apps/web/src/app.ts  (apps/**)\n',
+    stdout: 'risk/medium\n  apps/web/src/app.ts  (unmatched)\n',
   });
 });
 

@@ -65,12 +65,21 @@ user. See [the release bot](../../../../docs/contributing/setup/releases.md#the-
 
 ### Approval
 
-`.github/CODEOWNERS` lists the `one-way-door` paths of `.clutch/risk.yaml`, and
-the main ruleset requires a code owner's approval. So GitHub requires the
-owner's approval on a PR that changes one of those paths, and on no other PR.
+`.github/CODEOWNERS` lists the path rules of the `one-way-door` tier of
+`.clutch/risk.yaml`, and the main ruleset requires a code owner's approval. So
+GitHub requires the owner's approval on a PR that changes one of those paths.
 `tools/codeowners.ts` generates the file, and `check-agent-hooks` fails when it
 drifts. After a change to the one-way-door tier, run
 `mise exec -- bun tools/codeowners.ts --write`.
+
+Two kinds of PR wait for the owner without a GitHub approval rule:
+
+- A rule with `lines`, such as a workflow's `permissions:` or the `automerge`
+  section of `clutch.yaml`. CODEOWNERS cannot express it, so auto-merge holds
+  the PR by its `one-way-door` tier.
+- A PR with an `owner` finding from agent review. Auto-merge holds it.
+
+Do not merge either kind with `pr merge` until the owner says so.
 
 ## Follow a pull request to green
 

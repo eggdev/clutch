@@ -47,7 +47,7 @@ numbers that set the order:
 | ----- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | P0    | The platform. Done.                        | Doctor reports only capabilities that run. The tracker matches GitHub.                                |
 | P1    | Measure, and prepare delegated merge.      | Flow metrics have a baseline. The auto-merge dry-run matches Brendan on 20 PRs in a row.              |
-| P2    | Turn on delegated merge.                   | Half or more of the PRs merge with no human action. Reverts stay under 2%.                            |
+| P2    | Turn on delegated merge.                   | 80% or more of the PRs merge with no human action. Reverts stay under 2%.                             |
 | P3    | Fast checks and parallel lanes.            | The local check meets its measured budget. Three or more lanes run at once without collisions.        |
 | P4    | Learning loops.                            | Main-red minutes and flaky reruns go down. Friction turns into at least one new check a month.        |
 | P5    | Platform contracts, and ready for a team.  | No break reaches a project without a warning release. A new engineer keeps merges per engineer level. |
@@ -69,7 +69,10 @@ no dependency on each other, so parallel lanes can take them in any order.
 
 CL-308 makes agent review and CodeQL required. CL-405 turns auto-merge on in
 three steps: bot PRs, then `risk/low`, then `risk/medium` with a clean
-agent review. CL-503b adds PR size and agent share to the metrics.
+agent review. CL-503b adds PR size and agent share to the metrics. Decision 8
+sets the target at 80%: CL-207 adds the auto-revert and the watch, CL-208
+routes a weaker check to Brendan, and CL-209 narrows `one-way-door` to the
+hard core and turns on the step `medium`.
 
 ### P3: fast checks and parallel lanes
 
@@ -135,3 +138,14 @@ Brendan, 2026-11-01:
    keep the work on the code that CI runs without Clutch. The follow-ups wait
    in `later`: CL-912 (`clutch pr`), CL-913 (a delivery loop), CL-914 (skills
    name a command for each step) and CL-915 (`clutch brief`).
+
+Brendan, 2026-11-02:
+
+8. Most work merges with no human (CL-209). In Brendan's words: "I want most
+   work to be merged honestly. I should be driving the product and making
+   sure we're doing the things. Agents should be shipping. We should start at
+   80% merges and make it more restrictive if needed not the other way
+   around." This replaces the tiers of decision 6. Only the hard core in
+   [decision record 0002](../docs/contributing/decisions/0002-merge-most-prs-with-no-human.md)
+   needs him. Agent review sends him a change that weakens a check, whatever
+   its path.

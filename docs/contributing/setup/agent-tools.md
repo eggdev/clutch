@@ -38,7 +38,9 @@ Codex docs first.
 3. Put no secret in a file. Read it from an environment variable.
 4. Update the table above.
 
-Both files are agent steering, so a person reviews each change to them.
+Both files choose the servers that run with an agent's credentials. They are
+in the one-way-door tier of `.clutch/risk.yaml`, so a person reviews each
+change to them.
 
 ## Check it
 

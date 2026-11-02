@@ -245,6 +245,9 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
   tier of its files, and a change with no files is `low`.
 - A rule with `guardrails: tools/guardrail-files.json` adds every pattern in
   that list to its paths, so the two cannot drift.
+- A rule with `lines` matches a file only when one of its added or removed
+  lines matches one of those regular expressions. `tools/codeowners.ts` leaves
+  such a rule out of CODEOWNERS, which cannot express it.
 - The rules and the CLI come from the working tree. The
   [Risk workflow](../../.github/workflows/risk.yml) checks out the base
   branch first, so a pull request cannot lower its own tier. It labels the
@@ -252,16 +255,28 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
 - `--json` prints the tier and each file with its tier and the pattern that
   set it. Text output prints the tier and the files at that tier.
 
-Clutch's own rules follow the [plan decisions](../../.clutch/PLAN.md#decisions):
-Brendan's rule, held against the published risk policies of other teams.
-`one-way-door` holds the automation and its gates (the guardrail list,
-`.github/rulesets` and `.clutch/risk.yaml`), agent steering (`AGENTS.md`,
-`CLAUDE.md` and the skills), auth (`packages/access`, `packages/identity` and
-any `auth` folder) and migrations. It also holds a billing rule and an infra,
-deploy and secrets rule, both empty until a project names its paths. Product
-code in `apps`, `features`, `packages` and `tools`, including `packages/sync`,
-and `bun.lock` are `medium`. Docs, tests, changesets and tracker files are
-`low`. Any other path is `high`.
+Clutch's own rules follow
+[decision record 0002](../../docs/contributing/decisions/0002-merge-most-prs-with-no-human.md):
+80% of PRs merge with no human, and a rule tightens only on evidence.
+`one-way-door` holds only the hard core:
+
+- The merge gate: `.github/rulesets`, CODEOWNERS, `.clutch/risk.yaml`, the
+  guardrail list, the auto-merge script and workflow, agent review and
+  `review.md`, and the code that computes a tier.
+- Credentials: secret scanning and the MCP configs. A workflow change to
+  `permissions:`, an environment, a secret, an app token's permissions or a
+  privileged trigger. The `automerge` and `agentReview` sections of
+  `clutch.yaml`.
+- Auth (`packages/access`, `packages/identity` and any `auth` folder) and
+  migrations.
+- A billing rule and an infra, deploy and secrets rule, both empty until a
+  project names its paths.
+- Decision records, `docs/principles`, project intent and `.clutch/PLAN.md`.
+
+Docs, tests, changesets and tracker files are `low`. Every other path is
+`medium`: product code, skills, check scripts, lint config and workflows.
+Agent review gives a change that weakens a check an `owner` finding, so
+auto-merge leaves it for the owner.
 
 ## clutch.yaml
 
@@ -325,8 +340,9 @@ Semgrep even on a public repository. See
 The loader rejects unknown keys. Each error names its YAML path, such as
 `template.mode` or `capabilities.codeql_sast.reason`. An older `clutch.yaml`
 has `template.commit`. The loader accepts it and reads nothing from it, and
-the next sync removes it. `clutch.yaml` is a
-guardrail file, so a person reviews each change to it.
+the next sync removes it. Its `automerge` and
+`agentReview` sections are in the one-way-door tier. For the rest of the
+file, agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
 
 ## Init
 
@@ -568,7 +584,7 @@ A capability is present when every `detect` rule passes. It is partial when
 some pass and one fails, or when only `partial_if` rules pass. It is missing
 when none pass. It is unknown when the rules that did not pass are all
 unknown, such as remote rules without `--remote`. The registry is a guardrail
-file, so a person reviews each change to it.
+file: agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
 
 ## Test it
 

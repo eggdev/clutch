@@ -67,3 +67,40 @@ test('a valid config fills in an empty except list', () => {
     ],
   });
 });
+
+test('a lines rule matches a file only by a changed line, and a file with no diff matches', () => {
+  const lines: RiskConfig = {
+    unmatched: 'medium',
+    rules: [
+      {
+        tier: 'one-way-door',
+        paths: ['.github/workflows/**'],
+        except: [],
+        lines: ['^\\s*permissions:'],
+      },
+    ],
+  };
+  const changed = new Map([
+    ['.github/workflows/a.yml', ['    steps:']],
+    ['.github/workflows/b.yml', ['permissions:']],
+  ]);
+  const files = ['.github/workflows/a.yml', '.github/workflows/b.yml', '.github/workflows/c.yml'];
+  expect(classify(lines, files, changed).map((file) => file.tier)).toEqual([
+    'medium',
+    'one-way-door',
+    'one-way-door',
+  ]);
+});
+
+const linesRule = (lines: unknown) => ({
+  schemaVersion: 1,
+  unmatched: 'medium',
+  rules: [{ tier: 'low', paths: ['a'], lines }],
+});
+
+test('lines must be a list of valid regular expressions', () => {
+  expect(validateRiskConfig(linesRule(['('])).errors).toEqual([
+    { path: 'rules.0.lines', message: 'Expected a list of regular expressions.' },
+  ]);
+  expect(validateRiskConfig(linesRule(['^a'])).config?.rules[0].lines).toEqual(['^a']);
+});

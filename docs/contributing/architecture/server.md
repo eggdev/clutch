@@ -44,8 +44,8 @@ rollback undoes all of its work.
 - The registry grants the mark. List the service key under `transactionSafe`
   of its package in
   [`primitives.yaml`](./primitives.yaml). `check-transaction-safe` rejects a
-  marked service that the registry does not list, so a person reviews each
-  grant.
+  marked service that the registry does not list. A grant is a new escape
+  hatch, so agent review gives it an `owner` finding.
 - `defineServerChange` accepts only marked services. A vendor service has no
   mark, so a server change that uses one fails the typecheck.
   `packages/sync/commands/define.server.test.ts` proves both cases.

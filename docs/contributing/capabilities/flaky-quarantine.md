@@ -13,7 +13,7 @@ Rank 46 of the researched practices. About half of the leading repositories use 
 ## Adopt
 
 1. Add a registry file, such as `flaky-tests.json` in `tools/`. Give each entry the file, the test name, an issue and an expiry date.
-2. List the registry as a guardrail file in `tools/guardrail-files.json`. Then run `mise exec -- bun tools/codeowners.ts --write`, so `.github/CODEOWNERS` names its owner.
+2. List the registry as a guardrail file in `tools/guardrail-files.json`. Agent review then gives a change that weakens it an `owner` finding.
 3. Add a root target that fails on an expired entry, or on an entry with no issue. Run it in the canonical check command.
 4. Run the quarantined tests in a separate, optional CI step. Retry each one, and report the result.
 5. Leave the quarantined tests out of the blocking runs, outside the test file. Clutch's `tools/test-budget.ts` adds a `--test-name-pattern` that excludes them, so no test file needs a skip.
