@@ -106,6 +106,11 @@ change to one.
   pattern covers a file that one of them reads.
 - A file that tooling reads but that sets no rule goes under `exempt`, with
   the reason.
+- A test of a guardrail file needs no owner's review. The first one-way-door
+  rule in `.clutch/risk.yaml` keeps `**/*.test.ts` and `**/*.test.tsx` out,
+  so CODEOWNERS names no owner for them, and their risk tier is `low`.
+  `check-test-integrity` still fails a change that deletes or thins one, and
+  the agent hook still asks before an agent edits one.
 
 Each escape hatch lives in a guardrail file, so the review sees it:
 

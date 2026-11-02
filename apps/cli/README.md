@@ -206,6 +206,10 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
   tier of its files, and a change with no files is `low`.
 - A rule with `guardrails: tools/guardrail-files.json` adds every pattern in
   that list to its paths, so the two cannot drift.
+- `tools/codeowners.ts` writes the `one-way-door` paths to
+  `.github/CODEOWNERS`. Only the first `one-way-door` rule may have `except`:
+  its globs become lines with no owner, before the later rules' lines, so the
+  last matching line agrees with the tier.
 - The rules and the CLI come from the working tree. The
   [Risk workflow](../../.github/workflows/risk.yml) checks out the base
   branch first, so a pull request cannot lower its own tier. It labels the
@@ -222,7 +226,10 @@ any `auth` folder) and migrations. It also holds a billing rule and an infra,
 deploy and secrets rule, both empty until a project names its paths. Product
 code in `apps`, `features`, `packages` and `tools`, including `packages/sync`,
 and `bun.lock` are `medium`. Docs, tests, changesets and tracker files are
-`low`. Any other path is `high`.
+`low`. A test of a gate is `low` too: it changes no check, the gate's code
+stays a one-way door, and `check-test-integrity` fails a change that deletes
+or thins a test. A test of auth or a migration stays a one-way door. Any other
+path is `high`.
 
 ## clutch.yaml
 
