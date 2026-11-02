@@ -14,7 +14,7 @@ import {
   steps,
 } from '@tools/github/auto-merge-rules';
 import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rules';
-import { botKind, renovateProblems } from '@tools/github/bot-rule';
+import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
 import type { ChangedFile } from '@tools/github/bot-rule';
 import type { Run } from '@tools/github/stack';
 
@@ -198,6 +198,15 @@ async function changedFiles(run: Run, repo: string, pr: string): Promise<Array<C
     .map((line) => JSON.parse(line) as ChangedFile);
 }
 
+/** The managed files that `.clutch/lineage.json` lists at `sha`, from the checkout. None without one. */
+async function syncedFiles(run: Run, sha: string) {
+  const lineage = await run(['git', 'show', `${sha}:.clutch/lineage.json`]);
+  if (!lineage.ok) {
+    return new Set<string>();
+  }
+  return new Set(Object.keys((JSON.parse(lineage.out) as { files?: object }).files ?? {}));
+}
+
 /** A conclusion that makes a check red. */
 const red = new Set(['failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure']);
 
@@ -280,6 +289,11 @@ export async function runAutoMerge(
   let botProblems: Array<string> = [];
   if (bot === 'renovate') {
     botProblems = renovateProblems(await changedFiles(run, repo, values.pr));
+  } else if (bot === 'clutch-sync') {
+    botProblems = syncProblems(
+      await changedFiles(run, repo, values.pr),
+      await syncedFiles(run, pr.headRefOid),
+    );
   } else if (bot === 'gardening' && tier !== 'low') {
     botProblems = [`The gardening PR's risk tier is ${tier}, not low.`];
   }

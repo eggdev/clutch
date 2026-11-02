@@ -158,6 +158,23 @@ test('sync --check exits 0 when clean, 2 with changes or decisions, and 1 on an 
   expect(JSON.parse(output.at(-1) ?? '{}')).toMatchObject({ status: 'error' });
 });
 
+/** `clutch sync --check`, with its exit code and its output lines, outside GitHub Actions. */
+async function check(root: string, template: string) {
+  const output: Array<string> = [];
+  const { log } = console;
+  const actions = process.env.GITHUB_ACTIONS;
+  console.log = (line: string) => output.push(line);
+  delete process.env.GITHUB_ACTIONS;
+  try {
+    return { code: await syncCommand(['--check'], root, template), output };
+  } finally {
+    console.log = log;
+    if (actions !== undefined) {
+      process.env.GITHUB_ACTIONS = actions;
+    }
+  }
+}
+
 test('without --to a sync takes the latest release, records it and drops an older pin', async () => {
   const { repo, first, second } = await clutch();
   await using template = repo;
@@ -171,6 +188,7 @@ test('without --to a sync takes the latest release, records it and drops an olde
     templateCommit: first,
     release: 'v0.1.0',
     latest: true,
+    from: null,
   });
   expect(synced.changes).toContainEqual({ path: 'clutch.yaml', action: 'update' });
   expect(await readFile(path.join(target.root, 'clutch.yaml'), 'utf-8')).not.toContain('commit');
@@ -178,19 +196,47 @@ test('without --to a sync takes the latest release, records it and drops an olde
   expect(lineage).toMatchObject({ templateCommit: first, release: 'v0.1.0' });
   await commitAll(target.root);
 
+  // A new release of the same major version only warns, within the grace window.
   await gitOrThrow(template.root, 'tag', 'v0.2.0', second);
-  const output: Array<string> = [];
-  const { log } = console;
-  console.log = (line: string) => output.push(line);
-  try {
-    expect(await syncCommand(['--check'], target.root, template.root)).toBe(2);
-  } finally {
-    console.log = log;
-  }
-  expect(output.slice(-2)).toEqual([
+  const behind = await check(target.root, template.root);
+  expect(behind.code).toBe(0);
+  expect(behind.output.slice(-3)).toEqual([
     'The project would move to Clutch v0.2.0, the latest release.',
     'The project is behind the latest Clutch release. Run clutch sync to take it.',
+    'warning: the project is at Clutch v0.1.0, behind v0.2.0. v0.2.0 came out 0 days ago, so this passes for 14 more days (template.grace_days is 14). Merge the Clutch sync PR, or run clutch sync.',
   ]);
+
+  // A new major version fails at once.
+  await gitOrThrow(template.root, 'tag', 'v1.0.0', second);
+  const major = await check(target.root, template.root);
+  expect(major.code).toBe(2);
+  expect(major.output.at(-1)).toBe(
+    'The project is at Clutch v0.1.0, and v1.0.0 is a new major version. Run clutch sync.',
+  );
+});
+
+test('a decision that a new release brings only warns, and one at the same release fails', async () => {
+  const { repo, first, second } = await clutch();
+  await using template = repo;
+  await gitOrThrow(template.root, 'tag', 'v0.1.0', first);
+  await using target = await project();
+  await runSync({ root: target.root, template: template.root });
+  await target.write({ 'tools/check.ts': 'edited\n' });
+  await commitAll(target.root);
+
+  // The project edited a managed file at the release it has: drift, so it fails.
+  const drift = await check(target.root, template.root);
+  expect(drift.code).toBe(2);
+  expect(drift.output.join('\n')).not.toContain('warning:');
+
+  // v0.2.0 changes the same file, so the decision comes with a new release.
+  await gitOrThrow(template.root, 'tag', 'v0.2.0', second);
+  const behind = await check(target.root, template.root);
+  expect(behind.code).toBe(0);
+  expect(behind.output.join('\n')).toContain('so the project edited them:\n  tools/check.ts');
+  expect(behind.output.at(-1)).toStartWith(
+    'warning: the project is at Clutch v0.1.0, behind v0.2.0.',
+  );
 });
 
 test('without a release tag, a sync without --to stops and says how to fix it', async () => {

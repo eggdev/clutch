@@ -3,7 +3,9 @@
  * `bots` step of auto-merge. A Renovate PR may when its diff changes only
  * dependency versions, lockfiles and changesets. Renovate already waits out
  * the 3-day release age (`minimumReleaseAge` in renovate.json). A gardening
- * PR may when its risk tier is low. See
+ * PR may when its risk tier is low. A Clutch sync PR may when it changes only
+ * what `clutch sync` writes; the required `clutch / doctor` check proves that
+ * the managed files match the release. See
  * .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 
@@ -14,6 +16,9 @@ export type ChangedFile = { filename: string; patch?: string };
 export function botKind(headRefName: string) {
   if (headRefName.startsWith('renovate/')) {
     return 'renovate';
+  }
+  if (headRefName.startsWith('clutch-sync/')) {
+    return 'clutch-sync';
   }
   return headRefName.startsWith('gardening/') ? 'gardening' : null;
 }
@@ -112,4 +117,38 @@ export function renovateProblems(files: Array<ChangedFile>) {
     }
   }
   return problems;
+}
+
+/**
+ * The files that a Clutch sync PR may change besides the managed files in its
+ * `.clutch/lineage.json`: the lineage itself, the PR's changeset, clutch.yaml
+ * (sync drops an old pin), the files that sync merges (the `merge` rule in
+ * Clutch's clutch.files.yaml), and the TypeScript references that `nx sync`
+ * writes.
+ */
+const syncExtras = [
+  /^\.clutch\/lineage\.json$/u,
+  /^\.changeset\/clutch-sync\.md$/u,
+  /^clutch\.yaml$/u,
+  /^(?:package\.json|\.gitignore|\.gitattributes|\.claude\/settings\.json|\.codex\/hooks\.json)$/u,
+  /(?:^|\/)tsconfig(?:\.[\w-]+)?\.json$/u,
+];
+
+/**
+ * Why a Clutch sync PR's diff is more than a sync. `managed` holds the managed
+ * files that the PR's lineage lists. The lockfile may change, from the npm
+ * registry only. None means it passes the bot rule.
+ */
+export function syncProblems(files: Array<ChangedFile>, managed: ReadonlySet<string>) {
+  return files.flatMap((file) => {
+    if (lockfile.test(file.filename)) {
+      return file.patch === undefined
+        ? [`${file.filename} has no diff to check.`]
+        : lockfileProblems(file.filename, file.patch);
+    }
+    if (managed.has(file.filename) || syncExtras.some((pattern) => pattern.test(file.filename))) {
+      return [];
+    }
+    return [`${file.filename} is not a file that clutch sync writes.`];
+  });
 }

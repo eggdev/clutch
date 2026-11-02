@@ -56,7 +56,7 @@ export function kindProblem(pr: Pr) {
   }
   const bot = botKind(pr.headRefName);
   if (!bot) {
-    return `The head branch is neither an agent's (${agentBranch}) nor a bot's (renovate/, gardening/).`;
+    return `The head branch is neither an agent's (${agentBranch}) nor a bot's (renovate/, gardening/, clutch-sync/).`;
   }
   return pr.author.is_bot ? null : `The author of the ${bot} branch is not a bot.`;
 }

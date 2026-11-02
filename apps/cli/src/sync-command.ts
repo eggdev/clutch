@@ -2,7 +2,10 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { clutchCheckout, projectTemplateRepo } from '@/clutch-checkout';
+import { loadClutchConfig } from '@/clutch-config/load';
 import { askDecisions } from '@/sync/ask';
+import { defaultGraceDays, firstReleaseAfter, graceFor } from '@/sync/grace';
+import type { Grace } from '@/sync/grace';
 import { runSync } from '@/sync/run';
 import type { SyncResult } from '@/sync/run';
 
@@ -12,6 +15,34 @@ const codes: Record<SyncResult['status'], number> = {
   planned: 2,
   decisions: 2,
 };
+
+/**
+ * Whether `sync --check` may only warn: the project is behind a newer release,
+ * within the grace window. That holds for a plan, and for a keep-or-take
+ * decision that the new release brings. A plan or a decision at the release
+ * the project already has is drift, not a new release, so it never waits.
+ */
+async function graceOf(root: string, template: string, result: SyncResult) {
+  if (result.status === 'unchanged' || result.status === 'synced') {
+    return null;
+  }
+  if (!result.from || !result.release) {
+    return null;
+  }
+  if (result.from === result.release) {
+    return null;
+  }
+  const loaded = await loadClutchConfig(root);
+  const days =
+    (loaded.kind === 'loaded' ? loaded.config.template.grace_days : undefined) ?? defaultGraceDays;
+  return graceFor({
+    from: result.from,
+    to: result.release,
+    firstMissing: await firstReleaseAfter(template, result.from, result.release),
+    days,
+    now: new Date(),
+  });
+}
 
 function print(result: SyncResult) {
   for (const change of result.changes) {
@@ -41,6 +72,23 @@ function print(result: SyncResult) {
   console.log(`The project ${verbs[result.status]} Clutch ${target}${latest}.`);
   if (result.latest && result.status === 'planned') {
     console.log('The project is behind the latest Clutch release. Run clutch sync to take it.');
+  }
+}
+
+/** What to do next: after a review-only sync, or within the grace window. */
+function printNext(result: SyncResult, only: string | undefined, grace: Grace | null) {
+  if (only === 'review' && result.status === 'synced') {
+    console.log(
+      'Use setup-verification to create or reconcile .agents/skills/verify/SKILL.md, then commit the project tooling.',
+    );
+  }
+  if (!grace) {
+    return;
+  }
+  console.log(grace.message);
+  // A GitHub annotation, so a passing check still shows the warning on the PR.
+  if (grace.within && process.env.GITHUB_ACTIONS === 'true') {
+    console.log(`::warning title=Behind the latest Clutch release::${grace.message}`);
   }
 }
 
@@ -95,17 +143,14 @@ export async function syncCommand(
         result = { ...answered, latest: result.latest };
       }
     }
+    const grace: Grace | null = values.check ? await graceOf(root, template, result) : null;
     if (values.json) {
-      console.log(JSON.stringify(result));
+      console.log(JSON.stringify(grace ? { ...result, grace } : result));
     } else {
       print(result);
-      if (values.only === 'review' && result.status === 'synced') {
-        console.log(
-          'Use setup-verification to create or reconcile .agents/skills/verify/SKILL.md, then commit the project tooling.',
-        );
-      }
+      printNext(result, values.only, grace);
     }
-    return codes[result.status];
+    return grace?.within ? 0 : codes[result.status];
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (args.includes('--json')) {

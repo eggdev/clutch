@@ -399,7 +399,13 @@ mise exec -- bun run clutch sync --root ../shop --to v0.2.0
   project file that matches one is unchanged, so sync may replace it.
 - `--check` changes nothing. It exits 0 when the project is up to date, 2 when a
   sync would change files or a file needs a decision, and 1 on an error.
-  Without `--to`, exit 2 means the project is behind the latest release.
+- A project that is only behind a newer release gets a grace window, as
+  Renovate gives a dependency update. That covers a keep-or-take decision that
+  the new release brings, too. `--check` prints a warning and exits 0
+  while both releases share a major version, and the oldest release that the
+  project lacks is no more than `template.grace_days` days old (14 by default).
+  After that, or across a major version, it exits 2. Drift from the release
+  that the project already has exits 2 at once.
 - A sync never commits. Commit the result on a branch, and open a PR.
 - A managed file that the project edited needs a decision, and nothing changes
   until each one has an answer. In a terminal, sync asks: keep the project
@@ -414,13 +420,31 @@ mise exec -- bun run clutch sync --root ../shop --to v0.2.0
 - A kept file stays quiet until Clutch changes it again. `.clutch/lineage.json`
   records the Clutch copy that the project declined.
 
+### Sync pull requests
+
+`.github/workflows/clutch-sync.yml` takes each release for the project, as
+Renovate takes a dependency update. Each hour it compares the release in
+`.clutch/lineage.json` with the newest Clutch release. When the project is
+behind, it runs `clutch sync --to <release>`, refreshes `bun.lock` and the
+TypeScript references, and pushes the result to `clutch-sync/latest` as the
+release bot. One PR stays open, and it moves to each new release.
+
+- Auto-merge takes the PR at the step `bots`, when it passes the sync bot rule
+  and its checks. See
+  [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
+- A sync that needs a keep-or-take decision opens no PR. The run names the
+  files. Run `clutch sync` locally, and decide each one.
+- The workflow needs the release bot, with Contents, Pull requests and
+  Workflows, each read and write. Without it, the run ends with a notice.
+
 ## Use Clutch in another repository
 
 A repository with `clutch.yaml` can run the Clutch checks in its own CI with
 one job. The workflow checks out the latest release of the Clutch repository
 that `clutch.yaml` names, runs `clutch doctor --check`, and runs
-`clutch sync --check` against that release in `sync` mode. So the job fails
-when the project is behind the latest release:
+`clutch sync --check` against that release in `sync` mode. A project that is
+behind the latest release gets a warning within the grace window, and fails
+after it. See [Sync](#sync):
 
 ```yaml
 jobs:

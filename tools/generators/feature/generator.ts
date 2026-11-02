@@ -56,7 +56,11 @@ export function addFeature(tree: Tree, options: FeatureOptions) {
     name: `@features/${name.fileName}`,
     tag: 'type:feature',
     dependencies: { react: versionOf(tree, 'react') },
-    devDependencies: { '@types/react': versionOf(tree, '@types/react') },
+    // The journey imports the accessibility check from @repo/journeys.
+    devDependencies: {
+      '@repo/journeys': 'workspace:*',
+      '@types/react': versionOf(tree, '@types/react'),
+    },
     references: [],
     react: true,
   });

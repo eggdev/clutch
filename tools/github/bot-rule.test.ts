@@ -1,10 +1,11 @@
 import { expect, test } from 'bun:test';
 
-import { botKind, renovateProblems } from '@tools/github/bot-rule';
+import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
 
 test('the bot comes from the head branch', () => {
   expect(botKind('renovate/all-minor')).toBe('renovate');
   expect(botKind('gardening/2026-11-02')).toBe('gardening');
+  expect(botKind('clutch-sync/latest')).toBe('clutch-sync');
   expect(botKind('clutch/cl-132-steps')).toBeNull();
 });
 
@@ -86,5 +87,41 @@ test('a lockfile entry that takes a package from another source fails the bot ru
     'bun.lock takes oxlint@file:../oxlint from outside the npm registry.',
     'bun.lock takes oxlint@1.89.0 from https://evil.example/, not https://registry.npmjs.org/.',
     'bun.lock has no diff to check.',
+  ]);
+});
+
+test('a Clutch sync PR passes when it changes only what clutch sync writes', () => {
+  const managed = new Set(['tools/check.ts', '.github/workflows/ci.yml']);
+  expect(
+    syncProblems(
+      [
+        { filename: 'tools/check.ts', patch: '-a\n+b' },
+        { filename: '.github/workflows/ci.yml', patch: '-a\n+b' },
+        { filename: '.clutch/lineage.json', patch: '-a\n+b' },
+        { filename: '.changeset/clutch-sync.md', patch: '+---' },
+        { filename: 'package.json', patch: '+  "x": "y"' },
+        { filename: 'features/notes/tsconfig.spec.json', patch: '+{}' },
+        {
+          filename: 'bun.lock',
+          patch: '+    "axe-core": ["axe-core@4.14.0", "", {}, "sha512-x"],',
+        },
+      ],
+      managed,
+    ),
+  ).toEqual([]);
+});
+
+test('a Clutch sync PR fails on a file that sync does not write, or a lockfile source off npm', () => {
+  expect(
+    syncProblems(
+      [
+        { filename: 'apps/web/src/main.ts', patch: '+evil' },
+        { filename: 'bun.lock', patch: '+    "x": ["x@github:o/r", "", {}],' },
+      ],
+      new Set(['tools/check.ts']),
+    ),
+  ).toEqual([
+    'apps/web/src/main.ts is not a file that clutch sync writes.',
+    'bun.lock takes x@github:o/r from outside the npm registry.',
   ]);
 });

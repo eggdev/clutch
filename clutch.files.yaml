@@ -9,6 +9,10 @@ files:
   # Shared tooling and agent setup.
   - path: tools/
     rule: managed
+  # The accessibility check that each web journey, and the feature journey template, imports.
+  - path: packages/journeys/
+    rule: managed
+    capability: a11y_checks
   - path: .agents/skills/
     rule: managed
     capability: skills_dir

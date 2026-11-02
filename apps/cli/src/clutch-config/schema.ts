@@ -21,7 +21,11 @@ type Capability = {
 export type ClutchConfig = {
   schemaVersion: 1;
   project: string;
-  template: { repo: string; mode: (typeof modes)[number] };
+  /**
+   * `grace_days`: how long `sync --check` only warns when the project is behind
+   * a release of the same major version. 14 by default.
+   */
+  template: { repo: string; mode: (typeof modes)[number]; grace_days?: number };
   capabilities: Record<string, Capability>;
   worktree?: { root: string; copy: Array<string>; setup: Array<string> };
   /** What the Auto-merge workflow does with a low-risk agent PR. */
@@ -109,8 +113,8 @@ function readTemplate(value: unknown, errors: Errors) {
   }
   // An older clutch.yaml pins `commit`. Nothing reads it: a project follows the
   // latest Clutch release, and the next sync removes the key.
-  unknownKeys(value, ['repo', 'commit', 'mode'], 'template', errors);
-  const { repo, mode } = value;
+  unknownKeys(value, ['repo', 'commit', 'mode', 'grace_days'], 'template', errors);
+  const { repo, mode, grace_days: graceDays } = value;
   const before = errors.length;
   if (typeof repo !== 'string' || !repoPattern.test(repo)) {
     errors.push({ path: 'template.repo', message: 'Expected owner/name.' });
@@ -118,10 +122,17 @@ function readTemplate(value: unknown, errors: Errors) {
   if (!oneOf(modes, mode)) {
     errors.push({ path: 'template.mode', message: `Expected ${modes.join(' or ')}.` });
   }
+  if (graceDays !== undefined && !(Number.isInteger(graceDays) && (graceDays as number) >= 0)) {
+    errors.push({
+      path: 'template.grace_days',
+      message: 'Expected a whole number of days, 0 or more.',
+    });
+  }
   return errors.length === before
     ? {
         repo: repo as string,
         mode: mode as ClutchConfig['template']['mode'],
+        ...(graceDays === undefined ? {} : { grace_days: graceDays as number }),
       }
     : undefined;
 }

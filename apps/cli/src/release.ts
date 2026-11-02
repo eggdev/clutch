@@ -2,6 +2,12 @@ import { git } from '@/git';
 
 const releaseTag = /^v(\d+)\.(\d+)\.(\d+)$/u;
 
+/** The major, minor and patch numbers of a `vX.Y.Z` tag, or null for any other name. */
+export function releaseParts(tag: string) {
+  const match = releaseTag.exec(tag);
+  return match ? match.slice(1).map(Number) : null;
+}
+
 /** The newest `vX.Y.Z` tag in `tags`, or null. */
 export function newestRelease(tags: Array<string>) {
   const versions = tags.flatMap((tag) => {

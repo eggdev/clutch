@@ -119,6 +119,8 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A test file that a change may delete or thin              | `tools/test-integrity-allow.json`                                               |
 | A dependency override                                     | `tools/dependency-overrides.yaml`                                               |
 | Agent review of a PR that a bot opened                    | `agent-review.yml`, `allowed_bots`                                              |
+| Files a Clutch sync PR may change past the lineage        | `tools/github/bot-rule.ts`, `syncExtras`                                        |
+| Days a project may stay behind a Clutch release           | `clutch.yaml`, `template.grace_days`                                            |
 | A path kept out of a risk tier                            | `.clutch/risk.yaml`, a rule's `except`                                          |
 | A zizmor finding the owner accepted                       | `# zizmor: ignore[<audit>]` in the workflow                                     |
 | A flaky test kept out of the blocking runs                | `tools/flaky-tests.json`, with an issue and an expiry                           |

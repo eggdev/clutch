@@ -1,0 +1,164 @@
+# Opens a pull request that moves the project to the latest Clutch release, as
+# Renovate opens one for a dependency. Each hour it compares the release in
+# .clutch/lineage.json with the newest vX.Y.Z tag of the Clutch repository
+# that clutch.yaml names. When the project is behind, it runs clutch sync,
+# refreshes the lockfile, and pushes the result to the clutch-sync/latest
+# branch as the release bot. One PR stays open and moves to each new release.
+# Auto-merge takes it at the step bots, under the sync rule in
+# tools/github/bot-rule.ts. A sync that needs the owner's keep-or-take
+# decision opens no PR: the run says which files, and clutch sync --check keeps
+# warning until the grace window ends. See apps/cli/README.md#sync-pull-requests.
+name: Clutch sync
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+# Least privilege. The bot's token pushes the branch and opens the PR.
+permissions:
+  contents: read
+
+concurrency:
+  group: clutch-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-26.04
+    # The bot's key lives in the release environment, which only the default
+    # branch may deploy to. See docs/contributing/setup/releases.md#the-release-bot.
+    environment: release
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Find the release to take
+        id: release
+        env:
+          APP_ID: ${{ vars.CLUTCH_APP_ID }}
+        run: |
+          run=false
+          if [ ! -f clutch.yaml ] || [ "$(yq -r '.template.mode' clutch.yaml)" != sync ]; then
+            echo "::notice title=Clutch sync off::clutch.yaml is missing, or its template.mode is not sync."
+          elif [ "$(yq -r '.template.repo' clutch.yaml)" = "$GITHUB_REPOSITORY" ]; then
+            echo "::notice title=Clutch sync off::This repository is Clutch itself."
+          elif [ -z "$APP_ID" ]; then
+            echo "::notice title=Clutch sync off::Set up the release bot (CLUTCH_APP_ID and CLUTCH_APP_PRIVATE_KEY), so the sync PR runs CI. See docs/contributing/setup/releases.md#the-release-bot."
+          else
+            repo="$(yq -r '.template.repo' clutch.yaml)"
+            # Every merge to Clutch's main is a release tagged vX.Y.Z. The newest tag is the latest release.
+            release="$(git ls-remote --tags --refs "https://github.com/$repo" 'v*' \
+              | sed 's#.*refs/tags/##' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+            current="$(jq -r '.release // ""' .clutch/lineage.json 2>/dev/null || true)"
+            if [ -z "$release" ]; then
+              echo "::error title=No Clutch release::$repo has no vX.Y.Z release tag."
+              exit 1
+            elif [ "$release" = "$current" ]; then
+              echo "::notice title=Up to date::The project is at Clutch $release, the latest release."
+            else
+              run=true
+              { echo "repo=$repo"; echo "release=$release"; echo "current=$current"; } >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+      # Clutch lives under the workspace, because actions/checkout writes only
+      # there. Sync checks only the managed paths for changes, so it is no problem.
+      - if: steps.release.outputs.run == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.release.outputs.repo }}
+          ref: ${{ steps.release.outputs.release }}
+          path: .clutch-checkout
+          persist-credentials: false
+      - if: steps.release.outputs.run == 'true'
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      # The project's own packages first: sync formats what it writes with oxfmt.
+      - name: Install the project and Clutch
+        if: steps.release.outputs.run == 'true'
+        run: |
+          echo '/.clutch-checkout/' >> .git/info/exclude
+          bun install --frozen-lockfile --ignore-scripts
+          (cd .clutch-checkout && bun install --frozen-lockfile --ignore-scripts)
+      - name: clutch sync
+        id: sync
+        if: steps.release.outputs.run == 'true'
+        env:
+          RELEASE: ${{ steps.release.outputs.release }}
+        run: |
+          status=0
+          bun .clutch-checkout/apps/cli/src/main.ts sync --root . --to "$RELEASE" --json \
+            > "$RUNNER_TEMP/sync.json" || status=$?
+          result="$(jq -r '.status // "error"' "$RUNNER_TEMP/sync.json")"
+          if [ "$result" = decisions ]; then
+            files="$(jq -r '.decisions | join(", ")' "$RUNNER_TEMP/sync.json")"
+            echo "::warning title=Clutch sync needs the owner::The project edited these managed files: $files. Run clutch sync locally, and keep or take each one."
+            echo "open=false" >> "$GITHUB_OUTPUT"
+          elif [ "$status" != 0 ]; then
+            echo "::error title=Clutch sync failed::$(jq -r '.message // "Read the step log."' "$RUNNER_TEMP/sync.json")"
+            exit 1
+          else
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          fi
+      # The lockfile follows the merged package.json, and Nx writes the
+      # TypeScript references of new packages, so CI passes on the PR.
+      - name: Refresh the lockfile and the references
+        if: steps.sync.outputs.open == 'true'
+        env:
+          NX_DAEMON: 'false'
+        run: |
+          bun install --ignore-scripts
+          bun x nx sync
+      - name: Get the release bot token
+        id: bot
+        if: steps.sync.outputs.open == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          # The branch push, which may change workflows, and the PR. The app has more permissions.
+          permission-contents: write
+          permission-workflows: write
+          permission-pull-requests: write
+      - name: Open or update the sync pull request
+        if: steps.sync.outputs.open == 'true'
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          REPO: ${{ steps.release.outputs.repo }}
+          RELEASE: ${{ steps.release.outputs.release }}
+          CURRENT: ${{ steps.release.outputs.current }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          branch='clutch-sync/latest'
+          title="chore(clutch): sync to Clutch $RELEASE"
+          # Each PR carries a changeset, as tools/github/pr.ts writes it.
+          printf -- '---\n"%s": patch\n---\n\n%s\n' "$(jq -r .name package.json)" "$title" \
+            > ".changeset/clutch-sync.md"
+          {
+            echo "Moves the project from Clutch ${CURRENT:-an unrecorded release} to [$RELEASE](https://github.com/$REPO/releases/tag/$RELEASE), as \`clutch sync --to $RELEASE\` writes it, then refreshes \`bun.lock\` and the TypeScript references."
+            echo
+            echo "Read what changed in [Clutch's changelog](https://github.com/$REPO/blob/$RELEASE/CHANGELOG.md)."
+            echo
+            echo '<details><summary>Files</summary>'
+            echo
+            jq -r '.changes[] | "- \(.action) `\(.path)`"' "$RUNNER_TEMP/sync.json"
+            echo
+            echo '</details>'
+            echo
+            echo 'Opened by the Clutch sync workflow. Auto-merge takes it when the sync rule and the checks pass.'
+          } > "$RUNNER_TEMP/sync-body.md"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$branch"
+          git add --all
+          git commit --quiet --message "$title"
+          # The branch always starts from the default branch, so a force push replaces the older release.
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
+          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number // ""')"
+          if [ -n "$open" ]; then
+            gh pr edit "$open" --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/sync-body.md"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE" --head "$branch" \
+              --title "$title" --body-file "$RUNNER_TEMP/sync-body.md"
+          fi
