@@ -39,35 +39,48 @@ test('a hand-written migration or a changed folder fails with the fix', async ()
   ]);
 });
 
-test('a schema change with no migration fails, and passes once drizzle-kit writes one', async () => {
-  const results = await inRepo(
-    {
-      'packages/demo/drizzle.config.ts': config,
-      'packages/demo/repo/schema.ts': schema(''),
-      'packages/demo/repo/migrations/.gitkeep': '',
-    },
-    async (root) => {
-      await symlink(path.join(repoRoot, 'node_modules'), path.join(root, 'node_modules'));
-      const generate = () =>
-        Bun.spawnSync([path.join(root, 'node_modules/.bin/drizzle-kit'), 'generate'], {
-          cwd: path.join(root, 'packages/demo'),
-        });
-      generate();
-      const clean = checkDb(root);
-      await writeFile(
-        path.join(root, 'packages/demo/repo/schema.ts'),
-        schema(", title: text('title')"),
-      );
-      const changed = checkDb(root);
-      generate();
-      return { clean, changed, regenerated: checkDb(root) };
-    },
-  );
-  expect(results.clean).toEqual([]);
-  expect(results.changed).toHaveLength(1);
-  expect(results.changed[0]).toStartWith('packages/demo: The schema differs from the migrations.');
-  expect(results.changed[0]).toEndWith(
-    'Run `mise exec -- bun nx run @repo/demo:db-generate`, and commit the migration.',
-  );
-  expect(results.regenerated).toEqual([]);
-});
+// Each claim needs its own drizzle-kit run: generate, check, check, generate,
+// check. Each run starts a process that loads the TypeScript config, about
+// 0.3 s on an idle machine. On one busy core it measured 1.4 to 2 s each, 8.2 s
+// in all, past bun's 5 s default (CI run 41198473156). 30 s leaves room for a
+// loaded CI runner.
+const drizzleRunsTimeoutMs = 30_000;
+
+test(
+  'a schema change with no migration fails, and passes once drizzle-kit writes one',
+  async () => {
+    const results = await inRepo(
+      {
+        'packages/demo/drizzle.config.ts': config,
+        'packages/demo/repo/schema.ts': schema(''),
+        'packages/demo/repo/migrations/.gitkeep': '',
+      },
+      async (root) => {
+        await symlink(path.join(repoRoot, 'node_modules'), path.join(root, 'node_modules'));
+        const generate = () =>
+          Bun.spawnSync([path.join(root, 'node_modules/.bin/drizzle-kit'), 'generate'], {
+            cwd: path.join(root, 'packages/demo'),
+          });
+        generate();
+        const clean = checkDb(root);
+        await writeFile(
+          path.join(root, 'packages/demo/repo/schema.ts'),
+          schema(", title: text('title')"),
+        );
+        const changed = checkDb(root);
+        generate();
+        return { clean, changed, regenerated: checkDb(root) };
+      },
+    );
+    expect(results.clean).toEqual([]);
+    expect(results.changed).toHaveLength(1);
+    expect(results.changed[0]).toStartWith(
+      'packages/demo: The schema differs from the migrations.',
+    );
+    expect(results.changed[0]).toEndWith(
+      'Run `mise exec -- bun nx run @repo/demo:db-generate`, and commit the migration.',
+    );
+    expect(results.regenerated).toEqual([]);
+  },
+  drizzleRunsTimeoutMs,
+);
