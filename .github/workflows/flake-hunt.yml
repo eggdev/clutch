@@ -1,0 +1,103 @@
+# The nightly flake hunt. It runs the tools tests 20 times on the same code.
+# A test that passes on some runs and fails on others is flaky. Each new one
+# goes into the quarantine, tools/flaky-tests.json, with a new issue that owns
+# its fix, in one pull request. The hunt uses no agent and spends no tokens.
+# See docs/contributing/testing.md#flaky-tests.
+name: Flake hunt
+
+on:
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One hunt at a time. A queued one waits for the one that runs.
+concurrency:
+  group: flake-hunt
+  cancel-in-progress: false
+
+jobs:
+  hunt:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile
+      # An open hunt PR is not merged yet, so a new one would list the same tests.
+      - name: Skip while a hunt PR is open
+        id: open
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --search 'head:flake-hunt/' --json number --jq 'length')"
+          if [ "$open" != "0" ]; then
+            echo "::notice title=Flake hunt skipped::A flake-hunt pull request is open. Merge or close it first."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      # The test target's command from package.json, run 20 times. A failure here
+      # is data for the next step, so the step itself never fails the job.
+      - name: Run the tests 20 times
+        if: steps.open.outputs.run == 'true'
+        env:
+          CI: '1'
+        run: |
+          bun test --rerun-each 20 tools --path-ignore-patterns 'tools/lint/**' \
+            --reporter=junit --reporter-outfile="$RUNNER_TEMP/flake-hunt.xml" > /dev/null 2>&1 || true
+          test -s "$RUNNER_TEMP/flake-hunt.xml"
+      - name: Find flaky tests
+        id: hunt
+        if: steps.open.outputs.run == 'true'
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # The phase of each new issue. Set the FLAKE_ISSUE_PHASE repository variable to change it.
+          PHASE: ${{ vars.FLAKE_ISSUE_PHASE || 'later' }}
+        run: bun tools/flake-hunt.ts "$RUNNER_TEMP/flake-hunt.xml" "$RUN_URL" "$PHASE"
+      # A PR that the default token opens starts no workflows, so CI would not
+      # run on it. The release bot's token does start them.
+      - name: Get the release bot token
+        id: bot
+        if: steps.hunt.outputs.found != '' && steps.hunt.outputs.found != '0' && vars.CLUTCH_APP_ID != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CLUTCH_APP_ID }}
+          private-key: ${{ secrets.CLUTCH_APP_PRIVATE_KEY }}
+          # Only the branch push and the pull request.
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Open the quarantine pull request
+        if: steps.hunt.outputs.found != '' && steps.hunt.outputs.found != '0'
+        env:
+          FOUND: ${{ steps.hunt.outputs.found }}
+          PUSH_TOKEN: ${{ steps.bot.outputs.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$PUSH_TOKEN" ]; then
+            echo "::warning title=Flake hunt found $FOUND flaky test(s)::Set up the release bot (CLUTCH_APP_ID) so the hunt can open its PR. The tests are listed in this run's log."
+            exit 0
+          fi
+          branch="flake-hunt/$(date -u +%Y-%m-%d)"
+          title="test: quarantine $FOUND flaky test(s) from the flake hunt"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$branch"
+          # Each PR carries a changeset, as tools/github/pr.ts writes it.
+          printf -- '---\n"%s": patch\n---\n\n%s\n' "$(jq -r .name package.json)" "$title" \
+            > ".changeset/flake-hunt-$(date -u +%Y-%m-%d).md"
+          git add tools/flaky-tests.json .clutch/issues .changeset
+          git commit --message "$title"
+          git push "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
+          printf '%s\n\n%s\n' \
+            "The nightly flake hunt ran the tools tests 20 times. These tests passed on some runs and failed on others: $RUN_URL" \
+            'Each one gets a 14-day quarantine entry in tools/flaky-tests.json and a new issue that owns its fix. See docs/contributing/testing.md#flaky-tests.' \
+            > "$RUNNER_TEMP/body.md"
+          GH_TOKEN="$PUSH_TOKEN" gh pr create --repo "$GITHUB_REPOSITORY" --head "$branch" \
+            --title "$title" --body-file "$RUNNER_TEMP/body.md"

@@ -15,7 +15,7 @@
   "dev_bootstrap": "present",
   "factory_observability": "present",
   "file_size_caps": "present",
-  "flake_hunter": "missing",
+  "flake_hunter": "present",
   "flaky_quarantine": "present",
   "friction_log": "present",
   "gardener_bots": "present",
