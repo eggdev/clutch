@@ -199,6 +199,10 @@ At each step, the PR also needs all of these:
   from another app or token counts for nothing.
 - No required check is red on the default branch's latest commit. A red
   `main` stops every auto-merge until it is green again.
+- Agent review left no `owner` finding on its head. A change that weakens a
+  check, a lint rule, a budget or a test gets one, whatever its path. See
+  [review](../../../../docs/contributing/review.md#finding-levels). The owner
+  merges such a PR.
 
 The workflow runs when CI or agent review completes, and it runs the default
 branch's rules. It skips a run whose branch lives in a fork, because that run

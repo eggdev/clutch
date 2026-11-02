@@ -13,10 +13,15 @@ draft. It runs the Claude Code GitHub Action with this page as its rules.
 1. The agent reads the diff and the pages that the diff touches.
 2. It posts an inline comment for each finding.
 3. It posts one summary comment that lists each finding and its level.
-4. It returns the number of blocking findings to the workflow.
+4. It returns the number of blocking findings and each `owner` finding to the
+   workflow.
 
 The job fails when the agent returns one or more blocking findings. The job
-also fails when the agent returns no result.
+also fails when the agent returns no result. An `owner` finding passes the
+job, so the owner can still merge the PR. The job writes an "Owner review
+needed" annotation for it. Auto-merge reads that annotation on the head and
+leaves the PR for the owner. See
+[auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
 
 The agent runs on the cheapest Claude model, `claude-haiku-5-5`. To choose
 another model, set the `CLUTCH_AGENT_MODEL` repository variable to its id. The
@@ -45,6 +50,7 @@ Each finding has one level:
 | Level      | Means                                                        |
 | ---------- | ------------------------------------------------------------ |
 | `blocking` | The change must not merge until the author fixes it.         |
+| `owner`    | The change may merge only when the owner merges it.          |
 | `note`     | The author reads it and decides. The change can merge as is. |
 
 A rule below says which level it gives. When a rule does not say, the level is
@@ -53,19 +59,25 @@ A rule below says which level it gives. When a rule does not say, the level is
 ## Always flag
 
 Flag these on each pull request, also when a check passes. A check can pass
-while its rules get weaker.
+while its rules get weaker. Most PRs merge with no person, so these findings
+are how a weaker check reaches the owner.
 
+- **A weaker check.** A change can turn off, skip, loosen or delete a check,
+  a lint rule, a budget, a test or a required status check. It can also
+  weaken agent review itself. Whatever the path, that finding is `owner`.
+  That holds with or without a reason in the PR description. Name what gets
+  weaker. A stronger check is a `note`.
 - **A changed guardrail file.** [`tools/guardrail-files.json`](../../tools/guardrail-files.json)
-  lists them. Say what the change makes weaker or stronger. A weaker rule with
-  no reason in the PR description is `blocking`.
+  lists the files that configure a check. Say what the change makes weaker or
+  stronger. A weaker rule is `owner`.
 - **A new escape hatch.** The
   [escape hatch table](./harness-engineering.md#guardrail-files) lists where
   each one lives. Name the rule that the hatch turns off, and the reason the PR
-  gives. A hatch with no reason is `blocking`.
+  gives. A new hatch is `owner`. A hatch with no reason is `blocking`.
 - **A weaker or deleted test.** Flag a test that asserts less than before, a
   deleted test whose module still exists, and a new entry in
-  `tools/test-integrity-allow.json`. A deleted test with no reason is
-  `blocking`.
+  `tools/test-integrity-allow.json`. Each one is `owner`. A deleted test with
+  no reason is `blocking`.
 - **Docs that did not move with behavior.** When a change alters how a module
   or flow works, the page that owns it must change in the same PR. The
   placement table is in
