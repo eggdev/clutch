@@ -18,7 +18,7 @@ A project from Clutch has the engine and the commands. See decision 0001 (CL-301
 2. `clutch ratchet check` fails when a count goes up, against the baseline or against the merge base for a file the change touches. It exits 2 when a count went down and the baseline did not.
 3. `clutch ratchet update` lowers the baseline to the counts today. It refuses a higher count.
 4. Add the root target `check-ratchets` (`bun tools/clutch.ts ratchet check`), and run it in the canonical check command.
-5. List the baseline as a guardrail file in `tools/guardrail-files.json`. Then run `mise exec -- bun tools/codeowners.ts --write`, so `.github/CODEOWNERS` names its owner.
+5. List the baseline as a guardrail file in `tools/guardrail-files.json`. Agent review then gives a change that weakens it an `owner` finding.
 6. Set `ratchets` to `adopted` in `clutch.yaml`.
 
 ## Waive

@@ -1,43 +1,83 @@
 # Risk tiers by path. `clutch risk` gives each changed file the highest tier
 # whose globs match it, and a change the highest tier of its files. A file that
 # no rule matches gets `unmatched`. A file that matches a rule's `except`
-# does not match that rule. Auto-merge reads the tier, so this file is a
-# guardrail file. See apps/cli/README.md#risk.
-#   low:          docs, tests and tracker files. Auto-merge may take it.
-#   medium:       product code and the lockfile. Agent review reads it.
-#   high:         any path that no rule names.
-#   one-way-door: the automation and its gates, agent steering, auth,
-#                 migrations, billing, and infra and secrets. A person reviews it:
-#                 tools/codeowners.ts writes these paths to .github/CODEOWNERS,
-#                 and the main ruleset requires a code owner's approval.
-# The tiers follow Brendan's rule and the published risk policies that
-# .clutch/PLAN.md#decisions cites.
+# does not match that rule. A rule with `lines` matches a file only when one of
+# its added or removed lines matches. Auto-merge reads the tier, so this file
+# is part of the merge gate. See apps/cli/README.md#risk.
+#   low:          docs, tests and tracker files.
+#   medium:       everything else: product code, docs that state no rule,
+#                 agent skills, check scripts, lint config and workflows.
+#                 Auto-merge takes low and medium at the step medium. Agent
+#                 review leaves a PR that weakens a check for the owner.
+#   one-way-door: the hard core below. Brendan reviews it: tools/codeowners.ts
+#                 writes the path rules to .github/CODEOWNERS, and the main
+#                 ruleset requires a code owner's approval.
+# Brendan, 2026-11-02: start at 80% of PRs merging with no human, and tighten
+# a path only on evidence. See docs/contributing/decisions/0002-merge-most-prs-with-no-human.md.
 schemaVersion: 1
-unmatched: high
+unmatched: medium
 rules:
   - tier: one-way-door
-    # The automation and its gates. Every pattern in the guardrail list counts,
-    # so the two cannot drift. The list holds this file.
-    guardrails: tools/guardrail-files.json
     paths:
-      # The main ruleset as applied on GitHub.
+      # The merge gate: the rulesets, who approves, the tiers, the auto-merge
+      # script and workflow, and agent review, its rules and the code that
+      # computes a tier.
       - .github/rulesets/**
-      # Agent steering. Every agent reads these.
-      - AGENTS.md
-      - CLAUDE.md
-      - '**/AGENTS.md'
-      - .agents/skills/**
-      - .claude/skills/**
-      # The MCP servers that agents get. See docs/contributing/setup/agent-tools.md.
+      - .github/CODEOWNERS
+      - .clutch/risk.yaml
+      - tools/guardrail-files.json
+      - tools/codeowners.ts
+      - tools/github/auto-merge.ts
+      - tools/github/auto-merge-rules.ts
+      - tools/github/bot-rule.ts
+      - .github/workflows/auto-merge.yml
+      - .github/workflows/agent-review.yml
+      - docs/contributing/review.md
+      - apps/cli/src/risk/tiers.ts
+      - apps/cli/src/risk-command.ts
+      # Credentials: secret scanning, and the MCP servers that run with an
+      # agent's credentials. See docs/contributing/setup/agent-tools.md.
+      - .gitleaks.toml
+      - .gitleaksignore
       - .mcp.json
       - .cursor/mcp.json
-      # Auth: who an actor is and what it may see.
+      # Auth and access: who an actor is and what it may see.
       - '**/auth/**'
       - packages/access/**
       - packages/identity/**
       # Migrations, the paths tools/check-migrations.ts matches. A deployed
       # migration can lose data.
       - '{apps,features,packages}/**/migrations/**'
+      # Decision records and policy docs. They state the rules that agents and
+      # reviews follow. #132 merged decision record 0001 as low risk, with no
+      # review.
+      - docs/contributing/decisions/**
+      - docs/principles/**
+      - docs/contributing/project-intent.md
+      - .clutch/PLAN.md
+  - tier: one-way-door
+    # Credentials and permissions in a workflow: its token permissions, an
+    # environment, a secret, an app token's permissions, or a trigger that runs
+    # with this repository's secrets. Any other workflow change is medium.
+    paths:
+      - .github/workflows/**
+    lines:
+      - '^\s*permissions:'
+      - '^\s*(actions|attestations|checks|contents|deployments|discussions|id-token|issues|packages|pages|pull-requests|repository-projects|security-events|statuses|models):\s*(read|write|none)\b'
+      - '^\s*environment:'
+      - '\bsecrets\.'
+      - '^\s*permission-[a-z-]+:'
+      - '^\s*(pull_request_target|workflow_run):'
+  - tier: one-way-door
+    # The automerge and agentReview sections of clutch.yaml. The rest of the
+    # file, such as capabilities, is medium.
+    paths:
+      - clutch.yaml
+    lines:
+      - '^automerge:'
+      - '^agentReview:'
+      - '^\s+(step|owner|missingCredential):'
+      - '^\s+mode:\s*(on|off|dry-run)\b'
   - tier: one-way-door
     # Billing: the project's payment and billing code. Empty in the template.
     # Kickoff names it. See docs/contributing/setup/checks.md#ci.
@@ -47,22 +87,6 @@ rules:
     # code and secret handling. Empty in the template. Kickoff names it. See
     # docs/contributing/setup/checks.md#ci.
     paths: []
-  - tier: medium
-    paths:
-      # A lockfile change alone can pull in new code. CL-405's bot rule merges
-      # a Renovate PR that changes only versions, lockfiles and changesets.
-      - bun.lock
-  - tier: medium
-    paths:
-      - apps/**
-      - features/**
-      - packages/**
-      - tools/**
-    # Docs and tests in these folders stay low.
-    except:
-      - '**/*.md'
-      - '**/*.test.ts'
-      - '**/*.test.tsx'
   - tier: low
     paths:
       - docs/**
