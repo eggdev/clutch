@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.35.0 (2026-11-02)
+
+### Features
+
+- feat(cli): add the shrink-only ratchet engine (CL-302)
+- feat(cli): add clutch ratchet and adopt the first ratchet (CL-302b)
+
 ## 0.34.2 (2026-11-02)
 
 ### Fixes and maintenance
