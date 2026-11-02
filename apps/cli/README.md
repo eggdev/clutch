@@ -221,7 +221,8 @@ Clutch's own rules follow the [plan decisions](../../.clutch/PLAN.md#decisions):
 Brendan's rule, held against the published risk policies of other teams.
 `one-way-door` holds the automation and its gates (the guardrail list,
 `.github/rulesets` and `.clutch/risk.yaml`), agent steering (`AGENTS.md`,
-`CLAUDE.md` and the skills), auth (`packages/access`, `packages/identity` and
+`CLAUDE.md`, the skills, the decision records in
+`docs/contributing/decisions` and the principles in `docs/principles`), auth (`packages/access`, `packages/identity` and
 any `auth` folder) and migrations. It also holds a billing rule and an infra,
 deploy and secrets rule, both empty until a project names its paths. Product
 code in `apps`, `features`, `packages` and `tools`, including `packages/sync`,

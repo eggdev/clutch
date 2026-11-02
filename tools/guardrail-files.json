@@ -54,6 +54,7 @@
     "docs/contributing/review.md",
     ".cursor/BUGBOT.md",
     "tools/journeys/**",
+    "packages/journeys/**",
     ".agents/skills/verify/verification.json",
     "clutch.yaml",
     ".clutch/risk.yaml",

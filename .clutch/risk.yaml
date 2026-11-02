@@ -40,6 +40,11 @@ rules:
       - '**/AGENTS.md'
       - .agents/skills/**
       - .claude/skills/**
+      # Decision records and principles state the rules that agents and
+      # reviews follow, so a change to one changes the rules. #132 merged a
+      # decision record as low risk, with no review.
+      - docs/contributing/decisions/**
+      - docs/principles/**
       # The MCP servers that agents get. See docs/contributing/setup/agent-tools.md.
       - .mcp.json
       - .cursor/mcp.json

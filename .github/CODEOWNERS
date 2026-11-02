@@ -64,6 +64,7 @@
 /docs/contributing/review.md @eggdev
 /.cursor/BUGBOT.md @eggdev
 /tools/journeys/ @eggdev
+/packages/journeys/ @eggdev
 /.agents/skills/verify/verification.json @eggdev
 /clutch.yaml @eggdev
 /.clutch/risk.yaml @eggdev
@@ -85,6 +86,8 @@
 **/AGENTS.md @eggdev
 /.agents/skills/ @eggdev
 /.claude/skills/ @eggdev
+/docs/contributing/decisions/ @eggdev
+/docs/principles/ @eggdev
 /.mcp.json @eggdev
 /.cursor/mcp.json @eggdev
 **/auth/ @eggdev
