@@ -137,9 +137,10 @@ export async function snap(page: Page, name: string, options: SnapOptions = {}) 
             expect(shot).toMatchSnapshot(file, { maxDiffPixelRatio });
             keep = false;
           } catch (error) {
-            // Only a pixel diff is the flake the quarantine covers. Any other error still fails.
+            // Only a pixel diff is the flake the quarantine covers. A size change is a
+            // layout change, and any other error is real, so both still fail.
             if (
-              !/pixels \(ratio [\d.]+ of all image pixels\) are different|sizes are different/u.test(
+              !/pixels \(ratio [\d.]+ of all image pixels\) are different/u.test(
                 error instanceof Error ? error.message : '',
               )
             ) {
