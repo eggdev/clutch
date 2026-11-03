@@ -87,7 +87,7 @@ diff.
   the file.
 - The script rejects a PR body with a broken marker pair. Fix the markers in
   the PR description by hand, then run it again.
-- When `gh pr edit` fails, the script prints the merged body. Paste that body
+- When the REST update of the PR body fails, the script prints the merged body. Paste that body
   into the PR description.
 - GitHub shows a mermaid error in place of the diagram. Fix the diagram. Do not
   put `;` in a sequence message or note.
