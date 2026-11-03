@@ -121,7 +121,7 @@ it may, and a person merges it otherwise.
 ### Tighten after a revert
 
 When the Revert workflow reverts a PR that auto-merge merged, it also files a
-`risk-tighten` issue. The issue lists the PR's files with their risk tiers.
+`risk-tighten` issue, unless the PR is a drill. The issue lists the PR's files with their risk tiers.
 It proposes to tighten the path that broke: a one-way-door rule in
 `.clutch/risk.yaml`, or a check that catches the break. `clutch metrics` lists
 the open `risk-tighten` issues under Watch, so the weekly digest shows them.
