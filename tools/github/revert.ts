@@ -16,9 +16,13 @@ import { changesetDir, changesetText, packageName } from '@tools/release/changes
  * that lists the PR's files and their risk tiers, and proposes to tighten the
  * path that broke. It files the issue with `ISSUE_TOKEN`, the workflow's own
  * token, because the release bot has no Issues permission.
+ *
+ * With `--drill`, the reverted PR was a rehearsal. The revert PR carries the
+ * `drill` label, so it does not count toward the revert brake or metric, and
+ * no risk-tighten issue is filed.
  */
 const usage =
-  'Usage: bun tools/github/revert.ts --pr <number> --sha <merge commit> --title <title> --base <branch>';
+  'Usage: bun tools/github/revert.ts --pr <number> --sha <merge commit> --title <title> --base <branch> [--drill]';
 
 const root = path.resolve(import.meta.dir, '../..');
 
@@ -118,9 +122,10 @@ export async function runRevert(
       sha: { type: 'string' },
       title: { type: 'string' },
       base: { type: 'string' },
+      drill: { type: 'boolean', default: false },
     },
   });
-  const { pr, sha, title, base } = values;
+  const { pr, sha, title, base, drill } = values;
   if (!pr || !sha || !title || !base) {
     throw new Error(usage);
   }
@@ -165,6 +170,9 @@ export async function runRevert(
       ? `https://x-access-token:${env.PUSH_TOKEN}@github.com/${repo}.git`
       : 'origin';
   await must(run, ['git', 'push', remote, `HEAD:refs/heads/${branch}`]);
+  const drillNote = drill
+    ? ' This is a rehearsal: the original PR carries `drill`, so this revert does not count toward the revert brake or metric, and no risk-tighten issue is filed.'
+    : '';
   const url = await must(run, [
     'gh',
     'pr',
@@ -175,8 +183,9 @@ export async function runRevert(
     branch,
     '--title',
     subject,
+    ...(drill ? ['--label', 'drill'] : []),
     '--body',
-    `Reverts #${pr} (merge commit ${sha}). Someone added the \`revert\` label to it.\n\nWhen auto-merge merged the original PR and this revert is low or medium risk, auto-merge takes it once its checks pass. Otherwise, a person merges it.`,
+    `Reverts #${pr} (merge commit ${sha}). Someone added the \`revert\` label to it.${drillNote}\n\nWhen auto-merge merged the original PR and this revert is low or medium risk, auto-merge takes it once its checks pass. Otherwise, a person merges it.`,
   ]);
   await must(run, [
     'gh',
@@ -187,7 +196,7 @@ export async function runRevert(
     `Reverted in ${url}. Reply here with the reason for the revert, so the next change avoids it.`,
   ]);
   log(`Opened ${url}.`);
-  if (repo && (await autoMerged(run, repo, pr))) {
+  if (!drill && repo && (await autoMerged(run, repo, pr))) {
     const issue = await fileTightenIssue(run, { pr, sha, url }, env.ISSUE_TOKEN);
     log(`Auto-merge merged #${pr}. Filed ${issue} to tighten its path.`);
   }

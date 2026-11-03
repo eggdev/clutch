@@ -5,6 +5,7 @@ import {
   dryRunAgreement,
   gradeOf,
   flowMetrics,
+  isDrill,
   isRevert,
   mainRedMinutes,
 } from '@/metrics/compute';
@@ -80,10 +81,14 @@ export async function metricsReport(options: Options) {
 
   let mainRed: { branch: string; requiredChecks: Array<string>; minutes: number } | null = null;
   let revertCommits: number | null = null;
+  // A drill's revert commit is a rehearsal, so it is not counted as a revert on main.
+  const drillCommits = new Set(pulls.filter(isDrill).map((pull) => pull.mergeSha));
   try {
     const branch = await reader.branch();
     const commits = await reader.mainCommits(branch.name, since);
-    revertCommits = commits.filter((commit) => isRevert(commit.message)).length;
+    revertCommits = commits.filter(
+      (commit) => isRevert(commit.message) && !drillCommits.has(commit.sha),
+    ).length;
     if (branch.required.length === 0) {
       unavailable.mainRed = `${branch.name} requires no status checks.`;
     } else {
@@ -133,7 +138,7 @@ export async function metricsReport(options: Options) {
     unavailable.issuesDone = 'Counted only from the .clutch/issues of the checkout.';
   }
 
-  const { revertPulls, ...rest } = flow;
+  const { revertPulls, drillPulls, ...rest } = flow;
   const pullsOut = {
     ...rest,
     noHumanAction: { ...rest.noHumanAction, byStep: byStep(pulls) },
@@ -153,6 +158,7 @@ export async function metricsReport(options: Options) {
       pulls: revertPulls,
       commits: revertCommits,
       rate: flow.merged === 0 ? null : Math.round((revertPulls / flow.merged) * 1000) / 1000,
+      drills: drillPulls,
     },
     mainRed,
     ci,
@@ -200,6 +206,8 @@ export function renderMetrics(report: MetricsReport) {
   const agents = Object.entries(pulls.agents.byAgent)
     .map(([name, count]) => `${name} ${count}`)
     .join(', ');
+  const { drills: drillCount } = report.reverts;
+  const drills = drillCount > 0 ? `; ${drillCount} drill${drillCount === 1 ? '' : 's'}` : '';
   const rows: Array<[string, string]> = [
     [
       'Window',
@@ -220,7 +228,7 @@ export function renderMetrics(report: MetricsReport) {
     ],
     [
       'Reverts',
-      `${report.reverts.pulls} PRs (${percent(report.reverts.rate)}), ${show(report.reverts.commits)} commits on main`,
+      `${report.reverts.pulls} PRs (${percent(report.reverts.rate)}), ${show(report.reverts.commits)} commits on main${drills}`,
     ],
     [
       'Agent share',

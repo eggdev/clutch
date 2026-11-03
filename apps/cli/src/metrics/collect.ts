@@ -117,6 +117,7 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
         user: Account;
         labels: Array<{ name: string }>;
         head: { sha: string; ref: string };
+        merge_commit_sha: string | null;
       }>(`repos/${repo}/pulls/${number}`),
       list<TimelineEvent>(`repos/${repo}/issues/${number}/timeline`),
       list<{ commit: { message: string } }>(`repos/${repo}/pulls/${number}/commits`),
@@ -150,6 +151,7 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
         bot: pull.user?.type === 'Bot' || (pull.user?.login ?? '').endsWith('[bot]'),
       },
       labels: pull.labels.map((label) => label.name),
+      mergeSha: pull.merge_commit_sha ?? '',
       numstat: files
         .map((file) => `${file.additions}\t${file.deletions}\t${file.filename}`)
         .join('\n'),

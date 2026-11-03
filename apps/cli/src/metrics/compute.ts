@@ -10,6 +10,10 @@ export type MergedPull = {
   lastGreenAt?: string;
   /** The full message of each commit in the pull request. */
   commitMessages: Array<string>;
+  /** The labels of the pull request, such as `drill`. */
+  labels: Array<string>;
+  /** The commit that the merge put on the default branch. */
+  mergeSha: string;
 };
 
 /** One check run on a commit of the default branch. */
@@ -65,6 +69,11 @@ export function agentsIn(message: string) {
 /** Whether a commit message or a pull request title is a revert. */
 export function isRevert(text: string) {
   return /^revert\b/iu.test(text.trim()) || /^This reverts commit [0-9a-f]{7,}/mu.test(text);
+}
+
+/** Whether a merged pull request is a revert rehearsal: a revert that carries the `drill` label. */
+export function isDrill(pull: Pick<MergedPull, 'title' | 'labels'>) {
+  return isRevert(pull.title) && pull.labels.includes('drill');
 }
 
 /**
@@ -163,7 +172,8 @@ export function flowMetrics(pulls: Array<MergedPull>, days: number) {
       pullShare: share(agentPulls, merged),
       byAgent,
     },
-    revertPulls: pulls.filter((pull) => isRevert(pull.title)).length,
+    revertPulls: pulls.filter((pull) => isRevert(pull.title) && !isDrill(pull)).length,
+    drillPulls: pulls.filter(isDrill).length,
   };
 }
 

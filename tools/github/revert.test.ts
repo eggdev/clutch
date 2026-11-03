@@ -103,6 +103,32 @@ test('an auto-merged PR that is reverted gets a risk-tighten issue with its file
   );
 });
 
+test('a drill revert carries the drill label, says so, and files no tighten issue', async () => {
+  const gh = fake([
+    ['gh api --paginate repos/acme/shop/issues/75/comments', { out: '901\n' }],
+    ['bun tools/clutch.ts risk', { out: '{"tier":"medium","files":[]}' }],
+  ]);
+  const code = await runRevert([...args, '--drill'], gh.run, {
+    write: () => Promise.resolve(),
+    log: () => {},
+    env: { GITHUB_REPOSITORY: 'acme/shop', PUSH_TOKEN: 'bot' },
+  });
+  expect(code).toBe(0);
+  const create = gh.calls.find((call) => call.startsWith('gh pr create')) ?? '';
+  expect(create).toContain('--label drill');
+  expect(create).toContain('This is a rehearsal: the original PR carries `drill`');
+  expect(gh.calls.some((call) => call.startsWith('bun tools/clutch.ts risk'))).toBe(false);
+  expect(gh.calls.some((call) => call.startsWith('gh issue create'))).toBe(false);
+});
+
+test('a revert without --drill has no drill label and says nothing about drills', async () => {
+  const gh = fake();
+  await revert(gh);
+  const create = gh.calls.find((call) => call.startsWith('gh pr create')) ?? '';
+  expect(create).not.toContain('--label');
+  expect(create).not.toContain('rehearsal');
+});
+
 test('a single-parent commit reverts without -m, and an existing branch is left alone', async () => {
   const squash = fake([['git rev-list', { out: `${sha} p1\n` }]]);
   await revert(squash);

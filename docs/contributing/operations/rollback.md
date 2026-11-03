@@ -148,6 +148,10 @@ rehearsal.
 - [ ] You can find each secret that a check needs without a chat or an issue.
 - [ ] The last deploy passes the Path A safety checks.
 
+To rehearse a revert, add the `drill` label to the merged PR before you add
+`revert`. The revert PR gets `drill` too, and no `risk-tighten` issue is filed.
+A drill does not count toward the revert brake or the revert metric.
+
 ## Related
 
 - [Secret rotation](./secret-rotation.md)

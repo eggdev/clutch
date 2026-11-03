@@ -91,11 +91,15 @@ test('on at the last step posts no dry-run comment', async () => {
   expect(merges(gh.calls)).toEqual([]);
 });
 
-/** The merged PRs of the brake's window: `reverts` of the `merged` have a head branch that starts with `revert/`. */
-const mergedPrs = (merged: number, reverts: number) =>
+/**
+ * The merged PRs of the brake's window: `reverts` of the `merged` have a head
+ * branch that starts with `revert/`, and the first `drills` of those carry `drill`.
+ */
+const mergedPrs = (merged: number, reverts: number, drills = 0) =>
   JSON.stringify(
     Array.from({ length: merged }, (_, index) => ({
       headRefName: index < reverts ? `revert/${index + 1}` : `clutch/cl-${index + 1}-docs`,
+      labels: index < drills ? [{ name: 'drill' }] : [],
     })),
   );
 
@@ -131,6 +135,23 @@ test('1 revert in 60 merges (1.7%) does not brake', async () => {
   expect(await decide(gh, { mode: 'off', step: 'medium' })).toEqual([
     'Would auto-merge at the step medium.',
   ]);
+});
+
+test('a drill revert is merged but not a revert, so 1 drill in 48 merges does not brake', async () => {
+  const gh = fake([countMerged(mergedPrs(48, 1, 1))]);
+  expect(await decide(gh, { mode: 'off', step: 'medium' })).toEqual([
+    'Would auto-merge at the step medium.',
+  ]);
+});
+
+test('1 real revert in 48 merges (2.08%) brakes, so a drill is the only exception', async () => {
+  const gh = fake([
+    countMerged(mergedPrs(48, 1)),
+    ['bun tools/clutch.ts risk', { out: '{"tier":"medium"}' }],
+  ]);
+  const [verdict] = await decide(gh, { mode: 'off', step: 'medium' });
+  expect(verdict).toContain('Reverts are 1 of 48 merged PRs');
+  expect(verdict).toContain('so the step drops from medium to low.');
 });
 
 test('exactly 2% does not brake, since the limit is passed only above it', async () => {
