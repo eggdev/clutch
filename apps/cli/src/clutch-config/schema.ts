@@ -37,6 +37,8 @@ export type ClutchConfig = {
   };
   /** How `bun run pr` finds an agent's branch: its prefix, `clutch/cl-` by default. */
   pr?: { branchPrefix: string };
+  /** What auto-revert judges main by, besides the required checks. `watch` names checks or jobs. */
+  autoRevert?: { watch: Array<string> };
   /** The repositories that the weekly digest reads: each `owner/name` and the branch to read. */
   fleet?: Array<{ repo: string; ref: string }>;
   /**
@@ -68,6 +70,7 @@ const topKeys = [
   'capabilities',
   'worktree',
   'automerge',
+  'autoRevert',
   'pr',
   'fleet',
   'sast',
@@ -277,6 +280,23 @@ function readFleet(value: unknown, errors: Errors) {
   return errors.length === before ? fleet : undefined;
 }
 
+function readAutoRevert(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'autoRevert', message: 'Expected a map with watch.' });
+    return;
+  }
+  unknownKeys(value, ['watch'], 'autoRevert', errors);
+  const { watch = [] } = value;
+  if (!isStringList(watch) || watch.some((name) => !name.trim())) {
+    errors.push({
+      path: 'autoRevert.watch',
+      message: 'Expected a list of check or job names, such as production.',
+    });
+    return;
+  }
+  return { watch: watch.map((name) => name.trim()) };
+}
+
 function readPr(value: unknown, errors: Errors) {
   if (!isObject(value)) {
     errors.push({ path: 'pr', message: 'Expected a map with branchPrefix.' });
@@ -351,6 +371,7 @@ function readAgentReview(value: unknown, errors: Errors) {
 const optionalSections: Record<string, (value: unknown, errors: Errors) => unknown> = {
   worktree: readWorktree,
   automerge: readAutomerge,
+  autoRevert: readAutoRevert,
   pr: readPr,
   fleet: readFleet,
   agentReview: readAgentReview,

@@ -89,10 +89,15 @@ release bot, the default token opens the PR, and CI does not start on it.
 ### Auto-revert
 
 The [Auto-revert workflow](../../../.github/workflows/auto-revert.yml) acts
-when CI fails on a push to the default branch:
+when CI fails on a push to the default branch. It judges main the same way
+auto-merge and the red-main metric do: by the required checks of the default
+branch. Main is red when a required check fails, and green when every required
+check that ran passed. A check that is not required, such as a deploy job, does
+not make main red here.
 
-1. When the last finished CI run before it failed too, the branch was already
-   red, so it does nothing.
+1. When the previous push run did not pass every required check, the branch was
+   already red, so it does nothing. When no required check failed on the
+   commit, it does nothing and logs the checks that failed.
 2. On the first attempt, it reruns the failed jobs once, so a flaky test does
    not revert a PR.
 3. When the rerun fails too, it finds the merged PR. A red release commit
@@ -103,6 +108,12 @@ when CI fails on a push to the default branch:
    permission to create it, so a project that has never run the Labels
    workflow needs that workflow to run once. A PR that a person merged gets no
    automatic revert: the person fixes forward or adds the label.
+
+A project with a live deploy can add its deploy job to `autoRevert.watch` in
+`clutch.yaml`, such as `production`. Those checks count as required for
+auto-revert only, so a failed health check reverts the PR that broke it. Neither
+auto-merge nor the red-main metric reads the list. See
+[clutch.yaml](../../../apps/cli/README.md#clutchyaml).
 
 The revert PR merges as the revert section above says: auto-merge takes it when
 it may, and a person merges it otherwise.

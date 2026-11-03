@@ -307,6 +307,8 @@ automerge: # optional
   mode: dry-run # off (the default), dry-run or on
   step: low # bots (the default), low or medium: how far auto-merge reaches
   owner: eggdev # optional: the login whose reactions grade the dry-run verdicts
+autoRevert: # optional
+  watch: [production] # checks or jobs that also count as required for auto-revert only
 pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 sast: auto # optional: auto (the default), codeql or semgrep
@@ -325,6 +327,12 @@ fleet: # optional: the repositories the weekly digest reads
 `automerge.mode` tells the Auto-merge workflow what to do, and `automerge.step`
 how far it reaches: bot PRs, then low-risk agent PRs, then medium-risk ones. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
+
+`autoRevert.watch` lists checks or job names that count as required for the
+Auto-revert workflow only. A project with a live deploy lists its deploy job, so
+a failed health check still reverts the PR that broke it. The default is an
+empty list. Auto-merge and the red-main metric judge main by the required checks
+alone. See [rollback](../../docs/contributing/operations/rollback.md#auto-revert).
 
 `agentReview.missingCredential` tells `agent-review.yml` what to do without an
 Anthropic credential: pass with a notice, or fail. Set `fail` once
