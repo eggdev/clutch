@@ -56,10 +56,10 @@ the authoring skill. Each repository has one verify entry point, including
 monorepos; platform and flow are selections inside it. For signed Linear Todo
 events, follow [`deliver-linear`](../../.agents/skills/deliver-linear/SKILL.md).
 Linear holds the authoritative task, and its actual status UUIDs map to the
-execution stages. Todo authorizes build, verification and a PR. A
-[review](./review.md) with no blocking finding and retained visual evidence
-are required before declaring the PR ready.
-Merging and release need a separate grant and their own gates.
+execution stages. Todo authorizes build, verification and a PR. The required
+checks and [agent review](./review.md) must pass at the tested head before the
+PR is declared ready. Auto-merge then decides the merge by risk tier: the owner
+merges one-way-door PRs and PRs with an owner finding. Each merge is a release.
 
 ## Pull requests
 

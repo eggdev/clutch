@@ -22,8 +22,7 @@ def connect(path):
             receipts TEXT NOT NULL DEFAULT '{}', UNIQUE(issue, transition));
         CREATE UNIQUE INDEX IF NOT EXISTS one_issue ON runs(issue)
           WHERE state IN ('queued','reserved','working','review','blocked');
-        CREATE UNIQUE INDEX IF NOT EXISTS one_repository ON runs(route)
-          WHERE state IN ('reserved','working');
+        DROP INDEX IF EXISTS one_repository;
     ''')
     return db
 
@@ -38,7 +37,7 @@ def routes(db):
 
 def validate_route(value):
     required = ['id', 'repository', 'hostProjectId', 'integrationRef', 'teamId', 'states',
-                'destination', 'verificationSkill', 'requiredReview']
+                'destination', 'verificationSkill']
     if any(not value.get(k) for k in required) or value['destination'] != 'pr':
         raise ValueError('A complete route with destination pr is required')
     base = value['integrationRef']
@@ -46,12 +45,13 @@ def validate_route(value):
         raise ValueError('integrationRef must name an explicit non-option Git ref')
     if value['verificationSkill'] != '.agents/skills/verify/SKILL.md':
         raise ValueError('verificationSkill must be the committed project-local verify skill')
-    if value['requiredReview'] != 'bugbot':
-        raise ValueError('Only the configured bugbot review policy is supported')
     if any(not value['states'].get(k) for k in ['todo', 'active', 'review', 'blocked', 'done']):
         raise ValueError('All five status UUIDs are required')
     if not Path(value['repository']).is_absolute():
         raise ValueError('Repository path must be absolute')
+    if 'maxLanes' in value and (not isinstance(value['maxLanes'], int)
+                                or isinstance(value['maxLanes'], bool) or value['maxLanes'] < 1):
+        raise ValueError('maxLanes must be a positive integer')
 
 
 def snapshot_matches(issue, route):
@@ -194,12 +194,15 @@ def main():
                     result['status'] = 'stale-or-blocked'
                 else:
                     validate_route(route)
-                    try:
+                    active = db.execute(
+                        "SELECT COUNT(*) FROM runs WHERE route=? AND state IN ('reserved','working')",
+                        (route['id'],)).fetchone()[0]
+                    if active >= route.get('maxLanes', 3):
+                        result['status'] = 'busy'
+                    else:
                         db.execute("UPDATE runs SET state='reserved' WHERE id=?", (args.run,))
                         result.update({'status': 'reserved', 'state': 'reserved', 'routeConfig': route,
                                        'receipts': receipts, 'generation': receipts.get('generation', 0)})
-                    except sqlite3.IntegrityError:
-                        result['status'] = 'repository-busy'
             elif args.command in ['record', 'finish']:
                 receipts = json.loads(row['receipts'])
                 if args.generation != receipts.get('generation', 0):

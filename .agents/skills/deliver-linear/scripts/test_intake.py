@@ -21,7 +21,7 @@ class IntakeTests(unittest.TestCase):
                       'hostProjectId': 'host', 'integrationRef': 'origin/main', 'teamId': 'team', 'projectId': None,
                       'states': {'todo': 'todo', 'active': 'active', 'review': 'review',
                                  'blocked': 'blocked', 'done': 'done'},
-                      'destination': 'pr', 'verificationSkill': '.agents/skills/verify/SKILL.md', 'requiredReview': 'bugbot'}
+                      'destination': 'pr', 'verificationSkill': '.agents/skills/verify/SKILL.md'}
         self.issue = {'id': 'issue', 'teamId': 'team', 'projectId': None,
                       'stateId': 'todo', 'archivedAt': None, 'blockedBy': []}
         self.event = {'type': 'Issue', 'action': 'update', 'webhookTimestamp': time.time() * 1000,
@@ -59,11 +59,16 @@ class IntakeTests(unittest.TestCase):
             ('integrationRef', None, 'complete route'),
             ('integrationRef', '--wrong', 'explicit non-option'),
             ('verificationSkill', 'verify-app', 'project-local verify'),
-            ('requiredReview', 'unknown', 'bugbot review policy'),
         ]:
             route = {**self.route, field: value}
             with self.assertRaisesRegex(RuntimeError, error):
                 self.call('route', '--file', self.save('bad-route.json', route))
+
+    def test_old_route_with_required_review_still_loads(self):
+        legacy = {**self.route, 'requiredReview': 'bugbot'}
+        self.call('route', '--file', self.save('legacy-route.json', legacy))
+        self.assertEqual(self.call('routes')['routes'][0]['requiredReview'], 'bugbot')
+        self.assertEqual(self.reserve_issue(*self.queue_issue('one')), 'reserved')
 
     def test_description_edit_and_wrong_team_do_not_dispatch(self):
         self.event['updatedFrom'] = {'description': 'old'}
@@ -99,7 +104,37 @@ class IntakeTests(unittest.TestCase):
         self.issue_file = self.save('canceled.json', self.issue)
         self.assertEqual(self.call('reserve', run, '--issue', self.issue_file)['status'], 'stale-or-blocked')
 
+    def set_max_lanes(self, value):
+        self.route['maxLanes'] = value
+        self.call('route', '--file', self.save('route.json', self.route))
+
+    def queue_issue(self, issue_id):
+        issue = {**self.issue, 'id': issue_id}
+        issue_file = self.save(f'{issue_id}.json', issue)
+        event_file = self.save(f'{issue_id}-event.json', {**self.event, 'data': dict(issue)})
+        queued = self.call('enqueue', '--event', event_file, '--issue', issue_file,
+                           '--delivery', f'delivery-{issue_id}')
+        self.assertEqual(queued['status'], 'queued')
+        return queued['runId'], issue_file
+
+    def reserve_issue(self, run, issue_file):
+        return self.call('reserve', run, '--issue', issue_file)['status']
+
+    def test_default_max_lanes_allows_three_runs_per_route(self):
+        lanes = [self.queue_issue(issue_id) for issue_id in ['one', 'two', 'three', 'four']]
+        self.assertEqual([self.reserve_issue(*lane) for lane in lanes[:3]], ['reserved'] * 3)
+        self.assertEqual(self.reserve_issue(*lanes[3]), 'busy')
+        self.assertEqual(self.call('show', lanes[3][0])['state'], 'queued')
+
+    def test_max_lanes_two_reserves_two_issues_and_queues_the_third(self):
+        self.set_max_lanes(2)
+        first, second, third = (self.queue_issue(issue_id) for issue_id in ['one', 'two', 'three'])
+        self.assertEqual([self.reserve_issue(*first), self.reserve_issue(*second)], ['reserved', 'reserved'])
+        self.assertEqual(self.reserve_issue(*third), 'busy')
+        self.assertEqual(self.call('show', third[0])['state'], 'queued')
+
     def test_repository_slot_serializes_distinct_issues_without_losing_queue(self):
+        self.set_max_lanes(1)
         first = self.enqueue()['runId']
         self.assertEqual(self.call('reserve', first, '--issue', self.issue_file)['status'], 'reserved')
         self.issue['id'] = 'second'
@@ -107,11 +142,35 @@ class IntakeTests(unittest.TestCase):
         self.issue_file = self.save('second.json', self.issue)
         self.event_file = self.save('second-event.json', self.event)
         second = self.enqueue('second')['runId']
-        self.assertEqual(self.call('reserve', second, '--issue', self.issue_file)['status'], 'repository-busy')
+        self.assertEqual(self.call('reserve', second, '--issue', self.issue_file)['status'], 'busy')
         self.assertEqual(self.call('show', second)['state'], 'queued')
         self.call('finish', first, 'review', '--pr', 'https://example.test/pr/1',
                   '--head', 'sha', '--evidence', '/durable/receipt', '--generation', '0')
         self.assertEqual(self.call('reserve', second, '--issue', self.issue_file)['status'], 'reserved')
+
+    def test_finished_or_canceled_runs_free_their_lane(self):
+        self.set_max_lanes(1)
+        first, second = self.queue_issue('one'), self.queue_issue('two')
+        self.assertEqual(self.reserve_issue(*first), 'reserved')
+        self.call('finish', first[0], 'canceled', '--generation', '0')
+        self.assertEqual(self.reserve_issue(*second), 'reserved')
+
+    def test_invalid_max_lanes_cannot_register(self):
+        for value in [0, -1, 1.5, '2', True]:
+            with self.subTest(value=value):
+                self.route['maxLanes'] = value
+                with self.assertRaisesRegex(RuntimeError, 'maxLanes must be a positive integer'):
+                    self.call('route', '--file', self.save('bad-route.json', self.route))
+
+    def test_existing_database_drops_the_one_repository_index(self):
+        with sqlite3.connect(self.root / 'state.sqlite') as db:
+            db.execute("CREATE UNIQUE INDEX one_repository ON runs(route) WHERE state IN ('reserved','working')")
+        self.call('routes')
+        with sqlite3.connect(self.root / 'state.sqlite') as db:
+            indexes = [row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='index'")]
+        self.assertNotIn('one_repository', indexes)
+        self.assertEqual(self.reserve_issue(*self.queue_issue('one')), 'reserved')
+        self.assertEqual(self.reserve_issue(*self.queue_issue('two')), 'reserved')
 
     def test_dependencies_block_and_replayed_transition_cannot_duplicate(self):
         self.issue['blockedBy'] = ['dependency']

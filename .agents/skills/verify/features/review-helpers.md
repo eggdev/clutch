@@ -13,7 +13,7 @@ Expect no live fixture process after verified cleanup, failed receipts for
 interruption/source drift, bounded collected logs and preservation of originals.
 Native-labelled fallback commands must be rejected before execution.
 
-Exercise duplicate intake, route validation, repository claims and stale completion
+Exercise duplicate intake, route validation, lane claims and stale completion
 generations. Missing integration bases and noncanonical verification skills must
 fail registration. Fixtures prove the local helper contracts; they do not prove
 webhook signatures, T3 dispatch or deployed review completion.

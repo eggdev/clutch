@@ -21,9 +21,19 @@ names are not stable identifiers. A route has:
   },
   "destination": "pr",
   "verificationSkill": ".agents/skills/verify/SKILL.md",
-  "requiredReview": "bugbot"
+  "maxLanes": 3
 }
 ```
+
+A route file saved with a `requiredReview` field still loads. The field is
+ignored, and no review policy gates a route. The PR's required checks and
+`agent-review` are the gate; see [review and proof](../SKILL.md#review-and-proof).
+
+`maxLanes` is optional, a positive integer, and defaults to 3. It caps the
+route's runs that are reserved or working at once. Each lane gets its own
+checkout, but lanes still share fixed ports and caches. Lanes share simulators:
+projects with native journeys should set `maxLanes: 1` until verify isolates the
+simulator.
 
 Set `projectId` when a team serves several repositories. Only one team-wide
 route is allowed for a team; it cannot coexist with project-specific routes.
@@ -61,20 +71,19 @@ python3 .agents/skills/deliver-linear/scripts/intake.py show RUN_ID
 
 `enqueue` also supports a `create` event directly into Todo. Updates must carry
 a changed `updatedFrom.stateId`. Replayed delivery IDs and repeated transitions
-are ignored. Repository slots serialize work while fixed ports, simulators and
-shared caches make parallel verification unsafe. Claims survive restarts.
+are ignored. Lanes cap concurrent work per route, not per machine. Claims survive restarts.
 Signature and timestamp checks happen at the host's HTTP receipt, before agent
 queueing. The helper does not reapply a one-minute wall-clock window after an
 agent startup delay; it rechecks the current issue state and replay receipts.
 
 For a completed worker with review findings, `resume` validates the live issue,
-archives prior receipts and reacquires the repository slot. Use the returned
+archives prior receipts and reacquires its lane. Use the returned
 generation in `clientRequestId`, such as `linear-RUN_ID-GENERATION`, so a new
 fix round is distinct from retrying the same dispatch. If busy, the run remains
 queued for `next` and `reserve`; its resume flag preserves the allowed review
 state. Never use resume to replace a still-working child.
 Every `record` and `finish` carries that generation. Stale worker completions
-cannot overwrite new receipts or release a resumed worker's repository slot.
+cannot overwrite new receipts or release a resumed worker's lane.
 
 ## T3 webhook
 
