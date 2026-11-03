@@ -60,7 +60,19 @@ if (import.meta.main) {
   const body = gh(['pr', 'view', pr, '--json', 'body', '--jq', '.body']);
   const next = mergeRecapBlock(body, await Bun.file(blockFile).text());
   try {
-    gh(['pr', 'edit', pr, '--body-file', '-'], next);
+    // REST, not `gh pr edit`, which fails on Projects (classic). `@-` reads the body from stdin.
+    gh(
+      [
+        'api',
+        '--method',
+        'PATCH',
+        `repos/{owner}/{repo}/pulls/${pr}`,
+        '--field',
+        'body=@-',
+        '--silent',
+      ],
+      next,
+    );
     console.log(`The recap block on PR #${pr} is up to date.`);
   } catch (error) {
     console.error(

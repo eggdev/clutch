@@ -98,7 +98,10 @@ when CI fails on a push to the default branch:
 3. When the rerun fails too, it finds the merged PR. A red release commit
    blames the merge before it.
 4. When auto-merge merged that PR, it adds the `revert` label, starts the
-   Revert workflow and comments on the PR. A PR that a person merged gets no
+   Revert workflow and comments on the PR. First it tries to create the
+   `revert` label, which the Labels workflow also makes. This job may lack the
+   permission to create it, so a project that has never run the Labels
+   workflow needs that workflow to run once. A PR that a person merged gets no
    automatic revert: the person fixes forward or adds the label.
 
 The revert PR merges as the revert section above says: auto-merge takes it when

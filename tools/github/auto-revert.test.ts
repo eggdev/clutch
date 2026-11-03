@@ -55,16 +55,49 @@ test('a second red run after a green one reverts the auto-merged PR', async () =
   const gh = main();
   const { code } = await autoRevert(gh);
   expect(code).toBe(0);
-  expect(gh.calls).toContain('gh pr edit 42 --repo acme/shop --add-label revert');
+  expect(gh.calls).toContain(
+    'gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert',
+  );
   expect(gh.calls).toContain('gh workflow run revert.yml --repo acme/shop --ref main -f pr=42');
   expect(gh.calls.some((call) => call.startsWith('gh pr comment 42'))).toBe(true);
+});
+
+test('the revert label is created before it is added, so a fresh project has it', async () => {
+  const gh = main();
+  await autoRevert(gh);
+  const create = gh.calls.findIndex((call) => call.startsWith('gh label create revert --force'));
+  const add = gh.calls.indexOf(
+    'gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert',
+  );
+  expect(create).toBeGreaterThanOrEqual(0);
+  expect(create).toBeLessThan(add);
+  expect(gh.calls[create]).toContain('--repo acme/shop');
+  expect(gh.calls[create]).toContain('--color e99695');
+});
+
+test('a failed label add stops the revert, so no revert workflow starts without the label', async () => {
+  const gh = main([
+    ['gh api --method POST repos/acme/shop/issues/42/labels', { ok: false, err: 'HTTP 422' }],
+  ]);
+  await expect(autoRevert(gh)).rejects.toThrow('HTTP 422');
+  expect(gh.calls.some((call) => call.startsWith('gh workflow run'))).toBe(false);
+});
+
+test('a label create the job may not grant does not stop the revert', async () => {
+  const gh = main([['gh label create revert', { ok: false, err: 'HTTP 403' }]]);
+  const { code, lines } = await autoRevert(gh);
+  expect(code).toBe(0);
+  expect(gh.calls).toContain(
+    'gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert',
+  );
+  expect(lines.at(-1)).toContain('Started its revert.');
 });
 
 test('the first red run only reruns the failed jobs, in case a test is flaky', async () => {
   const gh = main();
   await autoRevert(gh, '1');
   expect(gh.calls).toContain('gh run rerun 77 --failed --repo acme/shop');
-  expect(gh.calls.some((call) => call.startsWith('gh pr edit'))).toBe(false);
+  expect(gh.calls.some((call) => call.startsWith('gh api --method POST'))).toBe(false);
 });
 
 test('a branch that was red before gets no rerun and no revert', async () => {
@@ -83,7 +116,9 @@ test('a red release commit blames the merge before it', async () => {
     ['gh api repos/acme/shop/commits/merge99/pulls', { out: '42\n' }],
   ]);
   await autoRevert(gh);
-  expect(gh.calls).toContain('gh pr edit 42 --repo acme/shop --add-label revert');
+  expect(gh.calls).toContain(
+    'gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert',
+  );
 });
 
 test('a PR that a person merged, or a commit with no PR, is not reverted', async () => {

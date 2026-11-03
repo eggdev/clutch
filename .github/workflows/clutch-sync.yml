@@ -157,7 +157,9 @@ jobs:
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
           open="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number // ""')"
           if [ -n "$open" ]; then
-            gh pr edit "$open" --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/sync-body.md"
+            # REST, not `gh pr edit`, which fails on Projects (classic).
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/pulls/$open" \
+              --raw-field "title=$title" --field "body=@$RUNNER_TEMP/sync-body.md" --silent
           else
             gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE" --head "$branch" \
               --title "$title" --body-file "$RUNNER_TEMP/sync-body.md"

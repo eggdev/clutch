@@ -44,7 +44,7 @@ take a PR to green.
 | -------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------- |
 | `bun run pr doctor [--fix]`                              | Once on each machine.                                | Installing `gh` and its extensions by hand.     |
 | `bun run pr open --title <title> --body-file <file>`     | You open a PR, or push to one. It marks the branch's issue `done` in the PR head before the push. Add `--force` after a rebase. | `git push`, `gh pr create` and `clutch issues set ... done`. |
-| `bun run pr body <number> <file>`                        | Only the PR description changes.                     | `gh pr edit --body-file`.                       |
+| `bun run pr body <number> <file>`                        | Only the PR description changes.                     | A REST PATCH of the body. `gh pr edit` fails on Projects (classic). |
 | `bun run pr status <number>`                             | Before each decision about the PR.                   | `gh pr checks` and reading review comments.     |
 | `bun run pr wait <number>`                               | After a push, to wait for the checks.                | A `gh pr checks --watch` or `sleep` loop.       |
 | `bun run pr failures <number>`                           | A check failed.                                      | Digging in `gh run view --log`.                 |

@@ -35,14 +35,21 @@ test('workspaces come from the array or the packages form of package.json', () =
   expect(workspaceGlobs(null)).toEqual([]);
 });
 
-test('a change gets one kind and each area once, and the one-way-door label is defined', () => {
+test('a change gets one kind and each area once, and the person labels are defined', () => {
   const labels = changeLabels(
     'docs: explain x',
     ['docs/a.md', 'docs/b.md', 'apps/cli/README.md'],
     workspaces,
   );
   expect(labels.apply.map((label) => label.name)).toEqual(['kind/docs', 'area/cli', 'area/docs']);
-  expect(labels.define.map((label) => label.name)).toContain('one-way-door');
+  expect(labels.define.map((label) => label.name)).toEqual([
+    'kind/docs',
+    'area/cli',
+    'area/docs',
+    'one-way-door',
+    'revert',
+  ]);
+  expect(labels.apply.map((label) => label.name)).not.toContain('revert');
   for (const label of labels.define) {
     expect(label.color).toMatch(/^[0-9a-f]{6}$/u);
     expect(label.description.length).toBeLessThanOrEqual(100);

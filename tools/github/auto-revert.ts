@@ -9,7 +9,7 @@ import type { Run } from '@tools/github/stack';
  * `revert` and starts the Revert workflow, which opens the revert PR. A first
  * failure only reruns the failed jobs, so a flaky test does not revert a PR.
  * A PR that a person merged gets no automatic revert: the person who merged it
- * owns the fix. See docs/contributing/operations/rollback.md#auto-revert.
+ * owns the fix. See https://github.com/eggdev/clutch/blob/main/docs/contributing/operations/rollback.md#auto-revert.
  */
 const usage =
   'Usage: bun tools/github/auto-revert.ts --sha <head> --branch <default branch> --run-id <id> --attempt <n> [--workflow ci.yml]';
@@ -148,7 +148,34 @@ export async function runAutoRevert(
     );
     return 0;
   }
-  await must(run, ['gh', 'pr', 'edit', pr, '--repo', repo, '--add-label', 'revert']);
+  // The label may be missing before the Labels workflow has run. Creating it
+  // needs the Issues permission, which this job does not grant. So a failure is
+  // not fatal: the add below fails if the label still does not exist. The color
+  // and description match apps/cli/src/labels/compute.ts.
+  await run([
+    'gh',
+    'label',
+    'create',
+    'revert',
+    '--force',
+    '--repo',
+    repo,
+    '--color',
+    'e99695',
+    '--description',
+    'Revert this merged PR: the Revert workflow opens the revert PR',
+  ]);
+  // The REST issues endpoint adds a label to a PR. `gh pr edit` fails on
+  // Projects (classic), which GitHub is retiring, so it does not add labels.
+  await must(run, [
+    'gh',
+    'api',
+    '--method',
+    'POST',
+    `repos/${repo}/issues/${pr}/labels`,
+    '-f',
+    'labels[]=revert',
+  ]);
   await must(run, [
     'gh',
     'workflow',

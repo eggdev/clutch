@@ -3,8 +3,10 @@ name: Labels
 # Labels each pull request with kind/<type> from its conventional title and
 # area/<part> for each part of the repository it touches, and size/S to
 # size/XL by its changed lines, from `clutch labels`. Above pr_size.warn in
-# clutch.yaml it warns. Size never fails a pull request. It also makes sure the one-way-door label exists, which a
-# person adds when a change is one-way (docs/principles/two-way-doors.md).
+# clutch.yaml it warns. Size never fails a pull request. It also makes sure the
+# one-way-door label exists, which a person adds when a change is one-way
+# (docs/principles/two-way-doors.md), and the revert label, which a person adds
+# to a merged PR to revert it.
 # risk/<tier> comes from risk.yml. See docs/contributing/review.md#labels.
 #
 # Two jobs, so the pull request's code never runs with a write token. compute

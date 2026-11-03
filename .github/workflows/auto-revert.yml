@@ -3,7 +3,8 @@
 # jobs once, so a flaky test does not revert a PR. A second failure labels the
 # PR `revert` and starts the Revert workflow, which opens the revert PR. A PR
 # that a person merged gets no automatic revert. tools/github/auto-revert.ts
-# holds the rules. See docs/contributing/operations/rollback.md#auto-revert.
+# holds the rules. See
+# https://github.com/eggdev/clutch/blob/main/docs/contributing/operations/rollback.md#auto-revert.
 name: Auto-revert
 
 on:

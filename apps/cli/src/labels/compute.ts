@@ -28,6 +28,17 @@ const oneWayDoor: Label = {
   description: 'A person marked this change one-way. The owner approves it before it merges.',
 };
 
+/**
+ * The label that a person adds to a merged PR to revert it. The Revert workflow
+ * then opens the revert PR. Auto-revert adds it too, with the same color and
+ * description in tools/github/auto-revert.ts, so each creates it the same way.
+ */
+const revertLabel: Label = {
+  name: 'revert',
+  color: 'e99695',
+  description: 'Revert this merged PR: the Revert workflow opens the revert PR',
+};
+
 /** `kind/<type>` from a conventional title, such as `feat(cli)!: add x`, or nothing. */
 export function kindLabel(title: string): Label | undefined {
   const type = /^(\w+)(?:\([^)]*\))?!?:\s/u.exec(title)?.[1];
@@ -120,5 +131,5 @@ export function changeLabels(title: string, files: Array<string>, workspaces: Ar
       description: `Changes ${area === 'root' ? 'files at the repository root' : area}.`,
     })),
   ];
-  return { apply, define: [...apply, oneWayDoor] };
+  return { apply, define: [...apply, oneWayDoor, revertLabel] };
 }
