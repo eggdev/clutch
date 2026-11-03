@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.53.1 (2026-11-03)
+
+### Fixes and maintenance
+
+- docs(journeys): name VISUAL_COMPARE for screenshots (CL-418)
+
 ## 0.53.0 (2026-11-03)
 
 ### Features
