@@ -1,14 +1,17 @@
 import { expect, test } from 'bun:test';
 
-import { enabledMarker, marker } from '@tools/github/auto-merge-rules';
 import type { Config } from '@tools/github/auto-merge-rules';
-import { sweepCap, stalePrs, sweep } from '@tools/github/auto-merge-sweep';
+import type { Mode } from '@tools/github/auto-merge-sweep';
+import { stalePrs, sweep, sweepCap } from '@tools/github/auto-merge-sweep';
 import { fake } from '@tools/github/fake-run';
-import type { Result } from '@tools/github/stack';
+import type { Result, Run } from '@tools/github/stack';
 
 const repo = 'eggdev/clutch';
 const agent = { login: 'eggdev', is_bot: false };
 const bot = { login: 'app/renovate', is_bot: true };
+
+/** When the last required check of every green head finished. */
+const DONE = '2026-11-02T09:00:00Z';
 
 type Listed = {
   number: number;
@@ -35,6 +38,7 @@ const pr = (number: number, fields: Partial<Listed> = {}): Listed => ({
 });
 
 type Judged = {
+  databaseId: number;
   conclusion: string | null;
   createdAt: string;
   displayTitle: string;
@@ -43,8 +47,9 @@ type Judged = {
   status: string;
 };
 
-/** A run of the Auto-merge workflow, completed as a success by default. */
+/** A run of the Auto-merge workflow on head sha7, completed as a success, from a pull_request event. */
 const judged = (fields: Partial<Judged>): Judged => ({
+  databaseId: 70,
   conclusion: 'success',
   createdAt: '2026-11-02T10:00:00Z',
   displayTitle: 'Auto-merge',
@@ -54,7 +59,7 @@ const judged = (fields: Partial<Judged>): Judged => ({
   ...fields,
 });
 
-/** The check runs of a head: validate and agent review, both green or validate still running. */
+/** The check runs of a head: validate and agent review, both finished at DONE, or validate still running. */
 const checkRuns = (green: boolean) =>
   [
     {
@@ -62,6 +67,7 @@ const checkRuns = (green: boolean) =>
       name: 'validate',
       status: green ? 'completed' : 'in_progress',
       conclusion: green ? 'success' : null,
+      completed_at: green ? DONE : null,
       app: 'github-actions',
     },
     {
@@ -69,6 +75,7 @@ const checkRuns = (green: boolean) =>
       name: 'agent-review',
       status: 'completed',
       conclusion: 'success',
+      completed_at: DONE,
       app: 'github-actions',
     },
   ]
@@ -77,17 +84,17 @@ const checkRuns = (green: boolean) =>
 
 /**
  * A fake repository: the open PRs, their green checks unless `pending` names a
- * head, the Auto-merge runs, and each PR's comment bodies.
+ * head, the Auto-merge runs, and each run's decide job as `[conclusion, startedAt]`.
  */
 function world(
   prs: Array<Listed>,
   options: {
     runs?: Array<Judged>;
-    comments?: Record<number, string>;
+    decides?: Record<number, [string | null, string]>;
     pending?: Array<string>;
   } = {},
 ) {
-  const { runs = [], comments = {}, pending = [] } = options;
+  const { runs = [], decides = {}, pending = [] } = options;
   const answers: Array<[string, Partial<Result>]> = [
     ['gh repo view --json nameWithOwner', { out: `${repo}\n` }],
     ['gh repo view --json defaultBranchRef', { out: 'main\n' }],
@@ -102,22 +109,98 @@ function world(
       `gh api --paginate repos/${repo}/commits/${item.headRefOid}/check-runs`,
       { out: checkRuns(true) },
     ]),
-    ...Object.entries(comments).map(([number, body]): [string, Partial<Result>] => [
-      `gh api --paginate repos/${repo}/issues/${number}/comments`,
-      { out: body },
+    ...Object.entries(decides).map(([id, [conclusion, startedAt]]): [string, Partial<Result>] => [
+      `gh api --paginate repos/${repo}/actions/runs/${id}/jobs`,
+      { out: `${conclusion ?? ''}\t${startedAt}` },
     ]),
   ];
   return fake(answers);
 }
 
-const chosen = (run: Parameters<typeof stalePrs>[0]) => stalePrs(run, repo, 'main');
+const chosen = (run: Run, mode: Mode) => stalePrs(run, repo, 'main', mode);
 
-test('a green agent PR with no verdict for its head is chosen', async () => {
-  expect(await chosen(world([pr(7)]).run)).toEqual([7]);
+/** A decide that started after the last check finished, and succeeded. */
+const heldDecide: [string, string] = ['success', '2026-11-02T10:00:30Z'];
+
+test('a held PR, decided after its checks finished, is left alone hourly, and a push dispatches it', async () => {
+  const gh = world([pr(7)], { runs: [judged({ databaseId: 70 })], decides: { 70: heldDecide } });
+  expect(await chosen(gh.run, 'schedule')).toEqual([]);
+  expect(await chosen(gh.run, 'push')).toEqual([7]);
 });
 
-test('a bot PR is chosen, and a PR that is not judged, or not ready, is not', async () => {
-  const gh = world(
+test('a decide job that was skipped did not decide, so the PR is chosen, even when its run succeeded', async () => {
+  const gh = world([pr(7)], {
+    runs: [judged({ databaseId: 70, conclusion: 'success' })],
+    decides: { 70: ['skipped', '2026-11-02T10:00:30Z'] },
+  });
+  expect(await chosen(gh.run, 'schedule')).toEqual([7]);
+});
+
+test('a failed decide is chosen again', async () => {
+  const gh = world([pr(7)], {
+    runs: [judged({ databaseId: 70, conclusion: 'failure' })],
+    decides: { 70: ['failure', '2026-11-02T10:00:30Z'] },
+  });
+  expect(await chosen(gh.run, 'schedule')).toEqual([7]);
+});
+
+test('a decide that started before the last check finished does not hold the PR', async () => {
+  const gh = world([pr(7)], {
+    runs: [judged({ databaseId: 70, createdAt: '2026-11-02T08:30:00Z' })],
+    decides: { 70: ['success', '2026-11-02T08:30:30Z'] },
+  });
+  expect(await chosen(gh.run, 'schedule')).toEqual([7]);
+});
+
+test('a later decide failure overrides an earlier success', async () => {
+  const gh = world([pr(7)], {
+    runs: [
+      judged({ databaseId: 70, createdAt: '2026-11-02T10:00:00Z' }),
+      judged({ databaseId: 71, createdAt: '2026-11-02T11:00:00Z', conclusion: 'failure' }),
+    ],
+    decides: { 70: heldDecide, 71: ['failure', '2026-11-02T11:00:30Z'] },
+  });
+  expect(await chosen(gh.run, 'schedule')).toEqual([7]);
+});
+
+test('a dispatch decide counts for its PR, by the title of its run', async () => {
+  const gh = world([pr(7)], {
+    runs: [
+      judged({
+        databaseId: 80,
+        displayTitle: 'Auto-merge #7',
+        event: 'workflow_dispatch',
+        headSha: 'mainsha',
+      }),
+    ],
+    decides: { 80: heldDecide },
+  });
+  expect(await chosen(gh.run, 'schedule')).toEqual([]);
+});
+
+test('a decide still going skips the PR hourly, but a push dispatches it anyway', async () => {
+  const gh = world([pr(7)], { runs: [judged({ status: 'in_progress', conclusion: null })] });
+  expect(await chosen(gh.run, 'schedule')).toEqual([]);
+  expect(await chosen(gh.run, 'push')).toEqual([7]);
+});
+
+test('a PR with a required check still running is skipped in both modes', async () => {
+  const gh = world([pr(7)], { pending: ['sha7'] });
+  expect(await chosen(gh.run, 'schedule')).toEqual([]);
+  expect(await chosen(gh.run, 'push')).toEqual([]);
+});
+
+test('a draft, a fork, a stacked PR and a person’s PR are never eligible, and a bot PR is', async () => {
+  const gh = world([
+    pr(1, { isDraft: true }),
+    pr(2, { isCrossRepository: true }),
+    pr(3, { baseRefName: 'clutch/cl-2-x' }),
+    pr(4, { headRefName: 'feature/x', author: agent }),
+    pr(5),
+    pr(6, { headRefName: 'renovate/all-minor', author: bot }),
+  ]);
+  expect(await chosen(gh.run, 'push')).toEqual([5, 6]);
+  const pending = world(
     [
       pr(1, { isDraft: true }),
       pr(2, { isCrossRepository: true }),
@@ -128,79 +211,53 @@ test('a bot PR is chosen, and a PR that is not judged, or not ready, is not', as
     ],
     { pending: ['sha5'] },
   );
-  expect(await chosen(gh.run)).toEqual([6]);
+  expect(await chosen(pending.run, 'push')).toEqual([6]);
 });
 
-test('a verdict for the head stops the sweep, and a verdict for an older head does not', async () => {
+test('a push chooses every eligible PR, held ones too, least recently decided first', async () => {
   const gh = world([pr(7), pr(8), pr(9)], {
-    comments: {
-      7: `Auto-merge dry run.\n${marker('sha7')}`,
-      8: marker('old8'),
-      9: enabledMarker('low', 'sha9'),
-    },
+    runs: [judged({ databaseId: 70 })],
+    decides: { 70: heldDecide },
+    pending: ['sha9'],
   });
-  expect(await chosen(gh.run)).toEqual([8]);
+  expect(await chosen(gh.run, 'push')).toEqual([8, 7]);
+  expect(await chosen(gh.run, 'schedule')).toEqual([8]);
 });
 
-test('a PR whose last decide run failed is chosen again, even with a verdict', async () => {
-  const gh = world([pr(7)], {
-    comments: { 7: marker('sha7') },
-    runs: [judged({ conclusion: 'failure' })],
-  });
-  expect(await chosen(gh.run)).toEqual([7]);
-});
-
-test('a decide run still going skips the PR, and a dispatch run counts for its PR', async () => {
-  const going = world([pr(7)], { runs: [judged({ status: 'in_progress', conclusion: null })] });
-  expect(await chosen(going.run)).toEqual([]);
-  const failedDispatch = world([pr(7)], {
-    comments: { 7: marker('sha7') },
-    runs: [
-      judged({
-        displayTitle: 'Auto-merge #7',
-        event: 'workflow_dispatch',
-        headSha: 'mainsha',
-        conclusion: 'failure',
-      }),
-    ],
-  });
-  expect(await chosen(failedDispatch.run)).toEqual([7]);
-  const dispatchedGreen = world([pr(7)], {
-    comments: { 7: marker('sha7') },
-    runs: [
-      judged({
-        displayTitle: 'Auto-merge #7',
-        event: 'workflow_dispatch',
-        headSha: 'mainsha',
-      }),
-    ],
-  });
-  expect(await chosen(dispatchedGreen.run)).toEqual([]);
-});
-
-test('at most 20 PRs, the least recently decided first', async () => {
+test('at most 20 PRs in both modes, the least recently decided first', async () => {
   expect(sweepCap).toBe(20);
   const prs = Array.from({ length: 25 }, (_, index) => pr(index + 1));
-  // PR n was decided (n) hours before the day's start, so the highest numbers are the oldest.
+  // PR n's run was created n hours before the day's start, so the highest numbers are the oldest.
   const runs = prs.map((item) =>
     judged({
+      databaseId: 100 + item.number,
       headSha: item.headRefOid,
       createdAt: new Date(Date.UTC(2026, 10, 2) - item.number * 3_600_000).toISOString(),
+      conclusion: 'failure',
     }),
   );
-  const gh = world(prs, { runs });
-  expect(await chosen(gh.run)).toEqual(Array.from({ length: 20 }, (_, index) => 25 - index));
+  const decides = Object.fromEntries(
+    prs.map((item) => [100 + item.number, ['failure', DONE] as [string, string]]),
+  );
+  const gh = world(prs, { runs, decides });
+  const twenty = Array.from({ length: 20 }, (_, index) => 25 - index);
+  expect(await chosen(gh.run, 'schedule')).toEqual(twenty);
+  expect(await chosen(gh.run, 'push')).toEqual(twenty);
 });
 
-test('the sweep dispatches the workflow for each stale PR, and nothing while auto-merge is off', async () => {
+test('the sweep dispatches each chosen PR, and nothing while auto-merge is off', async () => {
   const on: Config = { mode: 'on', step: 'medium' };
   const gh = world([pr(7)]);
   const lines: Array<string> = [];
-  expect(await sweep(gh.run, on, (line) => lines.push(line))).toEqual([7]);
+  expect(await sweep(gh.run, on, 'push', (line) => lines.push(line))).toEqual([7]);
   expect(gh.calls).toContain('gh workflow run auto-merge.yml -f pr=7');
   expect(lines).toEqual(['Dispatched the decision for #7.']);
 
+  const held = world([pr(7)], { runs: [judged({ databaseId: 70 })], decides: { 70: heldDecide } });
+  expect(await sweep(held.run, on, 'schedule', () => {})).toEqual([]);
+  expect(held.calls.some((call) => call.startsWith('gh workflow run'))).toBe(false);
+
   const off = world([pr(7)]);
-  expect(await sweep(off.run, { mode: 'off', step: 'medium' }, () => {})).toEqual([]);
+  expect(await sweep(off.run, { mode: 'off', step: 'medium' }, 'push', () => {})).toEqual([]);
   expect(off.calls.some((call) => call.startsWith('gh workflow run'))).toBe(false);
 });

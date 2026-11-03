@@ -1,12 +1,14 @@
 name: Auto-merge sweep
 
-# Dispatches Auto-merge again for the green agent and bot PRs that have no
-# verdict for their head, or whose last decide run failed, so a PR opened before
-# a rules change still gets decided. It runs hourly, and on a push to main that
-# changes an auto-merge rule. Up to 20 PRs a sweep. The choice is in
-# tools/github/auto-merge-sweep.ts. A dispatch from GITHUB_TOKEN is the one event
-# that such a token may start a workflow with, so only this job needs actions:
-# write. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
+# Dispatches Auto-merge for the PRs that need a decision, at most 20 a sweep.
+# Hourly (schedule), a green PR is dispatched once on its final check state, and
+# again only when its head changes or its last decide job fails. So a PR held at
+# the last step is left alone. On a push to main that changes an auto-merge rule
+# (push), every eligible PR is dispatched, since each last decision used the old
+# rules. The choice is in tools/github/auto-merge-sweep.ts, which takes the event
+# as its argument. A dispatch from GITHUB_TOKEN is the one event that such a token
+# may start a workflow with, so only this job needs actions: write. See
+# .agents/skills/deliver/references/pull-requests.md#auto-merge.
 
 on:
   schedule:
@@ -45,7 +47,8 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
       - run: bun install --frozen-lockfile --ignore-scripts
-      - name: Dispatch the stale pull requests
+      - name: Dispatch the pull requests that need a decision
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bun tools/github/auto-merge-sweep.ts
+          EVENT: ${{ github.event_name }}
+        run: bun tools/github/auto-merge-sweep.ts --event "$EVENT"

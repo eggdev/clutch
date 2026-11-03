@@ -1,5 +1,7 @@
-import { checkConclusions, readConfig } from '@tools/github/auto-merge';
-import { enabledMarker, kindProblem, marker, steps } from '@tools/github/auto-merge-rules';
+import { parseArgs } from 'node:util';
+
+import { readConfig } from '@tools/github/auto-merge';
+import { kindProblem } from '@tools/github/auto-merge-rules';
 import type { Config, Pr } from '@tools/github/auto-merge-rules';
 import { retrying } from '@tools/github/command';
 import { must } from '@tools/github/github';
@@ -7,15 +9,24 @@ import { requiredChecks } from '@tools/github/main-checks';
 import type { Run } from '@tools/github/stack';
 
 /**
- * The hourly sweep of auto-merge. It dispatches the Auto-merge workflow for each
- * green agent or bot PR that has no verdict for its head, or whose last decide
- * run failed, so a PR opened before a rules change still gets decided. The
- * workflow runs the default branch's rules, so the sweep only chooses PRs.
+ * The sweep of auto-merge: it dispatches the Auto-merge workflow for the PRs
+ * that need a decision. `schedule` is the hourly sweep. A PR that is held,
+ * because its decide job succeeded after its last required check finished, is
+ * left alone until its head changes, or until its last decide fails. `push` is a
+ * push to main that changes an auto-merge rule: each eligible PR's last decision
+ * used the old rules, so every one is dispatched again. The workflow runs the
+ * default branch's rules, so the sweep only chooses PRs.
  * See .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 
 /** The most PRs one sweep dispatches. Each one is a workflow run. */
 export const sweepCap = 20;
+
+/** `schedule` for the hourly sweep, and `push` for a push to main that changes a rule. */
+export type Mode = 'schedule' | 'push';
+
+/** The newest runs of a head whose decide job the hourly sweep reads. The latest decides, and a success just before it. */
+const newestRuns = 5;
 
 type Listed = Pr & { number: number; isCrossRepository: boolean };
 
@@ -23,6 +34,7 @@ type Listed = Pr & { number: number; isCrossRepository: boolean };
 type JudgedRun = {
   conclusion: string | null;
   createdAt: string;
+  databaseId: number;
   displayTitle: string;
   event: string;
   headSha: string;
@@ -34,29 +46,87 @@ const gh = (run: Run, ...args: Array<string>) => must(run, ['gh', ...args]);
 /** The title that the Auto-merge workflow gives a run that a dispatch started for PR `number`. */
 const dispatchTitle = (number: number) => `Auto-merge #${number}`;
 
-/** Whether the PR has a verdict comment for `sha`: a dry-run one, or one that auto-merge was enabled at a step. */
-async function hasVerdict(run: Run, repo: string, number: number, sha: string) {
-  const bodies = await gh(
+/** The app that runs the workflows, and so reports each required check. */
+const actionsApp = 'github-actions';
+
+/**
+ * When every required check of `sha` has finished, the time, in milliseconds,
+ * that the last one did. Null while one runs or is missing. As in
+ * auto-merge, the latest run of each name counts, and only the Actions app's.
+ */
+export async function checksDoneAt(
+  run: Run,
+  repo: string,
+  sha: string,
+  names: Array<string>,
+): Promise<number | null> {
+  const out = await gh(
     run,
     'api',
     '--paginate',
-    `repos/${repo}/issues/${number}/comments`,
+    `repos/${repo}/commits/${sha}/check-runs?per_page=100`,
     '--jq',
-    '.[].body',
+    '.check_runs[] | {id, name, status, completed_at, app: .app.slug}',
   );
-  return [marker(sha), ...steps.map((step) => enabledMarker(step, sha))].some((verdict) =>
-    bodies.includes(verdict),
-  );
+  const latest = new Map<string, { id: number; status: string; completed_at: string | null }>();
+  for (const line of out.split('\n').filter(Boolean)) {
+    const item = JSON.parse(line) as {
+      id: number;
+      name: string;
+      status: string;
+      completed_at: string | null;
+      app: string | null;
+    };
+    if (item.app !== actionsApp) {
+      continue;
+    }
+    if ((latest.get(item.name)?.id ?? -1) < item.id) {
+      latest.set(item.name, item);
+    }
+  }
+  let last: number | null = null;
+  for (const name of names) {
+    const found = latest.get(name);
+    if (!found || found.status !== 'completed' || !found.completed_at) {
+      return null;
+    }
+    last = Math.max(last ?? 0, Date.parse(found.completed_at));
+  }
+  return last;
 }
 
 /**
- * The PR numbers to decide again, least recently decided first, at most
- * `sweepCap`. A PR is chosen when it is an open, ready, same-repository agent
- * or bot PR into the default branch, its required checks have all finished, and
- * either it has no verdict for its head or its last decide run failed. A run
- * still going on it means a decision is under way, so it is skipped.
+ * The decide job of run `id`: its conclusion, and when it started in
+ * milliseconds. Null when the run has no decide job. The run's own
+ * conclusion is not used, since a run whose decide job was skipped did not decide.
  */
-export async function stalePrs(run: Run, repo: string, defaultBranch: string) {
+async function decideJob(run: Run, repo: string, id: number) {
+  const out = await gh(
+    run,
+    'api',
+    '--paginate',
+    `repos/${repo}/actions/runs/${id}/jobs`,
+    '--jq',
+    '.jobs[] | select(.name == "decide") | [.conclusion, .started_at] | @tsv',
+  );
+  const line = out.split('\n').find(Boolean);
+  if (!line) {
+    return null;
+  }
+  const [conclusion, startedAt] = line.split('\t');
+  return { conclusion: conclusion || null, startedAt: Date.parse(startedAt) };
+}
+
+/**
+ * The PR numbers to dispatch, least recently decided first, at most `sweepCap`.
+ * A PR is eligible when it is an open, ready, same-repository agent or bot PR
+ * into the default branch, and its required checks have all finished. In
+ * `push` mode every eligible PR is chosen. In `schedule` mode an eligible PR is
+ * chosen unless it is held: no decide job of its head succeeded after its last
+ * check finished, or the latest decide job failed. A run still going on the
+ * head means a decision is under way, so the PR is skipped.
+ */
+export async function stalePrs(run: Run, repo: string, defaultBranch: string, mode: Mode) {
   const listed = JSON.parse(
     await gh(
       run,
@@ -80,25 +150,21 @@ export async function stalePrs(run: Run, repo: string, defaultBranch: string) {
       '--limit',
       '500',
       '--json',
-      'conclusion,createdAt,displayTitle,event,headSha,status',
+      'conclusion,createdAt,databaseId,displayTitle,event,headSha,status',
     ),
   ) as Array<JudgedRun>;
   const names = await requiredChecks(run, repo, defaultBranch);
-  const stale: Array<{ number: number; judgedAt: number }> = [];
+  const chosen: Array<{ number: number; judgedAt: number }> = [];
   for (const pr of listed) {
-    // A fork's PR is never judged, and a person's gets only a refusal, so neither gets a verdict to find.
+    // A fork's PR is never judged, and a person's gets only a refusal, so neither is eligible.
     if (pr.isCrossRepository || pr.isDraft || pr.baseRefName !== defaultBranch) {
       continue;
     }
     if (kindProblem(pr)) {
       continue;
     }
-    const checks = await checkConclusions(run, repo, pr.headRefOid, names);
-    if (
-      Object.values(checks).some(
-        (conclusion) => conclusion === 'pending' || conclusion === 'missing',
-      )
-    ) {
+    const doneAt = await checksDoneAt(run, repo, pr.headRefOid, names);
+    if (doneAt === null) {
       continue;
     }
     // A dispatch's run carries the PR number in its title, since its head is the default branch's.
@@ -109,27 +175,45 @@ export async function stalePrs(run: Run, repo: string, defaultBranch: string) {
           (item.event !== 'workflow_dispatch' && item.headSha === pr.headRefOid),
       )
       .toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    const judgedAt = judged[0] ? Date.parse(judged[0].createdAt) : 0;
+    if (mode === 'push') {
+      chosen.push({ number: pr.number, judgedAt });
+      continue;
+    }
     if (judged.some((item) => item.status !== 'completed')) {
       continue;
     }
-    const failed = judged[0]?.conclusion === 'failure';
-    if (!failed && (await hasVerdict(run, repo, pr.number, pr.headRefOid))) {
+    // A decide that started after the last check finished read the checks as
+    // finished. One that started before may have read them still running, so it
+    // does not hold the PR.
+    const decides = [];
+    for (const item of judged.slice(0, newestRuns)) {
+      decides.push(await decideJob(run, repo, item.databaseId));
+    }
+    const failed = decides[0]?.conclusion === 'failure';
+    const held = decides.some((job) => job?.conclusion === 'success' && job.startedAt >= doneAt);
+    if (!failed && held) {
       continue;
     }
-    stale.push({ number: pr.number, judgedAt: judged[0] ? Date.parse(judged[0].createdAt) : 0 });
+    chosen.push({ number: pr.number, judgedAt });
   }
-  return stale
+  return chosen
     .toSorted((a, b) => a.judgedAt - b.judgedAt || a.number - b.number)
     .slice(0, sweepCap)
     .map((item) => item.number);
 }
 
 /**
- * Dispatches the Auto-merge workflow for each stale PR. A sweep does nothing
- * while `automerge.mode` is `off`, since no verdict would then be posted, so each
- * sweep would dispatch the same PRs again.
+ * Dispatches the Auto-merge workflow for each chosen PR. A sweep does nothing
+ * while `automerge.mode` is `off`, since no decision would then post anything,
+ * so each sweep would dispatch the same PRs again.
  */
-export async function sweep(run: Run, config: Config, log: (line: string) => void = console.log) {
+export async function sweep(
+  run: Run,
+  config: Config,
+  mode: Mode,
+  log: (line: string) => void = console.log,
+) {
   if (config.mode === 'off') {
     log('Auto-merge is off, so the sweep dispatches nothing.');
     return [];
@@ -144,7 +228,7 @@ export async function sweep(run: Run, config: Config, log: (line: string) => voi
     '--jq',
     '.defaultBranchRef.name',
   );
-  const numbers = await stalePrs(run, repo, defaultBranch);
+  const numbers = await stalePrs(run, repo, defaultBranch, mode);
   for (const number of numbers) {
     await gh(run, 'workflow', 'run', 'auto-merge.yml', '-f', `pr=${number}`);
     log(`Dispatched the decision for #${number}.`);
@@ -157,7 +241,12 @@ export async function sweep(run: Run, config: Config, log: (line: string) => voi
 
 if (import.meta.main) {
   try {
-    await sweep(retrying, await readConfig());
+    // The workflow passes its event. A push to main is the push mode; anything else is the hourly sweep.
+    const { values } = parseArgs({
+      args: process.argv.slice(2),
+      options: { event: { type: 'string' } },
+    });
+    await sweep(retrying, await readConfig(), values.event === 'push' ? 'push' : 'schedule');
     process.exit(0);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

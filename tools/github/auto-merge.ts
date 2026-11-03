@@ -92,7 +92,7 @@ const actionsApp = 'github-actions';
  * The conclusion of the latest run of each check in `names` on commit `sha`,
  * counting only runs that the GitHub Actions app reported.
  */
-export async function checkConclusions(run: Run, repo: string, sha: string, names: Array<string>) {
+async function checkConclusions(run: Run, repo: string, sha: string, names: Array<string>) {
   const out = await gh(
     run,
     'api',

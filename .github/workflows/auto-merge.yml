@@ -14,13 +14,14 @@ name: Auto-merge
 # GITHUB_TOKEN starts no workflow. It runs the base branch's code, so a pull
 # request cannot change the rules that judge it.
 #
-# The hourly sweep (auto-merge-sweep.yml) re-decides a green PR that has no
-# verdict for its head, or whose last decide run failed, through workflow_dispatch.
-# So a PR opened before a rules change still gets decided. A dispatch runs only
-# from the default branch and judges the head the PR has then. The find job reads
-# that head, and decide and merge queue on it, so a dispatch and an event run for
-# the same head never decide at once. The scripts retry a gh read on a transient
-# GitHub error, and never a write (tools/github/command.ts).
+# The sweep (auto-merge-sweep.yml) dispatches this workflow. Hourly, it decides a
+# green PR once on its final check state, and again only when its head changes
+# or its last decide job fails. After a push that changes a rule, it decides
+# every eligible PR again. A dispatch runs only from the default branch and
+# judges the head the PR has then. The find job reads that head, and decide and
+# merge queue on it, so a dispatch and an event run for the same head never
+# decide at once. The scripts retry a gh read on a transient GitHub error, and
+# never a write (tools/github/command.ts).
 
 run-name: "Auto-merge${{ inputs.pr && format(' #{0}', inputs.pr) || '' }}"
 
