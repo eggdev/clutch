@@ -57,6 +57,7 @@ A record amended more than once lists each amending record:
 - [0001](./0001-allow-shrink-only-ratchets.md): a repository may keep a shrink-only ratchet baseline for a rule it adopts. No other baseline of old violations.
 - [0002](./0002-merge-most-prs-with-no-human.md): 80% of PRs merge with no human. No person reviews a change outside the hard core unless agent review finds a weaker check.
 - [0003](./0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md): a pure Clutch sync's owner findings hold no PR, since the owner approved them in Clutch. Any other owner finding still holds.
+- [0004](./0004-no-design-canvas-tool-for-proposals.md): no design canvas tool, such as Pencil or Paper. Design proposals render in the app, on the real design system.
 
 ## Historical
 
