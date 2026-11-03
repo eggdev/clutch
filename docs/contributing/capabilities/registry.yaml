@@ -542,9 +542,6 @@ capabilities:
       - grep:
           files: features/*/journeys/*.pw.ts
           pattern: '@repo/journeys/testing/a11y'
-    # The journey runner ships, but no journey imports the helper: a project with no journey yet.
-    partial_if:
-      - file: tools/journeys/run.ts
   - id: flake_hunter
     name: Flake hunters / test audit loops
     category: Scale loops
