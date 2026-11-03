@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.44.3 (2026-11-03)
+
+### Fixes and maintenance
+
+- fix(test-integrity): honor an allow entry only in the change that adds it
+
 ## 0.44.2 (2026-11-03)
 
 ### Fixes and maintenance
