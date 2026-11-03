@@ -216,3 +216,16 @@ test('fleet is optional and takes a list of repo and ref', () => {
   ).toEqual(['fleet[0].branch', 'fleet[0].repo', 'fleet[0].ref', 'fleet[1]']);
   expect(paths({ ...valid, fleet: { repo: 'eggdev/clutch' } })).toEqual(['fleet']);
 });
+
+test('journeys is optional and takes the folder of the web app under apps/', () => {
+  expect(validateClutchConfig(valid).config?.journeys).toBeUndefined();
+  expect(
+    validateClutchConfig({ ...valid, journeys: { webApp: 'apps/app' } }).config?.journeys,
+  ).toEqual({ webApp: 'apps/app' });
+  expect(paths({ ...valid, journeys: { webApp: 'features/app' } })).toEqual(['journeys.webApp']);
+  expect(paths({ ...valid, journeys: { webApp: '../apps/app' } })).toEqual(['journeys.webApp']);
+  expect(paths({ ...valid, journeys: { webApp: 'apps/app', browser: 'chrome' } })).toEqual([
+    'journeys.browser',
+  ]);
+  expect(paths({ ...valid, journeys: 'apps/app' })).toEqual(['journeys']);
+});

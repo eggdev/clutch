@@ -137,6 +137,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A changeset written for a Renovate PR                     | `renovate.json`, `postUpgradeTasks`                                             |
 | A fleet repository that the release bot cannot read       | `weekly-digest.yml`, `continue-on-error` on the token step, then a notice       |
 | Files kept out of the PR size count                       | `clutch.yaml`, `pr_size.exclude`                                                |
+| Which app a web journey drives, with several web apps     | `clutch.yaml`, `journeys.webApp`                                                |
 | Lockfiles, snapshots and `.clutch/` out of the size count | `apps/cli/src/labels/compute.ts`, `sizeExcluded` (a guardrail file)             |
 
 <!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS; tools/codeowners.ts keeps it when it regenerates the file. -->

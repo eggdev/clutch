@@ -51,6 +51,8 @@ export type ClutchConfig = {
    * notice (the default), or fail, once agent review is a required check.
    */
   agentReview?: { missingCredential: (typeof missingCredentials)[number] };
+  /** The app that a web journey drives. Without it, the runner finds the one web app under apps/. */
+  journeys?: { webApp: string };
 };
 
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
@@ -71,6 +73,7 @@ const topKeys = [
   'sast',
   'pr_size',
   'agentReview',
+  'journeys',
 ];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
 const capabilityId = /^[a-z][a-z0-9_]*$/u;
@@ -309,6 +312,25 @@ function readPrSize(value: unknown, errors: Errors) {
     : undefined;
 }
 
+/** `journeys.webApp` is the folder of an app under apps/, such as apps/app. */
+const webAppPattern = /^apps\/[\w.-]+$/u;
+
+function readJourneys(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'journeys', message: 'Expected a map with webApp.' });
+    return;
+  }
+  unknownKeys(value, ['webApp'], 'journeys', errors);
+  if (typeof value.webApp !== 'string' || !webAppPattern.test(value.webApp)) {
+    errors.push({
+      path: 'journeys.webApp',
+      message: 'Expected the folder of an app under apps/, such as apps/app.',
+    });
+    return;
+  }
+  return { webApp: value.webApp };
+}
+
 function readAgentReview(value: unknown, errors: Errors) {
   if (!isObject(value)) {
     errors.push({ path: 'agentReview', message: 'Expected a map with missingCredential.' });
@@ -333,6 +355,7 @@ const optionalSections: Record<string, (value: unknown, errors: Errors) => unkno
   fleet: readFleet,
   agentReview: readAgentReview,
   pr_size: readPrSize,
+  journeys: readJourneys,
 };
 
 /** Checks parsed `clutch.yaml` data. Returns the typed config only when there is no error. */

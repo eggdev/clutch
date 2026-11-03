@@ -62,7 +62,8 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
 `check-journeys` rejects these problems:
 
 - A feature with a screen that an app ships, but no journey for that platform.
-  The web app is `apps/web`. A native app has the Nx tag `platform:native`.
+  This check counts `apps/web` as the web app, and `journeys.webApp` does not
+  change it. A native app has the Nx tag `platform:native`.
 - A journey header with no goal line, or no `Contract:`, `Entry:` or
   `Isolation and cleanup:` line.
 - A journey that `verification.json` does not register, and a flow that runs a
@@ -84,6 +85,15 @@ They run in these places:
 - The pre-push hook runs the `journeys` target when a push changes code.
 - CI runs `bun run journey --all` in the `journeys` job. The job caches
   Chromium for each Playwright version.
+
+A web journey runs against the web app. `journeys.webApp` in `clutch.yaml`
+names it, as `apps/app`. Without the key, it is the one app under `apps/` with
+an Nx `dev` target, not tagged `platform:server` or `platform:native`. Several
+such apps without the key fail the run.
+
+When no web journey exists, `--all` exits 0 and says so: a `No journey ran`
+warning in the run, and a line in the step summary. The check passes so a
+project before its first journey can merge, but it tests nothing.
 
 A web journey shares the dev database. It writes records with unique names, so
 runs do not collide. Delete `.data/` to reset the dev database.
