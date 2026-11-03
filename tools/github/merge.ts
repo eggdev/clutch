@@ -70,9 +70,8 @@ type Review = {
 };
 
 /**
- * Why GitHub still wants a person's review, or nothing. The owner's admin
- * login can bypass the ruleset, so `pr merge` checks this itself: a PR that
- * needs a code owner's approval waits for it, even when an agent merges.
+ * Why GitHub still wants a person's review, or nothing. `pr merge` checks
+ * this first, so a PR that needs a code owner's approval names the reviewer.
  */
 function reviewProblem(number: string, pr: Review) {
   if (pr.reviewDecision === 'CHANGES_REQUESTED') {

@@ -8,7 +8,7 @@ rule, delete the rule from this page in the same PR.
 ## How agent review runs
 
 `.github/workflows/agent-review.yml` runs on each pull request that is not a
-draft. It runs the Claude Code GitHub Action with this page as its rules.
+draft. It runs the Claude Code GitHub Action with this page as its rules, under the base branch's `CLAUDE.md`, `AGENTS.md` and `.claude/`.
 
 1. The agent reads the diff and the pages that the diff touches.
 2. It posts an inline comment for each finding.
@@ -16,12 +16,20 @@ draft. It runs the Claude Code GitHub Action with this page as its rules.
 4. It returns the number of blocking findings and each `owner` finding to the
    workflow.
 
+The agent reads the full diff from the checkout, not from the API, so a large
+PR is reviewed whole. The job also counts every inline `owner` comment, so a
+short structured answer alone cannot let a PR through. A failed listing of
+this head's comments is reported as a warning. A failed listing of the earlier
+heads' comments fails the job, so a re-run lists them again.
+
 The job fails when the agent returns one or more blocking findings. The job
 also fails when the agent returns no result. An `owner` finding passes the
 job, so the owner can still merge the PR. The job writes an "Owner review
 needed" annotation for it. Auto-merge reads that annotation on the head and
 leaves the PR for the owner. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
+
+An owner finding carries over to each new head until the diff removes its cause and the review says so. A silent drop still holds the PR.
 
 The agent runs on the cheapest Claude model, `claude-haiku-5-5`. To choose
 another model, set the `CLUTCH_AGENT_MODEL` repository variable to its id. The
