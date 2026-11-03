@@ -242,7 +242,7 @@ The bot rule:
   the same as Renovate's. The `clutch / doctor` check, which the project's CI
   runs and no ruleset requires, proves that the managed files match the release.
   When it succeeds on the head, its `owner` findings are approved upstream and
-  hold nothing, as [decision 0003](../../../../docs/contributing/decisions/0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md)
+  hold nothing, as [decision 0003](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md)
   records. The verdict still lists them.
 
 At each step, the PR also needs all of these:
