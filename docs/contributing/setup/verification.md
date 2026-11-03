@@ -97,7 +97,9 @@ features/<name>/journeys/__screenshots__/<snap>-<mobile|desktop>-<light|dark>.pn
 
 CI is the only renderer. Fonts and anti-aliasing differ between machines, so a
 local run compares nothing. It writes every shot to `test-results/visual/` for
-you to look at. In CI, `snap` compares each shot with its baseline, allowing
+you to look at. `snap` compares when `GITHUB_ACTIONS` is `true`, or when you set
+`VISUAL_COMPARE=1`, such as on a machine that renders like CI. It does not read
+`CI`, which `validate` sets on a laptop too. In CI, `snap` compares each shot with its baseline, allowing
 0.1% of the pixels to differ. A missing or changed baseline fails the
 `journeys` check. A screenshot that changes on the same code goes in the
 [flaky-test quarantine](../testing.md#flaky-tests) by its snap name. It then
