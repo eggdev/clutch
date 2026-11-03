@@ -74,6 +74,12 @@ export function parseChanges(diff: string): Array<Change> {
     .map(([status = '', file = '']) => ({ path: file, status: statuses[status] ?? 'changed' }));
 }
 
+/**
+ * The design rules the model judges against. \`prepare\` copies them from the
+ * base commit, so a PR cannot change the standard that judges it.
+ */
+const rulePages = ['docs/principles/design-tokens.md', 'docs/contributing/architecture/styling.md'];
+
 /** The prompt for the image model: the PR's intent, the rules, and each pair to look at. */
 export function prompt(
   pr: { title: string; body: string },
@@ -94,8 +100,8 @@ export function prompt(
 A pull request changes the screenshot baselines below. Each baseline is a
 screen at one width (\`mobile\` is 390 px, \`desktop\` is 1280 px) and in one
 scheme (\`light\` or \`dark\`). Read each before and after image with the Read
-tool, then judge each pair. Do not read any other file except the two rule
-pages named below, and only if you need them.
+tool, then judge each pair. Do not read any other file except the rule pages
+named below, and only if you need them.
 
 ## The pull request's intent
 
@@ -113,8 +119,8 @@ ${pr.body.trim() || '(The PR body is empty.)'}
   is clipped or overflows its box, content that is missing or blank, a control
   with no visible label, text that is hard to read against its background, a
   light part in a dark screen or a dark part in a light one, or an element that
-  looks unstyled. The rules are \`docs/principles/design-tokens.md\` and the
-  roles in \`docs/contributing/architecture/styling.md\`.
+  looks unstyled. The rules are ${rulePages.map((page) => `\`${path.join(out, 'rules', page)}\``).join(' and ')},
+  copied from the default branch.
 - A small anti-aliasing shift on an unchanged layout is explained and not broken.
 - \`note\` says in one sentence what changed, and the defect when \`broken\`.
 
@@ -229,6 +235,13 @@ async function prepare(run: Run, out: string, env = process.env) {
       const target = path.join(out, 'after', change.path);
       await mkdir(path.dirname(target), { recursive: true });
       await writeFile(target, await readFile(change.path));
+    }
+  }
+  for (const page of rulePages) {
+    const copy = await git(['show', `${base}:${page}`]).catch(() => null);
+    if (copy) {
+      await mkdir(path.dirname(path.join(out, 'rules', page)), { recursive: true });
+      await writeFile(path.join(out, 'rules', page), copy);
     }
   }
   const pr = JSON.parse(

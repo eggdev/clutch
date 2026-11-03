@@ -99,7 +99,9 @@ CI is the only renderer. Fonts and anti-aliasing differ between machines, so a
 local run compares nothing. It writes every shot to `test-results/visual/` for
 you to look at. In CI, `snap` compares each shot with its baseline, allowing
 0.1% of the pixels to differ. A missing or changed baseline fails the
-`journeys` check. The job uploads each changed or new shot, at its baseline
+`journeys` check. A screenshot that changes on the same code goes in the
+[flaky-test quarantine](../testing.md#flaky-tests) by its snap name. It then
+warns instead of failing, until its issue fixes it. The job uploads each changed or new shot, at its baseline
 path, as the `visual-screenshots` artifact.
 
 To change a screen on purpose:

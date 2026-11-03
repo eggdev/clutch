@@ -49,6 +49,7 @@ test('the prompt holds the intent and a before and after for each pair', () => {
   expect(text).toContain(`before: /out/before/${shots}/home-mobile-light.png`);
   expect(text).toContain('before: none (a new baseline)');
   expect(text).toContain('after: none (the baseline is removed)');
+  expect(text).toContain('`/out/rules/docs/principles/design-tokens.md`');
   expect(prompt({ title: 't', body: '' }, changes, '/out')).toContain('(The PR body is empty.)');
 });
 
