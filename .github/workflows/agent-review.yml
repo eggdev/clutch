@@ -33,7 +33,10 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           path: base
           persist-credentials: false
-          sparse-checkout: clutch.yaml
+          sparse-checkout: |
+            clutch.yaml
+            CLAUDE.md
+            AGENTS.md
           sparse-checkout-cone-mode: false
       # GitHub gives no secrets to a fork PR, and a project may have none. The
       # review then passes with a notice, unless agentReview.missingCredential
@@ -64,6 +67,17 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+      # A PR cannot change the instructions of its own reviewer; the reviewer still sees the PR's changes to those files through gh pr diff.
+      - name: Use the base branch's agent instructions
+        if: steps.credential.outputs.present == 'true'
+        run: |
+          for file in CLAUDE.md AGENTS.md; do
+            if [ -f "base/$file" ]; then
+              cp "base/$file" "./$file"
+            else
+              rm -f "./$file"
+            fi
+          done
       - name: Review the pull request
         id: review
         if: steps.credential.outputs.present == 'true'
