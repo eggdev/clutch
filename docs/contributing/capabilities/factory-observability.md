@@ -43,13 +43,15 @@ tab. For each repository in `fleet` in `clutch.yaml`, it checks the repository
 out at its `ref` and writes `clutch doctor --remote` and `clutch metrics` to the
 job summary. Then it adds a contact sheet of the screenshots that changed.
 
-The contact sheet is `tools/journeys/visual-digest.ts`. It lists each
-screenshot baseline that changed on the branch in the last 7 days, before and
-after, with the commit that changed it. The owner sees each visual change of
-the week on one page, so no single PR needs the owner for its pictures. The
-sheet reads the history of the checkout, which the job fetches with no file
-contents, so it makes no API call. See
-[screenshots](../setup/verification.md#screenshots).
+The contact sheet is `tools/journeys/visual-digest.ts`. A screenshot baseline
+is a PNG in a `__screenshots__` folder, named
+`<snap>-<mobile|desktop>-<light|dark>.png`. The sheet lists each one that
+changed on the branch in the last 7 days, before and after, with the commit
+that changed it. The owner sees each visual change of the week on one page, so
+no single PR needs the owner for its pictures. A repository with no such PNG
+gets the line "No screenshot baseline changed." The sheet reads the history of
+the checkout, which the job fetches with no file contents, so it makes no API
+call.
 
 ```yaml
 fleet:
