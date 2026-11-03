@@ -18,13 +18,13 @@ on a schedule, such as nightly, so finished checkouts do not pile up.
 
 ## What each checkout has of its own
 
-| State                      | Where it lives                         | Why it does not collide                                                                                                                  |
-| -------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Dependencies and git hooks | `node_modules`, installed by the setup | Each checkout runs `bun install`.                                                                                                        |
-| Dev servers                | `http://<branch>.<app>.localhost:1355` | Portless runs one proxy on port 1355 and gives each server its own port. In a linked worktree it adds the branch name to each host name. |
-| Dev run record and lock    | `.data/dev.lock`, `.data/dev-run.json` | Both are in the checkout. `dev --stop` stops only the servers of its own checkout.                                                       |
-| Local database             | `apps/api/.data/pglite`                | PGlite keeps its files in the checkout. Tests use in-memory PGlite.                                                                      |
-| Journey output             | `test-results/journeys`                | Playwright writes in the checkout. Each journey runs against its own checkout's dev servers.                                             |
+| State                      | Where it lives                                 | Why it does not collide                                                                                                                  |
+| -------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Dependencies and git hooks | `node_modules`, installed by the setup         | Each checkout runs `bun install`.                                                                                                        |
+| Dev servers                | `http://<branch>.<app>.localhost:1355`         | Portless runs one proxy on port 1355 and gives each server its own port. In a linked worktree it adds the branch name to each host name. |
+| Dev run record and lock    | `.data/dev.lock`, `.data/dev-run.json`         | Both are in the checkout. `dev --stop` stops only the servers of its own checkout.                                                       |
+| Local database             | `apps/api/.data/pglite`                        | PGlite keeps its files in the checkout. Tests use in-memory PGlite.                                                                      |
+| Journey output             | `test-results/journeys`, `test-results/visual` | Playwright writes in the checkout. Each journey runs against its own checkout's dev servers.                                             |
 
 Port 1355 is shared on purpose. It is the one proxy, and it routes by host
 name. The API's `PORT` default of 4000 and the web app's `DEV_API_URL`

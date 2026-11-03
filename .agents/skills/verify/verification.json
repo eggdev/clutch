@@ -92,7 +92,8 @@
       "ownsStack": true,
       "timeoutSeconds": 300,
       "artifactPaths": [
-        "test-results/journeys"
+        "test-results/journeys",
+        "test-results/visual"
       ],
       "commands": [
         [
