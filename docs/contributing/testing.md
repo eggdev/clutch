@@ -60,8 +60,12 @@ sets the base in `CHECK_BASE`. Locally, the base is the merge base with
 A test file may go in the same change that deletes the module it tests:
 `pool.test.ts` goes with `pool.ts`. For any other reason, list the test file
 in [`tools/test-integrity-allow.json`](../../tools/test-integrity-allow.json)
-with the reason. Agent review gives a new entry an `owner` finding, so
-auto-merge leaves the PR for the owner. Delete the entry after the change merges.
+with the reason, in the same change. Agent review gives a new entry an `owner`
+finding, so auto-merge leaves the PR for the owner.
+
+An entry counts only in the change that adds it or changes its reason. A later
+change gets no cover from it, so a stale entry is inert and the drop fails
+again. Deleting old entries is tidy, not required.
 
 ## Flaky tests
 

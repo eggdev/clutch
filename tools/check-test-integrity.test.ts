@@ -23,8 +23,14 @@ const twoTests = [
   "test('b', () => { expect(add(2, 2)).toBe(4); expect(add(0, 0)).toBe(0); });",
 ].join('\n');
 
-/** A repository with tests on `origin/main`, then `change` applied in the working tree. */
-async function changed(change: (root: string) => Promise<void>): Promise<Array<string>> {
+/**
+ * A repository with tests on `origin/main`, then `change` applied in the working tree.
+ * `baseAllow` is the allow list on `origin/main`; null means the file is missing there.
+ */
+async function changed(
+  change: (root: string) => Promise<void>,
+  baseAllow: string | null = '{ "files": {} }',
+): Promise<Array<string>> {
   const root = await mkdtemp(path.join(tmpdir(), 'test-integrity-'));
   try {
     git(root, 'init', '-q', '-b', 'main');
@@ -34,7 +40,9 @@ async function changed(change: (root: string) => Promise<void>): Promise<Array<s
       await write(root, `packages/a/service/${name}.ts`, 'export const add = 1;');
       await write(root, `packages/a/service/${name}.test.ts`, `// The ${name} tests.\n${twoTests}`);
     }
-    await write(root, 'tools/test-integrity-allow.json', '{ "files": {} }');
+    if (baseAllow !== null) {
+      await write(root, 'tools/test-integrity-allow.json', baseAllow);
+    }
     git(root, 'add', '-A');
     git(root, 'commit', '-qm', 'base');
     git(root, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
@@ -94,6 +102,61 @@ test('a test deleted with its module, or listed with a reason, passes; an empty 
   ).toEqual([
     'tools/test-integrity-allow.json: `packages/a/service/keep.test.ts` has no reason. Say why the test can go.',
   ]);
+});
+
+const keep = 'packages/a/service/keep.test.ts';
+const shrunkKeep = "test('a', () => { expect(1).toBe(1); });";
+
+test('an entry already at the base covers no drop, and the error says it predates the change', async () => {
+  const listed = JSON.stringify({ files: { [keep]: 'A journey in apps/web covers it.' } });
+  const lowered = await changed(async (root) => {
+    await write(root, keep, shrunkKeep);
+  }, listed);
+  expect(lowered).toHaveLength(1);
+  expect(lowered[0]).toContain('packages/a/service/keep.test.ts: tests 2 -> 1, assertions 3 -> 1');
+  expect(lowered[0]).toContain('its entry predates this change');
+  const deleted = await changed((root) => {
+    git(root, 'rm', '-q', keep);
+    return Promise.resolve();
+  }, listed);
+  expect(deleted).toHaveLength(1);
+  expect(deleted[0]).toContain('the change deletes it');
+  expect(deleted[0]).toContain('its entry predates this change');
+});
+
+test('a changed reason covers a drop', async () => {
+  expect(
+    await changed(
+      async (root) => {
+        await write(root, keep, shrunkKeep);
+        await write(
+          root,
+          'tools/test-integrity-allow.json',
+          JSON.stringify({ files: { [keep]: 'Moved to the apps/web journey.' } }),
+        );
+      },
+      JSON.stringify({ files: { [keep]: 'A journey in apps/web covers it.' } }),
+    ),
+  ).toEqual([]);
+});
+
+test('a missing allow file at the base: an entry the change adds covers a drop, no entry does not', async () => {
+  expect(
+    await changed(async (root) => {
+      await write(root, keep, shrunkKeep);
+      await write(
+        root,
+        'tools/test-integrity-allow.json',
+        JSON.stringify({ files: { [keep]: 'A journey in apps/web covers it.' } }),
+      );
+    }, null),
+  ).toEqual([]);
+  const problems = await changed(async (root) => {
+    await write(root, keep, shrunkKeep);
+  }, null);
+  expect(problems).toHaveLength(1);
+  expect(problems[0]).toContain('packages/a/service/keep.test.ts: tests 2 -> 1');
+  expect(problems[0]).not.toContain('predates');
 });
 
 test('tests and assertions are counted by call, and a test names the module it tests', () => {
