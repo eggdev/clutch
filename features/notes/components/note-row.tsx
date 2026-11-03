@@ -1,3 +1,4 @@
+import { TextField } from '@repo/design-system/ui/text-field';
 import { renameNote } from '@repo/notes/commands/rename-note';
 import { maxTitleLength } from '@repo/notes/models/note';
 import { useNote } from '@repo/notes/ui/use-notes';
@@ -32,10 +33,10 @@ function NoteRowView({ id }: { readonly id: string }) {
   }
   return (
     <li className="rounded-surface border border-line bg-surface px-3 py-2">
-      <input
+      <TextField
         key={current}
-        aria-label="Note title"
-        className="w-full bg-surface text-body text-fg focus-visible:outline-2 focus-visible:outline-focus"
+        variant="inline"
+        label="Note title"
         defaultValue={current}
         maxLength={maxTitleLength}
         onBlur={(event) => commit(event.currentTarget.value)}
