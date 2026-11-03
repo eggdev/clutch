@@ -87,27 +87,46 @@ jobs:
 
             - Read the pull requests merged in the last 7 days with
               `gh pr list --state merged` and `gh pr view --comments`.
+            - Read the reverts of the last 7 days: the merged pull requests
+              whose head branch starts with `revert/`. The `gh pr list`
+              output has `headRefName` and `mergedAt` for each one.
             - Read open cleanup issues with `gh issue list` and
-              `gh issue view`.
+              `gh issue view`. Read the open `risk-tighten` issues with
+              `gh issue list --label risk-tighten` and `gh issue view`.
+            - For each revert, read the pull request that it reverts, the one
+              its body names as "Reverts #N". Read its changed files with
+              `gh pr view N --json files,body`, and the code in them with
+              Read. Read the failing CI that its comments link with
+              `gh pr view N --comments`. Then add the smallest regression test
+              or check that fails on the reverted change and passes on `main`.
+              Name the reverted pull request in a comment above the test.
             - Read the friction of the last 7 days with
               `mise exec -- bun run clutch friction list --since 7d --json`.
               Each entry has an `at` time, which names it.
             - Read `tools/flaky-tests.json`. When the file is missing, the
               list is empty. A test whose `until` date is within 7 days is
               about to expire.
-            - Pick at most 3 items from the friction and the expiring flaky
-              tests, the ones that cost the most or repeat. Fix each one with
-              a doc, a check, a tool fix or a test fix. A flaky test that you
-              fix leaves `tools/flaky-tests.json` in the same edit.
+            - Pick at most 3 items from the reverts, the friction and the
+              expiring flaky tests. Take the reverts first, then the ones that
+              cost the most or repeat. Fix each one with a doc, a check, a tool
+              fix or a test fix. A flaky test that you fix leaves
+              `tools/flaky-tests.json` in the same edit.
             - A friction entry is handled when your edit fixes it. Delete its
               line from `.clutch/friction.jsonl`, and list its `at` value
               under "Handled friction" in the body. Leave every other line.
             - Make small edits to files only. Do not run git, and do not
               push. A later step commits your edits and opens one pull request.
+            - Tightening `.clutch/risk.yaml` stays a proposal, never an edit.
+              In the body, name the path that broke and say why it needs a
+              tighter tier, or why a check would catch the break instead.
             - A guardrail that needs a person's decision goes in the pull
               request body as a proposal, not as an edit.
             - Each cleanup issue that your edits close gets a "Closes #N" line
               in the body.
+            - When the week has a revert, the body has a "Reverts" section. For
+              each revert, list the reverted pull request, the test that now
+              guards it, and a re-land plan in 2 or 3 lines: what to change so
+              it can merge again.
 
             Return a pull request title and a body in Markdown. The title is a
             Conventional Commit of 72 characters or fewer, such as

@@ -208,10 +208,15 @@ The pass:
 4. Delete each rule from [`review.md`](./review.md) that a check covers.
 5. Close each cleanup issue whose "Ready when" criterion is true, in the PR
    that removes the leftover.
-6. Read the week's friction with `clutch friction list --since 7d --json`,
+6. Take the reverts first. For each revert of the week, a merged PR whose head
+   branch starts with `revert/`, add a regression test. Its test fails on the
+   reverted change and passes on `main`. Name the reverted PR in a comment above
+   it. List each revert under "Reverts" in the body, with its test and a 2-3 line
+   re-land plan.
+7. Read the week's friction with `clutch friction list --since 7d --json`,
    and [`tools/flaky-tests.json`](../../tools/flaky-tests.json) for tests that
-   expire within 7 days. Fix at most 3 of them, the ones that cost the most or
-   repeat. A fixed friction entry leaves `.clutch/friction.jsonl` in the same
+   expire within 7 days. Fix at most 3 items in all, the reverts from step 6
+   included, and the ones that cost the most or repeat. A fixed friction entry leaves `.clutch/friction.jsonl` in the same
    PR, and the body names it by its `at` time. A fixed flaky test leaves the
    quarantine.
 

@@ -108,7 +108,9 @@ When the Revert workflow reverts a PR that auto-merge merged, it also files a
 It proposes to tighten the path that broke: a one-way-door rule in
 `.clutch/risk.yaml`, or a check that catches the break. `clutch metrics` lists
 the open `risk-tighten` issues under Watch, so the weekly digest shows them.
-Close one with the reason when the path did not cause the break.
+Close one with the reason when the path did not cause the break. The next
+weekly gardening pass adds the regression test that would have caught the break,
+and writes the re-land plan in its PR body.
 
 ## 5. After any rollback
 
