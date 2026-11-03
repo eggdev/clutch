@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.43.1 (2026-11-03)
+
+### Fixes and maintenance
+
+- fix(github): edit issue bodies through REST in grade-verdicts
+
 ## 0.43.0 (2026-11-03)
 
 ### Features
