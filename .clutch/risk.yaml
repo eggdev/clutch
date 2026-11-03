@@ -56,14 +56,15 @@ rules:
       - docs/contributing/project-intent.md
       - .clutch/PLAN.md
   - tier: one-way-door
-    # Credentials and permissions in a workflow: its token permissions, an
-    # environment, a secret, an app token's permissions, or a trigger that runs
-    # with this repository's secrets. Any other workflow change is medium.
+    # A workflow change that grants write access or reaches secrets: a write
+    # grant, an environment, a secret, an app token's permissions, or a trigger
+    # that runs with this repository's secrets. Any other workflow change,
+    # including a read-only permissions block, is medium.
     paths:
       - .github/workflows/**
     lines:
-      - '^\s*permissions:'
-      - '^\s*(actions|attestations|checks|contents|deployments|discussions|id-token|issues|packages|pages|pull-requests|repository-projects|security-events|statuses|models):\s*(read|write|none)\b'
+      - '^\s*(actions|attestations|checks|contents|deployments|discussions|id-token|issues|packages|pages|pull-requests|repository-projects|security-events|statuses|models):\s*write\b'
+      - '^\s*permissions:\s*(write-all|read-all)\b'
       - '^\s*environment:'
       - '\bsecrets\.'
       - '^\s*permission-[a-z-]+:'

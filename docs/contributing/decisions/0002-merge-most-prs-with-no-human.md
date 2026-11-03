@@ -21,8 +21,8 @@ permissive and tighten only on evidence. Only this hard core needs Brendan:
 - The merge gate: the rulesets, CODEOWNERS, `.clutch/risk.yaml`, the guardrail
   list, the auto-merge script and workflow, agent review and its rules, and
   the `automerge` and `agentReview` sections of `clutch.yaml`.
-- Credentials and secrets, and a workflow's `permissions:`, environment,
-  secrets or privileged trigger.
+- Credentials and secrets, and a workflow's write grant, environment, secret,
+  app token permissions or privileged trigger.
 - Auth and access, and migrations.
 - Billing, and infra and deploy, which kickoff names for each project.
 - Decision records and policy docs: this folder, `docs/principles`, project

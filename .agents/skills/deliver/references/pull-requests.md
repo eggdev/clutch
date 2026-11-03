@@ -79,7 +79,7 @@ drifts. After a change to the one-way-door tier, run
 
 Two kinds of PR wait for the owner without a GitHub approval rule:
 
-- A rule with `lines`, such as a workflow's `permissions:` or the `automerge`
+- A rule with `lines`, such as a workflow's write grant or the `automerge`
   section of `clutch.yaml`. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
 - A PR with an `owner` finding from agent review. Auto-merge holds it.

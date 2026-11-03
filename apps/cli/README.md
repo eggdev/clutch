@@ -263,10 +263,12 @@ Clutch's own rules follow
 - The merge gate: `.github/rulesets`, CODEOWNERS, `.clutch/risk.yaml`, the
   guardrail list, the auto-merge script and workflow, agent review and
   `review.md`, and the code that computes a tier.
-- Credentials: secret scanning and the MCP configs. A workflow change to
-  `permissions:`, an environment, a secret, an app token's permissions or a
-  privileged trigger. The `automerge` and `agentReview` sections of
-  `clutch.yaml`.
+- Credentials: secret scanning and the MCP configs. A workflow change that
+  grants write access (a `write` scope, or `permissions: write-all` or
+  `read-all`), an environment, a secret, an app token's permissions or a
+  privileged trigger. A `permissions:` block that names only read scopes, such
+  as `contents: read`, is `medium`. The `automerge` and `agentReview` sections
+  of `clutch.yaml`.
 - Auth (`packages/access`, `packages/identity` and any `auth` folder) and
   migrations.
 - A billing rule and an infra, deploy and secrets rule, both empty until a

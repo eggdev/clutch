@@ -100,18 +100,29 @@ test('skills, check scripts, lint config, workflows and any unlisted path are me
   expect(await tierOf(['AGENTS.md', '.agents/skills/deliver/SKILL.md'])).toBe('low');
 });
 
-test('a workflow permission or secret, or the automerge section, is a one-way door', async () => {
+test('a workflow write grant, secret, environment or privileged trigger is a one-way door', async () => {
   const workflow = '.github/workflows/ci.yml';
   expect(await tierOf({ [workflow]: 'jobs:\n  a:\n    runs-on: x\n' })).toBe('medium');
   for (const line of [
-    'permissions:',
     '      contents: write',
+    '      id-token: write',
+    'permissions: write-all',
     '    environment: release',
     '        token: secrets.T',
+    `        token: \${{ secrets.X }}`,
     '  workflow_run:',
   ]) {
     expect(await tierOf({ [workflow]: `${line}\n` })).toBe('one-way-door');
   }
+});
+
+test('a workflow permissions block that names only read scopes is medium', async () => {
+  const workflow = '.github/workflows/ci.yml';
+  expect(await tierOf({ [workflow]: 'permissions:\n  contents: read\n' })).toBe('medium');
+  expect(await tierOf({ [workflow]: 'permissions:\n  contents: none\n' })).toBe('medium');
+});
+
+test('the automerge section of clutch.yaml is a one-way door', async () => {
   expect(await tierOf({ 'clutch.yaml': 'capabilities:\n  ci: adopted\n' })).toBe('medium');
   expect(await tierOf({ 'clutch.yaml': 'automerge:\n  step: medium\n' })).toBe('one-way-door');
 });
