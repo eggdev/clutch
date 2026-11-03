@@ -1,4 +1,5 @@
 import { ownerFindings } from '@tools/github/auto-merge';
+import { prFindings, unanswered } from '@tools/github/findings';
 import { defaultBranch, must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
@@ -137,6 +138,13 @@ export async function merge(
   if (await waitsForOwner(run, number, pr, owner)) {
     throw new Error(
       `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. The owner approves it before it merges.`,
+    );
+  }
+  // Each finding of every head has a fix or a reason, so none drops out unseen.
+  const open = unanswered(await prFindings(run, number));
+  if (open.length > 0) {
+    throw new Error(
+      `#${number} has ${open.length} agent review finding(s) with no disposition: ${open.map((finding) => `${finding.level} ${finding.path}`).join(', ')}. Run \`bun run pr findings ${number}\`, fix each one or say why not in a "## Review disposition" comment, then merge.`,
     );
   }
   const trunk = await defaultBranch(run);

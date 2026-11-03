@@ -101,6 +101,7 @@ It decides what to do with each failure, on top of the commands below.
 | `bun run pr status <number> [--json]`   | Before each decision. It shows the required checks, the agent review's blocking count, the dry-run verdict, the review decision and the mergeable state at the head commit. A PR that a rule still blocks, such as one waiting on a code-owner review, is not ready. |
 | `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending and GitHub shows the commit that the checkout has, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
 | `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. |
+| `bun run pr findings <number> [--check]` | After the checks finish, and after each new review. It lists every agent review finding from every head, and which ones the `## Review disposition` comment answers. See [answer each finding](#answer-each-finding). |
 | `bun run pr sync <number, branch or id>` | When GitHub reports the PR as conflicting. It rebases on the PR's base, takes the base's copy of `.clutch/TRACKER.md` if an older branch still committed it, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits, even when another clone rewrote the base. On a PR in the middle of a stack, it keeps the PRs above it linked. After a rebase that you finished by hand, it rebases as usual. |
 | `bun run pr ready <id> <number>`        | Optional, once the PR exists. It adds the PR link to the issue's `done` record, commits only the issue file as `chore(tracker): mark <id> done`, and pushes. It makes no commit when the issue already says `done` with that link. The release regenerates `.clutch/TRACKER.md` on `main`. |
 
@@ -109,6 +110,36 @@ issue id, such as `CL-117`, and finds the branch with the prefix that
 `pr.branchPrefix` in `clutch.yaml` names. The default is `clutch/cl-`. `sync`
 and `ready` change the tracker through `tools/clutch.ts`, so they run the
 release binary in a project.
+
+### Answer each finding
+
+When the checks finish, the PR is not done until each agent review finding
+has an answer. Agent review posts one inline comment for each finding, and it
+reviews each new head again. A later review can leave out an older finding
+that no fix resolved, so read every head, not only the last one:
+
+```sh
+mise exec -- bun run pr findings <number>
+```
+
+It lists each finding by level and file, with its comment ids and the heads
+that raised it. It marks each one that the latest `## Review disposition`
+comment answers. Post or edit that one comment, with one line for each finding:
+
+```markdown
+## Review disposition
+
+- blocking `docs/a.md` (4458028676): fixed in 443119f
+- owner `tools/x.ts` (4458080057, 4458124128): waits for the owner: approve the hatch
+- note `ci.yml` (4458028977): not fixed: it says the check got stronger
+```
+
+A line answers a finding when it names one of its comment ids, or its path and
+its level. `pr findings <number> --check` exits 1 while a finding has no line,
+and `pr merge` refuses the PR until it passes. A new push can bring new
+findings, so run it again after each review. Auto-merge does not read the
+disposition yet. CL-416 adds that, and it needs the owner, since auto-merge is
+part of the merge gate.
 
 ## Stack a pull request on another one
 
@@ -165,6 +196,10 @@ ruleset's code owner review leaves that decision empty, so `merge` also
 refuses a PR that GitHub reports as blocked while a review is still requested.
 The ruleset itself refuses such a merge too, since no repository role bypasses
 it. The check gives the message that names the reviewer.
+
+`merge` also refuses a PR while an agent review finding, from any head, has no
+line in its `## Review disposition` comment. See
+[answer each finding](#answer-each-finding).
 
 `merge` accepts the owner's approval of the current head as the answer to the
 owner findings. The owner is `automerge.owner` in `clutch.yaml`, else the

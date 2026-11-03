@@ -16,8 +16,9 @@ to merge, or a report of what is left.
 ## One round
 
 1. **Wait.** Run `bun run pr wait <number>`. It returns when no check is
-   pending. Exit 0 means the PR is ready: stop, and go on with the merge rules
-   in [pull requests](../deliver/references/pull-requests.md#merge). Exit 2 is
+   pending. Exit 0 means the checks are green: do step 7 before the merge
+   rules in [pull requests](../deliver/references/pull-requests.md#merge), so
+   no finding goes unanswered. Exit 2 is
    the timeout: report it as a stuck check.
 2. **Read the state.** Run `bun run pr status <number>`. Note each failed
    required check, the agent review's blocking count, and whether the branch
@@ -29,11 +30,26 @@ to merge, or a report of what is left.
    failed step of each job and the output of each failed Nx task.
 5. **Classify each failure**, with the table below.
 6. **Act** on each one, as the table says.
-7. **Answer the review.** Read each agent review finding on the head commit.
-   Fix each `blocking` finding. Most are docs that did not move with the
-   behavior: change the page that the finding names. For a `note`, fix it when
-   it is cheap and right. Otherwise reply in its thread with the reason, and
-   leave it.
+7. **Answer every finding.** Run `bun run pr findings <number>`. It lists
+   each agent review finding from every head of the PR, not only this one,
+   because a new review can drop an older finding that no fix resolved. For
+   each one:
+   - `blocking`: fix it. Most are docs that did not move with the behavior,
+     so change the page that the finding names.
+   - `owner`: fix it when the fix is in reach. A finding that names a real
+     defect, such as a check that fails open, is a fix, not an owner item.
+     Otherwise say what the owner decides.
+   - `note`: fix it when it is cheap and right. Otherwise give the reason.
+   - A finding that is stale, because a later head or a rebase removed its
+     cause, still gets a line that says so.
+
+   Then post or edit one PR comment that starts with `## Review disposition`.
+   It holds one line for each finding, with its level, its path or its comment
+   ids, and `fixed in <sha>`, `not fixed: <reason>` or
+   `waits for the owner: <decision>`. `pr findings` prints the template.
+   After each push, a new review can raise new findings, so run it again.
+   `bun run pr findings <number> --check` exits 1 while a finding has no
+   line. `pr merge` refuses the PR until it exits 0.
 8. **Push** the fixes with `bun run pr open --title "<title>" --body-file <file>`,
    after `bun run validate` passes. Then start the next round.
 
@@ -63,6 +79,7 @@ give the same text in your reply:
 Babysit report, round <n> of 3, head <sha>.
 
 - Fixed: <each real failure or finding, and the commit that fixed it>
+- Disposition: <link to the `## Review disposition` comment>
 - Reran: <each flaky job, and whether it passed>
 - Left: <each failure or finding still open, its class, and why it is left>
 - Needs the owner: <each setup problem or decision, or "nothing">
