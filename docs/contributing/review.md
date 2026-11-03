@@ -28,6 +28,8 @@ needed" annotation for it. Auto-merge reads that annotation on the head and
 leaves the PR for the owner. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
 
+An owner finding carries over to each new head until the diff removes its cause and the review says so. A silent drop still holds the PR.
+
 The agent runs on the cheapest Claude model, `claude-haiku-5-5`. To choose
 another model, set the `CLUTCH_AGENT_MODEL` repository variable to its id. The
 gardening workflow reads the same variable.

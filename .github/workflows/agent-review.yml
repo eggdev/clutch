@@ -106,6 +106,30 @@ jobs:
         run: |
           git diff --no-color "$BASE_SHA"...HEAD > "$RUNNER_TEMP/pr.diff"
           echo "Full diff: $(grep -c '^diff --git ' "$RUNNER_TEMP/pr.diff") files, $(wc -l < "$RUNNER_TEMP/pr.diff") lines."
+      # Each head starts the review with no memory of the earlier heads, so their owner findings are listed here and the review checks them against the diff again.
+      - name: Collect earlier owner findings
+        if: steps.credential.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # The review's summary comment is newer than this, so the count step takes only summaries posted after it.
+          echo "RUN_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          out="$RUNNER_TEMP/prior-owner.md"
+          if ! findings="$(gh api --paginate "repos/$REPO/pulls/$PR/comments" \
+            --jq '.[] | select(.commit_id != env.HEAD_SHA and .user.login == "github-actions[bot]") | select((.body | sub("^\\s+"; "") | split("\n")[0]) | test("^[^A-Za-z0-9]*owner([^A-Za-z0-9]|$)"; "i")) | "- \(.path):\(.line // .original_line // 0): \(.body | sub("^\\s+"; "") | split("\n")[0])"')"; then
+            # Without the list, a finding could be dropped unseen, so the job fails and a re-run lists it again.
+            echo "::error title=Earlier owner findings unknown::The review comments of earlier heads could not be listed, so an owner finding could be dropped unseen. Re-run the job."
+            exit 1
+          fi
+          if [ -n "$findings" ]; then
+            printf '%s\n' "$findings" > "$out"
+          else
+            echo "None." > "$out"
+          fi
+          echo "Earlier owner findings to recheck: $(grep -c '^- ' "$out" || true)"
       - name: Review the pull request
         id: review
         if: steps.credential.outputs.present == 'true'
@@ -132,15 +156,21 @@ jobs:
                when the file is missing. The file can be longer than one Read,
                so page through it with offset until you reach the end. Open
                each file and doc page that you need.
-            3. For each finding, post one inline comment with
+            3. Read `${{ runner.temp }}/prior-owner.md`. For each earlier owner
+               finding, check the current full diff. If the cause is still in
+               the diff, raise the same `owner` finding again (inline and in the
+               `owner` array). Drop it only when the diff no longer contains the
+               cause, and then name it under "Resolved owner findings" in the
+               summary, with the line of the diff that resolves it.
+            4. For each finding, post one inline comment with
                `mcp__github_inline_comment__create_inline_comment` and
                `confirmed: true`. Start it with the level, `blocking`,
                `owner` or `note`, and name the rule from review.md.
-            4. Post one summary comment with `gh pr comment`. Its first line
+            5. Post one summary comment with `gh pr comment`. Its first line
                must be exactly `## Agent review`, which the status command
                matches. List each finding with its level, or say that you
                found none.
-            5. Return the number of blocking findings, one line for each
+            6. Return the number of blocking findings, one line for each
                `owner` finding, and a one-line summary.
 
             Report a problem only when the diff shows it. Do not post praise.
@@ -203,4 +233,28 @@ jobs:
               line="${line//$'\r'/%0D}"
               echo "::warning title=Owner review needed::$line"
             done
+          fi
+          # The earlier owner findings that Collect earlier owner findings listed. The summary of this run must name each one as resolved. Otherwise each one holds the PR again.
+          prior=0
+          if [ -f "$RUNNER_TEMP/prior-owner.md" ]; then
+            prior="$(grep -c '^- ' "$RUNNER_TEMP/prior-owner.md" || true)"
+          fi
+          echo "Earlier owner findings: ${prior} from earlier heads."
+          if [ "$prior" -gt 0 ]; then
+            # Issue comments have no commit, so this run's summary is the newest one posted after RUN_START. Without a summary, every earlier finding is raised again.
+            summary=""
+            if [ -n "${RUN_START:-}" ]; then
+              summary="$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+                --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("## Agent review")) and .created_at >= env.RUN_START) | {created_at, body}' \
+                | jq -rs 'sort_by(.created_at) | last | .body // empty')" || summary=""
+            fi
+            if ! printf '%s' "$summary" | grep -qi 'Resolved owner findings'; then
+              echo "The summary does not name the resolved owner findings, so each earlier finding is raised again."
+              while IFS= read -r line; do
+                line="${line#- }"
+                line="${line//%/%25}"
+                line="${line//$'\r'/%0D}"
+                echo "::warning title=Owner review needed::$line"
+              done < <(grep '^- ' "$RUNNER_TEMP/prior-owner.md")
+            fi
           fi
