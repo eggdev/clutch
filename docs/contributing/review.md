@@ -18,8 +18,9 @@ draft. It runs the Claude Code GitHub Action with this page as its rules, under 
 
 The agent reads the full diff from the checkout, not from the API, so a large
 PR is reviewed whole. The job also counts every inline `owner` comment, so a
-short structured answer alone cannot let a PR through. A failed comment
-listing is reported as a warning.
+short structured answer alone cannot let a PR through. A failed listing of
+this head's comments is reported as a warning. A failed listing of the earlier
+heads' comments fails the job, so a re-run lists them again.
 
 The job fails when the agent returns one or more blocking findings. The job
 also fails when the agent returns no result. An `owner` finding passes the

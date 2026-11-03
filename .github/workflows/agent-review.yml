@@ -248,13 +248,20 @@ jobs:
                 --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("## Agent review")) and .created_at >= env.RUN_START) | {created_at, body}' \
                 | jq -rs 'sort_by(.created_at) | last | .body // empty')" || summary=""
             fi
-            if ! printf '%s' "$summary" | grep -qi 'Resolved owner findings'; then
-              echo "The summary does not name the resolved owner findings, so each earlier finding is raised again."
-              while IFS= read -r line; do
-                line="${line#- }"
-                line="${line//%/%25}"
-                line="${line//$'\r'/%0D}"
-                echo "::warning title=Owner review needed::$line"
-              done < <(grep '^- ' "$RUNNER_TEMP/prior-owner.md")
-            fi
+            # The part of the summary from "Resolved owner findings" on must name each earlier finding by its path. A finding that it does not name is raised again, so a summary with no such section raises all of them.
+            resolved="$(printf '%s\n' "$summary" | sed -n '/Resolved owner findings/I,$p')"
+            raised=0
+            while IFS= read -r line; do
+              path="${line#- }"
+              path="${path%%:*}"
+              if printf '%s' "$resolved" | grep -qF "$path"; then
+                continue
+              fi
+              raised=$((raised + 1))
+              line="${line#- }"
+              line="${line//%/%25}"
+              line="${line//$'\r'/%0D}"
+              echo "::warning title=Owner review needed::$line"
+            done < <(grep '^- ' "$RUNNER_TEMP/prior-owner.md")
+            echo "Earlier owner findings not named as resolved: ${raised}."
           fi
