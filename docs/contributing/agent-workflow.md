@@ -113,9 +113,10 @@ missing platform does not prevent work that does not depend on it.
   Exercise duplicate and stale events, claims, resume and failure reporting.
   Verify signed ingress, retained evidence and the required review integration
   before enabling the route. A prepared or disabled route is not live dispatch.
-- **Merge or release:** require an explicit grant and evidence for the project's
-  landing and release gates. Todo retains its configured PR destination until
-  that grant changes. Independent review must actually complete on the relevant
+- **Merge or release:** Auto-merge merges an agent PR when its risk tier allows
+  and agent review leaves no owner finding. The owner merges one-way-door PRs and
+  PRs with an owner finding. Each merge to `main` is a release, and the release
+  follows it. Independent review must actually complete on the relevant
   revision; requesting a review is not a passing result.
 
 `clutch worktree` owns task environments. It uses plain git worktrees. Sprig is

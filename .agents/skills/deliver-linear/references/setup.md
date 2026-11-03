@@ -28,8 +28,9 @@ names are not stable identifiers. A route has:
 
 `maxLanes` is optional, a positive integer, and defaults to 3. It caps the
 route's runs that are reserved or working at once. Each lane gets its own
-checkout, but lanes still share fixed ports, simulators and caches. Set
-`maxLanes` to 1 until the verification skill gives each checkout its own.
+checkout, but lanes still share fixed ports and caches. Lanes share simulators:
+projects with native journeys should set `maxLanes: 1` until verify isolates the
+simulator.
 
 Set `projectId` when a team serves several repositories. Only one team-wide
 route is allowed for a team; it cannot coexist with project-specific routes.
