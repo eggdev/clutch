@@ -75,7 +75,7 @@ skip it in the file. The lint rule `repo-tests/no-hidden-tests` refuses
 `test.skip` and `test.skipIf`.
 
 The quarantine is [`tools/flaky-tests.json`](../../tools/flaky-tests.json).
-Each entry names one test:
+Each entry names one `bun test` test, or one screenshot of a web journey:
 
 | Field    | What it holds                                                                                                              |
 | -------- | -------------------------------------------------------------------------------------------------------------------------- |
