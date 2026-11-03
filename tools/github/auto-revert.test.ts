@@ -112,7 +112,9 @@ test('a required check red after required green reverts the auto-merged PR', asy
   const gh = main();
   const { code } = await autoRevert(gh);
   expect(code).toBe(0);
-  expect(gh.calls).toContain('gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert');
+  expect(gh.calls).toContain(
+    'gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert',
+  );
   expect(gh.calls).toContain('gh workflow run revert.yml --repo acme/shop --ref main -f pr=42');
   expect(gh.calls.some((call) => call.startsWith('gh pr comment 42'))).toBe(true);
 });
@@ -228,7 +230,9 @@ test('a red release commit blames the merge before it', async () => {
     ['gh api repos/acme/shop/commits/merge99/pulls', { out: '42\n' }],
   ]);
   await autoRevert(gh);
-  expect(gh.calls).toContain('gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert');
+  expect(gh.calls).toContain(
+    'gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert',
+  );
 });
 
 test('a PR that a person merged, or a commit with no PR, is not reverted', async () => {

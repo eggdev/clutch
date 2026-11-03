@@ -4,6 +4,10 @@
     "tools/lint/import-policy.mjs": {
       "lines": 660,
       "reason": "One oxlint plugin. Its rules share the path model (tier, project, section), the package graph and the registry loader, so a split would pass them between files."
+    },
+    "apps/cli/src/clutch-config/schema.ts": {
+      "lines": 421,
+      "reason": "One clutch.yaml validator. Each section reader uses the same key checks (unknownKeys, oneOf, isObject) and the one ClutchConfig type, so a split would pass them between files."
     }
   }
 }
