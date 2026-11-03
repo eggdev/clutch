@@ -13,6 +13,15 @@ name: Auto-merge
 # check finished decides. It reads no label, because a label set with
 # GITHUB_TOKEN starts no workflow. It runs the base branch's code, so a pull
 # request cannot change the rules that judge it.
+#
+# The hourly sweep (auto-merge-sweep.yml) re-decides a green PR that has no
+# verdict for its head, or whose last decide run failed, through workflow_dispatch.
+# So a PR opened before a rules change still gets decided. A dispatch runs only
+# from the default branch and judges the head the PR has then. Its concurrency
+# group is the PR, since its head is read in the decide job. The scripts retry a
+# gh read on a transient GitHub error, and never a write (tools/github/command.ts).
+
+run-name: "Auto-merge${{ inputs.pr && format(' #{0}', inputs.pr) || '' }}"
 
 on:
   pull_request:
@@ -23,6 +32,12 @@ on:
   workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [CI, Agent review]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: The pull request number to judge again.
+        required: true
+        type: number
 
 # Least privilege. The decide job grants what it needs in its own block.
 permissions:
@@ -30,19 +45,23 @@ permissions:
 
 # One run at a time for each head commit, so two runs cannot both comment.
 concurrency:
-  group: auto-merge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+  group: auto-merge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || format('pr-{0}', inputs.pr) }}
   cancel-in-progress: false
 
 jobs:
   decide:
     # Every pull request from this repository, never a fork. The script judges
     # each one by its author and branch, so a person's PR gets only a refusal. A
-    # push to main also completes CI, and is no pull request.
+    # push to main also completes CI, and is no pull request. A dispatch from
+    # any branch but the default one is refused here, and a fork's PR in the
+    # Find step.
     if: >-
       (github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.head_repository.full_name == github.repository)
+      github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
@@ -61,14 +80,23 @@ jobs:
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
         run: |
-          if [ -z "$PR" ]; then
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            # A dispatch judges the head that the PR has now. A fork's PR is
+            # refused, as the workflow_run path refuses it: the decide job skips.
+            pr_view="$(gh pr view "$PR" --json headRefOid,isCrossRepository --jq '.headRefOid + " " + (.isCrossRepository | tostring)')"
+            read -r HEAD_SHA cross <<< "$pr_view"
+            if [ "$cross" != false ]; then
+              echo "::notice title=Auto-merge skipped::Pull request $PR comes from a fork, so it is not judged."
+              PR=""
+            fi
+          elif [ -z "$PR" ]; then
             PR="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")][0].number // empty')"
-          fi
-          if [ -z "$PR" ]; then
-            echo "::notice title=Auto-merge skipped::No open pull request has head $HEAD_SHA."
+            if [ -z "$PR" ]; then
+              echo "::notice title=Auto-merge skipped::No open pull request has head $HEAD_SHA."
+            fi
           fi
           echo "number=$PR" >> "$GITHUB_OUTPUT"
           echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
@@ -113,10 +141,13 @@ jobs:
   # bot's token. A merge made with the default token starts no workflow, so the
   # release and CI on main would not run after it. The bot's key lives in the
   # release environment, which only the default branch may use, so only a
-  # workflow_run run merges. A pull_request run waits for the next one.
+  # workflow_run run or a dispatch from the default branch merges. A
+  # pull_request run waits for the next one.
   merge:
     needs: decide
-    if: github.event_name == 'workflow_run' && needs.decide.outputs.merge == 'true'
+    if: >-
+      (github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch') &&
+      needs.decide.outputs.merge == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     environment: release

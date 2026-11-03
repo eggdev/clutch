@@ -76,14 +76,33 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           LABELS: ${{ needs.compute.outputs.labels }}
         run: |
+          # Retries a gh call up to 3 times on a transient GitHub error, which is a
+          # 5xx, no server, a timeout or a reset connection. Only the reads, the
+          # label creates and the label adds use it: they are idempotent, so a retry
+          # changes nothing. A removal is not, since a retry of one that took effect
+          # is a 404, so it runs once.
+          gh_retry() {
+            local attempt=1 errors
+            errors="$(mktemp)"
+            until "$@" 2> "$errors"; do
+              if [ "$attempt" -ge 3 ] || ! grep -qiE 'HTTP 5[0-9]{2}|No server is currently available|timeout|connection reset' "$errors"; then
+                cat "$errors" >&2
+                rm -f "$errors"
+                return 1
+              fi
+              attempt=$((attempt + 1))
+              sleep $((attempt == 2 ? 2 : 5))
+            done
+            rm -f "$errors"
+          }
           printf '%s' "$LABELS" | jq -c '.define[]' | while read -r label; do
-            gh label create "$(jq -r '.name' <<< "$label")" --force \
+            gh_retry gh label create "$(jq -r '.name' <<< "$label")" --force \
               --color "$(jq -r '.color' <<< "$label")" \
               --description "$(jq -r '.description' <<< "$label")" > /dev/null
           done
           wanted="$(printf '%s' "$LABELS" | jq -r '.apply[].name')"
           owned="$(printf '%s' "$LABELS" | jq -r '.owned | join("|")')"
-          current="$(gh api "repos/$GH_REPO/issues/$PR/labels" --jq '.[].name')"
+          current="$(gh_retry gh api "repos/$GH_REPO/issues/$PR/labels" --jq '.[].name')"
           for old in $(printf '%s\n' "$current" | grep -E "^($owned)" || true); do
             if ! printf '%s\n' "$wanted" | grep -qxF "$old"; then
               gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/${old/\//%2F}" > /dev/null
@@ -94,6 +113,6 @@ jobs:
             [ -n "$name" ] && args+=(-f "labels[]=$name")
           done <<< "$wanted"
           if [ "${#args[@]}" -gt 0 ]; then
-            gh api --method POST "repos/$GH_REPO/issues/$PR/labels" "${args[@]}" > /dev/null
+            gh_retry gh api --method POST "repos/$GH_REPO/issues/$PR/labels" "${args[@]}" > /dev/null
           fi
           printf '%s\n' "$wanted"
