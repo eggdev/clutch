@@ -461,7 +461,9 @@ mise exec -- bun run clutch sync --root ../shop --to v0.2.0
 - A managed file links only to paths that a project gets: a managed or merge
   path, or a seed that install writes. A capability page is linked by its GitHub
   URL, and `check-managed-links` fails a managed link that a project would not
-  resolve.
+  resolve. The check runs in Clutch only, because `clutch.files.yaml` is Clutch's
+  own file and sync does not deliver it. A project's run prints one notice line
+  and exits 0, and the check runs in Clutch before each release.
 
 ### Sync pull requests
 

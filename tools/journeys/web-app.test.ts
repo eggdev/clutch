@@ -3,7 +3,9 @@ import { expect, test } from 'bun:test';
 import { webAppOf } from '@tools/journeys/web-app';
 import { inRepo } from '@tools/testing/in-repo';
 
-const root = JSON.stringify({ name: 'shop' });
+/** The fixture's project name. The naming rule in tools/dev.ts gives the `web` app the bare project name. */
+const project = 'shop';
+const root = JSON.stringify({ name: project });
 
 /** An app with an Nx `dev` target, and the tags that the check reads. */
 const app = (tags: Array<string> = [], dev = true) =>
@@ -20,10 +22,10 @@ test('the one app under apps/ with a web entry is the web app, and servers and n
       'package.json': root,
       'apps/api/package.json': app(['platform:server']),
       'apps/mobile/package.json': app(['platform:native']),
-      'apps/app/package.json': app(['type:app']),
+      'apps/web/package.json': app(['type:app']),
       'apps/mailbox/package.json': app([], false),
     },
-    (folder) => expect(webAppOf(folder)).toMatchObject({ folder: 'apps/app', name: 'app.shop' }),
+    (folder) => expect(webAppOf(folder)).toMatchObject({ folder: 'apps/web', name: project }),
   );
 });
 

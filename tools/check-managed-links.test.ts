@@ -1,11 +1,14 @@
 import { expect, test } from 'bun:test';
+import path from 'node:path';
 
-import { findProblems } from '@tools/check-managed-links';
+import { clutchOnlyNotice, findProblems } from '@tools/check-managed-links';
 import type { FilesList } from '@tools/check-managed-links';
+import { inRepo } from '@tools/testing/in-repo';
 
 const list: FilesList = {
   files: [
     { path: 'packages/journeys/', rule: 'managed' },
+    { path: 'docs/principles/', rule: 'managed' },
     { path: 'docs/', rule: 'seed' },
     { path: 'docs/contributing/capabilities/', rule: 'seed' },
     { path: '.github/workflows/', rule: 'managed' },
@@ -77,4 +80,35 @@ test('a link inside a fenced example is not a reference', () => {
         '```md\n[x](../../docs/contributing/capabilities/a11y-checks.md)\n```\n',
     }),
   ).toEqual([]);
+});
+
+test('a principles page is checked, so its link to the verify skill fails, which Clutch does not ship', () => {
+  expect(
+    run({
+      'docs/principles/stable-layout.md': 'See [verify](../../.agents/skills/verify/SKILL.md).\n',
+    }),
+  ).toEqual([
+    'docs/principles/stable-layout.md:1: links `.agents/skills/verify/SKILL.md`, which sync and install never write, so a project does not get it. Link it by its GitHub URL, or make it a managed or seed path in clutch.files.yaml.',
+  ]);
+});
+
+test('in a project, without clutch.files.yaml, the check exits 0 with one notice line', async () => {
+  await inRepo({ 'package.json': '{}' }, async (folder) => {
+    const child = Bun.spawn(
+      [process.execPath, path.join(import.meta.dir, 'check-managed-links.ts')],
+      {
+        cwd: folder,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+    );
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    expect(code).toBe(0);
+    expect(stderr).toBe('');
+    expect(stdout).toBe(`${clutchOnlyNotice}\n`);
+  });
 });

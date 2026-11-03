@@ -102,7 +102,7 @@ change that loosens one.
   Agent review gives a change that makes one weaker an `owner` finding, and
   auto-merge leaves that PR for the owner. A change that makes one stronger
   merges like any other. See
-  [decision record 0002](./decisions/0002-merge-most-prs-with-no-human.md).
+  [decision record 0002](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
 - The list itself, and the merge gate, are in the one-way-door tier of
   `.clutch/risk.yaml`, so `.github/CODEOWNERS` names an owner for them.
 - `check-guardrail-coverage` finds the tool scripts that the root targets,
@@ -152,7 +152,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
   or in a few short sessions before the rule merges. The one exception is a
   shrink-only ratchet for a rule that an adopted repository turns on late. Its
   count for each file may only go down. See
-  [decision 0001](./decisions/0001-allow-shrink-only-ratchets.md).
+  [decision 0001](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0001-allow-shrink-only-ratchets.md).
 - On request, the [`pr-recap`](../../.agents/skills/pr-recap/SKILL.md)
   skill writes a PR recap block: the primitives touched, the risk and a diagram.
 
