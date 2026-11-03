@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { openAsBot } from '@tools/github/bot-open';
 import { markBranchDone, ready, recordForkPoint, sync } from '@tools/github/branch';
 import { failures, renderFailures } from '@tools/github/failures';
+import { prFindings, renderFindings, unanswered } from '@tools/github/findings';
 import {
   defaultBranch,
   duration,
@@ -41,6 +42,7 @@ export const usage = [
   '       bun run pr status <number> [--json]',
   '       bun run pr wait <number> [--timeout 30m] [--json]',
   '       bun run pr failures <number>',
+  '       bun run pr findings <number> [--check]',
   '       bun run pr sync <number | branch | CL-id>',
   '       bun run pr ready <CL-id> <number>',
   '       bun run pr merge <number> [--timeout 15m]',
@@ -280,6 +282,7 @@ export async function runPr(
       json: { type: 'boolean' },
       timeout: { type: 'string' },
       help: { type: 'boolean' },
+      check: { type: 'boolean' },
     },
   });
   if (values.help) {
@@ -333,6 +336,14 @@ export async function runPr(
         const status = await prStatus(run, number);
         console.log(renderFailures(await failures(run, status.checks)));
         return 0;
+      },
+    ],
+    findings: [
+      1,
+      async ([number]) => {
+        const found = await prFindings(run, number);
+        console.log(renderFindings(found));
+        return values.check === true && unanswered(found).length > 0 ? 1 : 0;
       },
     ],
     sync: [1, ([target]) => sync(run, root, target, (options) => open(run, options, write, clock))],
