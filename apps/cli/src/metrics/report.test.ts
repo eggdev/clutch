@@ -57,6 +57,7 @@ const pullRoutes = (number: number, shape: Shape) => ({
     user: shape.author,
     labels: shape.labels.map((name) => ({ name })),
     head: { sha: `head${number}`, ref: shape.ref },
+    merge_commit_sha: `m${number}`,
   },
   [`repos/${repo}/issues/${number}/timeline`]: [
     ...(shape.comments ?? []).map((body) => ({ event: 'commented', user: bot, body })),
@@ -222,6 +223,43 @@ test('the report reads only gh api GET routes and fills every field', async () =
   );
   expect(renderMetrics(report)).toContain('Main red');
   expect(renderMetrics(report)).toContain('1 agreed, 0 disagreed, 1 unanswered of 2; streak 1');
+});
+
+test('a drill revert is merged but counts apart from the reverts, on the PRs and on main', async () => {
+  const withDrill = {
+    ...routes,
+    'search/issues': { items: [{ number: 1 }, { number: 2 }, { number: 3 }] },
+    ...pullRoutes(3, {
+      mergedBy: person,
+      title: 'Revert "feat: x"',
+      trailer: '',
+      ref: 'revert/3',
+      author: person,
+      labels: ['drill'],
+      files: [['src/x.ts', 1, 1]],
+    }),
+    [`repos/${repo}/commits`]: [
+      { sha: 'm3', parents: [{ sha: 'm2' }], commit: { message: 'Revert "feat: x"' } },
+      ...(routes[`repos/${repo}/commits`] as Array<object>),
+    ],
+    [`repos/${repo}/commits/m3/check-runs`]: {
+      check_runs: [
+        {
+          name: 'validate',
+          status: 'completed',
+          conclusion: 'success',
+          completed_at: '2026-10-10T03:30:00Z',
+        },
+      ],
+    },
+  };
+  const { gh } = fakeGh(withDrill);
+  const report = await metricsReport({ gh, repo, days: 14, now });
+  expect(report).toMatchObject({
+    pulls: { merged: 3 },
+    reverts: { pulls: 1, commits: 1, rate: 0.333, drills: 1 },
+  });
+  expect(renderMetrics(report)).toContain('1 PRs (33.3%), 1 commits on main; 1 drill');
 });
 
 test('another repository has no issues count, and an unreadable section names its reason', async () => {

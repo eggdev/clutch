@@ -95,6 +95,8 @@ const pull = (overrides: Partial<MergedPull>): MergedPull => ({
   mergedAt: '2026-10-01T02:00:00Z',
   humanAction: true,
   commitMessages: [],
+  labels: [],
+  mergeSha: '',
   ...overrides,
 });
 
@@ -131,6 +133,18 @@ test('flow metrics for an empty window have no shares and no percentiles', () =>
   expect(flow.noHumanAction.share).toBeNull();
   expect(flow.openToMergeHours.p50).toBeNull();
   expect(flow.agents.pullShare).toBeNull();
+});
+
+test('a drill revert is merged and counted apart from the reverts', () => {
+  const flow = flowMetrics(
+    [
+      pull({ title: 'Revert "feat: x"', labels: ['drill'] }),
+      pull({ title: 'Revert "feat: y"' }),
+      pull({ title: 'feat: z', labels: ['drill'] }),
+    ],
+    3,
+  );
+  expect(flow).toMatchObject({ merged: 3, revertPulls: 1, drillPulls: 1 });
 });
 
 const at = (minute: number) => `2026-10-01T00:${String(minute).padStart(2, '0')}:00Z`;

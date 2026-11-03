@@ -214,8 +214,8 @@ It also gives `size/S` (up to 100 changed lines), `size/M` (300), `size/L`
 prints a warning. It never fails.
 
 `--json` adds the color and description of each label, the label prefixes
-that the command owns, and the person labels `one-way-door` and `revert`,
-which the Labels workflow creates so a person can add them. See
+that the command owns, and the person labels `one-way-door`, `revert` and
+`drill`, which the Labels workflow creates so a person can add them. See
 [labels](../../docs/contributing/review.md#labels).
 
 ## Ratchets
@@ -610,6 +610,8 @@ mise exec -- bun run clutch metrics --verdicts
 ```
 
 - `--since` takes a number of days, such as `14d`, the default.
+- A revert PR labelled `drill` is a rehearsal. It is counted as a drill, not a
+  revert, in the reverts and the revert rate. `--json` has `reverts.drills`.
 - `--json` prints the report for a digest. A section that GitHub does not
   answer is null, and `unavailable` names the reason.
 - The issues done come from `.clutch/issues` in the checkout, so `--repo` for

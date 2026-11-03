@@ -4,8 +4,9 @@ name: Revert
 # reverts the merge commit on a revert/<number> branch, with a conventional
 # `revert:` title and a changeset, and links the original PR. The release bot
 # pushes and opens it, so CI runs on it. tools/github/revert.ts holds the steps.
-# When auto-merge merged the PR, it also files a risk-tighten issue. This is
-# the safety valve for auto-merge. See
+# When auto-merge merged the PR, it also files a risk-tighten issue, unless the
+# PR carries the drill label: a rehearsal, whose revert PR is labelled drill too.
+# This is the safety valve for auto-merge. See
 # https://github.com/eggdev/clutch/blob/main/docs/contributing/operations/rollback.md#revert-a-merged-pull-request.
 
 on:
@@ -76,7 +77,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq '
             if .merged and .head.repo.full_name == .base.repo.full_name
               and any(.labels[]; .name == "revert") then
-              "sha=\(.merge_commit_sha)\nbase=\(.base.ref)"
+              "sha=\(.merge_commit_sha)\nbase=\(.base.ref)\ndrill=\(any(.labels[]; .name == "drill"))"
             else error("#\(.number) is not a merged pull request from this repository with the revert label.") end' \
             >> "$GITHUB_OUTPUT"
           # A title can hold any character, so it goes through a file, not an output line.
@@ -113,7 +114,11 @@ jobs:
           PR: ${{ inputs.pr }}
           SHA: ${{ steps.pr.outputs.sha }}
           BASE: ${{ steps.pr.outputs.base }}
+          DRILL: ${{ steps.pr.outputs.drill }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          bun tools/github/revert.ts --pr "$PR" --sha "$SHA" --title "$(cat "$RUNNER_TEMP/title.txt")" --base "$BASE"
+          # The drill label comes from the PR above, not from the dispatch input.
+          flags=()
+          if [ "$DRILL" = true ]; then flags+=(--drill); fi
+          bun tools/github/revert.ts --pr "$PR" --sha "$SHA" --title "$(cat "$RUNNER_TEMP/title.txt")" --base "$BASE" "${flags[@]}"

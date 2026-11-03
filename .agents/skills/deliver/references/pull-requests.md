@@ -213,8 +213,10 @@ See [auto-revert](../../../../docs/contributing/operations/rollback.md#auto-reve
 
 The revert brake: the step steps down by itself. Each run counts the PRs that
 merged in the last 30 days, and how many of them have a head branch that starts
-with `revert/`. When there are at least 20 merges and reverts pass 2% of them,
-the run judges at the step below the configured one: `medium` acts as `low`,
+with `revert/` and no `drill` label. A drill is a rehearsal, so it counts in the
+merges but not in the reverts. When there are at least 20 merges and reverts
+pass 2% of them, the run judges at the step below the configured one: `medium`
+acts as `low`,
 and `low` acts as `bots`. The verdict names the rate and the step. The brake
 lifts by itself when the rate falls back to 2% or less. The limits are `brake`
 in `tools/github/auto-merge-rules.ts`, and they come from

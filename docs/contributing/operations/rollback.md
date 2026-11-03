@@ -121,7 +121,7 @@ it may, and a person merges it otherwise.
 ### Tighten after a revert
 
 When the Revert workflow reverts a PR that auto-merge merged, it also files a
-`risk-tighten` issue. The issue lists the PR's files with their risk tiers.
+`risk-tighten` issue, unless the PR is a drill. The issue lists the PR's files with their risk tiers.
 It proposes to tighten the path that broke: a one-way-door rule in
 `.clutch/risk.yaml`, or a check that catches the break. `clutch metrics` lists
 the open `risk-tighten` issues under Watch, so the weekly digest shows them.
@@ -147,6 +147,10 @@ rehearsal.
 - [ ] The health SHA of each service matches the main branch head.
 - [ ] You can find each secret that a check needs without a chat or an issue.
 - [ ] The last deploy passes the Path A safety checks.
+
+To rehearse a revert, add the `drill` label to the merged PR before you add
+`revert`. The revert PR gets `drill` too, and no `risk-tighten` issue is filed.
+A drill does not count toward the revert brake or the revert metric.
 
 ## Related
 

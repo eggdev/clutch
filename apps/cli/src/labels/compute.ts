@@ -39,6 +39,18 @@ const revertLabel: Label = {
   description: 'Revert this merged PR: the Revert workflow opens the revert PR',
 };
 
+/**
+ * The label that a person adds to a merged PR that exists to rehearse a revert,
+ * before they add `revert`. The revert PR then carries it too, and it does not
+ * count toward the revert brake or the revert metric. See
+ * docs/contributing/operations/rollback.md#rehearsal.
+ */
+const drillLabel: Label = {
+  name: 'drill',
+  color: 'd4d4d4',
+  description: 'A rehearsal: its revert does not count toward the revert brake or metric.',
+};
+
 /** `kind/<type>` from a conventional title, such as `feat(cli)!: add x`, or nothing. */
 export function kindLabel(title: string): Label | undefined {
   const type = /^(\w+)(?:\([^)]*\))?!?:\s/u.exec(title)?.[1];
@@ -131,5 +143,5 @@ export function changeLabels(title: string, files: Array<string>, workspaces: Ar
       description: `Changes ${area === 'root' ? 'files at the repository root' : area}.`,
     })),
   ];
-  return { apply, define: [...apply, oneWayDoor, revertLabel] };
+  return { apply, define: [...apply, oneWayDoor, revertLabel, drillLabel] };
 }

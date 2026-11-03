@@ -20,7 +20,11 @@ function brakeSince(now: Date) {
   return new Date(now.getTime() - days * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** How many PRs merged in the window, and how many of them revert another PR. Throws when GitHub cannot list them. */
+/**
+ * How many PRs merged in the window, and how many of them revert another PR.
+ * A revert labelled `drill` is a rehearsal, so it is not a revert here, though
+ * it is still merged. Throws when GitHub cannot list them.
+ */
 async function mergedInWindow(run: Run) {
   const result = await run([
     'gh',
@@ -33,15 +37,21 @@ async function mergedInWindow(run: Run) {
     '--limit',
     '1000',
     '--json',
-    'headRefName',
+    'headRefName,labels',
   ]);
   if (!result.ok) {
     throw new Error(`gh pr list failed: ${result.err || result.out}`);
   }
-  const prs = JSON.parse(result.out) as Array<{ headRefName: string }>;
+  const prs = JSON.parse(result.out) as Array<{
+    headRefName: string;
+    labels: Array<{ name: string }>;
+  }>;
   return {
     merged: prs.length,
-    reverts: prs.filter((pr) => pr.headRefName.startsWith('revert/')).length,
+    reverts: prs.filter(
+      (pr) =>
+        pr.headRefName.startsWith('revert/') && !pr.labels.some((label) => label.name === 'drill'),
+    ).length,
   };
 }
 
