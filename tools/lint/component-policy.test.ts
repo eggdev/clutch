@@ -7,28 +7,64 @@ import {
   designSystemExports,
   exportedNames,
   isExempt,
-  ratchetedFiles,
   replacement,
+  repositoryOf,
 } from '@tools/lint/component-policy.mjs';
 import { countLines, ruleCode } from '@tools/lint/lint-counts';
 
 const root = path.resolve(import.meta.dir, '../..');
 
-/** Lints TSX files in a temporary folder and lists `file element component` for each diagnostic. */
-async function lint(files: Record<string, string>): Promise<Array<string>> {
+/**
+ * Only this plugin, so the test holds in a project whose `oxlint.config.ts`
+ * has not turned the rule on yet.
+ */
+const config = JSON.stringify({
+  plugins: [],
+  jsPlugins: [
+    { name: 'repo-components', specifier: path.join(import.meta.dir, 'component-policy.mjs') },
+  ],
+  rules: { 'repo-components/design-system-only': 'error' },
+});
+
+/** A design system with four components, in a fake repository. */
+const designSystem = {
+  'package.json': '{ "workspaces": ["apps/*", "packages/*"] }',
+  'packages/design-system/ui/button.tsx':
+    'export function Button() { return <button type="button" />; }',
+  'packages/design-system/ui/text-field.tsx': 'export function TextField() { return <input />; }',
+  'packages/design-system/ui/text.tsx': 'const Text = () => null;\nexport { Text };',
+  'packages/design-system/ui/checkbox.native.tsx': 'export const Checkbox = () => null;',
+};
+
+/**
+ * Lints the files of a fake repository that holds `designSystem`, and lists
+ * `file element component` for each diagnostic of the rule.
+ */
+async function lint(
+  files: Record<string, string>,
+  env: Record<string, string> = {},
+): Promise<Array<string>> {
   const directory = await mkdtemp(path.join(tmpdir(), 'component-rule-'));
   try {
-    for (const [name, source] of Object.entries(files)) {
+    for (const [name, source] of Object.entries({
+      ...designSystem,
+      ...files,
+      '.oxlintrc.json': config,
+    })) {
+      await mkdir(path.dirname(path.join(directory, name)), { recursive: true });
       await writeFile(path.join(directory, name), source);
     }
-    const run = Bun.spawnSync([
-      path.resolve(root, 'node_modules/.bin/oxlint'),
-      '-c',
-      path.resolve(root, 'oxlint.config.ts'),
-      '--format',
-      'json',
-      directory,
-    ]);
+    const run = Bun.spawnSync(
+      [
+        path.resolve(root, 'node_modules/.bin/oxlint'),
+        '-c',
+        path.join(directory, '.oxlintrc.json'),
+        '--format',
+        'json',
+        directory,
+      ],
+      { env: { ...process.env, ...env } },
+    );
     const result = JSON.parse(run.stdout.toString());
     return result.diagnostics
       .filter((item: { code: string }) => item.code === 'repo-components(design-system-only)')
@@ -36,7 +72,7 @@ async function lint(files: Record<string, string>): Promise<Array<string>> {
         const [element, component] = [...item.message.matchAll(/`([^`]+)`/gu)].map(
           (match) => match[1],
         );
-        return `${path.basename(item.filename)} ${element} ${component}`;
+        return `${path.relative(directory, path.resolve(item.filename))} ${element} ${component}`;
       })
       .toSorted();
   } finally {
@@ -57,10 +93,21 @@ const inner = 1;
   ]).toEqual(['Button', 'buttonVariants', 'Text', 'Context', 'Switch']);
 });
 
-test('the template design system exports Button and TextField', () => {
-  const exports = designSystemExports(root);
-  expect(exports.get('Button')).toBe('@repo/design-system/ui/button');
-  expect(exports.get('TextField')).toBe('@repo/design-system/ui/text-field');
+test('designSystemExports maps each component to its module, platform files too', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'component-exports-'));
+  try {
+    for (const [name, source] of Object.entries(designSystem)) {
+      await mkdir(path.dirname(path.join(directory, name)), { recursive: true });
+      await writeFile(path.join(directory, name), source);
+    }
+    const exports = designSystemExports(directory);
+    expect(exports.get('Button')).toBe('@repo/design-system/ui/button');
+    expect(exports.get('Checkbox')).toBe('@repo/design-system/ui/checkbox');
+    expect(exports.get('Text')).toBe('@repo/design-system/ui/text');
+    expect(repositoryOf(path.join(directory, 'apps/app/screen.tsx'))).toBe(directory);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('replacement names the first component that the design system exports', () => {
@@ -88,7 +135,7 @@ test('the design system and tests may render raw elements', () => {
 test('the rule flags wrapped web and React Native elements, and names the component', async () => {
   expect(
     await lint({
-      'screen.tsx': `
+      'apps/app/screen.tsx': `
         import { Pressable as Tap, Text, View, ScrollView, TextInput } from 'react-native';
         import * as RN from 'react-native';
         export function Screen() {
@@ -110,47 +157,48 @@ test('the rule flags wrapped web and React Native elements, and names the compon
       `,
     }),
   ).toEqual([
-    'screen.tsx <RN.TouchableOpacity> Button',
-    'screen.tsx <Tap> Button',
-    'screen.tsx <TextInput> TextField',
-    'screen.tsx <button> Button',
-    'screen.tsx <input> TextField',
-    'screen.tsx <input> TextField',
+    'apps/app/screen.tsx <RN.TouchableOpacity> Button',
+    'apps/app/screen.tsx <Tap> Button',
+    'apps/app/screen.tsx <Text> Text',
+    'apps/app/screen.tsx <TextInput> TextField',
+    'apps/app/screen.tsx <button> Button',
+    'apps/app/screen.tsx <input> Checkbox',
+    'apps/app/screen.tsx <input> TextField',
   ]);
 });
 
-test('the rule skips test files and elements that the design system does not wrap', async () => {
+test('the rule skips tests, the design system and elements that it does not wrap', async () => {
   expect(
     await lint({
-      'screen.test.tsx': `export function Probe() { return <button type="button" />; }`,
-      'layout.tsx': `
-        import { Text, View } from 'react-native';
-        export function Layout() { return <View><Text>Hi</Text><div /><textarea /></View>; }
+      'apps/app/screen.test.tsx': 'export function Probe() { return <button type="button" />; }',
+      'apps/app/layout.tsx': `
+        import { View } from 'react-native';
+        export function Layout() { return <View><div /><textarea /><select /></View>; }
       `,
     }),
   ).toEqual([]);
 });
 
-test('the rule skips the files that the ratchet holds, unless REPO_LINT_ALL is set', async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'component-ratchet-'));
-  try {
-    await mkdir(path.join(directory, '.clutch'));
-    await writeFile(
-      path.join(directory, '.clutch/ratchets.json'),
-      JSON.stringify({
-        schemaVersion: 1,
-        ratchets: {
-          'design-system-only': { command: 'x', files: '**/*.tsx', counts: { 'apps/a.tsx': 2 } },
+test('the rule skips the files that the ratchet counts, unless REPO_LINT_ALL is set', async () => {
+  const files = {
+    '.clutch/ratchets.json': JSON.stringify({
+      schemaVersion: 1,
+      ratchets: {
+        'design-system-only': {
+          command: 'bun tools/lint/lint-counts.ts repo-components/design-system-only',
+          files: '**/*.tsx',
+          counts: { 'apps/app/old.tsx': 1 },
         },
-      }),
-    );
-    expect([...ratchetedFiles(directory)]).toEqual(['apps/a.tsx']);
-    process.env.REPO_LINT_ALL = '1';
-    expect([...ratchetedFiles(directory)]).toEqual([]);
-  } finally {
-    delete process.env.REPO_LINT_ALL;
-    await rm(directory, { recursive: true, force: true });
-  }
+      },
+    }),
+    'apps/app/old.tsx': 'export function Old() { return <button type="button" />; }',
+    'apps/app/new.tsx': 'export function New() { return <button type="button" />; }',
+  };
+  expect(await lint(files)).toEqual(['apps/app/new.tsx <button> Button']);
+  expect(await lint(files, { REPO_LINT_ALL: '1' })).toEqual([
+    'apps/app/new.tsx <button> Button',
+    'apps/app/old.tsx <button> Button',
+  ]);
 });
 
 test('lint-counts prints one path:count line for each file that breaks the rule', () => {

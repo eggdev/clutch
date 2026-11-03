@@ -9,8 +9,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
-const root = path.resolve(import.meta.dirname, '../..');
-
 /** Where the design system's components live, from the repository root. */
 export const designSystemFolder = 'packages/design-system/ui';
 
@@ -74,7 +72,7 @@ export function exportedNames(source) {
  * Each component that the design system exports, mapped to its import path.
  * A platform file such as `slider.native.tsx` shares the path of `slider.tsx`.
  */
-export function designSystemExports(repositoryRoot = root) {
+export function designSystemExports(repositoryRoot) {
   const folder = path.join(repositoryRoot, designSystemFolder);
   const found = new Map();
   if (!existsSync(folder)) {
@@ -113,7 +111,7 @@ export function isExempt(file) {
  * The files that the ratchet holds. Their old call sites stay counted by
  * `clutch ratchet check`, which runs this rule with `REPO_LINT_ALL=1`.
  */
-export function ratchetedFiles(repositoryRoot) {
+function ratchetedFiles(repositoryRoot) {
   if (process.env.REPO_LINT_ALL === '1') {
     return new Set();
   }
@@ -132,11 +130,34 @@ const literalType = (node) => {
   return attribute?.value?.type === 'Literal' ? attribute.value.value : null;
 };
 
-let cache = null;
-/** The design system's exports and the ratchet, read once for each lint run. */
-function state() {
-  cache ??= { exports: designSystemExports(), ratcheted: ratchetedFiles(root) };
-  return cache;
+const roots = new Map();
+/**
+ * The repository that holds a file: the nearest folder whose `package.json`
+ * declares workspaces. Lint can run from any folder, so the rule does not
+ * trust the working directory.
+ */
+export function repositoryOf(file) {
+  const folder = path.dirname(file);
+  if (!roots.has(folder)) {
+    const manifest = path.join(folder, 'package.json');
+    const isRoot =
+      existsSync(manifest) && JSON.parse(readFileSync(manifest, 'utf-8')).workspaces !== undefined;
+    const parent = path.dirname(folder);
+    roots.set(folder, isRoot || parent === folder ? folder : repositoryOf(folder));
+  }
+  return roots.get(folder);
+}
+
+const states = new Map();
+/** The design system's exports and the ratchet of one repository, read once a run. */
+function state(repositoryRoot) {
+  if (!states.has(repositoryRoot)) {
+    states.set(repositoryRoot, {
+      exports: designSystemExports(repositoryRoot),
+      ratcheted: ratchetedFiles(repositoryRoot),
+    });
+  }
+  return states.get(repositoryRoot);
 }
 
 const useDesignSystem = {
@@ -148,11 +169,10 @@ const useDesignSystem = {
     },
   },
   create(context) {
-    const file = path
-      .relative(root, context.filename ?? context.getFilename())
-      .split(path.sep)
-      .join('/');
-    const { exports, ratcheted } = state();
+    const filename = path.resolve(context.filename ?? context.getFilename());
+    const repositoryRoot = repositoryOf(filename);
+    const file = path.relative(repositoryRoot, filename).split(path.sep).join('/');
+    const { exports, ratcheted } = state(repositoryRoot);
     if (isExempt(file) || ratcheted.has(file) || exports.size === 0) {
       return {};
     }
