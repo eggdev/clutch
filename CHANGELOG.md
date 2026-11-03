@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53.0 (2026-11-03)
+
+### Features
+
+- feat(journeys): compare journey screenshots with baselines (CL-412)
+- feat(review): review changed screenshots with an image model (CL-413)
+
 ## 0.52.1 (2026-11-03)
 
 ### Fixes and maintenance
