@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.45.0 (2026-11-03)
+
+### Features
+
+- `clutch worktree prune` removes each checkout whose PR is merged or closed, when nothing in it would be lost.
+
 ## 0.44.4 (2026-11-03)
 
 ### Fixes and maintenance
