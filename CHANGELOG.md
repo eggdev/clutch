@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.0 (2026-11-03)
+
+### Features
+
+- feat(digest): show the week's screenshot changes (CL-414)
+
 ## 0.49.1 (2026-11-03)
 
 ### Fixes and maintenance
