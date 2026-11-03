@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { entryFor, issueBody, newFlakes, tally } from '@tools/flake-hunt';
+import { entryFor, issueBody, issueTitle, newFlakes, tally } from '@tools/flake-hunt';
 import { inRepo } from '@tools/testing/in-repo';
 
 /** A test that fails on every third run. It counts its runs in a file, because --rerun-each reloads the module. */
@@ -65,4 +65,9 @@ test('a new flake gets a 14-day quarantine entry and an issue that names the run
   const body = issueBody(flake, 'https://ci/run/1');
   expect(body).toContain('It failed 2 times: https://ci/run/1');
   expect(body).toContain('mise exec -- bun test a.test.ts --rerun-each 20');
+});
+
+test('the issue for a flake names its file and test, so the owner finds the test', () => {
+  const flake = { file: 'tools/a.test.ts', name: 'slow', passed: 18, failed: 2 };
+  expect(issueTitle(flake)).toBe('Fix the flaky test tools/a.test.ts: slow');
 });

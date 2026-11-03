@@ -178,10 +178,10 @@ than 60 seconds fails, even when every test passes. A slow suite slows every
 push, and it is often the first sign of a test that reaches the network or
 builds too much setup.
 
-When the budget fails, make the slowest tests faster. `bun test` prints the time
-of each one. Never delete or skip a test to fit the budget. Raise a budget only
-in a reviewed change that says why. The budget is the first argument of the
-target's command in `package.json`.
+When the budget fails, the output lists the 10 slowest test files and the 10
+slowest tests, with their times. Make those faster. Never delete or skip a test
+to fit the budget. Raise a budget only in a reviewed change that says why. The
+budget is the first argument of the target's command in `package.json`.
 
 ## Test output
 
