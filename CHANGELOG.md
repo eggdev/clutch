@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.48.1 (2026-11-03)
+
+### Fixes and maintenance
+
+- docs(skills): link decision 0003 by URL in the deliver doc (CL-237)
+
 ## 0.48.0 (2026-11-03)
 
 ### Features
