@@ -49,6 +49,11 @@ to merge, or a report of what is left.
    ids, and `fixed in <sha>`, `not fixed: <reason>` or
    `waits for the owner: <decision>`. `pr findings` prints the template.
    After each push, a new review can raise new findings, so run it again.
+   Once the owner approves the head, stop pushing: a push dismisses the
+   approval. Fix only a `blocking` finding, or a `DIRTY` merge state, and then
+   ask the owner to approve again. Answer every other new finding in the
+   disposition, as `not fixed: after the owner's approval` with the fix you
+   would make, and file it as an issue.
    `bun run pr findings <number> --check` exits 1 while a finding has no
    line. `pr merge` refuses the PR until it exits 0.
 8. **Push** the fixes with `bun run pr open --title "<title>" --body-file <file>`,

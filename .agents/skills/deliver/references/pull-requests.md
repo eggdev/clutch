@@ -142,6 +142,13 @@ findings, so run it again after each review. Auto-merge does not read the
 disposition yet. CL-416 adds that, and it needs the owner, since auto-merge is
 part of the merge gate.
 
+After the owner approves a PR, do not push a fix for a new `owner` or `note`
+finding. The push dismisses the approval, as
+[one approval round per batch](#one-approval-round-per-batch) says. Answer the
+finding as `not fixed: after the owner's approval`, and file the fix as an
+issue. Only a `blocking` finding or a `DIRTY` merge state justifies a push and
+a new approval.
+
 ## Stack a pull request on another one
 
 When the work builds on a branch whose PR is still open, the PRs form a stack.
