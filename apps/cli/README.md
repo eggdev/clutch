@@ -314,6 +314,8 @@ pr_size: # optional
   exclude: [] # globs whose lines do not count, such as generated code
 agentReview: # optional
   missingCredential: notice # notice (the default) or fail
+journeys: # optional
+  webApp: apps/app # the app that web journeys drive. Without it, the one app under apps/ with a web entry
 fleet: # optional: the repositories the weekly digest reads
   - repo: eggdev/neighborhood # owner/name
     ref: main # the branch to read
@@ -326,6 +328,12 @@ how far it reaches: bot PRs, then low-risk agent PRs, then medium-risk ones. See
 `agentReview.missingCredential` tells `agent-review.yml` what to do without an
 Anthropic credential: pass with a notice, or fail. Set `fail` once
 `agent-review` is a required check. See [review](../../docs/contributing/review.md).
+
+`journeys.webApp` names the app that `bun run journey` drives in a browser. Set
+it when a repository has more than one app with a web entry, which is an Nx
+`dev` target that is not tagged `platform:server` or `platform:native`. Without
+it, the runner uses the one such app, and fails when there are several. See
+[journeys](../../docs/contributing/setup/verification.md#journeys).
 
 `fleet` lists the repositories that `.github/workflows/weekly-digest.yml`
 reads each Monday, as the release bot. See

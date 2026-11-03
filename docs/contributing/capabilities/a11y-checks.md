@@ -8,7 +8,7 @@ A journey already drives the real app through its main flows. That makes it the 
 
 ## Detection
 
-`clutch doctor` reports this capability as present when a journey in `features/*/journeys/*.pw.ts` imports `@repo/journeys/testing/a11y`. See the `a11y_checks` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when a journey in `features/*/journeys/*.pw.ts` imports `@repo/journeys/testing/a11y`. It reports `partial` when the journey runner ships but no journey imports the helper, such as a project with no journey yet. See the `a11y_checks` entry in [the registry](./registry.yaml).
 
 ## How it works
 

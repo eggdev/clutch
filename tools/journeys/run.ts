@@ -1,22 +1,64 @@
+import { appendFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { devApps, isUp, urlOf } from '@tools/dev';
 import type { DevApp } from '@tools/dev';
 import { budgetOf, journeys } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
+import { webAppOf } from '@tools/journeys/web-app';
 
 /**
  * Runs one journey: `mise exec -- bun run journey <id>`. `--all` runs every
  * web journey in one browser run, as CI and the pre-push hook do. A web journey runs
- * in Playwright against the dev servers. Running servers are used again. When
+ * in Playwright against the web app, which `journeys.webApp` in clutch.yaml
+ * names, or the one app under apps/ with a web entry. Running servers are used again. When
  * a server is down, the runner starts the missing ones through `tools/dev.ts`,
  * then stops only what it started. A journey that runs past its budget fails.
- * A native journey runs only through the device host. See
- * docs/contributing/setup/verification.md#journeys.
+ * With no web journey, `--all` passes and says so: a warning annotation and a
+ * line in the step summary. A native journey runs only through the device host.
+ * See docs/contributing/setup/verification.md#journeys.
  */
 
 /** Time for Playwright to start and to stop the browser, on top of the journey budget. */
 const overheadMs = 20_000;
+
+/** Where a run writes its lines. The CLI uses the console and the process environment. */
+export type Sink = {
+  env: Record<string, string | undefined>;
+  log: (line: string) => void;
+  error: (line: string) => void;
+};
+
+const consoleSink: Sink = {
+  env: process.env,
+  log: (line) => console.log(line),
+  error: (line) => console.error(line),
+};
+
+/** The end-to-end testing guide: its GitHub page at this commit in a GitHub Actions run, else its path. */
+function guideLink(env: Sink['env']) {
+  const { GITHUB_REPOSITORY: repository, GITHUB_SHA: sha } = env;
+  const base =
+    repository && sha
+      ? `${env.GITHUB_SERVER_URL ?? 'https://github.com'}/${repository}/blob/${sha}/`
+      : '';
+  return `${base}docs/contributing/end-to-end-testing.md`;
+}
+
+/** Says that the run tested nothing, so a required check that runs no journey is visible. */
+function noJourneyNotice(sink: Sink) {
+  const link = guideLink(sink.env);
+  sink.log('No web journey exists yet. Nothing ran.');
+  sink.log(
+    `::warning title=No journey ran::No web journey exists yet, so this check tested nothing. Add one at features/<feature>/journeys/<id>.pw.ts. See ${link}`,
+  );
+  if (sink.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(
+      sink.env.GITHUB_STEP_SUMMARY,
+      `**No journey ran.** The journeys check passed with nothing to run. Add a web journey at \`features/<feature>/journeys/<id>.pw.ts\`. See [end-to-end testing](${link}).\n`,
+    );
+  }
+}
 
 async function allUp(apps: ReadonlyArray<DevApp>, urls: ReadonlyMap<string, string>) {
   const states = await Promise.all(apps.map((app) => isUp(urls.get(app.name) ?? '', app.health)));
@@ -111,23 +153,28 @@ function select(all: ReadonlyArray<Journey>, id: string | undefined): Array<Jour
   return [journey];
 }
 
-async function main(root: string, id: string | undefined): Promise<number> {
+/** Runs the selected journeys. Returns the exit code. Exported for the runner's tests. */
+export async function main(
+  root: string,
+  id: string | undefined,
+  sink: Sink = consoleSink,
+): Promise<number> {
   const selected = select(journeys(root), id);
   if (typeof selected === 'string') {
-    console.error(selected);
+    sink.error(selected);
     return 1;
   }
   if (selected.length === 0) {
-    console.log('No web journey exists yet. Nothing ran.');
+    noJourneyNotice(sink);
     return 0;
+  }
+  const web = webAppOf(root);
+  if (typeof web === 'string') {
+    sink.error(web);
+    return 1;
   }
   const apps = devApps(root);
   const urls = new Map(apps.map((app) => [app.name, urlOf(root, app.name)]));
-  const web = apps.find((app) => app.folder === 'apps/web');
-  if (web === undefined) {
-    console.error('A web journey needs apps/web with a `dev` target. Add the web app first.');
-    return 1;
-  }
   const started = (await allUp(apps, urls)) ? null : await startServers(root, apps, urls);
   try {
     const budget = selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
