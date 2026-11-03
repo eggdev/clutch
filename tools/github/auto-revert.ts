@@ -165,7 +165,17 @@ export async function runAutoRevert(
     '--description',
     'Revert this merged PR: the Revert workflow opens the revert PR',
   ]);
-  await must(run, ['gh', 'pr', 'edit', pr, '--repo', repo, '--add-label', 'revert']);
+  // The REST issues endpoint adds a label to a PR. `gh pr edit` fails on
+  // Projects (classic), which GitHub is retiring, so it does not add labels.
+  await must(run, [
+    'gh',
+    'api',
+    '--method',
+    'POST',
+    `repos/${repo}/issues/${pr}/labels`,
+    '-f',
+    'labels[]=revert',
+  ]);
   await must(run, [
     'gh',
     'workflow',
