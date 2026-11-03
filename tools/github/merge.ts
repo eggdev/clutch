@@ -1,7 +1,8 @@
+import { ownerFindings } from '@tools/github/auto-merge';
 import { defaultBranch, must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
-import { ownerFindings, waitsForOwner } from '@tools/github/status';
+import { waitsForOwner } from '@tools/github/status';
 
 type ReleaseRun = { headSha: string; status: string; conclusion: string; url: string };
 
@@ -113,9 +114,13 @@ export async function merge(
     'view',
     number,
     '--json',
-    'baseRefName,headRefName,reviewDecision,mergeStateStatus,reviewRequests,latestReviews',
+    'baseRefName,headRefName,headRefOid,reviewDecision,mergeStateStatus,reviewRequests,latestReviews',
   ]);
-  const pr = JSON.parse(out) as Review & { baseRefName: string; headRefName: string };
+  const pr = JSON.parse(out) as Review & {
+    baseRefName: string;
+    headRefName: string;
+    headRefOid: string;
+  };
   const { baseRefName, headRefName } = pr;
   const problem = reviewProblem(number, {
     // gh prints an empty reviewDecision as an empty string.
@@ -127,8 +132,9 @@ export async function merge(
   if (problem) {
     throw new Error(problem);
   }
-  const owner = await ownerFindings(run, number);
-  if (waitsForOwner(owner, pr.reviewDecision)) {
+  const findings = await ownerFindings(run, '{owner}/{repo}', pr.headRefOid);
+  const owner = findings.length;
+  if (await waitsForOwner(run, number, pr, owner)) {
     throw new Error(
       `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. The owner approves it before it merges.`,
     );

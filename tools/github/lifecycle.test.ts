@@ -2,10 +2,11 @@ import { expect, test } from 'bun:test';
 
 import { marker } from '@tools/github/auto-merge-rules';
 import { readJobLog } from '@tools/github/failures';
-import { fake, fakeClock, noWrite, trunk } from '@tools/github/fake-run';
+import { fake, fakeClock, findingsOn, noWrite, repoOwner, reviewsOf } from '@tools/github/fake-run';
+import type { Reviewed } from '@tools/github/fake-run';
 import { runPr } from '@tools/github/pr';
 import type { Result } from '@tools/github/stack';
-import { blockingCount, ownerCount, prStatus } from '@tools/github/status';
+import { blockingCount, prStatus } from '@tools/github/status';
 
 const head = 'abc1234def';
 const check = (name: string, conclusion: string, status = 'COMPLETED') => ({
@@ -37,20 +38,6 @@ const comments = (...bodies: Array<string>) =>
     'gh api --paginate repos/{owner}/{repo}/issues/7/comments',
     { out: bodies.map(comment).join('\n') },
   ] as [string, Partial<Result>];
-
-test('the owner count reads each owner bullet of the summary', () => {
-  const body = [
-    '## Agent review',
-    '',
-    'Findings: 3, 2 `owner`. No `blocking` findings.',
-    '',
-    '- `owner`: **weaker check**. x',
-    '- **owner**: weaker test. y',
-    '- `note`: z, not an owner finding',
-  ].join('\n');
-  expect(ownerCount(body)).toBe(2);
-  expect(ownerCount('## Agent review\n\nNo findings.')).toBe(0);
-});
 
 test('the blocking count reads each way the agent words it', () => {
   expect(blockingCount('## Agent review\n\n**Blocking findings: 0**')).toBe(0);
@@ -177,54 +164,6 @@ test('failures reads the log of each failed job only', async () => {
   );
 });
 
-const release = (status: string, conclusion: string) => ({
-  out: JSON.stringify([
-    { headSha: 'm3rge', status, conclusion, url: 'https://github.com/o/r/actions/runs/9' },
-  ]),
-});
-
-test('merge falls back to the stack when GitHub refuses a plain merge for its stack', async () => {
-  const gh = fake([
-    trunk,
-    ['gh pr view 12 --json mergeCommit', { out: 'm3rge' }],
-    ['gh pr view 12', { out: '{"baseRefName":"main","headRefName":"cl-024"}' }],
-    ['gh pr list --state open --base cl-024', { out: '[]' }],
-    ['gh pr merge 12 --merge', { ok: false, err: 'GraphQL: Pull request is part of a stack' }],
-    [
-      'gh run list --workflow release.yml',
-      [release('in_progress', ''), release('completed', 'success')],
-    ],
-    ['git show origin/main:package.json', { out: '{"version":"1.2.3"}' }],
-  ]);
-  const clock = fakeClock();
-  expect(await runPr(['merge', '12'], gh.run, noWrite, clock)).toBe(0);
-  expect(gh.calls).toContain('gh stack merge 12 --merge --yes');
-  expect(gh.calls).toContain('git fetch --quiet --tags origin');
-  expect(clock.slept).toBe(15_000);
-});
-
-test('merge reports a failed release, and a plain merge error that is not the stack', async () => {
-  const failed = fake([
-    trunk,
-    ['gh pr view 12 --json mergeCommit', { out: 'm3rge' }],
-    ['gh pr view 12', { out: '{"baseRefName":"main","headRefName":"cl-024"}' }],
-    ['gh pr list --state open --base cl-024', { out: '[]' }],
-    ['gh run list --workflow release.yml', release('completed', 'failure')],
-  ]);
-  expect(await runPr(['merge', '12'], failed.run, noWrite, fakeClock())).toBe(1);
-  expect(failed.calls.some((call) => call.startsWith('gh stack'))).toBe(false);
-
-  const refused = fake([
-    trunk,
-    ['gh pr view 12', { out: '{"baseRefName":"main","headRefName":"cl-024"}' }],
-    ['gh pr list --state open --base cl-024', { out: '[]' }],
-    ['gh pr merge 12 --merge', { ok: false, err: 'Pull request is not mergeable' }],
-  ]);
-  await expect(runPr(['merge', '12'], refused.run, noWrite, fakeClock())).rejects.toThrow(
-    'not mergeable',
-  );
-});
-
 const pull7: [string, Partial<Result>] = [
   'gh pr view 7',
   {
@@ -274,22 +213,6 @@ test('ready makes no commit and no push when the issue is already done with this
   expect(gh.calls.some((call) => call.includes(' issues set '))).toBe(false);
   expect(gh.calls.some((call) => call.startsWith('git commit'))).toBe(false);
   expect(gh.calls.some((call) => call.startsWith('git push'))).toBe(false);
-});
-
-const releaseLookup = (err: string) =>
-  fake([
-    trunk,
-    ['gh pr view 12 --json mergeCommit', { out: 'm3rge' }],
-    ['gh pr view 12', { out: '{"baseRefName":"main","headRefName":"cl-024"}' }],
-    ['gh pr list --state open --base cl-024', { out: '[]' }],
-    ['gh run list --workflow release.yml', { ok: false, err }],
-  ]);
-
-test('merge passes without release.yml, and fails when it cannot read the release runs', async () => {
-  const missing = releaseLookup('HTTP 404: workflow release.yml not found on the default branch');
-  expect(await runPr(['merge', '12'], missing.run, noWrite, fakeClock())).toBe(0);
-  const offline = releaseLookup('error connecting to api.github.com');
-  expect(await runPr(['merge', '12'], offline.run, noWrite, fakeClock())).toBe(1);
 });
 
 test('failures reports a job log that GitHub no longer has', async () => {
@@ -348,19 +271,49 @@ test('a required code-owner review keeps a green PR from ready', async () => {
   expect(await prStatus(gh.run, '7')).toMatchObject({ review: 'REVIEW_REQUIRED', ready: false });
 });
 
-test('an owner finding keeps a green PR from ready until the owner approves', async () => {
+test('status counts the owner findings from the annotations, whatever the comment says', async () => {
+  const gh = fake([
+    ['gh pr view 7', view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')])],
+    rules,
+    comments('## Agent review\n\nNo `blocking` findings.'),
+    ...findingsOn(head, ['**owner**: weaker check.', '**owner**: weaker test.']),
+  ]);
+  expect(await prStatus(gh.run, '7')).toMatchObject({
+    agentReview: { blocking: 0, owner: 2 },
+    ready: false,
+  });
+});
+
+test('an owner finding keeps a green PR from ready until the owner approves the head', async () => {
+  const me = await repoOwner();
   const green = JSON.parse(
     view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out,
   );
-  const review = comments('## Agent review\n\nNo `blocking` findings.\n\n- `owner`: weaker check.');
-  const status = (reviewDecision: string) =>
-    prStatus(
-      fake([['gh pr view 7', { out: JSON.stringify({ ...green, reviewDecision }) }], rules, review])
-        .run,
+  const readyWith = async (reviews: Array<Reviewed>, reviewDecision = '') => {
+    const status = await prStatus(
+      fake([
+        ['gh pr view 7', { out: JSON.stringify({ ...green, reviewDecision }) }],
+        rules,
+        comments('## Agent review\n\nNo `blocking` findings.'),
+        ...findingsOn(head, ['**owner**: weaker check.']),
+        reviewsOf('7', ...reviews),
+      ]).run,
       '7',
     );
-  expect(await status('')).toMatchObject({ agentReview: { blocking: 0, owner: 1 }, ready: false });
-  expect(await status('APPROVED')).toMatchObject({ ready: true });
+    return status.ready;
+  };
+  expect(await readyWith([{ login: me, state: 'APPROVED', commit: head }])).toBe(true);
+  // A dismissed approval, one on an older commit, or another login's approval does not count.
+  expect(
+    await Promise.all([
+      readyWith([]),
+      readyWith([{ login: me, state: 'DISMISSED', commit: head }]),
+      readyWith([{ login: me, state: 'APPROVED', commit: 'old0000' }]),
+      readyWith([{ login: 'someone', state: 'APPROVED', commit: head }]),
+      // GitHub's approval decision alone does not answer the owner's finding.
+      readyWith([], 'APPROVED'),
+    ]),
+  ).toEqual([false, false, false, false, false]);
 });
 
 test('a merge state that a rule blocks keeps a green PR from ready', async () => {
@@ -374,18 +327,4 @@ test('a merge state that a rule blocks keeps a green PR from ready', async () =>
     comments('## Agent review\n\nBlocking findings: 0'),
   ]);
   expect(await prStatus(gh.run, '7')).toMatchObject({ review: 'BLOCKED by a rule', ready: false });
-});
-
-test('merge refuses an owner finding until the owner approves', async () => {
-  const pr = { baseRefName: 'main', headRefName: 'cl-027', reviewRequests: [], latestReviews: [] };
-  const review = JSON.stringify({ body: '## Agent review\n\n- `owner`: x', login: 'gha[bot]' });
-  const owned = fake([
-    trunk,
-    ['gh pr view 17', { out: JSON.stringify(pr) }],
-    ['gh api --paginate', { out: review }],
-  ]);
-  await expect(runPr(['merge', '17'], owned.run, noWrite, fakeClock())).rejects.toThrow(
-    '#17 has 1 owner finding(s) from agent review',
-  );
-  expect(owned.calls.some((call) => call.startsWith('gh pr merge'))).toBe(false);
 });

@@ -164,6 +164,11 @@ refuses a PR that GitHub reports as blocked while a review is still requested.
 The ruleset itself refuses such a merge too, since no repository role bypasses
 it. The check gives the message that names the reviewer.
 
+`merge` accepts the owner's approval of the current head as the answer to the
+owner findings. The owner is `automerge.owner` in `clutch.yaml`, else the
+default owner in `.github/CODEOWNERS`. A dismissed approval, or one on an older
+commit, does not count, and neither does another login's approval.
+
 For a PR in a stack, `merge` merges every PR from the bottom up to that one,
 with merge commits. When one merge fails, none of them merge. For a PR that is
 not in a stack, it merges that PR with a merge commit. GitHub can still count a
