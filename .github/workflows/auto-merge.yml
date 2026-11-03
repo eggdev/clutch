@@ -17,9 +17,10 @@ name: Auto-merge
 # The hourly sweep (auto-merge-sweep.yml) re-decides a green PR that has no
 # verdict for its head, or whose last decide run failed, through workflow_dispatch.
 # So a PR opened before a rules change still gets decided. A dispatch runs only
-# from the default branch and judges the head the PR has then. Its concurrency
-# group is the PR, since its head is read in the decide job. The scripts retry a
-# gh read on a transient GitHub error, and never a write (tools/github/command.ts).
+# from the default branch and judges the head the PR has then. The find job reads
+# that head, and decide and merge queue on it, so a dispatch and an event run for
+# the same head never decide at once. The scripts retry a gh read on a transient
+# GitHub error, and never a write (tools/github/command.ts).
 
 run-name: "Auto-merge${{ inputs.pr && format(' #{0}', inputs.pr) || '' }}"
 
@@ -39,22 +40,17 @@ on:
         required: true
         type: number
 
-# Least privilege. The decide job grants what it needs in its own block.
+# Least privilege. Each job grants what it needs in its own block.
 permissions:
   contents: read
 
-# One run at a time for each head commit, so two runs cannot both comment.
-concurrency:
-  group: auto-merge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || format('pr-{0}', inputs.pr) }}
-  cancel-in-progress: false
-
 jobs:
-  decide:
+  find:
     # Every pull request from this repository, never a fork. The script judges
     # each one by its author and branch, so a person's PR gets only a refusal. A
     # push to main also completes CI, and is no pull request. A dispatch from
-    # any branch but the default one is refused here, and a fork's PR in the
-    # Find step.
+    # any branch but the default one is refused, and so is a fork's PR, which the
+    # Find step refuses for a dispatch.
     if: >-
       (github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository) ||
@@ -63,17 +59,12 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
-      checks: read
-      # The verdict comments.
-      pull-requests: write
-    # The merge job takes over when a PR may merge at the step.
+      pull-requests: read
     outputs:
-      merge: ${{ steps.decide.outputs.merge }}
-      step: ${{ steps.decide.outputs.step }}
-      pr: ${{ steps.pr.outputs.number }}
+      number: ${{ steps.pr.outputs.number }}
       head: ${{ steps.pr.outputs.head }}
     steps:
       - name: Find the pull request
@@ -100,16 +91,38 @@ jobs:
           fi
           echo "number=$PR" >> "$GITHUB_OUTPUT"
           echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-      - if: steps.pr.outputs.number != ''
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+  decide:
+    needs: find
+    # Only when the find job found a PR that this run may judge.
+    if: needs.find.outputs.number != ''
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    # One decision at a time for each head commit, so two runs cannot both
+    # comment. A dispatch and an event run on the same head queue here.
+    concurrency:
+      group: auto-merge-${{ needs.find.outputs.head }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      checks: read
+      # The verdict comments.
+      pull-requests: write
+    # The merge job takes over when a PR may merge at the step.
+    outputs:
+      merge: ${{ steps.decide.outputs.merge }}
+      step: ${{ steps.decide.outputs.step }}
+      pr: ${{ needs.find.outputs.number }}
+      head: ${{ needs.find.outputs.head }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ steps.pr.outputs.head }}
+          ref: ${{ needs.find.outputs.head }}
           # The risk diff needs the merge base, and the default branch runs the rules.
           fetch-depth: 0
       - name: Check out the default branch
         id: base
-        if: steps.pr.outputs.number != ''
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
@@ -131,8 +144,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           # Write merge=true and the step for the merge job, never merge here.
           AUTOMERGE_HANDOFF: '1'
-          PR: ${{ steps.pr.outputs.number }}
-          HEAD_SHA: ${{ steps.pr.outputs.head }}
+          PR: ${{ needs.find.outputs.number }}
+          HEAD_SHA: ${{ needs.find.outputs.head }}
         run: |
           set -o pipefail
           bun tools/github/auto-merge.ts --pr "$PR" --head "$HEAD_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -150,6 +163,9 @@ jobs:
       needs.decide.outputs.merge == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 10
+    concurrency:
+      group: auto-merge-${{ needs.decide.outputs.head }}
+      cancel-in-progress: false
     environment: release
     permissions:
       # gh pr merge --auto needs contents: write. The comment needs pull-requests: write.
