@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.42.0 (2026-11-03)
+
+### Features
+
+- feat(ci): turn each revert into a regression test in gardening
+
 ## 0.41.0 (2026-11-03)
 
 ### Features
