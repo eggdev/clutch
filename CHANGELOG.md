@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.49.0 (2026-11-03)
+
+### Features
+
+- feat(skills): propose a design before building a screen (CL-410)
+
 ## 0.48.1 (2026-11-03)
 
 ### Fixes and maintenance
