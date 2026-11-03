@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.52.0 (2026-11-03)
+
+### Features
+
+- feat(lint): reject raw elements that the design system wraps (CL-406)
+
 ## 0.51.0 (2026-11-03)
 
 ### Features
