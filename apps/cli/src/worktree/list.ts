@@ -9,7 +9,13 @@ export type ListedWorktree = {
   /** True for the main checkout, the one that holds the `.git` folder. */
   readonly main: boolean;
   readonly issue: string | null;
-  readonly pr: { readonly number: number; readonly url: string; readonly state: string } | null;
+  readonly pr: {
+    readonly number: number;
+    readonly url: string;
+    readonly state: string;
+    /** The commit at the PR's head, which `prune` compares with the checkout's. */
+    readonly head: string;
+  } | null;
 };
 
 /** Looks up the PR of a branch, or null when gh is missing or the branch has none. */

@@ -9,7 +9,12 @@ See [the CLI](../../../apps/cli/README.md#worktree).
 mise exec -- bun run clutch worktree new cart-total --issue CL-201
 mise exec -- bun run clutch worktree list
 mise exec -- bun run clutch worktree rm cart-total
+mise exec -- bun run clutch worktree prune --dry-run
 ```
+
+Nothing removes a checkout when its PR merges. `clutch worktree prune` removes
+each one whose PR is merged or closed and that holds no work a PR lacks. Run it
+on a schedule, such as nightly, so finished checkouts do not pile up.
 
 ## What each checkout has of its own
 

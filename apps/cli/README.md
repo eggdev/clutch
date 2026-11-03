@@ -133,6 +133,7 @@ PGlite database, and its own dev server names.
 mise exec -- bun run clutch worktree new cart-total --issue CL-201
 mise exec -- bun run clutch worktree list
 mise exec -- bun run clutch worktree rm cart-total
+mise exec -- bun run clutch worktree prune --dry-run
 ```
 
 - `new <slug>` fetches the base, then makes the branch and its checkout in
@@ -158,6 +159,16 @@ mise exec -- bun run clutch worktree rm cart-total
   `bun run dev --stop`, and only when a dev run there left
   `.data/dev-run.json`. Then it removes the checkout. It deletes the branch
   only when the branch is merged into the base.
+- `prune [--dry-run] [--base REF]` removes each checkout whose PR is merged
+  or closed, wherever the checkout lives, so the checkouts that other tools
+  make go too. It asks `gh` for the PR, so a squash merge counts. It keeps the
+  main checkout, the one it runs in, a detached one, one whose branch has no
+  PR or an open PR, and one with uncommitted changes. It also keeps one whose
+  HEAD is not the PR's head and not merged into the base, since those commits
+  came after the PR. Like `rm`, it stops the dev servers first. It deletes the
+  branch of a merged PR and keeps the branch of a closed one. It prints a line
+  for each checkout and exits 1 when a removal fails. Run it on a schedule to
+  clear finished checkouts without anyone asking.
 - Run it from the main checkout or from a task checkout. Both use the main
   checkout's settings.
 - The commands call a backend interface (`worktree/backend.ts`). Git is the

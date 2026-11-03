@@ -16,6 +16,7 @@ its options, and so does `bun run pr --help`.
 | `bun run clutch worktree new <slug> [--issue <id>]`                               | You start a task beside other work in this repository. | `git worktree add`, copying env files and `bun install` by hand. |
 | `bun run clutch worktree list [--json]`                                           | You want each checkout's branch, issue, PR and dirty state. | `git worktree list` and matching branches to PRs by hand. |
 | `bun run clutch worktree rm <slug> [--force]`                                     | A task's checkout is done, or abandoned.            | Stopping its servers and `git worktree remove` by hand. |
+| `bun run clutch worktree prune [--dry-run]`                                       | Checkouts of merged or closed PRs pile up.          | Matching each checkout to its PR and removing it by hand. |
 | `bun run clutch friction add "<text>" [--issue <id>] [--kind <kind>]`           | Something cost you more than 5 minutes.             | A note in a chat that the next session never reads. |
 
 ## Check

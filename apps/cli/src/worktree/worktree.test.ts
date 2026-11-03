@@ -124,7 +124,7 @@ test('list shows each checkout with its branch, dirty state, issue and PR', asyn
   const listed = await listWorktrees(gitBackend(repo.root), (branch) =>
     Promise.resolve(
       branch === 'clutch/cl-201-a'
-        ? { number: 7, url: 'https://example.test/7', state: 'OPEN' }
+        ? { number: 7, url: 'https://example.test/7', state: 'OPEN', head: 'c'.repeat(40) }
         : null,
     ),
   );
@@ -206,7 +206,7 @@ test('worktree list --json prints the checkouts, and a bad slug or action exits 
   try {
     expect(await worktreeCommand(['list', '--json'], repo.root)).toBe(0);
     expect(await worktreeCommand(['new', 'Bad Slug', '--base', 'main'], repo.root)).toBe(1);
-    expect(await worktreeCommand(['prune'], repo.root)).toBe(1);
+    expect(await worktreeCommand(['tidy'], repo.root)).toBe(1);
   } finally {
     console.log = log;
     console.error = error;
