@@ -80,10 +80,26 @@ test('a disposition line answers a finding by its id, or by its path and level',
   ).toBeNull();
 });
 
+test('only a fix answers a blocking finding', () => {
+  const answered = (line: string) =>
+    findingsOf(inline, 'h3ad000', `${dispositionHeading}\n${line}`)[0]?.disposition ?? null;
+  expect(answered('- 1: not fixed: it is fine')).toBeNull();
+  expect(answered('- blocking docs/a.md: waits for the owner')).toBeNull();
+  expect(answered('- 1: not fixed in this PR')).toBeNull();
+  expect(answered('- 1: fixed in abc1234')).toBe('- 1: fixed in abc1234');
+  // An owner finding may wait for the owner.
+  expect(
+    findingsOf(inline, 'h3ad000', `${dispositionHeading}\n- 2: waits for the owner`)[1]
+      ?.disposition,
+  ).toBe('- 2: waits for the owner');
+});
+
 test('the report names each finding, and gives a template for the unanswered ones', () => {
   const text = renderFindings(findingsOf(inline, 'h3ad000', ''));
   expect(text).toContain('- blocking docs/a.md (only on old1111; ids 1): docs did not move.');
+  expect(text).toContain('NO FIX: a blocking finding is answered only by "fixed in <sha>"');
   expect(text).toContain('NO DISPOSITION');
+  expect(text).toContain('- blocking `docs/a.md` (1): fixed in <sha>\n');
   expect(text).toContain('3 finding(s) have no disposition.');
   expect(text).toContain('- owner `tools/x.ts` (2, 3): fixed in <sha>');
   expect(renderFindings([])).toBe('Agent review left no finding on this PR.');

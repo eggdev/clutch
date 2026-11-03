@@ -53,11 +53,7 @@ function firstSentence(body: string) {
   return (end === -1 ? text : text.slice(0, end + 1)).slice(0, 200);
 }
 
-/**
- * The line of `disposition` that answers a finding: one that names one of its
- * comment ids, or names its path and its level.
- */
-function answer(disposition: string, finding: Omit<Finding, 'disposition'>) {
+function matchingLine(disposition: string, finding: Omit<Finding, 'disposition'>) {
   return (
     disposition
       .split('\n')
@@ -68,6 +64,24 @@ function answer(disposition: string, finding: Omit<Finding, 'disposition'>) {
           (line.includes(finding.path) && new RegExp(`\\b${finding.level}\\b`, 'iu').test(line)),
       ) ?? null
   );
+}
+
+/**
+ * The line of `disposition` that answers a finding: one that names one of its
+ * comment ids, or names its path and its level. A `blocking` finding counts as
+ * answered only by `fixed in <sha>`.
+ */
+function answer(disposition: string, finding: Omit<Finding, 'disposition'>) {
+  const line = matchingLine(disposition, finding);
+  // A blocking finding must not merge until it is fixed, so only a fix answers it.
+  if (
+    line &&
+    finding.level === 'blocking' &&
+    !/\bfixed in\b/iu.test(line.replaceAll(/\bnot fixed\b/giu, ''))
+  ) {
+    return null;
+  }
+  return line;
 }
 
 /** Groups the inline findings by file and level, and matches each group to the disposition. */
@@ -162,7 +176,10 @@ export function renderFindings(findings: ReadonlyArray<Finding>) {
     const where = finding.current
       ? 'on the head'
       : `only on ${finding.heads.map((sha) => sha.slice(0, 7)).join(', ')}`;
-    const answered = finding.disposition ? `answered: ${finding.disposition}` : 'NO DISPOSITION';
+    let answered = finding.disposition ? `answered: ${finding.disposition}` : 'NO DISPOSITION';
+    if (!finding.disposition && finding.level === 'blocking') {
+      answered = 'NO FIX: a blocking finding is answered only by "fixed in <sha>"';
+    }
     return `- ${finding.level} ${finding.path} (${where}; ids ${finding.ids.join(', ')}): ${finding.summary}\n  ${answered}`;
   });
   const missing = unanswered(findings);
@@ -177,7 +194,7 @@ export function renderFindings(findings: ReadonlyArray<Finding>) {
           '',
           ...missing.map(
             (finding) =>
-              `- ${finding.level} \`${finding.path}\` (${finding.ids.join(', ')}): fixed in <sha> | not fixed: <reason> | waits for the owner: <what they decide>`,
+              `- ${finding.level} \`${finding.path}\` (${finding.ids.join(', ')}): ${finding.level === 'blocking' ? 'fixed in <sha>' : 'fixed in <sha> | not fixed: <reason> | waits for the owner: <what they decide>'}`,
           ),
         ];
   return [...lines, ...template].join('\n');

@@ -35,7 +35,8 @@ to merge, or a report of what is left.
    because a new review can drop an older finding that no fix resolved. For
    each one:
    - `blocking`: fix it. Most are docs that did not move with the behavior,
-     so change the page that the finding names.
+     so change the page that the finding names. Only `fixed in <sha>`
+     answers a blocking finding.
    - `owner`: fix it when the fix is in reach. A finding that names a real
      defect, such as a check that fails open, is a fix, not an owner item.
      Otherwise say what the owner decides.

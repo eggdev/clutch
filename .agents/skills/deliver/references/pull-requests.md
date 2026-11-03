@@ -135,7 +135,8 @@ comment answers. Post or edit that one comment, with one line for each finding:
 ```
 
 A line answers a finding when it names one of its comment ids, or its path and
-its level. `pr findings <number> --check` exits 1 while a finding has no line,
+its level. A `blocking` finding must not merge until it is fixed, so only
+`fixed in <sha>` answers it. `pr findings <number> --check` exits 1 while a finding has no line,
 and `pr merge` refuses the PR until it passes. A new push can bring new
 findings, so run it again after each review. Auto-merge does not read the
 disposition yet. CL-416 adds that, and it needs the owner, since auto-merge is
