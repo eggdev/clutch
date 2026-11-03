@@ -1,6 +1,6 @@
 ---
 name: deliver-linear
-description: Dispatch explicitly configured Linear Todo transitions into repository delivery, with durable claims, retained verification evidence and Bugbot review. Use for signed Linear webhook runs or manual delivery of a Linear issue; T3 remains usable without Linear.
+description: Dispatch explicitly configured Linear Todo transitions into repository delivery, with durable claims. Use for signed Linear webhook runs or manual delivery of a Linear issue; T3 remains usable without Linear.
 ---
 
 # Linear delivery
@@ -60,34 +60,32 @@ Only after recording the dispatch, move the issue to In Progress. If dispatch
 or the status write fails, keep the receipt and reconcile before retrying.
 
 The worker uses `deliver`, updates the same Linear task record and executes
-the changed flows through the committed project-local `verify` skill. Keep screenshots or recordings and
-receipts outside the repository. For visible behavior, capture the
-interaction and result on the affected platform. Browser emulation is not a
-native check. Apply the installed Emil skills selected by `deliver`.
+the changed flows through the committed project-local `verify` skill. Keep
+receipts outside the repository. For visible behavior, extend a journey that
+exercises it on the affected platform. Browser emulation is not a native check.
+Apply the installed Emil skills selected by `deliver`.
 
-Before opening a PR, run required checks and capture evidence at the committed
-head. The PR links the Linear issue and names the tested SHA, exercised flows,
-artifacts and limitations. The worker opens it with `bun run pr open`, so the
-release bot opens it and Auto-merge judges it. The worker never merges by hand;
-Auto-merge merges when its risk tier allows, and the owner merges one-way-door PRs.
+Before opening a PR, run the required checks at the committed head. The worker
+opens the PR with `bun run pr open`, so the release bot opens it and Auto-merge
+judges it. The worker never merges by hand; Auto-merge merges when its risk tier
+allows, and the owner merges one-way-door PRs. See Review and proof for the PR body.
 
-## Bugbot and evidence gates
+## Review and proof
 
-After opening the PR, move to In Review and provide the working preview plus
-screenshots or recordings. Upload sanitized artifacts to Linear when supported;
-otherwise provide the persistent local path, explicitly marked local-only.
-Never claim an artifact is saved remotely until its upload succeeds.
+The required checks and `agent-review` are the gate. Fix each blocking
+agent-review finding and re-run the affected checks. When the project runs
+Bugbot, read its comments like any review comment, and never wait for it.
 
-Check whether Bugbot is enabled and has reviewed this PR's current code. Use
-the project's existing integration and documented trigger, not an invented bot
-command. If unavailable, record "Bugbot not configured" as a missing gate.
-If pending, record its check or review identity and use the host's PR watcher.
+Proof lives in checks and CI artifacts: the journeys, the preview deploy and the
+test that fails before the fix. The PR body names the tested SHA and the preview
+URL when there is one. For a visible change that no journey covers, add or
+extend a journey instead of attaching screenshots. Record the CI run URL as the
+`--evidence` receipt.
 
-Read each finding against the code. Fix confirmed defects inside the issue's
-scope, explain false positives with evidence, and escalate product decisions.
-Re-run affected verification after fixes and invalidate older captures when
-the demonstrated behavior changed. Confirm the review still covers the head.
-Green CI alone and an author's self-review never substitute for Bugbot.
+After opening the PR, move the issue to In Review and post one Linear comment
+that links the PR. Attach no screenshots or recordings to Linear. Read each
+finding against the code. Fix confirmed defects inside the issue's scope, explain
+false positives with evidence, and escalate product decisions.
 
 The parent coordinator owns monitoring. Delegated children return the PR URL,
 head SHA, evidence and pending review/check state without starting watchers.
@@ -97,8 +95,8 @@ Use T3's PR watcher when available; do not implement a polling agent loop.
 
 - **Todo:** work is explicitly queued. It is the entry signal, not a finish.
 - **In Progress:** a recorded execution owns build or fix work.
-- **In Review:** the PR and evidence exist; CI/Bugbot or owner review may still
-  be pending. State pending gates explicitly; never label this merge-ready yet.
+- **In Review:** the PR exists; required checks, agent-review or owner review may
+  still be pending. State pending gates explicitly; never label this merge-ready yet.
 - **Blocked:** an exact prerequisite, failed recovery or material decision is
   preventing progress. Save the task branch and smallest unblock action.
 - **Done:** the PR is merged and the merge is observed. Until then keep it In
