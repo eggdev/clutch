@@ -8,7 +8,7 @@ Each issue gets one branch (`clutch/cl-NNN-<slug>`) and one PR, opened ready for
 
 ## Pull requests and stacks
 
-Follow `.agents/skills/deliver/references/pull-requests.md`. Open, follow, stack and merge each PR with `mise exec -- bun run pr`. When the PR is green and ready to merge, `bun run pr ready <id> <number>` makes its last commit, which sets the issue to `done` with the PR link. The merge makes that true, so `main` never lags behind GitHub. When a PR closes without a merge, set its issue back to `todo` in the next branch.
+Follow `.agents/skills/deliver/references/pull-requests.md`. Open, follow, stack and merge each PR with `mise exec -- bun run pr`. `bun run pr open` commits the issue as `done` before it pushes, because a merge can come as soon as the checks pass. The merge makes that true, so `main` never lags behind GitHub. `bun run pr ready <id> <number>` is optional: it adds the PR link. When a PR closes without a merge, set its issue back to `todo` in the next branch.
 
 ## Frontmatter
 
@@ -30,13 +30,13 @@ The body follows the frontmatter: `# CL-NNN: <title>`, then Goal, Context, Steps
 
 ## Status values
 
-| Status        | Meaning                                                                                                 | Set when                                                             |
-| ------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `todo`        | Not started.                                                                                            | Created.                                                             |
-| `in_progress` | An agent owns it now. One per agent.                                                                    | Work starts. Commit this change with the first commit on the branch. |
-| `blocked`     | Waiting on a person or another issue. The reason goes in a `## Blocked` section at the end of the file. | A stop condition hits.                                               |
-| `review`      | A PR exists, validate is green locally and in CI, and `pr:` holds the URL.                              | After the green push.                                                |
-| `done`        | The PR is merged into `main`.                                                                           | The last commit of the PR, once it is green and ready to merge.      |
+| Status        | Meaning                                                                                                 | Set when                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `todo`        | Not started.                                                                                            | Created.                                                               |
+| `in_progress` | An agent owns it now. One per agent.                                                                    | Work starts. Commit this change with the first commit on the branch.   |
+| `blocked`     | Waiting on a person or another issue. The reason goes in a `## Blocked` section at the end of the file. | A stop condition hits.                                                 |
+| `review`      | A PR exists, validate is green locally and in CI, and `pr:` holds the URL.                              | After the green push.                                                  |
+| `done`        | The PR is merged into `main`.                                                                           | The PR's `open` push, before the checks pass. The merge makes it true. |
 
 ## Id ranges
 

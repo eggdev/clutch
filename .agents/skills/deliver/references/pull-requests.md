@@ -39,9 +39,14 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - To change only the body, run `bun run pr body <number> <file>`.
 - `open` asks the release bot to open a new PR. See
   [who opens the pull request](#who-opens-the-pull-request).
-- After the first green push, run `bun run pr ready <id> <number>`. The merge
-  makes `done` true. A PR that waits on a lower PR in a stack uses `review`
-  until it is ready to merge.
+- `open` marks the branch's issue `done` in the PR head, before it pushes. A
+  merge can come as soon as the checks pass, so the merged default branch must
+  already say `done`. A branch with no issue id is left alone. The first open
+  has no PR number yet, so it sets `done` without the PR link. The next `open`
+  adds the link.
+- `bun run pr ready <id> <number>` is optional. It adds the PR link to the
+  issue, once the PR exists. It makes no commit when the issue already says
+  `done` with that link.
 
 ### Who opens the pull request
 
@@ -92,7 +97,7 @@ It decides what to do with each failure, on top of the commands below.
 | `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending and GitHub shows the commit that the checkout has, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
 | `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. |
 | `bun run pr sync <number, branch or id>` | When GitHub reports the PR as conflicting. It rebases on the PR's base, takes the base's copy of `.clutch/TRACKER.md` if an older branch still committed it, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits, even when another clone rewrote the base. On a PR in the middle of a stack, it keeps the PRs above it linked. After a rebase that you finished by hand, it rebases as usual. |
-| `bun run pr ready <id> <number>`        | When the PR is green and ready to merge. It sets the issue to `done` with the PR link, commits only `.clutch/issues` as `chore(tracker): mark <id> done`, and pushes. The release regenerates `.clutch/TRACKER.md` on `main`. |
+| `bun run pr ready <id> <number>`        | Optional, once the PR exists. It adds the PR link to the issue's `done` record, commits only the issue file as `chore(tracker): mark <id> done`, and pushes. It makes no commit when the issue already says `done` with that link. The release regenerates `.clutch/TRACKER.md` on `main`. |
 
 Each command reads the repository from the `origin` remote. `sync` takes an
 issue id, such as `CL-117`, and finds the branch with the prefix that
@@ -129,7 +134,7 @@ stale reviews. So the owner approves a batch once:
 
 1. Before you ask the owner for approval, put your finished PRs in one stack
    with `open --base`, so `gh stack` links them bottom to top. Each PR is green,
-   with 0 blocking findings and its done commit last.
+   with 0 blocking findings and its head already marks the issue `done`.
 2. Ask the owner to approve every PR in the stack in one sitting.
 3. Run `bun run pr merge <top>`. It merges the whole stack, bottom up, in one
    step.
@@ -168,9 +173,9 @@ prints the released version, or the failed run, and exits 1 when the release
 fails.
 
 The default branch takes no direct pushes, so a task cannot become `done`
-after its merge. When the PR is green and ready to merge, its last commit sets
-the task to `done` with its PR link, and the merge makes that true. When a PR
-closes without a merge, set its task back to `todo` in the next branch.
+after its merge. The PR head makes it so: `open` commits the task as `done`
+before it pushes, and the merge makes that true. When a PR closes without a
+merge, set its task back to `todo` in the next branch.
 
 ## Auto-merge
 

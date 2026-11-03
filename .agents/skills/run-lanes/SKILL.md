@@ -68,8 +68,9 @@ in your own git worktree. Do the work yourself.
   `mise exec -- bun run pr open --title "<conventional title> (CL-NNN)" --body-file <file>`.
   Fill every section of the PR template. Conventional commits. Never `--no-verify`.
 - Run `mise exec -- bun run validate` before each push.
-- When the PR is green and ready, its last commit runs
-  `bun run pr ready CL-NNN <number>`, which commits only the issue file.
+- `bun run pr open` commits the issue as `done` before its push, so the PR head
+  already says `done`. `bun run pr ready CL-NNN <number>` is optional: it adds
+  the PR link.
 - Merge rules: see "Merge" below.
 - File new issues with `clutch issues new --range <your block>`.
 - Never commit `.clutch/TRACKER.md`. The release writes it on `main`.
@@ -100,7 +101,7 @@ of these hold:
 
 - Every required check passed, and agent review passed with 0 blocking
   findings.
-- The last commit marks the issue `done`.
+- The PR head marks the issue `done`.
 - The owner approved it, when the ruleset requires a code owner review. A lane
   asks once for its whole stack. See
   [one approval round per batch](../deliver/references/pull-requests.md#one-approval-round-per-batch).
