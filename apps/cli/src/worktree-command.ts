@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -9,6 +9,7 @@ import { formatWorktrees, listWorktrees } from '@/worktree/list';
 import type { FindPr } from '@/worktree/list';
 import { newWorktree } from '@/worktree/new';
 import type { NewWorktreeSteps } from '@/worktree/new';
+import { pruneWorktrees } from '@/worktree/prune';
 import { removeWorktree } from '@/worktree/remove';
 import { worktreeSettings } from '@/worktree/settings';
 
@@ -94,8 +95,15 @@ const findPr =
     if (!gh) {
       return null;
     }
-    const result = await run([gh, 'pr', 'view', branch, '--json', 'number,url,state'], repoRoot);
-    return result.code === 0 ? JSON.parse(result.out) : null;
+    const result = await run(
+      [gh, 'pr', 'view', branch, '--json', 'number,url,state,headRefOid'],
+      repoRoot,
+    );
+    if (result.code !== 0) {
+      return null;
+    }
+    const { headRefOid, ...pr } = JSON.parse(result.out);
+    return { ...pr, head: headRefOid };
   };
 
 async function runCommand(args: Array<string>, cwd: string): Promise<number> {
@@ -137,6 +145,26 @@ async function runCommand(args: Array<string>, cwd: string): Promise<number> {
     );
     return 0;
   }
+  if (action === 'prune') {
+    const { values } = parseArgs({
+      args: rest,
+      options: { 'dry-run': { type: 'boolean' }, base: { type: 'string' } },
+    });
+    const results = await pruneWorktrees(
+      {
+        base: values.base ?? (await defaultBase(repoRoot)),
+        cwd: await realpath(cwd),
+        dryRun: values['dry-run'] ?? false,
+      },
+      {
+        backend: gitBackend(repoRoot),
+        findPr: findPr(repoRoot),
+        stopServers,
+        log: (line) => console.log(line),
+      },
+    );
+    return results.some((result) => result.action === 'failed') ? 1 : 0;
+  }
   if (action === 'list') {
     const { values } = parseArgs({ args: rest, options: { json: { type: 'boolean' } } });
     const worktrees = await listWorktrees(gitBackend(repoRoot), findPr(repoRoot));
@@ -144,7 +172,7 @@ async function runCommand(args: Array<string>, cwd: string): Promise<number> {
     return 0;
   }
   throw new Error(
-    'Run clutch worktree new <slug> [--issue CL-NNN] [--base REF], clutch worktree list [--json], or clutch worktree rm <slug> [--force].',
+    'Run clutch worktree new <slug> [--issue CL-NNN] [--base REF], clutch worktree list [--json], clutch worktree rm <slug> [--force], or clutch worktree prune [--dry-run] [--base REF].',
   );
 }
 
