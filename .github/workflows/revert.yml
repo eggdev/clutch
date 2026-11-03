@@ -6,7 +6,7 @@ name: Revert
 # pushes and opens it, so CI runs on it. tools/github/revert.ts holds the steps.
 # When auto-merge merged the PR, it also files a risk-tighten issue. This is
 # the safety valve for auto-merge. See
-# docs/contributing/operations/rollback.md#revert-a-merged-pull-request.
+# https://github.com/eggdev/clutch/blob/main/docs/contributing/operations/rollback.md#revert-a-merged-pull-request.
 
 on:
   pull_request:

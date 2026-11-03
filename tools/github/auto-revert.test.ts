@@ -60,6 +60,25 @@ test('a second red run after a green one reverts the auto-merged PR', async () =
   expect(gh.calls.some((call) => call.startsWith('gh pr comment 42'))).toBe(true);
 });
 
+test('the revert label is created before it is added, so a fresh project has it', async () => {
+  const gh = main();
+  await autoRevert(gh);
+  const create = gh.calls.findIndex((call) => call.startsWith('gh label create revert --force'));
+  const add = gh.calls.indexOf('gh pr edit 42 --repo acme/shop --add-label revert');
+  expect(create).toBeGreaterThanOrEqual(0);
+  expect(create).toBeLessThan(add);
+  expect(gh.calls[create]).toContain('--repo acme/shop');
+  expect(gh.calls[create]).toContain('--color e99695');
+});
+
+test('a label create the job may not grant does not stop the revert', async () => {
+  const gh = main([['gh label create revert', { ok: false, err: 'HTTP 403' }]]);
+  const { code, lines } = await autoRevert(gh);
+  expect(code).toBe(0);
+  expect(gh.calls).toContain('gh pr edit 42 --repo acme/shop --add-label revert');
+  expect(lines.at(-1)).toContain('Started its revert.');
+});
+
 test('the first red run only reruns the failed jobs, in case a test is flaky', async () => {
   const gh = main();
   await autoRevert(gh, '1');

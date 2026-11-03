@@ -10,7 +10,7 @@ import { changesetDir, changesetText, packageName } from '@tools/release/changes
  * revert PR. The Revert workflow runs it when someone adds the `revert` label
  * to a merged PR. It pushes and opens the PR with the token in `PUSH_TOKEN` and
  * `GH_TOKEN`, the release bot's, so CI runs on the revert PR. See
- * docs/contributing/operations/rollback.md#revert-a-merged-pull-request.
+ * https://github.com/eggdev/clutch/blob/main/docs/contributing/operations/rollback.md#revert-a-merged-pull-request.
  *
  * When auto-merge merged the reverted PR, it also files a `risk-tighten` issue
  * that lists the PR's files and their risk tiers, and proposes to tighten the
@@ -59,7 +59,7 @@ export function tightenBody(pr: string, url: string, files: Array<RiskFile>) {
     '',
     'If one of these paths caused the break, tighten it: add it to a one-way-door rule in `.clutch/risk.yaml`, or add a check that catches the break. If the path did not cause it, such as a flaky test, close this issue with the reason.',
     '',
-    'See docs/contributing/operations/rollback.md#tighten-after-a-revert.',
+    'See https://github.com/eggdev/clutch/blob/main/docs/contributing/operations/rollback.md#tighten-after-a-revert.',
   ].join('\n');
 }
 
