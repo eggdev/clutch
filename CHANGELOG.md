@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.44.4 (2026-11-03)
+
+### Fixes and maintenance
+
+- fix(pr): read blocking and owner counts the way the gate does
+
 ## 0.44.3 (2026-11-03)
 
 ### Fixes and maintenance
