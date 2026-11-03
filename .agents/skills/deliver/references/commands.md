@@ -43,13 +43,13 @@ take a PR to green.
 | Command                                                  | Use it when                                          | It replaces                                     |
 | -------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------- |
 | `bun run pr doctor [--fix]`                              | Once on each machine.                                | Installing `gh` and its extensions by hand.     |
-| `bun run pr open --title <title> --body-file <file>`     | You open a PR, or push to one. Add `--force` after a rebase. | `git push` and `gh pr create`.                  |
+| `bun run pr open --title <title> --body-file <file>`     | You open a PR, or push to one. It marks the branch's issue `done` in the PR head before the push. Add `--force` after a rebase. | `git push`, `gh pr create` and `clutch issues set ... done`. |
 | `bun run pr body <number> <file>`                        | Only the PR description changes.                     | `gh pr edit --body-file`.                       |
 | `bun run pr status <number>`                             | Before each decision about the PR.                   | `gh pr checks` and reading review comments.     |
 | `bun run pr wait <number>`                               | After a push, to wait for the checks.                | A `gh pr checks --watch` or `sleep` loop.       |
 | `bun run pr failures <number>`                           | A check failed.                                      | Digging in `gh run view --log`.                 |
 | `bun run pr sync <number>`                               | The base moved, or the tracker conflicts.            | A manual rebase, tracker fix, validate and push. |
-| `bun run pr ready <id> <number>`                         | The PR is green and ready to merge.                  | `clutch issues set ... done`, commit and push.  |
+| `bun run pr ready <id> <number>`                         | Optional, once the PR exists: it adds the PR link to the issue. | `clutch issues set ... done`, commit and push.  |
 | `bun run pr merge <number>`                              | The merge rules hold.                                | `gh pr merge` and `gh stack merge`.             |
 
 ## Measure

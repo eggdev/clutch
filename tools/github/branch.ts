@@ -201,10 +201,72 @@ export async function sync(
   return open({ title: pr.title, 'body-file': body, base: pr.base, force: true });
 }
 
+/** An issue's record in the tracker, from `clutch issues --json`. */
+type Tracked = { id: string; status: string; pr: string; file: string };
+
+async function trackedIssues(run: Run): Promise<Array<Tracked>> {
+  const out = await must(run, clutch('issues', '--json'));
+  return (JSON.parse(out) as { issues: Array<Tracked> }).issues;
+}
+
 /**
- * `pr ready`: the last commit of a green PR. It marks the issue done with the
- * PR's link, commits only the issue file and pushes. The release regenerates
- * the tracker on the default branch.
+ * The issue that a branch works on, by the branch prefix: `clutch/cl-123-x` is
+ * CL-123. Undefined when the name carries no id.
+ */
+function issueOf(branch: string, prefix: string) {
+  const escaped = prefix.replaceAll(/[$()*+.?[\\\]^{|}]/gu, '\\$&');
+  const match = new RegExp(`^${escaped}(\\d{3}[a-z]?)(?:-|$)`, 'iu').exec(branch);
+  return match ? `CL-${match[1].toLowerCase()}` : undefined;
+}
+
+/**
+ * Marks the issue done, in a commit of only its issue file. `url` is the PR's
+ * link when the PR is known. It commits nothing when the issue already says so.
+ * Returns whether it committed.
+ */
+async function commitDone(run: Run, issue: Tracked, url?: string) {
+  if (issue.status === 'done' && (url === undefined || issue.pr === url)) {
+    return false;
+  }
+  const link = url === undefined ? [] : ['--pr', url];
+  await must(run, clutch('issues', 'set', issue.id, 'done', ...link));
+  await must(run, ['git', 'add', issue.file]);
+  await must(run, [
+    'git',
+    'commit',
+    '--quiet',
+    '--message',
+    `chore(tracker): mark ${issue.id} done`,
+    '--',
+    issue.file,
+  ]);
+  return true;
+}
+
+/**
+ * `pr open` marks the branch's issue done in the PR head before it pushes. A
+ * merge can come as soon as the checks pass, so the merged default branch then
+ * says `done` too. A branch without an issue id is left alone.
+ */
+export async function markBranchDone(run: Run, root: string, branch: string, url?: string) {
+  const id = issueOf(branch, await branchPrefix(root));
+  if (!id) {
+    return;
+  }
+  const tracked = await trackedIssues(run);
+  const issue = tracked.find((candidate) => candidate.id === id);
+  if (!issue) {
+    console.log(`Note: ${id} is not in .clutch/issues, so it is not marked done.`);
+    return;
+  }
+  await commitDone(run, issue, url);
+}
+
+/**
+ * `pr ready`: adds the PR's link to the issue, or re-marks it, in one commit of
+ * the issue file, then pushes. It does nothing when the issue already says
+ * `done` with this link. The release regenerates the tracker on the default
+ * branch.
  */
 export async function ready(run: Run, root: string, id: string, number: string) {
   const pr = await view(run, number);
@@ -215,17 +277,15 @@ export async function ready(run: Run, root: string, id: string, number: string) 
   if ((await must(run, ['git', 'branch', '--show-current'])) !== pr.head) {
     throw new Error(`Switch to ${pr.head}, the branch of #${pr.number}, first.`);
   }
-  await must(run, clutch('issues', 'set', id, 'done', '--pr', pr.url));
-  await must(run, ['git', 'add', '.clutch/issues']);
-  await must(run, [
-    'git',
-    'commit',
-    '--quiet',
-    '--message',
-    `chore(tracker): mark ${id} done`,
-    '--',
-    '.clutch/issues',
-  ]);
+  const tracked = await trackedIssues(run);
+  const issue = tracked.find((candidate) => candidate.id === id);
+  if (!issue) {
+    throw new Error(`No issue ${id} in .clutch/issues.`);
+  }
+  if (!(await commitDone(run, issue, pr.url))) {
+    console.log(`${id} is already done in ${pr.url}. Nothing to commit.`);
+    return 0;
+  }
   const pushed = await run(['git', 'push', 'origin', 'HEAD'], { inherit: true });
   if (!pushed.ok) {
     throw new Error('The push failed. Read the git output above.');

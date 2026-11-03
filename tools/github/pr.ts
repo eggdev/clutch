@@ -3,7 +3,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { openAsBot } from '@tools/github/bot-open';
-import { ready, recordForkPoint, sync } from '@tools/github/branch';
+import { markBranchDone, ready, recordForkPoint, sync } from '@tools/github/branch';
 import { failures, renderFailures } from '@tools/github/failures';
 import {
   defaultBranch,
@@ -212,6 +212,10 @@ async function open(
     );
   }
   await ensureChangeset(run, write, base, branch, title);
+  // The PR's link is known only once the PR exists, so a first open marks the issue done without it.
+  const existing = await prWithHead(run, branch);
+  // Before the push: a merge can come as soon as the checks pass, so the head must already say done.
+  await markBranchDone(run, root, branch, existing?.url);
   // After a rebase the branch needs a forced push. The lease refuses it when someone else pushed.
   const push = [
     'git',
@@ -229,7 +233,6 @@ async function open(
         : 'The push failed. Read the git output above. When a check failed, fix it. After a rebase of your own branch, run open again with --force.',
     );
   }
-  const existing = await prWithHead(run, branch);
   let opened = existing;
   if (existing) {
     await setBody(run, String(existing.number), bodyFile);

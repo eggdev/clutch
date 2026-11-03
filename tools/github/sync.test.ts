@@ -36,6 +36,17 @@ const syncAnswers = (
     ['git -c core.editor=true rebase --continue', { ok: true }],
     ['git diff --name-only --diff-filter=U', conflicted],
     ['git diff --name-only --diff-filter=A', { out: '.changeset/x.md' }],
+    // A sync that opens the PR marks its issue done, so the tracker answers too.
+    [
+      'bun tools/clutch.ts issues --json',
+      {
+        out: JSON.stringify({
+          issues: [
+            { id: 'CL-117', status: 'in_progress', pr: '', file: '.clutch/issues/CL-117.md' },
+          ],
+        }),
+      },
+    ],
   ]);
 
 test('sync takes the base copy of a conflicted tracker, validates and pushes with a lease', async () => {

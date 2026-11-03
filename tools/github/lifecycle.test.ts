@@ -225,32 +225,55 @@ test('merge reports a failed release, and a plain merge error that is not the st
   );
 });
 
-test('ready marks the issue done through tools/clutch.ts, and commits only the issue files', async () => {
+const pull7: [string, Partial<Result>] = [
+  'gh pr view 7',
+  {
+    out: JSON.stringify({
+      number: 7,
+      url: 'https://github.com/o/r/pull/7',
+      title: 'feat: x (CL-117)',
+      body: '',
+      headRefName: 'clutch/cl-117-pr-lifecycle',
+      baseRefName: 'main',
+    }),
+  },
+];
+const tracked = (status: string, pr = ''): [string, Partial<Result>] => [
+  'bun tools/clutch.ts issues --json',
+  {
+    out: JSON.stringify({
+      issues: [{ id: 'CL-117', status, pr, file: '.clutch/issues/CL-117.md' }],
+    }),
+  },
+];
+
+test('ready marks the issue done through tools/clutch.ts, and commits only the issue file', async () => {
   const gh = fake([
-    [
-      'gh pr view 7',
-      {
-        out: JSON.stringify({
-          number: 7,
-          url: 'https://github.com/o/r/pull/7',
-          title: 'feat: x (CL-117)',
-          body: '',
-          headRefName: 'clutch/cl-117-pr-lifecycle',
-          baseRefName: 'main',
-        }),
-      },
-    ],
+    pull7,
     ['git branch --show-current', { out: 'clutch/cl-117-pr-lifecycle\n' }],
+    tracked('in_progress'),
   ]);
   expect(await runPr(['ready', 'CL-117', '7'], gh.run, noWrite)).toBe(0);
   expect(gh.calls.slice(-4)).toEqual([
     'bun tools/clutch.ts issues set CL-117 done --pr https://github.com/o/r/pull/7',
-    'git add .clutch/issues',
-    'git commit --quiet --message chore(tracker): mark CL-117 done -- .clutch/issues',
+    'git add .clutch/issues/CL-117.md',
+    'git commit --quiet --message chore(tracker): mark CL-117 done -- .clutch/issues/CL-117.md',
     'git push origin HEAD',
   ]);
   // The release regenerates the tracker on the default branch, never a PR.
   expect(gh.calls).not.toContain('bun tools/clutch.ts issues --write');
+});
+
+test('ready makes no commit and no push when the issue is already done with this link', async () => {
+  const gh = fake([
+    pull7,
+    ['git branch --show-current', { out: 'clutch/cl-117-pr-lifecycle\n' }],
+    tracked('done', 'https://github.com/o/r/pull/7'),
+  ]);
+  expect(await runPr(['ready', 'CL-117', '7'], gh.run, noWrite)).toBe(0);
+  expect(gh.calls.some((call) => call.includes(' issues set '))).toBe(false);
+  expect(gh.calls.some((call) => call.startsWith('git commit'))).toBe(false);
+  expect(gh.calls.some((call) => call.startsWith('git push'))).toBe(false);
 });
 
 const releaseLookup = (err: string) =>
