@@ -247,12 +247,10 @@ async function prepare(run: Run, out: string, env = process.env) {
       await writeFile(target, await readFile(change.path));
     }
   }
+  // A missing rule page fails, so the model never judges without the written standard.
   for (const page of rulePages) {
-    const copy = await git(['show', `${base}:${page}`]).catch(() => null);
-    if (copy) {
-      await mkdir(path.dirname(path.join(out, 'rules', page)), { recursive: true });
-      await writeFile(path.join(out, 'rules', page), copy);
-    }
+    await mkdir(path.dirname(path.join(out, 'rules', page)), { recursive: true });
+    await writeFile(path.join(out, 'rules', page), await git(['show', `${base}:${page}`]));
   }
   const pr = JSON.parse(
     await must(run, [
