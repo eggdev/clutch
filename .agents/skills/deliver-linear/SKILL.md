@@ -7,8 +7,8 @@ description: Dispatch explicitly configured Linear Todo transitions into reposit
 
 Linear owns scope and status. The host owns task execution. The repository owns
 verification commands. Use `deliver` to carry each issue through its configured
-destination. A Todo transition authorizes build, verification and PR creation;
-it does not authorize merging or releasing.
+destination. A Todo transition authorizes build, verification and a PR. The merge
+follows the repository's auto-merge rules; the worker never merges by hand.
 
 Read [setup](./references/setup.md) to register a repository or webhook. Use
 `scripts/intake.py` for local routing, event receipts and atomic claims. Its
@@ -28,8 +28,8 @@ SQLite file stores execution receipts, not a parallel project backlog.
    already Todo: `updatedFrom.stateId` must show entry into Todo.
 4. `next ROUTE` identifies the oldest queued execution. Re-fetch that issue and
    run `reserve RUN --issue SNAPSHOT` immediately before dispatch. Claims are
-   atomic, one active worker per repository, and duplicate deliveries cannot
-   create another active run for the issue. A busy route leaves work queued.
+   atomic, at most `maxLanes` runs per route are active, and duplicate deliveries
+   cannot create another active run for the issue. A busy route leaves work queued.
 5. Save the coordinator thread ID with `record`. If a reserved or working job
    already exists, inspect that recorded thread and child task before acting.
    Never expire a claim by age or start a replacement because a worker is quiet.
@@ -40,19 +40,18 @@ building on guessed results. An unconfigured team or project never starts work.
 
 ## Run one issue
 
-Use the configured repository's host project. The task runs in that
-project's main checkout, on a new task branch. Never create a Git worktree, and
-never pass `isolation: "worktree"` to `delegate_task`. In T3, delegate the task
-from that project using `delegate_task`, with `clientRequestId` derived from
-the stable run ID. Read live model capabilities and preserve the requested
+Use the configured repository's host project. Each issue runs in its own
+checkout, and up to the route's `maxLanes` run at once. In T3, delegate with
+`delegate_task` and `isolation: "worktree"`; elsewhere, run
+`bun run clutch worktree new <slug> --issue <id>`. Derive `clientRequestId`
+from the stable run ID. Read live model capabilities and preserve the requested
 model options. Do not create unrelated top-level conversations.
 If the current host project is wrong, stop and route through its configured
 webhook/project; a shell `cd` does not change a thread's workspace binding.
-Fetch the route's integration ref and create the task branch from it, not from
-an unrelated branch open in the checkout. Switch only from a clean checkout.
-When the checkout holds uncommitted or unpushed work, stop and ask the owner.
-Never discard, stash or rewrite the owner's work. Confirm the verification
-skill exists on that base; otherwise block until its tooling PR lands.
+Branch from the route's integration ref. The task branch is
+`clutch/cl-<linear key in lowercase>-<slug>`. Never touch the owner's checkout.
+Confirm the verification skill exists on that base; otherwise block until its
+tooling PR lands.
 
 Give the worker the live issue and comments, acceptance criteria, scope,
 repository verification skill, evidence location, destination, run ID and this
@@ -68,7 +67,9 @@ native check. Apply the installed Emil skills selected by `deliver`.
 
 Before opening a PR, run required checks and capture evidence at the committed
 head. The PR links the Linear issue and names the tested SHA, exercised flows,
-artifacts and limitations. Register it with T3 when linking tools are available.
+artifacts and limitations. The worker opens it with `bun run pr open`, so the
+release bot opens it and Auto-merge judges it. The worker never merges by hand;
+Auto-merge merges when its risk tier allows, and the owner merges one-way-door PRs.
 
 ## Bugbot and evidence gates
 
@@ -100,9 +101,8 @@ Use T3's PR watcher when available; do not implement a polling agent loop.
   be pending. State pending gates explicitly; never label this merge-ready yet.
 - **Blocked:** an exact prerequisite, failed recovery or material decision is
   preventing progress. Save the task branch and smallest unblock action.
-- **Done:** the configured completion boundary is verified. For this PR-only
-  grant, keep Linear In Review until merge is observed. A future merge grant
-  needs its own gates; never infer it from a ready PR.
+- **Done:** the PR is merged and the merge is observed. Until then keep it In
+  Review; a ready PR is not done.
 
 Before status writes, re-read the issue. Respect an owner's cancellation or
 manual hold and stop affected work; do not overwrite it with a stale update.
@@ -110,7 +110,7 @@ Write one concise progress comment per meaningful stage, not per tool call.
 Link the task, branch, PR, tested SHA and evidence so another agent can resume.
 
 When the worker finishes, record `review`, `blocked`, `done` or `canceled` with
-its receipts, releasing the repository execution slot. Drain the next queued
+its receipts, releasing its lane. Drain the next queued
 job after re-reading it. For an In Review issue, completion of the worker is
 not completion of the issue. Use `resume RUN --issue SNAPSHOT` to reacquire a
 claim for fixes, preserving receipts and using the returned generation in the

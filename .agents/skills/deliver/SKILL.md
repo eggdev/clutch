@@ -91,7 +91,8 @@ register relevant PRs and use supported watchers; delegated children return
 their result to the parent rather than watching independently.
 
 For a Linear issue, deliver-linear owns intake, status and its configured review
-gates; this skill owns implementation. A Todo transition grants a PR, not merge.
+gates; this skill owns implementation. A Todo transition grants a PR; the merge
+follows the repository's auto-merge rules.
 
 Mark done only when the destination and required proof exist. Missing proof
 stays failed/unverified with its prerequisite. Owner review is a state only

@@ -21,9 +21,15 @@ names are not stable identifiers. A route has:
   },
   "destination": "pr",
   "verificationSkill": ".agents/skills/verify/SKILL.md",
-  "requiredReview": "bugbot"
+  "requiredReview": "bugbot",
+  "maxLanes": 3
 }
 ```
+
+`maxLanes` is optional, a positive integer, and defaults to 3. It caps the
+route's runs that are reserved or working at once. Each lane gets its own
+checkout, but lanes still share fixed ports, simulators and caches. Set
+`maxLanes` to 1 until the verification skill gives each checkout its own.
 
 Set `projectId` when a team serves several repositories. Only one team-wide
 route is allowed for a team; it cannot coexist with project-specific routes.
@@ -61,8 +67,7 @@ python3 .agents/skills/deliver-linear/scripts/intake.py show RUN_ID
 
 `enqueue` also supports a `create` event directly into Todo. Updates must carry
 a changed `updatedFrom.stateId`. Replayed delivery IDs and repeated transitions
-are ignored. Repository slots serialize work while fixed ports, simulators and
-shared caches make parallel verification unsafe. Claims survive restarts.
+are ignored. Lanes cap concurrent work per route, not per machine. Claims survive restarts.
 Signature and timestamp checks happen at the host's HTTP receipt, before agent
 queueing. The helper does not reapply a one-minute wall-clock window after an
 agent startup delay; it rechecks the current issue state and replay receipts.
