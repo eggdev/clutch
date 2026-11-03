@@ -21,7 +21,7 @@ class IntakeTests(unittest.TestCase):
                       'hostProjectId': 'host', 'integrationRef': 'origin/main', 'teamId': 'team', 'projectId': None,
                       'states': {'todo': 'todo', 'active': 'active', 'review': 'review',
                                  'blocked': 'blocked', 'done': 'done'},
-                      'destination': 'pr', 'verificationSkill': '.agents/skills/verify/SKILL.md', 'requiredReview': 'bugbot'}
+                      'destination': 'pr', 'verificationSkill': '.agents/skills/verify/SKILL.md'}
         self.issue = {'id': 'issue', 'teamId': 'team', 'projectId': None,
                       'stateId': 'todo', 'archivedAt': None, 'blockedBy': []}
         self.event = {'type': 'Issue', 'action': 'update', 'webhookTimestamp': time.time() * 1000,
@@ -59,11 +59,16 @@ class IntakeTests(unittest.TestCase):
             ('integrationRef', None, 'complete route'),
             ('integrationRef', '--wrong', 'explicit non-option'),
             ('verificationSkill', 'verify-app', 'project-local verify'),
-            ('requiredReview', 'unknown', 'bugbot review policy'),
         ]:
             route = {**self.route, field: value}
             with self.assertRaisesRegex(RuntimeError, error):
                 self.call('route', '--file', self.save('bad-route.json', route))
+
+    def test_old_route_with_required_review_still_loads(self):
+        legacy = {**self.route, 'requiredReview': 'bugbot'}
+        self.call('route', '--file', self.save('legacy-route.json', legacy))
+        self.assertEqual(self.call('routes')['routes'][0]['requiredReview'], 'bugbot')
+        self.assertEqual(self.reserve_issue(*self.queue_issue('one')), 'reserved')
 
     def test_description_edit_and_wrong_team_do_not_dispatch(self):
         self.event['updatedFrom'] = {'description': 'old'}

@@ -37,7 +37,7 @@ def routes(db):
 
 def validate_route(value):
     required = ['id', 'repository', 'hostProjectId', 'integrationRef', 'teamId', 'states',
-                'destination', 'verificationSkill', 'requiredReview']
+                'destination', 'verificationSkill']
     if any(not value.get(k) for k in required) or value['destination'] != 'pr':
         raise ValueError('A complete route with destination pr is required')
     base = value['integrationRef']
@@ -45,8 +45,6 @@ def validate_route(value):
         raise ValueError('integrationRef must name an explicit non-option Git ref')
     if value['verificationSkill'] != '.agents/skills/verify/SKILL.md':
         raise ValueError('verificationSkill must be the committed project-local verify skill')
-    if value['requiredReview'] != 'bugbot':
-        raise ValueError('Only the configured bugbot review policy is supported')
     if any(not value['states'].get(k) for k in ['todo', 'active', 'review', 'blocked', 'done']):
         raise ValueError('All five status UUIDs are required')
     if not Path(value['repository']).is_absolute():

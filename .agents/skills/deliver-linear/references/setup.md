@@ -21,10 +21,13 @@ names are not stable identifiers. A route has:
   },
   "destination": "pr",
   "verificationSkill": ".agents/skills/verify/SKILL.md",
-  "requiredReview": "bugbot",
   "maxLanes": 3
 }
 ```
+
+A route file saved with a `requiredReview` field still loads. The field is
+ignored, and no review policy gates a route. The PR's required checks and
+`agent-review` are the gate; see [review and proof](../SKILL.md#review-and-proof).
 
 `maxLanes` is optional, a positive integer, and defaults to 3. It caps the
 route's runs that are reserved or working at once. Each lane gets its own
