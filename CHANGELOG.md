@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.44.0 (2026-11-03)
+
+### Features
+
+- feat(ci): judge agent PRs by author and auto-merge reverts
+- feat(ci): hold the hard core without trusting the agent
+- feat(skills): run Linear issues in parallel lanes that auto-merge
+- feat(skills): put Linear delivery proof in checks, not PR prose
+- feat(ci): step auto-merge down when reverts pass 2%
+- feat(ci): count every owner finding and review the full diff
+- feat(ci): keep an owner finding until the diff removes its cause
+
+### Fixes and maintenance
+
+- fix(sync): make a sync land with no hand fixes
+- fix(journeys): find the web app and warn when no journey ran
+- fix(labels): create the revert label in every project
+
 ## 0.43.1 (2026-11-03)
 
 ### Fixes and maintenance
