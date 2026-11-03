@@ -1,6 +1,6 @@
 ## Intent
 
-<!-- What this change does and why, in two or three sentences. Link the issue. -->
+<!-- What this change does and why, in two or three sentences. Link the issue. For a visible change that an adopted design proposal covers, name its record and direction, such as "Design: docs/design/proposals/<slug>.md (adopted B)". -->
 
 ## Delivery
 

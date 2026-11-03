@@ -106,6 +106,12 @@ jobs:
             - Read `tools/flaky-tests.json`. When the file is missing, the
               list is empty. A test whose `until` date is within 7 days is
               about to expire.
+            - List the stale design proposals with
+              `mise exec -- bun tools/check-proposals.ts --stale`. For an
+              adoption whose issue is done, set the record's status to
+              `current` and delete its prototype file. List a proposal that
+              waits for the owner under "Proposals waiting" in the body.
+              Neither counts toward the 3 items.
             - Pick at most 3 items from the reverts, the friction and the
               expiring flaky tests. Take the reverts first, then the ones that
               cost the most or repeat. Fix each one with a doc, a check, a tool
@@ -136,7 +142,7 @@ jobs:
           # The cheapest model unless the CLUTCH_AGENT_MODEL repository variable names another one.
           claude_args: |
             --model ${{ vars.CLUTCH_AGENT_MODEL || 'claude-haiku-5-5' }}
-            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(mise exec -- bun run clutch friction:*)"
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(mise exec -- bun run clutch friction:*),Bash(mise exec -- bun tools/check-proposals.ts --stale)"
             --json-schema '{"type":"object","properties":{"title":{"type":"string"},"body":{"type":"string"}},"required":["title","body"]}'
       # A PR that the default token opens starts no workflows, so CI and agent
       # review would not run on it. The release bot's token does start them.
