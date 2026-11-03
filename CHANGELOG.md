@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.44.2 (2026-11-03)
+
+### Fixes and maintenance
+
+- fix(sync): fix three breaks found by the Neighborhood sync
+- fix(pr): see the owner approval and count findings from the gate
+
 ## 0.44.1 (2026-11-03)
 
 ### Fixes and maintenance
