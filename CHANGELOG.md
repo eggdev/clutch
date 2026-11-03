@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.52.1 (2026-11-03)
+
+### Fixes and maintenance
+
+- docs(skills): keep the owner's approval when answering findings (CL-417)
+
 ## 0.52.0 (2026-11-03)
 
 ### Features
