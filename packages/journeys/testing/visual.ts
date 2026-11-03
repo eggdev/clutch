@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -47,6 +48,22 @@ export function comparing(env: Record<string, string | undefined> = process.env)
   return env.VISUAL_COMPARE === '1' || env.GITHUB_ACTIONS === 'true';
 }
 
+/**
+ * The snap names that `tools/flaky-tests.json` quarantines for the journey
+ * file `file`. A quarantined shot is still compared and kept, but a change
+ * warns instead of failing. See docs/contributing/testing.md#flaky-tests.
+ */
+function quarantinedSnaps(file: string, root = process.cwd()): Set<string> {
+  let text: string;
+  try {
+    text = readFileSync(path.join(root, 'tools/flaky-tests.json'), 'utf-8');
+  } catch {
+    return new Set();
+  }
+  const tests: Array<{ file?: string; name?: string }> = JSON.parse(text).tests ?? [];
+  return new Set(tests.filter((entry) => entry.file === file).map((entry) => entry.name ?? ''));
+}
+
 type SnapOptions = {
   /** Regions whose content changes on each run, such as a generated title. */
   readonly mask?: ReadonlyArray<Locator>;
@@ -91,6 +108,9 @@ async function setScheme(page: Page, scheme: Scheme) {
  */
 export async function snap(page: Page, name: string, options: SnapOptions = {}) {
   const info = test.info();
+  const quarantine = quarantinedSnaps(
+    path.relative(process.cwd(), info.file).split(path.sep).join('/'),
+  );
   const viewport = page.viewportSize();
   const wasDark = await page.evaluate<boolean>(
     "document.documentElement.classList.contains('dark')",
@@ -110,7 +130,17 @@ export async function snap(page: Page, name: string, options: SnapOptions = {}) 
         // Locally every shot is kept to look at. In CI only a changed or a new
         // one, so the artifact holds exactly what `visual pull` should copy.
         let keep = true;
-        if (comparing()) {
+        if (comparing() && quarantine.has(name)) {
+          try {
+            expect(shot).toMatchSnapshot(file, { maxDiffPixelRatio });
+            keep = false;
+          } catch {
+            info.annotations.push({
+              type: 'warning',
+              description: `${file} differs from its baseline, but ${name} is quarantined in tools/flaky-tests.json.`,
+            });
+          }
+        } else if (comparing()) {
           const before = info.errors.length;
           // Soft, so one run reports every changed shot, and `visual pull` gets them all.
           expect

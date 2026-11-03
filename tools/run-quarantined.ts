@@ -1,6 +1,6 @@
 import { appendFileSync } from 'node:fs';
 
-import { onlyPattern, quarantined } from '@tools/flaky';
+import { bunTests, onlyPattern, quarantined } from '@tools/flaky';
 import type { FlakyTest } from '@tools/flaky';
 
 /**
@@ -58,7 +58,7 @@ const bunRun = (test: FlakyTest) =>
   }).exitCode === 0;
 
 if (import.meta.main) {
-  const outcomes = quarantined(process.cwd()).map((test) => retry(test, bunRun));
+  const outcomes = bunTests(quarantined(process.cwd())).map((test) => retry(test, bunRun));
   const text = report(outcomes);
   console.log(text);
   if (process.env.GITHUB_STEP_SUMMARY) {

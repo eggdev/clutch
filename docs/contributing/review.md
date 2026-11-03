@@ -49,6 +49,32 @@ required status check, so a blocking finding blocks the merge. A project that
 has not set up the credential keeps the default, `notice`, and the check
 passes with a notice until the project adopts it.
 
+### Visual review
+
+The same job reviews the pixels too. When a PR adds, changes or removes a
+screenshot baseline (a PNG in a `__screenshots__/` folder, see
+[screenshots](./setup/verification.md#screenshots)), these steps run:
+
+1. The default branch's copy of `tools/journeys/visual-review.ts` writes each
+   before and after PNG, and a prompt with the PR title and body.
+2. `claude-haiku-5-5` reads each pair and returns one verdict for it. A pair
+   is `explained` when the PR says what changed on that screen. It is `broken`
+   when the after image shows a defect. A defect is clipped or overlapping text,
+   missing content, poor contrast, a scheme mix-up or an unstyled element. Set
+   the `CLUTCH_VISUAL_MODEL` repository variable to use another model.
+3. The script posts one comment with the before and after pictures and the
+   verdicts. A new head edits that comment. The job fails when a pair is
+   unexplained or broken, or has no verdict.
+
+A PR that changes no baseline skips these steps, with no install and no API
+call. A PR that changes a baseline on purpose and says why in its body passes,
+so it can still merge with no person. To clear a block, fix the screen, or say
+what changed and why in the PR body. Then re-run the `agent-review` job.
+
+The job runs the default branch's copy of the script, so a PR cannot change
+the code that judges it. A review of 2 pairs measured $0.006 to $0.008 on
+`claude-haiku-5-5`, most of it the Claude Code prompt, which is cached.
+
 <!-- kickoff: Whether the agent-review job is a required status check on the main branch, and who reviews when the agent finds a blocking problem. -->
 
 ## Finding levels

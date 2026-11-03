@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { excludePattern, quarantined } from '@tools/flaky';
+import { bunTests, excludePattern, quarantined } from '@tools/flaky';
 import type { FlakyTest } from '@tools/flaky';
 
 /**
@@ -140,7 +140,7 @@ export function timingReport(timings: Timings | null, limit = 10): string {
 
 if (import.meta.main) {
   const { budgetSeconds, command: plain, report } = parseArgs(Bun.argv.slice(2));
-  const tests = quarantined(process.cwd());
+  const tests = bunTests(quarantined(process.cwd()));
   const quarantine = withQuarantine(plain, tests);
   if (quarantine !== plain) {
     console.log(
