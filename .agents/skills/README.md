@@ -19,6 +19,8 @@ global skills or other repositories when maintaining this suite.
   failure, rerun a flaky job once, fix real ones, answer findings, stop after 3 rounds.
 - [run-lanes](./run-lanes/SKILL.md): coordinate agent lanes that deliver issues in
   parallel: split by file ownership, brief, reserve ids, merge in a train.
+- [design-proposal](./design-proposal/SKILL.md): show today's screen next to 2 or 3
+  directions in the app, let the owner pick one, build against it, then retire it.
 - [pr-recap](./pr-recap/SKILL.md): on explicit request, explain a PR diff. It adds
   no correctness gate or publication permission.
 - kickoff (when installed): define or resume project setup; use recorded

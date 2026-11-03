@@ -222,6 +222,12 @@ The pass:
    included, and the ones that cost the most or repeat. A fixed friction entry leaves `.clutch/friction.jsonl` in the same
    PR, and the body names it by its `at` time. A fixed flaky test leaves the
    quarantine.
+8. Find the stale design proposals in `docs/design/proposals/`, as
+   `bun tools/check-proposals.ts --stale` lists them. An `adopted` record whose
+   issue is `done` becomes `current`, and its prototype goes. List each
+   `proposed` record older than 14 days in the PR body, as waiting for the
+   owner. See the [design-proposal](../../.agents/skills/design-proposal/SKILL.md)
+   skill.
 
 Many small cleanups cost less than one large rewrite.
 

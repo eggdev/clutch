@@ -201,6 +201,13 @@
         },
         "cache": false
       },
+      "check-proposals": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-proposals.ts"
+        },
+        "cache": false
+      },
       "check-file-size": {
         "executor": "nx:run-commands",
         "options": {
@@ -287,6 +294,7 @@
           "check-vendor-leaks",
           "check-bundle",
           "check-decisions",
+          "check-proposals",
           "check-file-size",
           "check-kickoff-slots",
           "check-primitives",

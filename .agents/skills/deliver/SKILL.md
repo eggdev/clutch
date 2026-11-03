@@ -61,6 +61,11 @@ When a consequential design choice remains open, use the research and design
 procedure to test a usage sketch or prototype before committing to it. A
 settled direction proceeds to implementation without another planning gate.
 
+A new visible feature or a material UI change starts with a
+[design proposal](../design-proposal/SKILL.md), unless an adopted proposal
+already covers it. Build against the adopted proposal's spec, and name it in
+the PR. When the build ships, retire the proposal in the same PR.
+
 ## Verify and finalize
 
 Run verify's mapped proof and the required repository gate. Record criterion,
