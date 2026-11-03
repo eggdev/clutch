@@ -278,7 +278,12 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          count="$(git diff --name-only --no-renames "$BASE_SHA"...HEAD -- ':(glob)**/__screenshots__/*.png' | wc -l | tr -d ' ')"
+          # Fail closed: a diff that cannot run must not read as "no change".
+          if ! changed="$(git diff --name-only --no-renames "$BASE_SHA"...HEAD -- ':(glob)**/__screenshots__/*.png')"; then
+            echo "::error title=Visual review did not run::git diff against the base failed, so the changed screenshots are unknown. Re-run the job."
+            exit 1
+          fi
+          count="$(printf '%s' "$changed" | grep -c . || true)"
           echo "Changed screenshot baselines: $count"
           if [ "$count" != 0 ] && ! git cat-file -e "$BASE_SHA:tools/journeys/visual-review.ts" 2>/dev/null; then
             echo "::notice title=Visual review off::The default branch has no tools/journeys/visual-review.ts yet."

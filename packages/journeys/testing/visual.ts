@@ -50,7 +50,8 @@ export function comparing(env: Record<string, string | undefined> = process.env)
 
 /**
  * The snap names that `tools/flaky-tests.json` quarantines for the journey
- * file `file`. A quarantined shot is still compared and kept, but a change
+ * file `file`. `tools/flaky.ts` owns the registry, but a package may not import
+ * `tools/`, so this reads the same file and the same `file` and `name` fields. A quarantined shot is still compared and kept, but a change
  * warns instead of failing. See docs/contributing/testing.md#flaky-tests.
  */
 function quarantinedSnaps(file: string, root = process.cwd()): Set<string> {

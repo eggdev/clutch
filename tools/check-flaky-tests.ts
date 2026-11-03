@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { quarantined, registryFile } from '@tools/flaky';
+import { journeyFile, quarantined, registryFile } from '@tools/flaky';
 import type { FlakyTest } from '@tools/flaky';
 
 /**
@@ -17,8 +17,6 @@ export const maxDays = 30;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/u;
 const issuePattern = /^CL-\d{3}[a-z]?$/u;
 const bunTest = /\.test\.[cm]?[jt]sx?$/u;
-/** A web journey, whose `snap` names may be quarantined too. */
-const journey = /(?:^|\/)journeys\/[^/]+\.pw\.ts$/u;
 
 /** The `status:` of an issue file, or null when the file or the field is missing. */
 function issueStatus(root: string, issue: string): string | null {
@@ -52,7 +50,7 @@ function entryProblems(root: string, entry: FlakyTest, today: string): Array<str
     ];
   }
   const problems: Array<string> = [];
-  if (!bunTest.test(entry.file) && !journey.test(entry.file)) {
+  if (!bunTest.test(entry.file) && !journeyFile.test(entry.file)) {
     problems.push(
       `${where}: only bun test files and journey screenshots can be quarantined. Fix the test, or file an issue.`,
     );
