@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { blankFences } from '@tools/docs-files';
@@ -98,19 +98,27 @@ export async function checkManagedLinks(root: string): Promise<Array<string>> {
   return findProblems(list, tracked, (file) => readFileSync(path.join(root, file), 'utf-8'));
 }
 
+/** The notice that a project prints. `clutch.files.yaml` is Clutch's own file, and sync never delivers it. */
+export const clutchOnlyNotice =
+  'check-managed-links runs in Clutch only: this checkout has no clutch.files.yaml, so the check is skipped.';
+
 if (import.meta.main) {
-  const problems = await checkManagedLinks(process.cwd());
-  if (problems.length) {
-    console.error(
-      [
-        `Managed link check failed (${problems.length}).`,
-        'A managed file replaces the copy in each project, so its links must resolve there.',
-        '',
-        ...problems,
-      ].join('\n'),
-    );
-    process.exitCode = 1;
+  if (existsSync(path.join(process.cwd(), 'clutch.files.yaml'))) {
+    const problems = await checkManagedLinks(process.cwd());
+    if (problems.length) {
+      console.error(
+        [
+          `Managed link check failed (${problems.length}).`,
+          'A managed file replaces the copy in each project, so its links must resolve there.',
+          '',
+          ...problems,
+        ].join('\n'),
+      );
+      process.exitCode = 1;
+    } else {
+      console.log('Managed files link only to paths that a project gets.');
+    }
   } else {
-    console.log('Managed files link only to paths that a project gets.');
+    console.log(clutchOnlyNotice);
   }
 }

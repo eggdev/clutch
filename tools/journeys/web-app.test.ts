@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 
+import { devApps } from '@tools/dev';
 import { webAppOf } from '@tools/journeys/web-app';
 import { inRepo } from '@tools/testing/in-repo';
 
@@ -23,7 +24,12 @@ test('the one app under apps/ with a web entry is the web app, and servers and n
       'apps/app/package.json': app(['type:app']),
       'apps/mailbox/package.json': app([], false),
     },
-    (folder) => expect(webAppOf(folder)).toMatchObject({ folder: 'apps/app', name: 'app.shop' }),
+    (folder) => {
+      // The dev name comes from the naming rule in tools/dev.ts, and a project's copy of that rule
+      // can differ. This test checks which app is chosen, so it reads the name from devApps.
+      const expected = devApps(folder).find((item) => item.folder === 'apps/app');
+      expect(webAppOf(folder)).toMatchObject({ folder: 'apps/app', name: expected?.name });
+    },
   );
 });
 

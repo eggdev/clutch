@@ -213,7 +213,7 @@ the run judges at the step below the configured one: `medium` acts as `low`,
 and `low` acts as `bots`. The verdict names the rate and the step. The brake
 lifts by itself when the rate falls back to 2% or less. The limits are `brake`
 in `tools/github/auto-merge-rules.ts`, and they come from
-[decision 0002](../../../../docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
+[decision 0002](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
 Revert PRs merge at every step, so the brake does not hold them. When the count
 fails, the run uses the configured step and logs a warning. A person still
 tightens a path from its `risk-tighten` issue.
