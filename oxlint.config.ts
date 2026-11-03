@@ -92,6 +92,7 @@ export default defineConfig({
     { name: 'repo-gates', specifier: './tools/lint/gate-policy.mjs' },
     { name: 'repo-effect', specifier: './tools/lint/effect-policy.mjs' },
     { name: 'repo-tests', specifier: './tools/lint/test-policy.mjs' },
+    { name: 'repo-components', specifier: './tools/lint/component-policy.mjs' },
   ],
   rules: {
     // Function declarations read as the module's API and hoist. Arrow
@@ -166,6 +167,11 @@ export default defineConfig({
     'repo-classes/speed-tokens-only': 'error',
     'repo-classes/no-transition-all': 'error',
     'repo-classes/no-dark-variant': 'error',
+
+    // Product code renders the design system's components, not the raw
+    // elements that they wrap. The design system and tests are exempt. See
+    // docs/contributing/setup/lint-rules.md#design-system-components.
+    'repo-components/design-system-only': 'error',
   },
   overrides: [
     {
@@ -222,9 +228,10 @@ export default defineConfig({
       },
     },
     {
-      // The design system's Button is the one place that renders `<button>`.
-      // It forwards `type` and defaults it to `button`. The rule cannot read a
-      // forwarded value, and each caller still passes a literal.
+      // The design system's Button is the one place that renders `<button>`
+      // (`repo-components/design-system-only`). It forwards `type` and
+      // defaults it to `button`. The rule cannot read a forwarded value, and
+      // each caller still passes a literal.
       files: ['**/packages/design-system/ui/button.tsx'],
       plugins: react.plugins,
       rules: { 'react/button-has-type': 'off' },
@@ -302,6 +309,7 @@ export default defineConfig({
         'tools/lint/gate-policy.mjs',
         'tools/lint/effect-policy.mjs',
         'tools/lint/test-policy.mjs',
+        'tools/lint/component-policy.mjs',
       ],
       rules: { 'import/no-default-export': 'off' },
     },

@@ -77,6 +77,59 @@ Brackets in a variant select an element and stay allowed, such as
 `data-[state=open]:` and `[&>svg]:`. A duration reads its token through the
 variable shorthand: `duration-(--speed-quick)`.
 
+## Design-system components
+
+Product code renders the design system's components, not the raw platform
+elements that they wrap. A raw `<button>` misses the focus ring, the touch
+target and the tokens that `Button` carries, and each copy drifts on its own.
+The `repo-components` oxlint plugin,
+[`tools/lint/component-policy.mjs`](../../../tools/lint/component-policy.mjs),
+enforces it. Sentry's `preferPrimitives` and Twenty's `no-twenty-ui-override`
+do the same job.
+
+| Rule                 | Rejects                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `design-system-only` | A raw element that `packages/design-system/ui/` exports a component for, outside of it |
+
+`wrapped` in the plugin is the one list. It maps each raw element to the
+components that replace it, best first:
+
+| Raw element                                                                 | Component                                                       |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `<button>`, and `Pressable` and the `Touchable*` family from `react-native` | `Button`, else `IconButton`                                     |
+| `<input>`, and `TextInput` from `react-native`                              | `TextField`, `Input` or `TextInput`, by `type` where one exists |
+| `<textarea>`, `<select>`, `<a>`                                             | `Textarea`, `NativeSelect` or `Select`, `Link`                  |
+| `Switch` and `Text` from `react-native`                                     | `Switch`, `Text`                                                |
+
+The rule reads the design system's exports at lint time. A raw element fails
+only when one of its components exists, and the message names that component
+and its import path. So the template, whose design system has `Button` and
+`TextField`, rejects `<button>` and `<input>`. A project with a `Text`
+component rejects `Text` from `react-native` too. Layout elements such as
+`View`, `ScrollView` and `<div>` pass. The design system itself, test files
+and `testing/` folders are exempt.
+
+A product need that no component covers is a change to the design system: add
+a variant or a component there, then use it. The notes row edits its title in
+place with `TextField variant="inline"`, for example.
+
+### Ratchet a rule
+
+A project that turns this rule on with old call sites ratchets them, as
+[decision 0001](../decisions/0001-allow-shrink-only-ratchets.md) allows. The
+rule skips each file that the `design-system-only` ratchet in
+`.clutch/ratchets.json` counts, and `clutch ratchet check` counts those files
+with [`tools/lint/lint-counts.ts`](../../../tools/lint/lint-counts.ts). That
+script runs oxlint with `REPO_LINT_ALL=1`, so the skip is off, and prints
+`path:count` for one rule. A count may only go down. A file whose count reaches
+0 leaves the ratchet at `clutch ratchet update`, and the rule covers it again.
+
+```sh
+mise exec -- bun run clutch ratchet add design-system-only \
+  --command 'bun tools/lint/lint-counts.ts repo-components/design-system-only' \
+  --files '{apps,features,packages}/**/*.tsx'
+```
+
 ## Feature gates
 
 The `repo-gates` oxlint plugin,
