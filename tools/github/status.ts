@@ -4,6 +4,7 @@ import { ownerFindings } from '@tools/github/auto-merge';
 import { marker } from '@tools/github/auto-merge-rules';
 import { must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
+import { ownerCount, reviews } from '@tools/github/owner-reviews';
 import type { Run } from '@tools/github/stack';
 
 type State = 'pass' | 'fail' | 'pending' | 'skipped';
@@ -18,6 +19,7 @@ type Rollup = {
   state?: string;
   detailsUrl?: string;
   targetUrl?: string;
+  startedAt?: string;
 };
 
 const failed = new Set([
@@ -52,7 +54,7 @@ const plain = (body: string) => body.replaceAll(/[*`]/gu, '');
 /**
  * The blocking count in an agent review comment. The agent words it in several
  * ways: "Blocking findings: 0", "Blocking: 0", "Findings: 1 (0 blocking)",
- * "0 blocking" or "No `blocking` findings".
+ * "0 blocking", "No `blocking` findings" or "Findings (2, all `note`; none blocking)".
  */
 export function blockingCount(body: string) {
   const text = plain(body);
@@ -64,11 +66,11 @@ export function blockingCount(body: string) {
   if (match) {
     return Number(match[1]);
   }
-  // Only when no count is written: "No blocking findings" or "No findings".
-  return /\bno (?:blocking )?findings\b/iu.test(text) ? 0 : null;
+  // Only when no count is written: "No blocking findings", "No findings" or "none blocking".
+  return /\bno (?:blocking )?findings\b|\bnone blocking\b/iu.test(text) ? 0 : null;
 }
 
-type Comment = { body: string; login: string };
+type Comment = { body: string; login: string; createdAt?: string };
 
 /** The comments on a PR, oldest first. */
 async function comments(run: Run, number: string): Promise<Array<Comment>> {
@@ -78,7 +80,7 @@ async function comments(run: Run, number: string): Promise<Array<Comment>> {
     '--paginate',
     `repos/{owner}/{repo}/issues/${number}/comments?per_page=100`,
     '--jq',
-    '.[] | {body, login: .user.login}',
+    '.[] | {body, login: .user.login, createdAt: .created_at}',
   ]);
   return out
     .split('\n')
@@ -86,11 +88,36 @@ async function comments(run: Run, number: string): Promise<Array<Comment>> {
     .map((line) => JSON.parse(line) as Comment);
 }
 
+/** Whether a note was posted after the run that started at `started`. Without either time, it counts. */
+const postedInRun = (note: Comment, started?: string) =>
+  started === undefined || note.createdAt === undefined || note.createdAt >= started;
+
 /** The bot's latest agent review summary among `posted`, or undefined. */
 function latestReview(posted: Array<Comment>) {
   return posted
     .filter((note) => note.login.endsWith('[bot]'))
     .findLast((note) => note.body.trimStart().startsWith('## Agent review'));
+}
+
+/**
+ * The summary of this head's agent-review run, or undefined. With no credential the
+ * run posts none, so an earlier head's summary is not this head's.
+ */
+function thisRunsReview(posted: Array<Comment>, started?: string) {
+  const latest = latestReview(posted);
+  return latest && postedInRun(latest, started) ? latest : undefined;
+}
+
+/**
+ * The blocking count of the head. The agent-review job fails on any blocking finding,
+ * so a passed check has none, and the summary gives the count only when the check did
+ * not pass. No summary means the review did not run, so the count stays unknown.
+ */
+function blockingOf(review: Comment | undefined, agent: Check | undefined): number | null {
+  if (review === undefined) {
+    return null;
+  }
+  return agent?.state === 'pass' ? 0 : blockingCount(review.body);
 }
 
 const root = path.resolve(import.meta.dir, '../..');
@@ -134,27 +161,6 @@ export async function ownerLogin(): Promise<string | undefined> {
   }
   const codeowners = Bun.file(path.join(root, '.github/CODEOWNERS'));
   return (await codeowners.exists()) ? codeownersDefault(await codeowners.text()) : undefined;
-}
-
-type Review = { login: string; state: string; commit: string };
-
-/**
- * The reviews on PR `number`, oldest first. The REST list gives each review's
- * commit: `gh pr view --json latestReviews` leaves it empty.
- */
-async function reviews(run: Run, number: string): Promise<Array<Review>> {
-  const out = await must(run, [
-    'gh',
-    'api',
-    '--paginate',
-    `repos/{owner}/{repo}/pulls/${number}/reviews?per_page=100`,
-    '--jq',
-    '.[] | {login: .user.login, state, commit: .commit_id}',
-  ]);
-  return out
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as Review);
 }
 
 /**
@@ -230,13 +236,19 @@ export async function prStatus(run: Run, number: string) {
   // Only a bot posts the review and the dry run. A person's comment that quotes one does not count.
   const posted = await comments(run, number);
   const notes = posted.filter((note) => note.login.endsWith('[bot]'));
-  const reviewComment = latestReview(posted);
+  const agentRun = (pr.statusCheckRollup ?? []).find(
+    (item) => (item.name ?? item.context) === 'agent-review',
+  );
+  const reviewComment = thisRunsReview(posted, agentRun?.startedAt);
   const dryRun = notes.findLast((note) => note.body.includes(marker(pr.headRefOid)));
   const count = (state: State) => all.filter((check) => check.state === state).length;
-  const blocking = reviewComment ? blockingCount(reviewComment.body) : null;
-  // The owner findings are the annotations of the latest agent-review run on the head, as auto-merge reads them.
+  const blocking = blockingOf(
+    reviewComment,
+    all.find((check) => check.name === 'agent-review'),
+  );
+  // The annotations of the latest agent-review run on the head decide whether an owner finding exists, as auto-merge reads them.
   const findings = await ownerFindings(run, '{owner}/{repo}', pr.headRefOid);
-  const owner = findings.length;
+  const owner = await ownerCount(run, number, pr.headRefOid, findings.length);
   // A repository without agent review has no review to wait for.
   const reviewed =
     blocking === 0 || (blocking === null && !all.some((check) => check.name === 'agent-review'));
