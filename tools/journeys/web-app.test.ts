@@ -1,10 +1,11 @@
 import { expect, test } from 'bun:test';
 
-import { devApps } from '@tools/dev';
 import { webAppOf } from '@tools/journeys/web-app';
 import { inRepo } from '@tools/testing/in-repo';
 
-const root = JSON.stringify({ name: 'shop' });
+/** The fixture's project name. The dev name ends with it: Clutch's rule gives `app.shop`, and a project's rule can give `shop`. */
+const project = 'shop';
+const root = JSON.stringify({ name: project });
 
 /** An app with an Nx `dev` target, and the tags that the check reads. */
 const app = (tags: Array<string> = [], dev = true) =>
@@ -24,12 +25,11 @@ test('the one app under apps/ with a web entry is the web app, and servers and n
       'apps/app/package.json': app(['type:app']),
       'apps/mailbox/package.json': app([], false),
     },
-    (folder) => {
-      // The dev name comes from the naming rule in tools/dev.ts, and a project's copy of that rule
-      // can differ. This test checks which app is chosen, so it reads the name from devApps.
-      const expected = devApps(folder).find((item) => item.folder === 'apps/app');
-      expect(webAppOf(folder)).toMatchObject({ folder: 'apps/app', name: expected?.name });
-    },
+    (folder) =>
+      expect(webAppOf(folder)).toMatchObject({
+        folder: 'apps/app',
+        name: expect.stringMatching(new RegExp(`(^|\\.)${project}$`, 'u')),
+      }),
   );
 });
 
