@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.46.0 (2026-11-03)
+
+### Features
+
+- feat(revert): keep drill reverts out of the brake and metric
+
+### Fixes and maintenance
+
+- fix(auto-merge): retry GitHub errors and re-decide stale PRs
+
 ## 0.45.0 (2026-11-03)
 
 ### Features
