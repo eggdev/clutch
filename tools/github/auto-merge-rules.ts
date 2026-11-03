@@ -62,9 +62,12 @@ export type Facts = {
   tier: string;
   /** Each required check, with the conclusion of its latest run, `pending` or `missing`. */
   checks: Record<string, string>;
+  /** The conclusion of the `clutch / doctor` check on the head, which no ruleset requires: `success`, `pending`, `missing` or a failure. */
+  doctor: string;
   /**
    * Agent review's `owner` findings on the head: the change weakens a check, a
-   * lint rule, a budget or a test. Each one leaves the PR for the owner.
+   * lint rule, a budget or a test. Each one leaves the PR for the owner, except
+   * the findings of a pure Clutch sync, see `approvedUpstream`.
    */
   ownerFindings: Array<string>;
   /** Why a bot PR fails its bot rule: a diff that is more than a version, or a revert that may not merge. Empty for an agent PR. */
@@ -132,6 +135,27 @@ export async function revertProblems(
   return problems;
 }
 
+/**
+ * Whether the PR's owner findings were approved upstream, so they hold nothing.
+ * A pure Clutch sync is the release bot's sync PR whose diff passes the sync
+ * rule, and whose `clutch / doctor` check succeeded on its head. Clutch's
+ * owner already approved the gate changes it carries, so agent review's
+ * findings on them repeat that approval. See decision 0003.
+ */
+function approvedUpstream(facts: Facts) {
+  return (
+    botKind(facts.pr.headRefName) === 'clutch-sync' &&
+    kindProblem(facts.pr) === null &&
+    facts.botProblems.length === 0 &&
+    facts.doctor === 'success'
+  );
+}
+
+/** The owner findings that `approvedUpstream` takes as approved upstream. The verdict lists them. */
+export function upstreamFindings(facts: Facts) {
+  return approvedUpstream(facts) ? facts.ownerFindings : [];
+}
+
 /** The reasons the pull request may not merge without a person at `step`. None means it may. */
 export function blockers(facts: Facts, step: Step): Array<string> {
   const { pr, defaultBranch, checks, mainRed } = facts;
@@ -156,8 +180,10 @@ export function blockers(facts: Facts, step: Step): Array<string> {
       reasons.push(`The required check ${name} is ${conclusion}.`);
     }
   }
-  for (const finding of facts.ownerFindings) {
-    reasons.push(`Agent review asks the owner: ${finding}`);
+  if (!approvedUpstream(facts)) {
+    for (const finding of facts.ownerFindings) {
+      reasons.push(`Agent review asks the owner: ${finding}`);
+    }
   }
   // A revert is how a red main turns green, so the red main does not hold it.
   if (botKind(pr.headRefName) !== 'revert') {
@@ -170,11 +196,19 @@ export function blockers(facts: Facts, step: Step): Array<string> {
   return reasons;
 }
 
-/** The verdict that a run prints: whether the PR would auto-merge at `step`, and the reasons when it would not. */
-export function verdictText(reasons: Array<string>, step: Step) {
-  return reasons.length > 0
-    ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
-    : `Would auto-merge at the step ${step}.`;
+/**
+ * The verdict that a run prints: whether the PR would auto-merge at `step`, the
+ * reasons when it would not, and the owner findings that a pure sync takes as
+ * approved upstream, so that they stay visible.
+ */
+export function verdictText(reasons: Array<string>, step: Step, upstream: Array<string>) {
+  const verdict =
+    reasons.length > 0
+      ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
+      : `Would auto-merge at the step ${step}.`;
+  return upstream.length > 0
+    ? `${verdict}\nOwner findings, approved upstream in Clutch:\n${upstream.map((finding) => `- ${finding}`).join('\n')}`
+    : verdict;
 }
 
 /** Marks the dry-run comment for one head commit, so a rerun does not repeat it. */

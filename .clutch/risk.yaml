@@ -28,6 +28,7 @@ rules:
       - tools/guardrail-files.json
       - tools/codeowners.ts
       - tools/github/auto-merge.ts
+      - tools/github/auto-merge-checks.ts
       - tools/github/auto-merge-rules.ts
       - tools/github/auto-merge-brake.ts
       - tools/github/bot-rule.ts

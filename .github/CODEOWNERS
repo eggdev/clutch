@@ -17,6 +17,7 @@
 /tools/guardrail-files.json @eggdev
 /tools/codeowners.ts @eggdev
 /tools/github/auto-merge.ts @eggdev
+/tools/github/auto-merge-checks.ts @eggdev
 /tools/github/auto-merge-rules.ts @eggdev
 /tools/github/auto-merge-brake.ts @eggdev
 /tools/github/bot-rule.ts @eggdev

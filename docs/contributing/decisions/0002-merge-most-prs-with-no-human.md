@@ -1,6 +1,6 @@
 # 0002: Merge most PRs with no human, and tighten only on evidence
 
-- **Status:** accepted
+- **Status:** amended by [0003](./0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md)
 - **Date:** 2026-11-02
 
 ## Context

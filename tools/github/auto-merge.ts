@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { judgeAtStep } from '@tools/github/auto-merge-brake';
+import { actionsApp, checkConclusions } from '@tools/github/auto-merge-checks';
 import {
   blockers,
   dryRunComment,
@@ -45,6 +46,9 @@ const root = path.resolve(import.meta.dir, '../..');
 /** The check that agent review reports. It joins the required checks of the default branch. */
 const agentReview = 'agent-review';
 
+/** The check that a project's CI runs for Clutch: `clutch doctor --check`. No ruleset requires it, so the rule reads it. */
+const doctorCheck = 'clutch / doctor';
+
 async function must(run: Run, command: Array<string>) {
   const result = await run(command);
   if (!result.ok) {
@@ -83,51 +87,6 @@ async function requiredChecks(run: Run, repo: string, branch: string) {
     '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]',
   );
   return [...new Set([...(JSON.parse(out) as Array<string>), agentReview])];
-}
-
-/** The app that runs the workflows, and so reports each required check. */
-const actionsApp = 'github-actions';
-
-/**
- * The conclusion of the latest run of each check in `names` on commit `sha`,
- * counting only runs that the GitHub Actions app reported.
- */
-async function checkConclusions(run: Run, repo: string, sha: string, names: Array<string>) {
-  const out = await gh(
-    run,
-    'api',
-    '--paginate',
-    `repos/${repo}/commits/${sha}/check-runs?per_page=100`,
-    '--jq',
-    '.check_runs[] | {id, name, status, conclusion, app: .app.slug}',
-  );
-  const latest = new Map<string, { id: number; status: string; conclusion: string | null }>();
-  for (const line of out.split('\n').filter(Boolean)) {
-    const runInfo = JSON.parse(line) as {
-      id: number;
-      name: string;
-      status: string;
-      conclusion: string | null;
-      app: string | null;
-    };
-    // Only the GitHub Actions app reports the required checks. A run with the
-    // same name from another app, or from a token with checks: write, is no proof.
-    if (runInfo.app !== actionsApp) {
-      continue;
-    }
-    if ((latest.get(runInfo.name)?.id ?? -1) < runInfo.id) {
-      latest.set(runInfo.name, runInfo);
-    }
-  }
-  return Object.fromEntries(
-    names.map((name) => {
-      const found = latest.get(name);
-      if (!found) {
-        return [name, 'missing'];
-      }
-      return [name, found.status === 'completed' ? (found.conclusion ?? 'pending') : 'pending'];
-    }),
-  );
 }
 
 /** The title of the annotation that agent review writes for an `owner` finding. */
@@ -304,11 +263,14 @@ export async function runAutoMerge(
   } else if (bot === 'revert') {
     botProblems = await revertProblems(pr.headRefName, tier, (n) => autoMerged(run, repo, n));
   }
+  const conclusions = await checkConclusions(run, repo, pr.headRefOid, [...names, doctorCheck]);
+  const { [doctorCheck]: doctor, ...checks } = conclusions;
   const facts: Facts = {
     pr,
     defaultBranch,
     tier,
-    checks: await checkConclusions(run, repo, pr.headRefOid, names),
+    checks,
+    doctor,
     ownerFindings: await ownerFindings(run, repo, pr.headRefOid),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
