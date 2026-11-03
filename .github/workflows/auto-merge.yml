@@ -72,6 +72,8 @@ jobs:
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
+          # This job has no checkout, so gh needs the repository named.
+          GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
         run: |
