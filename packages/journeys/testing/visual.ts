@@ -39,9 +39,12 @@ const fix =
 export const shotName = (name: string, width: Width, scheme: Scheme) =>
   `${name}-${width}-${scheme}.png`;
 
-/** Whether this run compares with the baselines: in CI, or when `VISUAL_COMPARE=1`. */
+/**
+ * Whether this run compares with the baselines: on GitHub Actions, or when
+ * `VISUAL_COMPARE=1`. Not on `CI`, which `validate` sets on a laptop too.
+ */
 export function comparing(env: Record<string, string | undefined> = process.env) {
-  return env.VISUAL_COMPARE === '1' || (env.CI !== undefined && env.CI !== '' && env.CI !== '0');
+  return env.VISUAL_COMPARE === '1' || env.GITHUB_ACTIONS === 'true';
 }
 
 type SnapOptions = {

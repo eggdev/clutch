@@ -22,10 +22,10 @@ test('a shot is named by its snap, width and scheme', () => {
   expect(shotName('notes-open', 'desktop', 'dark')).toBe('notes-open-desktop-dark.png');
 });
 
-test('only CI or VISUAL_COMPARE=1 compares with the baselines', () => {
+test('only GitHub Actions or VISUAL_COMPARE=1 compares with the baselines', () => {
   expect(comparing({})).toBe(false);
-  expect(comparing({ CI: '0' })).toBe(false);
-  expect(comparing({ CI: 'true' })).toBe(true);
+  expect(comparing({ CI: '1' })).toBe(false);
+  expect(comparing({ GITHUB_ACTIONS: 'true' })).toBe(true);
   expect(comparing({ VISUAL_COMPARE: '1' })).toBe(true);
 });
 
