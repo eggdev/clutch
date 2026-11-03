@@ -267,7 +267,8 @@ gets this repository's token. `automerge.mode` decides what it does:
   PR that may merge at the step, and comments that the merge is queued. A
   separate `merge` job does that in the `release` environment, which holds the
   bot's key and admits only the default branch. So only a run that CI or agent
-  review completes merges, and the merge is pinned to the judged head commit. GitHub
+  review completes, or a sweep dispatch from the default branch, merges, and the
+  merge is pinned to the judged head commit. GitHub
   merges it with a merge commit once the required checks pass. A merge made with
   the default token starts no workflow, so the bot's token keeps the release
   and CI running on `main`. Each agent PR also gets the dry-run verdict for the
