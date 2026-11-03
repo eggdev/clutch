@@ -1,3 +1,7 @@
+import { isObject, isStringList, unknownKeys } from '@/clutch-config/checks';
+import type { Errors } from '@/clutch-config/checks';
+import { readAutoRevert, readJourneys } from '@/clutch-config/optional-keys';
+
 const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
 const modes = ['sync', 'doctor'] as const;
 const automergeModes = ['off', 'dry-run', 'on'] as const;
@@ -60,9 +64,6 @@ export type ClutchConfig = {
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
 export type ConfigError = { path: string; message: string };
 
-type Errors = Array<ConfigError>;
-type Data = Record<string, unknown>;
-
 const topKeys = [
   'schemaVersion',
   'project',
@@ -83,25 +84,8 @@ const capabilityId = /^[a-z][a-z0-9_]*$/u;
 const issuePattern = /^CL-\d{3}[a-z]?$/u;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/u;
 
-function isObject(value: unknown): value is Data {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function oneOf<T extends string>(values: ReadonlyArray<T>, value: unknown): value is T {
   return typeof value === 'string' && (values as ReadonlyArray<string>).includes(value);
-}
-
-function isStringList(value: unknown): value is Array<string> {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
-}
-
-/** Adds an error for each key of `data` that `allowed` does not name. */
-function unknownKeys(data: Data, allowed: Array<string>, at: string, errors: Errors) {
-  for (const key of Object.keys(data)) {
-    if (!allowed.includes(key)) {
-      errors.push({ path: at ? `${at}.${key}` : key, message: 'Unknown key.' });
-    }
-  }
 }
 
 function isDate(value: unknown) {
@@ -280,23 +264,6 @@ function readFleet(value: unknown, errors: Errors) {
   return errors.length === before ? fleet : undefined;
 }
 
-function readAutoRevert(value: unknown, errors: Errors) {
-  if (!isObject(value)) {
-    errors.push({ path: 'autoRevert', message: 'Expected a map with watch.' });
-    return;
-  }
-  unknownKeys(value, ['watch'], 'autoRevert', errors);
-  const { watch = [] } = value;
-  if (!isStringList(watch) || watch.some((name) => !name.trim())) {
-    errors.push({
-      path: 'autoRevert.watch',
-      message: 'Expected a list of check or job names, such as production.',
-    });
-    return;
-  }
-  return { watch: watch.map((name) => name.trim()) };
-}
-
 function readPr(value: unknown, errors: Errors) {
   if (!isObject(value)) {
     errors.push({ path: 'pr', message: 'Expected a map with branchPrefix.' });
@@ -330,25 +297,6 @@ function readPrSize(value: unknown, errors: Errors) {
   return errors.length === before
     ? { warn: warn as number, exclude: exclude as Array<string> }
     : undefined;
-}
-
-/** `journeys.webApp` is the folder of an app under apps/, such as apps/app. */
-const webAppPattern = /^apps\/[\w.-]+$/u;
-
-function readJourneys(value: unknown, errors: Errors) {
-  if (!isObject(value)) {
-    errors.push({ path: 'journeys', message: 'Expected a map with webApp.' });
-    return;
-  }
-  unknownKeys(value, ['webApp'], 'journeys', errors);
-  if (typeof value.webApp !== 'string' || !webAppPattern.test(value.webApp)) {
-    errors.push({
-      path: 'journeys.webApp',
-      message: 'Expected the folder of an app under apps/, such as apps/app.',
-    });
-    return;
-  }
-  return { webApp: value.webApp };
 }
 
 function readAgentReview(value: unknown, errors: Errors) {
