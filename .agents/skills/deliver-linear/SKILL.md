@@ -117,7 +117,7 @@ claim for fixes, preserving receipts and using the returned generation in the
 dispatch idempotency key. Fresh verification follows each fix; never start a
 second writer beside a live one.
 Pass the reserved generation to every `record` and `finish` call. Reject a
-completion from an older generation instead of releasing a newer worker's slot.
+completion from an older generation instead of releasing a newer worker's lane.
 
 Record ambiguous crashes and reconcile by T3 task ID, branch and PR before
 releasing their claims. A receipt is not a lease. Native T3 requests without

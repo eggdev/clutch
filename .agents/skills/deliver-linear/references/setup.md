@@ -73,13 +73,13 @@ queueing. The helper does not reapply a one-minute wall-clock window after an
 agent startup delay; it rechecks the current issue state and replay receipts.
 
 For a completed worker with review findings, `resume` validates the live issue,
-archives prior receipts and reacquires the repository slot. Use the returned
+archives prior receipts and reacquires its lane. Use the returned
 generation in `clientRequestId`, such as `linear-RUN_ID-GENERATION`, so a new
 fix round is distinct from retrying the same dispatch. If busy, the run remains
 queued for `next` and `reserve`; its resume flag preserves the allowed review
 state. Never use resume to replace a still-working child.
 Every `record` and `finish` carries that generation. Stale worker completions
-cannot overwrite new receipts or release a resumed worker's repository slot.
+cannot overwrite new receipts or release a resumed worker's lane.
 
 ## T3 webhook
 

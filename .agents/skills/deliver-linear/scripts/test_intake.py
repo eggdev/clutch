@@ -128,15 +128,20 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(self.reserve_issue(*third), 'busy')
         self.assertEqual(self.call('show', third[0])['state'], 'queued')
 
-    def test_max_lanes_one_keeps_one_run_per_repository_without_losing_queue(self):
+    def test_repository_slot_serializes_distinct_issues_without_losing_queue(self):
         self.set_max_lanes(1)
-        first, second = self.queue_issue('one'), self.queue_issue('two')
-        self.assertEqual(self.reserve_issue(*first), 'reserved')
-        self.assertEqual(self.reserve_issue(*second), 'busy')
-        self.assertEqual(self.call('show', second[0])['state'], 'queued')
-        self.call('finish', first[0], 'review', '--pr', 'https://example.test/pr/1',
+        first = self.enqueue()['runId']
+        self.assertEqual(self.call('reserve', first, '--issue', self.issue_file)['status'], 'reserved')
+        self.issue['id'] = 'second'
+        self.event['data']['id'] = 'second'
+        self.issue_file = self.save('second.json', self.issue)
+        self.event_file = self.save('second-event.json', self.event)
+        second = self.enqueue('second')['runId']
+        self.assertEqual(self.call('reserve', second, '--issue', self.issue_file)['status'], 'busy')
+        self.assertEqual(self.call('show', second)['state'], 'queued')
+        self.call('finish', first, 'review', '--pr', 'https://example.test/pr/1',
                   '--head', 'sha', '--evidence', '/durable/receipt', '--generation', '0')
-        self.assertEqual(self.reserve_issue(*second), 'reserved')
+        self.assertEqual(self.call('reserve', second, '--issue', self.issue_file)['status'], 'reserved')
 
     def test_finished_or_canceled_runs_free_their_lane(self):
         self.set_max_lanes(1)
