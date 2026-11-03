@@ -203,8 +203,9 @@ It also gives `size/S` (up to 100 changed lines), `size/M` (300), `size/L`
 prints a warning. It never fails.
 
 `--json` adds the color and description of each label, the label prefixes
-that the command owns, and `one-way-door`, which the Labels workflow creates
-so a person can add it. See [labels](../../docs/contributing/review.md#labels).
+that the command owns, and the person labels `one-way-door` and `revert`,
+which the Labels workflow creates so a person can add them. See
+[labels](../../docs/contributing/review.md#labels).
 
 ## Ratchets
 
