@@ -35,9 +35,6 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             clutch.yaml
-            CLAUDE.md
-            AGENTS.md
-            .claude/
           sparse-checkout-cone-mode: false
       # GitHub gives no secrets to a fork PR, and a project may have none. The
       # review then passes with a notice, unless agentReview.missingCredential
@@ -68,21 +65,39 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+      # The PR-head checkout above clears the workspace, so the base's agent instructions are checked out after it, into their own folder.
+      - name: Check out the base branch's agent instructions
+        if: steps.credential.outputs.present == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .base-instructions
+          persist-credentials: false
+          sparse-checkout: |
+            CLAUDE.md
+            AGENTS.md
+            .claude/
+          sparse-checkout-cone-mode: false
       # A PR cannot change the instructions or hooks of its own reviewer. Hooks and settings in .claude/ run inside the review job, so they also come from the base. The reviewer still sees the PR's changes to those files through gh pr diff.
       - name: Use the base branch's agent instructions
         if: steps.credential.outputs.present == 'true'
         run: |
+          if [ ! -d .base-instructions ]; then
+            echo "::error title=Base instructions missing::.base-instructions was not checked out, so the reviewer would run on the PR's own instructions. See docs/contributing/review.md."
+            exit 1
+          fi
           for file in CLAUDE.md AGENTS.md; do
-            if [ -f "base/$file" ]; then
-              cp "base/$file" "./$file"
+            if [ -f ".base-instructions/$file" ]; then
+              cp ".base-instructions/$file" "./$file"
             else
               rm -f "./$file"
             fi
           done
           rm -rf .claude
-          if [ -d base/.claude ]; then
-            cp -R base/.claude .claude
+          if [ -d .base-instructions/.claude ]; then
+            cp -R .base-instructions/.claude .claude
           fi
+          rm -rf .base-instructions
       - name: Review the pull request
         id: review
         if: steps.credential.outputs.present == 'true'
