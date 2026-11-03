@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.47.0 (2026-11-03)
+
+### Features
+
+- feat(sync): name the project pages whose Clutch copy changed
+
 ## 0.46.0 (2026-11-03)
 
 ### Features
