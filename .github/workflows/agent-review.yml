@@ -136,8 +136,10 @@ jobs:
                `mcp__github_inline_comment__create_inline_comment` and
                `confirmed: true`. Start it with the level, `blocking`,
                `owner` or `note`, and name the rule from review.md.
-            4. Post one summary comment with `gh pr comment`. List each
-               finding with its level, or say that you found none.
+            4. Post one summary comment with `gh pr comment`. Its first line
+               must be exactly `## Agent review`, which the status command
+               matches. List each finding with its level, or say that you
+               found none.
             5. Return the number of blocking findings, one line for each
                `owner` finding, and a one-line summary.
 
