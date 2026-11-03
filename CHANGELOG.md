@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.43.0 (2026-11-03)
+
+### Features
+
+- feat(pr): mark the issue done in the PR head before auto-merge
+
 ## 0.42.0 (2026-11-03)
 
 ### Features
