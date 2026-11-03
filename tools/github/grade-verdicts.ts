@@ -152,8 +152,19 @@ async function calibrate(run: Run, date: string, write: Write, retitle: boolean)
   await write(file, issueBody(verdicts));
   const number = await openIssue(run);
   if (number) {
-    const title = retitle ? ['--title', issueTitle(date)] : [];
-    await must(run, ['gh', 'issue', 'edit', String(number), ...title, '--body-file', file]);
+    // REST, not `gh issue edit`, which fails on Projects (classic). `-F body=@file` reads the body from the file.
+    const title = retitle ? ['-f', `title=${issueTitle(date)}`] : [];
+    await must(run, [
+      'gh',
+      'api',
+      '-X',
+      'PATCH',
+      `repos/{owner}/{repo}/issues/${number}`,
+      ...title,
+      '-F',
+      `body=@${file}`,
+      '--silent',
+    ]);
     return number;
   }
   await must(run, ['gh', 'label', 'create', label, '--force', '--color', 'fbca04']);
