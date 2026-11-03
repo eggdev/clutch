@@ -106,7 +106,11 @@ test("the owner's agree with all adds a 👍 to each listed verdict, and keeps t
   expect(calls).toContain(
     "gh issue comment 41 --body Graded on the owner's instruction: 👍 on 2 verdicts, 👎 on 0.",
   );
-  expect(calls.find((call) => call.startsWith('gh issue edit 41'))).not.toContain('--title');
+  const patch = calls.find((call) =>
+    call.startsWith('gh api -X PATCH repos/{owner}/{repo}/issues/41'),
+  );
+  expect(patch).toContain('-F body=@');
+  expect(patch).not.toContain('title=');
   expect(lines[0]).toContain('Calibration issue #41 is up to date.');
 });
 
@@ -127,9 +131,10 @@ test('a comment from anyone but the owner grades nothing', async () => {
 test('calibrate updates the open issue for the week, or opens one with the label', async () => {
   const open = fake();
   expect(await runGradeVerdicts(['calibrate'], open.run, { ...quiet, log: () => {} })).toBe(0);
-  expect(open.calls.find((call) => call.startsWith('gh issue edit 41'))).toContain(
-    '--title Auto-merge calibration: week of 2026-11-02 --body-file',
-  );
+  expect(
+    open.calls.find((call) => call.startsWith('gh api -X PATCH repos/{owner}/{repo}/issues/41')),
+  ).toContain('-f title=Auto-merge calibration: week of 2026-11-02 -F body=@');
+  expect(open.calls.some((call) => call.startsWith('gh issue edit'))).toBe(false);
   const none = fake([
     ['gh issue list', { out: '' }],
     ['gh issue create', { out: 'https://github.com/acme/shop/issues/42\n' }],
