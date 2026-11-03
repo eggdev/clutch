@@ -129,6 +129,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | Days a project may stay behind a Clutch release                                   | `clutch.yaml`, `template.grace_days`                                                                                |
 | A path kept out of a risk tier                                                    | `.clutch/risk.yaml`, a rule's `except`                                                                              |
 | A zizmor finding the owner accepted                                               | `# zizmor: ignore[<audit>]` in the workflow                                                                         |
+| A file whose old lint violations a ratchet holds                                  | `.clutch/ratchets.json`: a ratchet that a lint rule reads, such as `design-system-only`                             |
 | A flaky test kept out of the blocking runs                                        | `tools/flaky-tests.json`, with an issue and an expiry                                                               |
 | A Semgrep false positive                                                          | `nosemgrep: rule-id -- reason` on the line, which `check-suppressions` enforces                                     |
 | A Semgrep rule off for the whole repository                                       | `sast.yml`, `--exclude-rule`                                                                                        |
