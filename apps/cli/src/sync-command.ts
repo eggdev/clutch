@@ -75,6 +75,21 @@ function print(result: SyncResult) {
   }
 }
 
+/** The project pages that Clutch changed since the last sync. A person ports what applies. */
+function printSeedChanges(result: SyncResult) {
+  if (result.seedChangesNote) {
+    console.log(result.seedChangesNote);
+  }
+  if (result.seedChanges.length > 0) {
+    console.log(
+      [
+        'Clutch changed its copy of these project-owned pages. Port what applies:',
+        ...result.seedChanges.map((change) => `  ${change.path}\n    ${change.see}`),
+      ].join('\n'),
+    );
+  }
+}
+
 /** What to do next: after a review-only sync, or within the grace window. */
 function printNext(result: SyncResult, only: string | undefined, grace: Grace | null) {
   if (only === 'review' && result.status === 'synced') {
@@ -148,6 +163,7 @@ export async function syncCommand(
       console.log(JSON.stringify(grace ? { ...result, grace } : result));
     } else {
       print(result);
+      printSeedChanges(result);
       printNext(result, values.only, grace);
     }
     return grace?.within ? 0 : codes[result.status];

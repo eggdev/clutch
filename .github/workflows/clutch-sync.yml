@@ -146,6 +146,19 @@ jobs:
             echo
             echo '</details>'
             echo
+            # Seed pages are the project's own. Sync never edits them, so the reviewer ports what applies.
+            if [ "$(jq '.seedChanges | length' "$RUNNER_TEMP/sync.json")" != 0 ]; then
+              echo '### Project pages that Clutch changed'
+              echo
+              echo "Clutch changed its copy of these pages, which the project owns, so sync left them alone. Port what applies:"
+              echo
+              jq -r '.seedChanges[] | "- `\(.path)`: \(.see)"' "$RUNNER_TEMP/sync.json"
+              echo
+            fi
+            if [ -n "$(jq -r '.seedChangesNote // ""' "$RUNNER_TEMP/sync.json")" ]; then
+              echo "> $(jq -r '.seedChangesNote' "$RUNNER_TEMP/sync.json")"
+              echo
+            fi
             echo 'Opened by the Clutch sync workflow. Auto-merge takes it when the sync rule and the checks pass.'
           } > "$RUNNER_TEMP/sync-body.md"
           git config user.name "github-actions[bot]"

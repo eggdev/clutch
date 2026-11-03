@@ -451,6 +451,7 @@ mise exec -- bun run clutch sync --root ../shop --to v0.2.0
   After that, or across a major version, it exits 2. Drift from the release
   that the project already has exits 2 at once.
 - A sync never commits. Commit the result on a branch, and open a PR.
+- A sync lists the seed pages whose Clutch copy changed since the release in `.clutch/lineage.json`, each with a compare link, so the owner can port what applies. The list is in the text output, in `--json` as `seedChanges`, and in the sync PR body. It never fails a sync or edits a seed page.
 - A managed file that the project edited needs a decision, and nothing changes
   until each one has an answer. In a terminal, sync asks: keep the project
   copy, take the Clutch copy, or show the difference first.

@@ -14,6 +14,8 @@ import type { Change, SyncFile } from '@/sync/engine';
 import { planMerges } from '@/sync/merges';
 import { pinFile, planPinFile } from '@/sync/pin';
 import type { PinAnswer } from '@/sync/pin';
+import { seedChangesSince } from '@/sync/seed-changes';
+import type { SeedChange } from '@/sync/seed-changes';
 import { lineagePath, loadClutchSource } from '@/sync/source';
 import type { ClutchSource } from '@/sync/source';
 
@@ -45,6 +47,10 @@ export type SyncResult = {
   decisions: Array<string>;
   /** package.json values where Clutch's copy won the merge. */
   mergeClashes: Array<{ file: string; key: string }>;
+  /** Project-owned pages whose Clutch copy changed since the last sync. Information only. See sync/seed-changes.ts. */
+  seedChanges: Array<SeedChange>;
+  /** Why seedChanges could not be read, or null. */
+  seedChangesNote: string | null;
 };
 
 /** The last lineage. A project that only has review tooling starts from `.review/tooling.json`. */
@@ -279,6 +285,7 @@ export async function runSync(options: {
   const root = await gitOrThrow(options.root, 'rev-parse', '--show-toplevel');
   const loaded = await loadClutchConfig(root);
   const config = loaded.kind === 'loaded' ? loaded.config : undefined;
+  const repo = config?.template.repo;
   const source = await loadClutchSource(
     options.template,
     options.to ?? (await latestRelease(options.template)),
@@ -308,7 +315,7 @@ export async function runSync(options: {
   );
   const pin = await pinStep(root, source, lineage, scope, answers);
   const next = nextLineage({
-    repo: config?.template.repo,
+    repo,
     source,
     lineage,
     scope,
@@ -330,6 +337,13 @@ export async function runSync(options: {
   if (lineage.legacy) {
     managed.inspected.set(reviewRecord, lineage.legacy.hash);
   }
+  const seeds = await seedChangesSince({
+    root,
+    template: options.template,
+    from: lineage.release,
+    source,
+    repo,
+  });
   const result: SyncResult = {
     schemaVersion: 1,
     status: 'unchanged',
@@ -340,6 +354,8 @@ export async function runSync(options: {
     changes,
     decisions: [...managed.conflicts, ...merges.decisions, ...(pin.decision ? [pinFile] : [])],
     mergeClashes: merges.clashes,
+    seedChanges: seeds.changes,
+    seedChangesNote: seeds.note,
   };
   if (result.decisions.length > 0) {
     return { ...result, status: 'decisions' };
