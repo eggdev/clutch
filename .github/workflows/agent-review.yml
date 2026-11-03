@@ -161,7 +161,8 @@ jobs:
                the diff, raise the same `owner` finding again (inline and in the
                `owner` array). Drop it only when the diff no longer contains the
                cause, and then name it under "Resolved owner findings" in the
-               summary, with the line of the diff that resolves it.
+               summary, quoting its `path:line` from that file, with the line
+               of the diff that resolves it.
             4. For each finding, post one inline comment with
                `mcp__github_inline_comment__create_inline_comment` and
                `confirmed: true`. Start it with the level, `blocking`,
@@ -248,13 +249,13 @@ jobs:
                 --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("## Agent review")) and .created_at >= env.RUN_START) | {created_at, body}' \
                 | jq -rs 'sort_by(.created_at) | last | .body // empty')" || summary=""
             fi
-            # The part of the summary from "Resolved owner findings" on must name each earlier finding by its path. A finding that it does not name is raised again, so a summary with no such section raises all of them.
+            # The part of the summary from "Resolved owner findings" on must quote each earlier finding's path:line. A finding it does not quote is raised again, so a summary with no such section raises all of them.
             resolved="$(printf '%s\n' "$summary" | sed -n '/Resolved owner findings/I,$p')"
             raised=0
             while IFS= read -r line; do
-              path="${line#- }"
-              path="${path%%:*}"
-              if printf '%s' "$resolved" | grep -qF "$path"; then
+              key="$(printf '%s' "${line#- }" | cut -d: -f1,2)"
+              pattern="$(printf '%s' "$key" | sed 's/[][\\.*^$+?(){}|]/\\&/g')"
+              if printf '%s' "$resolved" | grep -qE -- "${pattern}([^0-9]|\$)"; then
                 continue
               fi
               raised=$((raised + 1))
