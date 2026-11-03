@@ -55,4 +55,6 @@ does not require an approval.
 
 **Revisit if:** reverts pass 2% of merged PRs in a 30-day window, or a
 `risk-tighten` issue names the same path twice. Tighten that path, or the
-rule, first.
+rule, first. Auto-merge now steps down by itself when reverts pass 2%, see the
+[revert brake](../../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
+A person still tightens the path from the `risk-tighten` issue.

@@ -2,6 +2,7 @@ import { appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { judgeAtStep } from '@tools/github/auto-merge-brake';
 import {
   blockers,
   dryRunComment,
@@ -14,7 +15,6 @@ import {
   noVerdictYet,
   revertProblems,
   steps,
-  verdictText,
 } from '@tools/github/auto-merge-rules';
 import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rules';
 import { autoMerged } from '@tools/github/auto-revert';
@@ -298,8 +298,8 @@ export async function runAutoMerge(
       await changedFiles(run, repo, values.pr),
       await syncedFiles(run, pr.headRefOid),
     );
-  } else if (bot === 'gardening' && tier !== 'low') {
-    botProblems = [`The gardening PR's risk tier is ${tier}, not low.`];
+  } else if (bot === 'gardening' && !['low', 'medium'].includes(tier)) {
+    botProblems = [`The gardening PR's risk tier is ${tier}, not low or medium.`];
   } else if (bot === 'revert') {
     botProblems = await revertProblems(pr.headRefName, tier, (n) => autoMerged(run, repo, n));
   }
@@ -312,14 +312,13 @@ export async function runAutoMerge(
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
   };
-  const reasons = blockers(facts, step);
-  const verdict = verdictText(reasons, step);
+  const { effective, reasons, verdict } = await judgeAtStep(run, facts, step, log);
   if (mode === 'on' && reasons.length === 0) {
     if (handoff) {
-      await handoff(step);
+      await handoff(effective);
       log(`${verdict}\nHanded the merge to the merge job.`);
     } else {
-      await enableAutoMerge(run, repo, values.pr, pr.headRefOid, step);
+      await enableAutoMerge(run, repo, values.pr, pr.headRefOid, effective);
       log(`${verdict}\nQueued the merge.`);
     }
     return 0;
@@ -328,11 +327,11 @@ export async function runAutoMerge(
     log(verdict);
     return 0;
   }
-  if (lastStepOn(mode, step)) {
-    log(`${verdict}\nNo dry-run comment: the step ${step} is the last.`);
+  if (lastStepOn(mode, effective)) {
+    log(`${verdict}\nNo dry-run comment: the step ${effective} is the last.`);
     return 0;
   }
-  const calibrate = mode === 'on' ? nextStep(step) : step;
+  const calibrate = mode === 'on' ? nextStep(effective) : effective;
   const graded = blockers(facts, calibrate);
   const wait = noVerdictYet(facts);
   if (wait) {

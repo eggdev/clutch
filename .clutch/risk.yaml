@@ -29,6 +29,7 @@ rules:
       - tools/codeowners.ts
       - tools/github/auto-merge.ts
       - tools/github/auto-merge-rules.ts
+      - tools/github/auto-merge-brake.ts
       - tools/github/bot-rule.ts
       - .github/workflows/auto-merge.yml
       - .github/workflows/agent-review.yml
