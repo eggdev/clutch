@@ -16,6 +16,10 @@ draft. It runs the Claude Code GitHub Action with this page as its rules, under 
 4. It returns the number of blocking findings and each `owner` finding to the
    workflow.
 
+The agent reads the full diff from the checkout, not from the API, so a large
+PR is reviewed whole. The job also counts every inline `owner` comment, so a
+short structured answer cannot let a PR through.
+
 The job fails when the agent returns one or more blocking findings. The job
 also fails when the agent returns no result. An `owner` finding passes the
 job, so the owner can still merge the PR. The job writes an "Owner review
