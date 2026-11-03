@@ -159,6 +159,21 @@ test('automerge is optional and takes off, dry-run or on', () => {
   ]);
 });
 
+test('autoRevert is optional and takes a watch list of check or job names', () => {
+  expect(validateClutchConfig(valid).config?.autoRevert).toBeUndefined();
+  expect(validateClutchConfig({ ...valid, autoRevert: {} }).config?.autoRevert).toEqual({
+    watch: [],
+  });
+  expect(
+    validateClutchConfig({ ...valid, autoRevert: { watch: ['production'] } }).config?.autoRevert,
+  ).toEqual({ watch: ['production'] });
+  expect(paths({ ...valid, autoRevert: 'production' })).toEqual(['autoRevert']);
+  expect(paths({ ...valid, autoRevert: { watch: 'production' } })).toEqual(['autoRevert.watch']);
+  expect(paths({ ...valid, autoRevert: { watch: [1] } })).toEqual(['autoRevert.watch']);
+  expect(paths({ ...valid, autoRevert: { watch: ['  '] } })).toEqual(['autoRevert.watch']);
+  expect(paths({ ...valid, autoRevert: { watch: [], when: 'red' } })).toEqual(['autoRevert.when']);
+});
+
 test('pr is optional and takes a branch prefix', () => {
   expect(validateClutchConfig(valid).config?.pr).toBeUndefined();
   expect(validateClutchConfig({ ...valid, pr: { branchPrefix: 'agent/' } }).config?.pr).toEqual({

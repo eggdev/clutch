@@ -1,15 +1,21 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { isRed, latestChecks, requiredChecks } from '@tools/github/main-checks';
+import type { CheckRun } from '@tools/github/main-checks';
 import type { Run } from '@tools/github/stack';
 
 /**
  * When CI fails on the default branch right after a green run, finds the pull
- * request that broke it. When auto-merge merged that PR, this labels it
- * `revert` and starts the Revert workflow, which opens the revert PR. A first
- * failure only reruns the failed jobs, so a flaky test does not revert a PR.
- * A PR that a person merged gets no automatic revert: the person who merged it
- * owns the fix. See https://github.com/eggdev/clutch/blob/main/docs/contributing/operations/rollback.md#auto-revert.
+ * request that broke it. Main is red when a required check is red, and green
+ * when every required check that ran passed, the same as auto-merge and the
+ * red-main metric judge it. `autoRevert.watch` in clutch.yaml adds checks that
+ * count here only, such as a deploy job. A failure of only other checks does
+ * nothing. When auto-merge merged that PR, this labels it `revert` and starts
+ * the Revert workflow, which opens the revert PR. A first failure only reruns
+ * the failed jobs, so a flaky test does not revert a PR. A PR that a person
+ * merged gets no automatic revert: the person who merged it owns the fix. See
+ * docs/contributing/operations/rollback.md#auto-revert.
  */
 const usage =
   'Usage: bun tools/github/auto-revert.ts --sha <head> --branch <default branch> --run-id <id> --attempt <n> [--workflow ci.yml]';
@@ -49,26 +55,71 @@ export async function autoMerged(run: Run, repo: string, pr: string) {
 type CiRun = { headSha: string; conclusion: string; status: string };
 
 /**
- * The conclusion of the last finished push run of CI on the branch before the
- * run for `sha`. A cancelled or skipped run says nothing, so it is passed over.
+ * The last finished push run of CI on the branch before the run for `sha`. A
+ * cancelled or skipped run says nothing, so it is passed over. A run that
+ * failed on a check that is not required still counts, so its own checks decide.
  */
-export function previousConclusion(runs: Array<CiRun>, sha: string) {
+export function previousRun(runs: Array<CiRun>, sha: string) {
   const index = runs.findIndex((ciRun) => ciRun.headSha === sha);
   const before = index === -1 ? [] : runs.slice(index + 1);
-  return (
-    before.find(
-      (ciRun) => ciRun.status === 'completed' && ['success', 'failure'].includes(ciRun.conclusion),
-    )?.conclusion ?? null
+  return before.find(
+    (ciRun) => ciRun.status === 'completed' && ['success', 'failure'].includes(ciRun.conclusion),
   );
+}
+
+/**
+ * Whether every check in `names` that ran on a commit concluded success, and at
+ * least one ran. A skipped check did not run, as GitHub counts a skipped
+ * required check as passing, and a check that is missing never ran.
+ */
+export function isGreen(checks: Map<string, CheckRun>, names: Array<string>) {
+  const ran = names
+    .map((name) => checks.get(name))
+    .filter((check): check is CheckRun => check !== undefined && check.conclusion !== 'skipped');
+  return (
+    ran.length > 0 &&
+    ran.every((check) => check.status === 'completed' && check.conclusion === 'success')
+  );
+}
+
+/**
+ * The `autoRevert.watch` names of the clutch.yaml at `file`: checks that count
+ * as required for auto-revert only. A repository without the file watches none.
+ * The config loader in apps/cli validates the whole file. This reads only this
+ * key, because tools may not import from apps.
+ */
+export async function readWatch(file: string): Promise<Array<string>> {
+  const handle = Bun.file(file);
+  if (!(await handle.exists())) {
+    return [];
+  }
+  const { autoRevert } = (Bun.YAML.parse(await handle.text()) ?? {}) as { autoRevert?: unknown };
+  if (autoRevert === undefined) {
+    return [];
+  }
+  const invalid =
+    'clutch.yaml: autoRevert must be a map with watch, a list of check or job names such as production.';
+  if (typeof autoRevert !== 'object' || autoRevert === null || Array.isArray(autoRevert)) {
+    throw new Error(invalid);
+  }
+  const { watch = [] } = autoRevert as { watch?: unknown };
+  if (!Array.isArray(watch) || watch.some((name) => typeof name !== 'string' || !name.trim())) {
+    throw new Error(invalid);
+  }
+  return watch.map((name: string) => name.trim());
 }
 
 /** Runs the check. Returns the exit code. */
 export async function runAutoRevert(
   args: Array<string>,
   run: Run,
-  options: { log?: (text: string) => void; env?: Record<string, string | undefined> } = {},
+  options: {
+    log?: (text: string) => void;
+    env?: Record<string, string | undefined>;
+    watch?: Array<string>;
+  } = {},
 ): Promise<number> {
-  const { log = console.log } = options;
+  const { log = console.log, watch = [] } = options;
   const env = options.env ?? process.env;
   const { values } = parseArgs({
     args,
@@ -105,10 +156,27 @@ export async function runAutoRevert(
       'headSha,conclusion,status',
     ]),
   ) as Array<CiRun>;
-  const before = previousConclusion(runs, sha);
-  if (before !== 'success') {
+  const names = [...new Set([...(await requiredChecks(run, repo, branch)), ...watch])];
+  const previous = previousRun(runs, sha);
+  const greenBefore =
+    previous !== undefined &&
+    isGreen(await latestChecks(run, repo, branch, previous.headSha), names);
+  if (!greenBefore) {
+    const why = previous
+      ? `its previous run ${previous.headSha.slice(0, 7)} did not pass every required check`
+      : 'there is no earlier run';
+    log(`${branch} was not green before ${sha.slice(0, 7)} (${why}), so no single PR broke it.`);
+    return 0;
+  }
+  const failing = await latestChecks(run, repo, branch, sha);
+  if (!names.some((name) => isRed(failing.get(name)))) {
+    const others = [...failing]
+      .filter(([name, check]) => !names.includes(name) && isRed(check))
+      .map(([name]) => name);
     log(
-      `${branch} was not green before ${sha.slice(0, 7)} (${before ?? 'no run'}), so no single PR broke it.`,
+      others.length > 0
+        ? `Only checks that are not required failed (${others.join(', ')}), so no revert.`
+        : `No required check failed on ${branch} at ${sha.slice(0, 7)}, so no revert.`,
     );
     return 0;
   }
@@ -214,7 +282,8 @@ const spawn: Run = async (command) => {
 
 if (import.meta.main) {
   try {
-    process.exit(await runAutoRevert(process.argv.slice(2), spawn));
+    const watch = await readWatch(path.join(root, 'clutch.yaml'));
+    process.exit(await runAutoRevert(process.argv.slice(2), spawn, { watch }));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

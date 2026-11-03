@@ -1,6 +1,9 @@
 import { expect, test } from 'bun:test';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
-import { previousConclusion, runAutoRevert } from '@tools/github/auto-revert';
+import { isGreen, previousRun, readWatch, runAutoRevert } from '@tools/github/auto-revert';
 import { fake } from '@tools/github/fake-run';
 import type { Result } from '@tools/github/stack';
 
@@ -16,6 +19,7 @@ const args = (attempt: string) => [
   attempt,
 ];
 
+/** The push runs of CI on main, newest first: the red one, a cancelled one, and the one before. */
 const runs = (before: string) => ({
   out: JSON.stringify([
     { headSha: 'red1234', conclusion: 'failure', status: 'completed' },
@@ -24,11 +28,36 @@ const runs = (before: string) => ({
   ]),
 });
 
-/** A merge of #42 that main was green before, with `answers` first. */
+/** A job of a push run, as `[name, conclusion]`. */
+type Job = [string, string];
+
+/**
+ * The jobs of the push run `id` on commit `sha`. Each job gets an id that grows
+ * with its position, as GitHub's job ids do.
+ */
+function commit(sha: string, id: number, jobs: Array<Job>): Array<[string, Partial<Result>]> {
+  const out = jobs
+    .map(([name, conclusion], index) =>
+      JSON.stringify({ id: id * 100 + index, name, status: 'completed', conclusion }),
+    )
+    .join('\n');
+  return [
+    [`gh api --paginate repos/acme/shop/actions/runs?head_sha=${sha}`, { out: `${id}\n` }],
+    [`gh api --paginate repos/acme/shop/actions/runs/${id}/jobs`, { out }],
+  ];
+}
+
+/**
+ * A merge of #42 that main was green before. The required check is `validate`,
+ * and `production` is a job that is not required. `answers` come first.
+ */
 function main(answers: Array<[string, Partial<Result>]> = []) {
   return fake([
     ...answers,
     ['gh run list', runs('success')],
+    ['gh api repos/acme/shop/rules/branches/main', { out: '["validate"]' }],
+    ...commit('red1234', 41, [['validate', 'failure']]),
+    ...commit('old5678', 40, [['validate', 'success']]),
     [
       'gh api repos/acme/shop/commits/red1234 ',
       { out: JSON.stringify({ message: 'Merge pull request #42', parents: ['a', 'b'] }) },
@@ -38,20 +67,48 @@ function main(answers: Array<[string, Partial<Result>]> = []) {
   ]);
 }
 
-async function autoRevert(gh: ReturnType<typeof fake>, attempt = '2') {
+async function autoRevert(gh: ReturnType<typeof fake>, attempt = '2', watch: Array<string> = []) {
   const lines: Array<string> = [];
-  const code = await runAutoRevert(args(attempt), gh.run, { log: (line) => lines.push(line), env });
+  const code = await runAutoRevert(args(attempt), gh.run, {
+    log: (line) => lines.push(line),
+    env,
+    watch,
+  });
   return { code, lines };
 }
 
-test('the run before is the last finished push run, past a cancelled one', () => {
+const reverted = (gh: ReturnType<typeof fake>) =>
+  gh.calls.includes('gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert');
+const reran = (gh: ReturnType<typeof fake>) =>
+  gh.calls.some((call) => call.startsWith('gh run rerun'));
+
+test('the previous run is the last finished push run, past a cancelled one', () => {
   const list = JSON.parse(runs('success').out);
-  expect(previousConclusion(list, 'red1234')).toBe('success');
-  expect(previousConclusion(list, 'old5678')).toBeNull();
-  expect(previousConclusion(list, 'missing')).toBeNull();
+  expect(previousRun(list, 'red1234')?.headSha).toBe('old5678');
+  expect(previousRun(list, 'old5678')).toBeUndefined();
+  expect(previousRun(list, 'missing')).toBeUndefined();
 });
 
-test('a second red run after a green one reverts the auto-merged PR', async () => {
+/** A check run with a status and a conclusion. */
+const check = (conclusion: string | null, status = 'completed') => ({ status, conclusion });
+
+test('green before means every check that ran passed, and a skipped or missing one is aside', () => {
+  expect(
+    isGreen(
+      new Map([
+        ['validate', check('success')],
+        ['commits', check('skipped')],
+      ]),
+      ['validate', 'commits', 'agent-review'],
+    ),
+  ).toBe(true);
+  expect(isGreen(new Map([['validate', check('failure')]]), ['validate'])).toBe(false);
+  expect(isGreen(new Map([['validate', check(null, 'in_progress')]]), ['validate'])).toBe(false);
+  expect(isGreen(new Map([['validate', check('skipped')]]), ['validate'])).toBe(false);
+  expect(isGreen(new Map(), ['validate'])).toBe(false);
+});
+
+test('a required check red after required green reverts the auto-merged PR', async () => {
   const gh = main();
   const { code } = await autoRevert(gh);
   expect(code).toBe(0);
@@ -87,9 +144,7 @@ test('a label create the job may not grant does not stop the revert', async () =
   const gh = main([['gh label create revert', { ok: false, err: 'HTTP 403' }]]);
   const { code, lines } = await autoRevert(gh);
   expect(code).toBe(0);
-  expect(gh.calls).toContain(
-    'gh api --method POST repos/acme/shop/issues/42/labels -f labels[]=revert',
-  );
+  expect(reverted(gh)).toBe(true);
   expect(lines.at(-1)).toContain('Started its revert.');
 });
 
@@ -97,14 +152,73 @@ test('the first red run only reruns the failed jobs, in case a test is flaky', a
   const gh = main();
   await autoRevert(gh, '1');
   expect(gh.calls).toContain('gh run rerun 77 --failed --repo acme/shop');
-  expect(gh.calls.some((call) => call.startsWith('gh api --method POST'))).toBe(false);
+  expect(reverted(gh)).toBe(false);
 });
 
 test('a branch that was red before gets no rerun and no revert', async () => {
-  const gh = main([['gh run list', runs('failure')]]);
+  const gh = main([...commit('old5678', 40, [['validate', 'failure']])]);
   const { lines } = await autoRevert(gh, '1');
   expect(lines[0]).toContain('was not green before');
-  expect(gh.calls.some((call) => call.startsWith('gh run rerun'))).toBe(false);
+  expect(reran(gh)).toBe(false);
+});
+
+test('only a check that is not required failed: no rerun and no revert', async () => {
+  for (const attempt of ['1', '2']) {
+    const gh = main([
+      ...commit('red1234', 41, [
+        ['validate', 'success'],
+        ['production', 'failure'],
+      ]),
+    ]);
+    const { lines } = await autoRevert(gh, attempt);
+    expect(lines).toEqual(['Only checks that are not required failed (production), so no revert.']);
+    expect(reran(gh)).toBe(false);
+    expect(reverted(gh)).toBe(false);
+  }
+});
+
+test('a previous commit where production failed counts as green when the required checks passed', async () => {
+  const gh = main([
+    ['gh run list', runs('failure')],
+    ...commit('old5678', 40, [
+      ['validate', 'success'],
+      ['production', 'failure'],
+    ]),
+  ]);
+  await autoRevert(gh);
+  expect(reverted(gh)).toBe(true);
+});
+
+test('autoRevert.watch makes a failed production job revert', async () => {
+  const gh = main([
+    ...commit('red1234', 41, [
+      ['validate', 'success'],
+      ['production', 'failure'],
+    ]),
+    ...commit('old5678', 40, [
+      ['validate', 'success'],
+      ['production', 'success'],
+    ]),
+  ]);
+  const { lines } = await autoRevert(gh, '2', ['production']);
+  expect(lines[0]).toContain('Started its revert');
+  expect(reverted(gh)).toBe(true);
+});
+
+test('a watched check that failed on the commit before is not green before', async () => {
+  const gh = main([
+    ...commit('red1234', 41, [
+      ['validate', 'success'],
+      ['production', 'failure'],
+    ]),
+    ...commit('old5678', 40, [
+      ['validate', 'success'],
+      ['production', 'failure'],
+    ]),
+  ]);
+  const { lines } = await autoRevert(gh, '2', ['production']);
+  expect(lines[0]).toContain('was not green before');
+  expect(reverted(gh)).toBe(false);
 });
 
 test('a red release commit blames the merge before it', async () => {
@@ -130,6 +244,22 @@ test('a PR that a person merged, or a commit with no PR, is not reverted', async
   expect(unmerged.lines[0]).toContain('is not the merge of a pull request');
   for (const gh of [person, direct]) {
     expect(gh.calls.some((call) => call.startsWith('gh workflow run'))).toBe(false);
+  }
+});
+
+test('the watch list comes from autoRevert in clutch.yaml, and a bad one fails', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'auto-revert-'));
+  const file = path.join(dir, 'clutch.yaml');
+  const base =
+    'schemaVersion: 1\nproject: shop\ntemplate:\n  repo: eggdev/clutch\n  mode: sync\ncapabilities: {}\n';
+  try {
+    expect(await readWatch(file)).toEqual([]);
+    await writeFile(file, `${base}autoRevert:\n  watch: [production]\n`);
+    expect(await readWatch(file)).toEqual(['production']);
+    await writeFile(file, `${base}autoRevert:\n  watch: production\n`);
+    await expect(readWatch(file)).rejects.toThrow('clutch.yaml: autoRevert must be a map');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
 
