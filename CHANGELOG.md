@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.44.1 (2026-11-03)
+
+### Fixes and maintenance
+
+- fix(ci): judge a red main by its required checks in auto-revert
+
 ## 0.44.0 (2026-11-03)
 
 ### Features
