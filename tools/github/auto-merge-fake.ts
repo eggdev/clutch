@@ -23,6 +23,7 @@ export const facts = (fields: Partial<Facts> = {}, pr: Partial<Facts['pr']> = {}
   defaultBranch: 'main',
   tier: 'low',
   checks: { validate: 'success', 'agent-review': 'success' },
+  doctor: 'missing',
   ownerFindings: [],
   botProblems: [],
   mainRed: [],

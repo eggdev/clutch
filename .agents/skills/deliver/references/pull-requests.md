@@ -85,7 +85,9 @@ Two kinds of PR wait for the owner without a GitHub approval rule:
 - A rule with `lines`, such as a workflow's `permissions:` or the `automerge`
   section of `clutch.yaml`. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
-- A PR with an `owner` finding from agent review. Auto-merge holds it.
+- A PR with an `owner` finding from agent review. Auto-merge holds it, except
+  a pure Clutch sync whose findings are approved upstream (see
+  [Auto-merge](#auto-merge)).
 
 Do not merge either kind with `pr merge` until the owner says so. `pr status` counts the `owner` findings and reports such a PR as not ready. `pr merge` refuses it until the owner approves it.
 
@@ -237,8 +239,11 @@ The bot rule:
   `clutch sync` writes: the managed files that its `.clutch/lineage.json`
   lists, the lineage, its changeset, `clutch.yaml`, the merged files such as
   `package.json`, the TypeScript configs and the lockfile. The lockfile rule is
-  the same as Renovate's. The required `clutch / doctor` check proves that the
-  managed files match the release.
+  the same as Renovate's. The `clutch / doctor` check, which the project's CI
+  runs and no ruleset requires, proves that the managed files match the release.
+  When it succeeds on the head, its `owner` findings are approved upstream and
+  hold nothing, as [decision 0003](../../../../docs/contributing/decisions/0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md)
+  records. The verdict still lists them.
 
 At each step, the PR also needs all of these:
 
@@ -250,7 +255,8 @@ At each step, the PR also needs all of these:
   from another app or token counts for nothing.
 - No required check is red on the default branch's latest commit. A red
   `main` stops every auto-merge until it is green again, except a revert PR.
-- Agent review left no `owner` finding on its head. A change that weakens a
+- Agent review left no `owner` finding on its head, unless the PR is a pure
+  Clutch sync, as above. A change that weakens a
   check, a lint rule, a budget or a test gets one, whatever its path. See
   [review](../../../../docs/contributing/review.md#finding-levels). The owner
   merges such a PR.

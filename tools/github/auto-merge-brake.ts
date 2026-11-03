@@ -3,6 +3,7 @@ import {
   brake,
   brakeReason,
   brakedStep,
+  upstreamFindings,
   verdictText,
 } from '@tools/github/auto-merge-rules';
 import type { Facts, Step } from '@tools/github/auto-merge-rules';
@@ -84,6 +85,8 @@ async function judgedStep(run: Run, step: Step, log: (line: string) => void) {
 export async function judgeAtStep(run: Run, facts: Facts, step: Step, log: (line: string) => void) {
   const { effective, note } = await judgedStep(run, step, log);
   const reasons = blockers(facts, effective);
-  const verdict = [note, verdictText(reasons, effective)].filter(Boolean).join('\n');
+  const verdict = [note, verdictText(reasons, effective, upstreamFindings(facts))]
+    .filter(Boolean)
+    .join('\n');
   return { effective, reasons, verdict };
 }
