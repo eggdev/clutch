@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -131,7 +131,8 @@ export async function snap(page: Page, name: string, options: SnapOptions = {}) 
         // Locally every shot is kept to look at. In CI only a changed or a new
         // one, so the artifact holds exactly what `visual pull` should copy.
         let keep = true;
-        if (comparing() && quarantine.has(name)) {
+        // A quarantine covers a flaky diff, not a missing baseline, so a missing one still fails.
+        if (comparing() && quarantine.has(name) && existsSync(info.snapshotPath(file))) {
           try {
             expect(shot).toMatchSnapshot(file, { maxDiffPixelRatio });
             keep = false;

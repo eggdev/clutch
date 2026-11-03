@@ -95,7 +95,8 @@ Each entry names one `bun test` test, or one screenshot of a web journey:
   expiry more than 30 days ahead. A new date needs a new reason in review.
 - A journey entry quarantines one screenshot of a web journey. `snap` still
   compares and uploads that shot, but a change writes a warning on the test
-  instead of failing the `journeys` check. The `bun test` runs ignore it. See
+  instead of failing the `journeys` check. A missing baseline still fails.
+  The `bun test` runs ignore the entry. See
   [screenshots](./setup/verification.md#screenshots).
 - Remove the entry in the PR that fixes the test.
 - The nightly [flake hunt](../../.github/workflows/flake-hunt.yml) runs the
