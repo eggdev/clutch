@@ -436,6 +436,16 @@ mise exec -- bun run clutch sync --root ../shop --to v0.2.0
   Clutch's value win. Install still lets Clutch's value win on a new project.
 - A kept file stays quiet until Clutch changes it again. `.clutch/lineage.json`
   records the Clutch copy that the project declined.
+- `mise.toml` carries the clutch CLI pin. Sync moves only that tool line's
+  version, to the release it syncs to. The rest of the file follows the managed
+  rules, so a release that moves only the pin asks nothing.
+- `docs/contributing/architecture/primitives.yaml` is a merge file. Each folder
+  that sync ships joins the primitive with the same id, so a shipped package has
+  its claim in each project.
+- A managed file links only to paths that a project gets: a managed or merge
+  path, or a seed that install writes. A capability page is linked by its GitHub
+  URL, and `check-managed-links` fails a managed link that a project would not
+  resolve.
 
 ### Sync pull requests
 

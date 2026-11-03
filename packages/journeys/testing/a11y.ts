@@ -7,7 +7,7 @@ import type { Page } from '@playwright/test';
  * `accessible(page, 'where')` after each step that renders a page. It runs axe
  * on the whole page and fails on a `serious` or `critical` violation. It has
  * no way to skip a rule: fix the defect. See
- * docs/contributing/capabilities/a11y-checks.md.
+ * https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/a11y-checks.md.
  */
 
 /** The impacts that fail a journey. axe also reports `minor` and `moderate`. */

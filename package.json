@@ -104,6 +104,13 @@
         },
         "cache": false
       },
+      "check-managed-links": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-managed-links.ts"
+        },
+        "cache": false
+      },
       "check-docs-temporal": {
         "executor": "nx:run-commands",
         "options": {
@@ -268,6 +275,7 @@
         "executor": "nx:noop",
         "dependsOn": [
           "check-docs-file-refs",
+          "check-managed-links",
           "check-docs-temporal",
           "check-suppressions",
           "check-terms",

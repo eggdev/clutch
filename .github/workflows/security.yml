@@ -7,7 +7,7 @@ name: Security
 # files only. The steps after it add its triage note to each new private
 # report, then commit its edits to a security/<date> branch and open one
 # pull request. Nothing here pushes to the default branch or publishes an
-# advisory. See docs/contributing/capabilities/security-agent-loop.md.
+# advisory. See https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/security-agent-loop.md.
 
 on:
   schedule:

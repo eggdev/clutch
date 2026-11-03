@@ -1,17 +1,21 @@
+import { existsSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { parseDocument } from 'yaml';
 
 import { loadClutchConfig } from '@/clutch-config/load';
-import { formatFile, formatText } from '@/format';
+import { formatFile } from '@/format';
 import { gitOrThrow } from '@/git';
-import { mergers } from '@/install-template';
 import { latestRelease } from '@/release';
 import { localFile } from '@/review-source';
 import { apply, plan, writeEntry } from '@/sync/engine';
 import type { Change, SyncFile } from '@/sync/engine';
+import { planMerges } from '@/sync/merges';
+import { pinFile, planPinFile } from '@/sync/pin';
+import type { PinAnswer } from '@/sync/pin';
 import { lineagePath, loadClutchSource } from '@/sync/source';
+import type { ClutchSource } from '@/sync/source';
 
 const reviewRecord = '.review/tooling.json';
 
@@ -92,68 +96,6 @@ function settle(
   return nextKept;
 }
 
-/** A stable hash of one JSON value, so a kept value is asked again only when Clutch changes it. */
-const valueHash = (value: unknown) =>
-  new Bun.CryptoHasher('sha256').update(JSON.stringify(value)).digest('hex');
-
-/**
- * Plans the merge files. Where the project and Clutch set different values, each
- * clash is a decision named `<file>#<key path>`. `take` lets Clutch's value win.
- * `keep`, or a value kept before that Clutch has not changed, keeps the project's.
- */
-async function planMerges(
-  root: string,
-  merge: Map<string, SyncFile>,
-  answers: { keep: Array<string>; take: Array<string> },
-  kept: Record<string, string>,
-) {
-  const writes = new Map<string, string>();
-  const changes: Array<Change> = [];
-  const clashes: SyncResult['mergeClashes'] = [];
-  const inspected = new Map<string, string | null>();
-  const decisions: Array<string> = [];
-  const asked = new Set<string>();
-  const nextKept: Record<string, string> = {};
-  for (const [file, theirs] of merge) {
-    const mine = await localFile(root, file);
-    inspected.set(file, mine?.hash ?? null);
-    const template = theirs.content.toString();
-    const fn = mergers[path.basename(file)];
-    const own = mine?.content.toString().trimEnd() ?? '';
-    const keepPaths = new Set<string>();
-    for (const clash of mine ? fn(own, template).conflicts : []) {
-      const id = `${file}#${clash.path}`;
-      asked.add(id);
-      if (answers.take.includes(id)) {
-        continue;
-      }
-      if (answers.keep.includes(id) || kept[id] === valueHash(clash.template)) {
-        keepPaths.add(clash.path);
-        nextKept[id] = valueHash(clash.template);
-      } else {
-        decisions.push(id);
-      }
-    }
-    const merged = mine
-      ? fn(own, template, (key) => keepPaths.has(key))
-      : { content: template, conflicts: [] };
-    const content = file.endsWith('.json')
-      ? await formatText(root, file, merged.content)
-      : merged.content;
-    clashes.push(...merged.conflicts.map((conflict) => ({ file, key: conflict.path })));
-    if (content !== mine?.content.toString()) {
-      writes.set(file, content);
-      changes.push({ path: file, action: mine ? 'update' : 'add' });
-    }
-  }
-  for (const id of [...answers.keep, ...answers.take].filter((answer) => answer.includes('#'))) {
-    if (!asked.has(id)) {
-      throw new Error(`${id} needs no decision. Pass --keep or --take only for what sync lists.`);
-    }
-  }
-  return { writes, changes, clashes, inspected, decisions, kept: nextKept };
-}
-
 /** `clutch.yaml` without the pin that an older copy has, or nothing when it has none. */
 async function unpinnedConfig(root: string) {
   const config = await localFile(root, 'clutch.yaml');
@@ -185,6 +127,7 @@ function nextLineage(input: {
   lineage: Awaited<ReturnType<typeof readLineage>>;
   scope: Array<string> | null;
   kept: Record<string, string>;
+  pinHash: string | undefined;
 }): Lineage {
   const { source, lineage, scope } = input;
   const next: Lineage = {
@@ -195,6 +138,7 @@ function nextLineage(input: {
     files: {
       ...outside(lineage.files, scope),
       ...Object.fromEntries([...source.managed.files].map(([file, entry]) => [file, entry.hash])),
+      ...(input.pinHash ? { [pinFile]: input.pinHash } : {}),
     },
   };
   const kept = { ...outside(lineage.kept, scope), ...input.kept };
@@ -223,13 +167,14 @@ function recordChanges(
   return changes;
 }
 
-/** Writes the merged files, the lineage and clutch.yaml without its old pin, after the engine wrote the managed files. */
+/** Writes the merged files, the pin, the lineage and clutch.yaml without its old pin, after the engine wrote the managed files. */
 async function writeRest(
   root: string,
   merged: Map<string, string>,
   lineageText: string,
   unpinned: string | null,
   legacy: boolean,
+  pinText: string | null,
 ) {
   for (const [file, content] of merged) {
     // A fresh project may not have the folder yet, such as .codex/.
@@ -238,6 +183,9 @@ async function writeRest(
     if (file.endsWith('.json')) {
       await formatFile(root, file);
     }
+  }
+  if (pinText !== null) {
+    await writeFile(path.join(root, pinFile), pinText);
   }
   await writeEntry(root, lineagePath, {
     mode: '100644',
@@ -250,6 +198,67 @@ async function writeRest(
   if (legacy) {
     await unlink(path.join(root, reviewRecord));
   }
+}
+
+/** The owner's answer for the pin, if any. */
+function pinAnswer(answers: { keep: Array<string>; take: Array<string> }): PinAnswer {
+  if (answers.keep.includes(pinFile)) {
+    return 'keep';
+  }
+  return answers.take.includes(pinFile) ? 'take' : undefined;
+}
+
+/** The pin's part of a sync: its plan, and the text to write when the file changes. */
+async function pinStep(
+  root: string,
+  source: ClutchSource,
+  lineage: Awaited<ReturnType<typeof readLineage>>,
+  scope: Array<string> | null,
+  answers: { keep: Array<string>; take: Array<string> },
+) {
+  const answer = pinAnswer(answers);
+  const pin = scope
+    ? null
+    : await planPinFile(root, {
+        template: source.pin,
+        release: source.release,
+        recorded: lineage.files[pinFile],
+        kept: lineage.kept[pinFile],
+        answer,
+      });
+  const answered = [...answers.keep, ...answers.take].includes(pinFile);
+  if (answered && !pin?.plan.asked) {
+    throw new Error(
+      `${pinFile} needs no decision. Pass --keep or --take only for the files that sync lists.`,
+    );
+  }
+  const content = pin?.plan.content ?? null;
+  const changed = content !== null && content !== (pin?.file?.content.toString() ?? null);
+  return {
+    planned: pin !== null,
+    file: pin?.file ?? null,
+    text: changed ? content : null,
+    changed,
+    decision: pin?.plan.decision === true,
+    kept: pin?.plan.kept,
+    hash: pin?.plan.hash ?? lineage.files[pinFile],
+  };
+}
+
+/** A folder counts when the project has it, or when this sync writes a file in it. */
+const deliveredFolder = (root: string, source: ClutchSource) => (folder: string) =>
+  existsSync(path.join(root, folder)) ||
+  [...source.managed.files.keys()].some((file) => file.startsWith(folder));
+
+/** The lineage entries that the managed plan records. The pin is planned apart, so its entry is not in the plan. */
+function managedRecord(
+  lineage: Awaited<ReturnType<typeof readLineage>>,
+  scope: Array<string> | null,
+) {
+  const record = scope
+    ? Object.fromEntries(Object.entries(lineage.files).filter(([file]) => under(scope, file)))
+    : lineage.files;
+  return Object.fromEntries(Object.entries(record).filter(([file]) => file !== pinFile));
 }
 
 /**
@@ -278,34 +287,44 @@ export async function runSync(options: {
   const lineage = await readLineage(root);
   // A scoped sync plans only its own files, and keeps the lineage of the rest.
   const scope = options.only ? source.managed.roots : null;
-  const record = scope
-    ? Object.fromEntries(Object.entries(lineage.files).filter(([file]) => under(scope, file)))
-    : lineage.files;
+  const answers = { keep: options.keep ?? [], take: options.take ?? [] };
   const managed = await plan(
     root,
     source.managed,
-    { files: record },
+    { files: managedRecord(lineage, scope) },
     lineagePath,
     lineage.previous,
   );
   const kept = settle(managed, source.managed.files, lineage.kept, {
-    keep: options.keep ?? [],
-    take: options.take ?? [],
+    keep: answers.keep.filter((file) => file !== pinFile),
+    take: answers.take.filter((file) => file !== pinFile),
   });
-  const answers = { keep: options.keep ?? [], take: options.take ?? [] };
-  const merges = await planMerges(root, source.merge, answers, lineage.kept);
+  const merges = await planMerges(
+    root,
+    source.merge,
+    answers,
+    lineage.kept,
+    deliveredFolder(root, source),
+  );
+  const pin = await pinStep(root, source, lineage, scope, answers);
   const next = nextLineage({
     repo: config?.template.repo,
     source,
     lineage,
     scope,
-    kept: { ...kept, ...merges.kept },
+    kept: {
+      ...kept,
+      ...merges.kept,
+      ...(pin.kept === undefined ? {} : { [pinFile]: pin.kept }),
+    },
+    pinHash: pin.hash,
   });
   const lineageText = `${JSON.stringify(next, null, 2)}\n`;
   const unpinned = scope ? null : await unpinnedConfig(root);
   const changes = [
     ...managed.changes,
     ...merges.changes,
+    ...(pin.changed ? [{ path: pinFile, action: pin.file ? 'update' : 'add' } as const] : []),
     ...recordChanges(lineage, lineageText, unpinned),
   ];
   if (lineage.legacy) {
@@ -319,7 +338,7 @@ export async function runSync(options: {
     latest: options.to === undefined,
     from: lineage.release,
     changes,
-    decisions: [...managed.conflicts, ...merges.decisions],
+    decisions: [...managed.conflicts, ...merges.decisions, ...(pin.decision ? [pinFile] : [])],
     mergeClashes: merges.clashes,
   };
   if (result.decisions.length > 0) {
@@ -334,7 +353,10 @@ export async function runSync(options: {
   for (const [file, hash] of merges.inspected) {
     managed.inspected.set(file, hash);
   }
+  if (pin.planned) {
+    managed.inspected.set(pinFile, pin.file?.hash ?? null);
+  }
   await apply(root, source.managed, managed, lineagePath);
-  await writeRest(root, merges.writes, lineageText, unpinned, lineage.legacy !== null);
+  await writeRest(root, merges.writes, lineageText, unpinned, lineage.legacy !== null, pin.text);
   return { ...result, status: 'synced' };
 }

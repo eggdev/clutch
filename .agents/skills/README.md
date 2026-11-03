@@ -12,7 +12,8 @@ global skills or other repositories when maintaining this suite.
   then apply its status and review gates around deliver.
 - [setup-verification](./setup-verification/SKILL.md): create or maintain the one
   committed verify executor and its journeys. This is the only authoring entry point.
-- [verify](./verify/SKILL.md): execute this project's existing proof and cleanup.
+- verify: execute this project's existing proof and cleanup. The project generates
+  `.agents/skills/verify/SKILL.md`, so sync does not ship it.
 - [audit-codebase](./audit-codebase/SKILL.md): investigate code risks and report findings.
 - [babysit-pr](./babysit-pr/SKILL.md): drive one open PR to green: classify each
   failure, rerun a flaky job once, fix real ones, answer findings, stop after 3 rounds.

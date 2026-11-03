@@ -54,6 +54,13 @@
       "entry": ["models/*.ts", "**/*.test.{ts,tsx}"],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },
+    "packages/journeys": {
+      // The accessibility helper that a web journey imports. A project with no
+      // web journey has no caller for it yet, so this entry keeps knip from
+      // flagging it. The journey generator's template imports it.
+      "entry": ["testing/a11y.ts"],
+      "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+    },
     "{apps,features,packages}/*": {
       // Bun test runs every test file.
       "entry": ["**/*.test.{ts,tsx}"],
