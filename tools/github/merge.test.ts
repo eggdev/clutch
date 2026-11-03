@@ -50,14 +50,20 @@ function mergingWithFinding(headSha: string, reviews: Array<Reviewed>, reviewDec
   ]);
 }
 
-/** What `merge` does with PR 17's owner finding: `merged`, or the message of its refusal. */
+/**
+ * What `merge` does with PR 17's owner finding: `merged`, or the message of its
+ * refusal, and the merge commands that it ran.
+ */
 async function mergeOutcome(reviews: Array<Reviewed>, reviewDecision = '') {
   const gh = mergingWithFinding('h3ad', reviews, reviewDecision);
+  const merges = () =>
+    gh.calls.filter((call) => call.startsWith('gh pr merge') || call.startsWith('gh stack merge'));
   try {
     await runPr(['merge', '17'], gh.run, noWrite, fakeClock());
-    return 'merged';
+    return { outcome: 'merged', merges: merges() };
   } catch (error) {
-    return error instanceof Error ? error.message : String(error);
+    const outcome = error instanceof Error ? error.message : String(error);
+    return { outcome, merges: merges() };
   }
 }
 
@@ -72,16 +78,23 @@ test('merge refuses an owner finding unless the owner approved the current head'
   const me = await repoOwner();
   const refusal =
     '#17 has 1 owner finding(s) from agent review, such as a weaker check. The owner approves it before it merges.';
-  expect(
-    await Promise.all([
-      mergeOutcome([]),
-      mergeOutcome([{ login: me, state: 'DISMISSED', commit: 'h3ad' }]),
-      mergeOutcome([{ login: me, state: 'APPROVED', commit: 'old0000' }]),
-      mergeOutcome([{ login: 'someone-else', state: 'APPROVED', commit: 'h3ad' }]),
-      // GitHub's approval decision alone does not answer the owner's finding.
-      mergeOutcome([], 'APPROVED'),
-    ]),
-  ).toEqual([refusal, refusal, refusal, refusal, refusal]);
+  const attempts = await Promise.all([
+    mergeOutcome([]),
+    mergeOutcome([{ login: me, state: 'DISMISSED', commit: 'h3ad' }]),
+    mergeOutcome([{ login: me, state: 'APPROVED', commit: 'old0000' }]),
+    mergeOutcome([{ login: 'someone-else', state: 'APPROVED', commit: 'h3ad' }]),
+    // GitHub's approval decision alone does not answer the owner's finding.
+    mergeOutcome([], 'APPROVED'),
+  ]);
+  expect(attempts.map((attempt) => attempt.outcome)).toEqual([
+    refusal,
+    refusal,
+    refusal,
+    refusal,
+    refusal,
+  ]);
+  // A refused merge runs no `gh pr merge` and no `gh stack merge`.
+  expect(attempts.map((attempt) => attempt.merges)).toEqual([[], [], [], [], []]);
 });
 
 const release = (status: string, conclusion: string) => ({
