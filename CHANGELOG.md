@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.41.0 (2026-11-03)
+
+### Features
+
+- feat(tools): name the slowest tests and file an issue per flake
+
 ## 0.40.0 (2026-11-02)
 
 ### Features
