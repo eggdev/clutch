@@ -73,6 +73,9 @@ user. See [the release bot](../../../../docs/contributing/setup/releases.md#the-
 `.github/CODEOWNERS` lists the path rules of the `one-way-door` tier of
 `.clutch/risk.yaml`, and the main ruleset requires a code owner's approval. So
 GitHub requires the owner's approval on a PR that changes one of those paths.
+No repository role can bypass the ruleset, the owner's admin role included, so
+a one-way-door PR merges only with that approval. The release bot opens each
+agent PR, so the owner approves it on GitHub like any other PR from another author.
 `tools/codeowners.ts` generates the file, and `check-agent-hooks` fails when it
 drifts. After a change to the one-way-door tier, run
 `mise exec -- bun tools/codeowners.ts --write`.
@@ -157,9 +160,9 @@ mise exec -- bun run pr merge <number>
 `merge` refuses while GitHub reports that the PR needs a review
 (`REVIEW_REQUIRED`) or has changes requested, and it names the reviewer. A
 ruleset's code owner review leaves that decision empty, so `merge` also
-refuses a PR that GitHub reports as blocked while a review is still requested. The
-owner's admin login can bypass the ruleset, so this keeps an agent that runs
-`merge` with the owner's login from merging past the approval.
+refuses a PR that GitHub reports as blocked while a review is still requested.
+The ruleset itself refuses such a merge too, since no repository role bypasses
+it. The check gives the message that names the reviewer.
 
 For a PR in a stack, `merge` merges every PR from the bottom up to that one,
 with merge commits. When one merge fails, none of them merge. For a PR that is

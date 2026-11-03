@@ -32,11 +32,11 @@ required check reaches each project. This repository's file is the example.
    app, or from a token with `checks: write`, cannot pass the rule. Auto-merge
    counts only those runs too.
 4. Block force pushes and branch deletion.
-5. Add bypass actors. The release bot bypasses always, so the release commit
-   can reach the default branch. See [releases](../setup/releases.md#the-release-bot).
-   The repository admin bypasses for pull requests only. A person can then
-   merge a fix while a required check is down, but nobody pushes to the
-   default branch directly. The bot's `actor_id` is `vars.CLUTCH_APP_ID`, the
+5. Add bypass actors. Only the release bot bypasses, always, so the release
+   commit can reach the default branch. See
+   [releases](../setup/releases.md#the-release-bot). No repository role gets a
+   bypass, the admin role included, so a one-way-door PR merges only with the
+   code owner's approval. The bot's `actor_id` is `vars.CLUTCH_APP_ID`, the
    repository variable that holds the app id, so one file fits each project.
 6. Run `mise exec -- bun run clutch ruleset --apply`. It creates each ruleset
    in `.github/rulesets/`, or updates the one with the same name with PUT.

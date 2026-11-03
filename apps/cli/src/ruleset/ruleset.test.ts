@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 import {
   applyRulesets,
@@ -15,7 +17,6 @@ const repo = 'acme/shop';
 const file = {
   name: 'main',
   bypass_actors: [
-    { actor_type: 'RepositoryRole', actor_id: 5, bypass_mode: 'pull_request' },
     { actor_type: 'Integration', actor_id: 'vars.CLUTCH_APP_ID', bypass_mode: 'always' },
   ],
   rules: [
@@ -55,7 +56,7 @@ test('a bypass actor that names a variable gets its value, or is dropped with a 
     bypass_mode: 'always',
   });
   const without = await resolveRuleset(file, repo, fakeGh({}).gh);
-  expect(without.ruleset.bypass_actors).toHaveLength(1);
+  expect(without.ruleset.bypass_actors).toHaveLength(0);
   expect(without.notes[0]).toContain('CLUTCH_APP_ID is not set');
 });
 
@@ -113,7 +114,7 @@ test('apply creates a missing ruleset with POST and updates one by name with PUT
   expect(empty.writes).toEqual([
     ['api', '-X', 'POST', `repos/${repo}/rulesets`, '--input', '/tmp/body-1.json'],
   ]);
-  expect(JSON.parse(bodies[0]).bypass_actors[1].actor_id).toBe(42);
+  expect(JSON.parse(bodies[0]).bypass_actors[0].actor_id).toBe(42);
   const existing = fakeGh({
     ...variable,
     [`repos/${repo}/rulesets?per_page=100`]: [{ id: 7, name: 'main' }],
@@ -132,7 +133,7 @@ test('compare reports matches and missing, skips keys the file does not name, an
   const live = {
     ...file,
     id: 7,
-    bypass_actors: [file.bypass_actors[0], { ...file.bypass_actors[1], actor_id: 42 }],
+    bypass_actors: [{ ...file.bypass_actors[0], actor_id: 42 }],
   };
   const matching = fakeGh({
     ...variable,
@@ -184,4 +185,12 @@ test('a required check pinned to an app differs from an unpinned one on GitHub',
     ],
   };
   expect(rulesetDifferences(want, pinned)).toEqual([]);
+});
+
+test('the main ruleset gives no repository role a bypass, so an admin cannot merge past a code owner review', async () => {
+  const shipped = path.resolve(import.meta.dir, '../../../../.github/rulesets/main.json');
+  const main = JSON.parse(await readFile(shipped, 'utf-8')) as {
+    bypass_actors: Array<{ actor_type: string }>;
+  };
+  expect(main.bypass_actors.map((actor) => actor.actor_type)).toEqual(['Integration']);
 });
