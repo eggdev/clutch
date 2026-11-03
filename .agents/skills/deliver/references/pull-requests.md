@@ -267,12 +267,25 @@ gets this repository's token. `automerge.mode` decides what it does:
   PR that may merge at the step, and comments that the merge is queued. A
   separate `merge` job does that in the `release` environment, which holds the
   bot's key and admits only the default branch. So only a run that CI or agent
-  review completes merges, and the merge is pinned to the judged head commit. GitHub
+  review completes, or a sweep dispatch from the default branch, merges, and the
+  merge is pinned to the judged head commit. GitHub
   merges it with a merge commit once the required checks pass. A merge made with
   the default token starts no workflow, so the bot's token keeps the release
   and CI running on `main`. Each agent PR also gets the dry-run verdict for the
   next step, so the owner can grade it before that step turns on. At the last
   step, `medium`, there is no next step, so `on` posts no verdict.
+
+The sweep (`.github/workflows/auto-merge-sweep.yml`) dispatches the Auto-merge
+workflow for up to 20 PRs a run, least recently decided first. Hourly, it
+decides a green PR once, on its final check state. It decides that PR again only
+when its head changes, or when its last decide job fails. A decide job that was
+skipped did not decide. A PR held at the last step, which posts no verdict, is
+therefore left alone. A push to `main` that changes an auto-merge rule file
+decides every eligible PR again, since each last decision used the old rules.
+
+The `gh` reads of these scripts are retried on a transient GitHub error (a 5xx,
+a timeout or a reset connection), up to 3 tries. A write is never retried,
+because a 5xx on a write may have taken effect.
 
 To stop one queued merge, run `gh pr merge --disable-auto <number>`. To stop
 all of them, set `automerge.mode` to `dry-run`.

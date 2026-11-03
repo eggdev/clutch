@@ -280,7 +280,8 @@ warns. Size never fails a PR. See
 <!-- kickoff: The globs of the project's deploy config, infrastructure code and secret handling, as the paths of the infra, deploy and secrets rule in .clutch/risk.yaml. Leave the list empty when the project has none. -->
 
 The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
-CI or agent review completes on a branch of this repository, never a fork. It
+CI or agent review completes on a branch of this repository, never a fork. The
+[sweep](../../../.github/workflows/auto-merge-sweep.yml) also dispatches it. It
 judges each pull request of this repository, and logs a person's as not judged.
 An agent's PR is one that a bot opens. A bot's PR is on a `renovate/`,
 `gardening/`, `clutch-sync/` or `revert/` branch. It acts on `automerge.mode`

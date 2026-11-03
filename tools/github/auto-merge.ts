@@ -20,6 +20,7 @@ import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rul
 import { autoMerged } from '@tools/github/auto-revert';
 import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
 import type { ChangedFile } from '@tools/github/bot-rule';
+import { retrying } from '@tools/github/command';
 import type { Run } from '@tools/github/stack';
 
 /**
@@ -55,7 +56,7 @@ async function must(run: Run, command: Array<string>) {
 const gh = (run: Run, ...args: Array<string>) => must(run, ['gh', ...args]);
 
 /** `automerge` in clutch.yaml. A project without it is `off`, and the step defaults to `bots`. */
-async function readConfig(): Promise<Config> {
+export async function readConfig(): Promise<Config> {
   const file = Bun.file(path.join(root, 'clutch.yaml'));
   const config = (await file.exists())
     ? (Bun.YAML.parse(await file.text()) as Record<string, unknown>)
@@ -347,16 +348,6 @@ export async function runAutoMerge(
   return 0;
 }
 
-const spawn: Run = async (command) => {
-  const proc = Bun.spawn(command, { cwd: root, stdout: 'pipe', stderr: 'pipe' });
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  return { ok: code === 0, out, err };
-};
-
 /** The command line: a decision, or `--enable` from the merge job. */
 async function main(args: Array<string>) {
   if (!args.includes('--enable')) {
@@ -368,7 +359,7 @@ async function main(args: Array<string>) {
             await appendFile(output, `merge=true\nstep=${step}\n`);
           }
         : undefined;
-    return runAutoMerge(args, spawn, await readConfig(), console.log, handoff);
+    return runAutoMerge(args, retrying, await readConfig(), console.log, handoff);
   }
   const { values } = parseArgs({
     args,
@@ -383,8 +374,16 @@ async function main(args: Array<string>) {
   if (!values.pr || !values.head || !(steps as ReadonlyArray<string>).includes(step)) {
     throw new Error(usage);
   }
-  const repo = await gh(spawn, 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner');
-  await enableAutoMerge(spawn, repo, values.pr, values.head, step);
+  const repo = await gh(
+    retrying,
+    'repo',
+    'view',
+    '--json',
+    'nameWithOwner',
+    '--jq',
+    '.nameWithOwner',
+  );
+  await enableAutoMerge(retrying, repo, values.pr, values.head, step);
   console.log(`Enabled auto-merge for #${values.pr} at ${values.head.slice(0, 7)}, step ${step}.`);
   return 0;
 }
