@@ -114,6 +114,10 @@ jobs:
           token: ${{ steps.bot.outputs.token }}
           path: target
           persist-credentials: false
+          # The history, without file contents, for the contact sheet of the
+          # screenshots that changed this week.
+          fetch-depth: 0
+          filter: blob:none
       - if: steps.bot.outcome == 'success'
         uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
@@ -132,13 +136,16 @@ jobs:
           bun tools/clutch.ts doctor --root ../target --remote --repo "$REPO" > "$RUNNER_TEMP/doctor.txt"
           bun tools/clutch.ts doctor --root ../target --remote --repo "$REPO" --json > "$RUNNER_TEMP/doctor.json"
           bun tools/clutch.ts metrics --root ../target --repo "$REPO" > "$RUNNER_TEMP/metrics.txt"
+          bun tools/journeys/visual-digest.ts --root ../target --repo "$REPO" > "$RUNNER_TEMP/visual.md"
           fence="$(printf '\140\140\140')"
           {
             printf '## %s (%s)\n\n### Doctor\n\n%stext\n' "$REPO" "$REF" "$fence"
             cat "$RUNNER_TEMP/doctor.txt"
             printf '%s\n\n### Metrics\n\n%stext\n' "$fence" "$fence"
             cat "$RUNNER_TEMP/metrics.txt"
-            printf '%s\n\n<details><summary>doctor --json</summary>\n\n%sjson\n' "$fence" "$fence"
+            printf '%s\n\n' "$fence"
+            cat "$RUNNER_TEMP/visual.md"
+            printf '\n<details><summary>doctor --json</summary>\n\n%sjson\n' "$fence" "$fence"
             cat "$RUNNER_TEMP/doctor.json"
             printf '\n%s\n\n</details>\n' "$fence"
           } >> "$GITHUB_STEP_SUMMARY"
