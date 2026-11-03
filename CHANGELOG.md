@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.49.1 (2026-11-03)
+
+### Fixes and maintenance
+
+- docs(decisions): adopt no design canvas tool for proposals (CL-411)
+
 ## 0.49.0 (2026-11-03)
 
 ### Features
