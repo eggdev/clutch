@@ -72,7 +72,10 @@ so it can still merge with no person. To clear a block, fix the screen, or say
 what changed and why in the PR body. Then re-run the `agent-review` job.
 
 The job runs the default branch's copy of the script, so a PR cannot change
-the code that judges it. It copies the rule pages from the default branch too.
+the code that judges it. It copies the rule pages from the default branch too. The prompt fences the PR title
+and body as data, and says that `broken` comes from the image alone. The model
+still reads that text in the same prompt, so a body written to sway it can. The
+weekly digest shows the owner each change that passed.
 While the default branch has no `tools/journeys/visual-review.ts`, the steps
 write a "Visual review off" notice and skip, and a baseline change passes
 unreviewed. That lasts until the PR that adds the script merges. A review of 2 pairs measured $0.006 to $0.008 on

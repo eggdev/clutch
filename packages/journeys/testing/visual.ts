@@ -136,7 +136,15 @@ export async function snap(page: Page, name: string, options: SnapOptions = {}) 
           try {
             expect(shot).toMatchSnapshot(file, { maxDiffPixelRatio });
             keep = false;
-          } catch {
+          } catch (error) {
+            // Only a pixel diff is the flake the quarantine covers. Any other error still fails.
+            if (
+              !/pixels \(ratio [\d.]+ of all image pixels\) are different|sizes are different/u.test(
+                error instanceof Error ? error.message : '',
+              )
+            ) {
+              throw error;
+            }
             info.annotations.push({
               type: 'warning',
               description: `${file} differs from its baseline, but ${name} is quarantined in tools/flaky-tests.json.`,
