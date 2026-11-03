@@ -92,9 +92,22 @@ Each entry names one test:
 - Remove the entry in the PR that fixes the test.
 - The nightly [flake hunt](../../.github/workflows/flake-hunt.yml) runs the
   tools tests 20 times on the same code. Each test that passes on some runs and
-  fails on others gets a 14-day entry and a new issue, in one PR. The release
-  bot opens it, so CI runs on it. The hunt uses no agent. While its PR is open,
-  the next hunt skips.
+  fails on others gets a 14-day entry and a new issue, in one PR. The hunt files
+  each issue with `clutch issues new`, titled `Fix the flaky test <file>: <name>`,
+  and writes its id to the entry's `issue` field. The issue file is part of the
+  same PR. Its phase is the `FLAKE_ISSUE_PHASE` repository variable, `later` when
+  unset. The release bot opens the PR, so CI runs on it. The hunt uses no agent.
+  While its PR is open, the next hunt skips.
+
+## Slow tests
+
+`tools/test-budget.ts` fails a `bun test` target that takes longer than its
+budget. It then lists the 10 slowest test files and the 10 slowest tests, each
+with its time. Run `bun tools/test-budget.ts --report 60 -- bun test <path>` to
+see the same list when the run passes. The times come from a JUnit report that
+Bun writes to a temporary file, so they show locally as well as in CI. A test
+file's time is the sum of its tests' times. A test in a `describe` block is
+named with its blocks, such as `inner > outer > name`.
 
 ## Console output
 

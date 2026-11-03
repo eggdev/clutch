@@ -85,6 +85,11 @@ export function entryFor(flake: Tally, issue: string, today: string, runUrl: str
   };
 }
 
+/** The title of the issue that owns one flake. */
+export function issueTitle(flake: Tally): string {
+  return `Fix the flaky test ${flake.file}: ${flake.name}`;
+}
+
 /** The body of the issue that owns one flake. */
 export function issueBody(flake: Tally, runUrl: string): string {
   return [
@@ -119,17 +124,7 @@ export function issueBody(flake: Tally, runUrl: string): string {
 /** Files one issue through the project's own `clutch issues new`, and returns its id. */
 function fileIssue(root: string, flake: Tally, phase: string, runUrl: string): string {
   const run = Bun.spawnSync(
-    [
-      'bun',
-      'run',
-      'clutch',
-      'issues',
-      'new',
-      '--phase',
-      phase,
-      '--title',
-      `Fix the flaky test "${flake.name}"`,
-    ],
+    ['bun', 'run', 'clutch', 'issues', 'new', '--phase', phase, '--title', issueTitle(flake)],
     { cwd: root, stdout: 'pipe', stderr: 'inherit' },
   );
   const out = run.stdout.toString();
