@@ -49,6 +49,9 @@ const rules: [string, Partial<Result>] = [
 ];
 
 const botComment = (body: string) => JSON.stringify({ body, login: 'github-actions[bot]' });
+/** A bot comment with the time it was posted, as the issues comments API gives it. */
+const dated = (body: string, createdAt: string) =>
+  JSON.stringify({ body, login: 'github-actions[bot]', createdAt });
 const comments = (...bodies: Array<string>) =>
   [
     'gh api --paginate repos/{owner}/{repo}/issues/7/comments',
@@ -275,5 +278,51 @@ test('no owner annotation means no owner finding, even with owner comments on th
   expect(await prStatus(gh.run, '7')).toMatchObject({
     agentReview: { owner: 0 },
     review: 'none required',
+  });
+});
+
+test('an earlier head summary does not count when this head ran no review', async () => {
+  // With no credential the run on this head posts no summary, so the latest bot summary is the earlier head's.
+  const started = '2026-11-03T12:40:00Z';
+  const gh = fake([
+    [
+      'gh pr view 7',
+      view(head172, [
+        check('validate', 'SUCCESS'),
+        { ...check('agent-review', 'SUCCESS'), startedAt: started },
+      ]),
+    ],
+    rules,
+    [
+      'gh api --paginate repos/{owner}/{repo}/issues/7/comments',
+      {
+        out: dated('## Agent review\n\nBlocking findings: 1', '2026-11-03T12:20:00Z'),
+      },
+    ],
+  ]);
+  const status = await prStatus(gh.run, '7');
+  expect(status).toMatchObject({ agentReview: { posted: false, blocking: null }, ready: false });
+  expect(renderStatus(status)).toContain('Agent review: no review yet.');
+});
+
+test('a summary posted after the run on this head started counts', async () => {
+  const started = '2026-11-03T12:33:00Z';
+  const gh = fake([
+    [
+      'gh pr view 7',
+      view(head172, [
+        check('validate', 'SUCCESS'),
+        { ...check('agent-review', 'SUCCESS'), startedAt: started },
+      ]),
+    ],
+    rules,
+    [
+      'gh api --paginate repos/{owner}/{repo}/issues/7/comments',
+      { out: dated(summary172, '2026-11-03T12:36:21Z') },
+    ],
+  ]);
+  expect(await prStatus(gh.run, '7')).toMatchObject({
+    agentReview: { posted: true, blocking: 0 },
+    ready: true,
   });
 });
