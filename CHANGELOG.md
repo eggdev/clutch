@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.48.0 (2026-11-03)
+
+### Features
+
+- feat(auto-merge): let a pure sync pass owner findings approved upstream
+
+### Fixes and maintenance
+
+- Auto-merge: a dispatched run names the repository for gh, so its find job no longer fails without a checkout.
+
 ## 0.47.0 (2026-11-03)
 
 ### Features
