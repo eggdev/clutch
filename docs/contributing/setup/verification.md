@@ -62,7 +62,8 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
 `check-journeys` rejects these problems:
 
 - A feature with a screen that an app ships, but no journey for that platform.
-  The web app is `apps/web`. A native app has the Nx tag `platform:native`.
+  This check counts `apps/web` as the web app, and `journeys.webApp` does not
+  change it. A native app has the Nx tag `platform:native`.
 - A journey header with no goal line, or no `Contract:`, `Entry:` or
   `Isolation and cleanup:` line.
 - A journey that `verification.json` does not register, and a flow that runs a
