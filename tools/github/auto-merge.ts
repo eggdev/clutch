@@ -2,18 +2,22 @@ import { appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { judgeAtStep } from '@tools/github/auto-merge-brake';
 import {
   blockers,
   dryRunComment,
   enabledMarker,
   kindProblem,
+  lastStepOn,
   marker,
   modes,
   nextStep,
   noVerdictYet,
+  revertProblems,
   steps,
 } from '@tools/github/auto-merge-rules';
 import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rules';
+import { autoMerged } from '@tools/github/auto-revert';
 import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
 import type { ChangedFile } from '@tools/github/bot-rule';
 import type { Run } from '@tools/github/stack';
@@ -24,11 +28,11 @@ import type { Run } from '@tools/github/stack';
  * takes Renovate and gardening PRs that pass the bot rule, `low` also takes
  * low-risk agent PRs, and `medium` also takes medium-risk ones. `on` queues
  * GitHub's auto-merge for each PR that may merge, and never while a required
- * check is red on the default branch. `dry-run` and `on` comment a verdict
- * once for each head commit of an agent PR, so the owner can grade it: at the
- * step for `dry-run`, and at the next step for `on`. `off` only prints. The Auto-merge
- * workflow runs it from the base branch, so a pull request cannot change the
- * rules that judge it. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
+ * check is red on the default branch, except for a revert. `dry-run` and `on`
+ * comment a verdict once for each head commit of an agent PR, so the owner can
+ * grade it: at the step for `dry-run`, and at the next step for `on`. `off` only
+ * prints. The Auto-merge workflow runs it from the base branch, so a pull request
+ * cannot change the rules that judge it. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 const usage = [
   'Usage: bun tools/github/auto-merge.ts --pr <number> --head <sha>',
@@ -294,8 +298,10 @@ export async function runAutoMerge(
       await changedFiles(run, repo, values.pr),
       await syncedFiles(run, pr.headRefOid),
     );
-  } else if (bot === 'gardening' && tier !== 'low') {
-    botProblems = [`The gardening PR's risk tier is ${tier}, not low.`];
+  } else if (bot === 'gardening' && !['low', 'medium'].includes(tier)) {
+    botProblems = [`The gardening PR's risk tier is ${tier}, not low or medium.`];
+  } else if (bot === 'revert') {
+    botProblems = await revertProblems(pr.headRefName, tier, (n) => autoMerged(run, repo, n));
   }
   const facts: Facts = {
     pr,
@@ -306,17 +312,13 @@ export async function runAutoMerge(
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
   };
-  const reasons = blockers(facts, step);
-  const verdict =
-    reasons.length > 0
-      ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
-      : `Would auto-merge at the step ${step}.`;
+  const { effective, reasons, verdict } = await judgeAtStep(run, facts, step, log);
   if (mode === 'on' && reasons.length === 0) {
     if (handoff) {
-      await handoff(step);
+      await handoff(effective);
       log(`${verdict}\nHanded the merge to the merge job.`);
     } else {
-      await enableAutoMerge(run, repo, values.pr, pr.headRefOid, step);
+      await enableAutoMerge(run, repo, values.pr, pr.headRefOid, effective);
       log(`${verdict}\nQueued the merge.`);
     }
     return 0;
@@ -325,7 +327,11 @@ export async function runAutoMerge(
     log(verdict);
     return 0;
   }
-  const calibrate = mode === 'on' ? nextStep(step) : step;
+  if (lastStepOn(mode, effective)) {
+    log(`${verdict}\nNo dry-run comment: the step ${effective} is the last.`);
+    return 0;
+  }
+  const calibrate = mode === 'on' ? nextStep(effective) : effective;
   const graded = blockers(facts, calibrate);
   const wait = noVerdictYet(facts);
   if (wait) {

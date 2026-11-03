@@ -2,39 +2,26 @@ import { expect, test } from 'bun:test';
 
 import { runAutoMerge } from '@tools/github/auto-merge';
 import {
+  agent,
+  app,
+  args,
+  comments,
+  decide,
+  facts,
+  fake,
+  head,
+  merges,
+} from '@tools/github/auto-merge-fake';
+import {
   blockers,
   dryRunComment,
   enabledMarker,
+  isAgentPr,
   marker,
   nextStep,
   noVerdictYet,
   reactionRequest,
 } from '@tools/github/auto-merge-rules';
-import type { Config, Facts } from '@tools/github/auto-merge-rules';
-import type { Result, Run } from '@tools/github/stack';
-
-const head = 'a1b2c3d4e5f6';
-const agent = { login: 'eggdev', is_bot: false };
-const app = { login: 'app/renovate', is_bot: true };
-
-const facts = (fields: Partial<Facts> = {}, pr: Partial<Facts['pr']> = {}): Facts => ({
-  pr: {
-    state: 'OPEN',
-    isDraft: false,
-    baseRefName: 'main',
-    headRefName: 'clutch/cl-123-docs',
-    headRefOid: head,
-    author: agent,
-    ...pr,
-  },
-  defaultBranch: 'main',
-  tier: 'low',
-  checks: { validate: 'success', 'agent-review': 'success' },
-  ownerFindings: [],
-  botProblems: [],
-  mainRed: [],
-  ...fields,
-});
 
 test('each step takes the PRs of the steps before it', () => {
   const renovate = facts({ tier: 'one-way-door' }, { headRefName: 'renovate/x', author: app });
@@ -68,6 +55,9 @@ test('a bot branch needs a bot author and a diff that passes the bot rule', () =
   expect(blockers(facts({}, { headRefName: 'renovate/x', author: agent }), 'medium')).toEqual([
     'The author of the renovate branch is not a bot.',
   ]);
+  expect(blockers(facts({}, { headRefName: 'revert/5', author: agent }), 'medium')).toEqual([
+    'The author of the revert branch is not a bot.',
+  ]);
   expect(
     blockers(
       facts(
@@ -77,9 +67,24 @@ test('a bot branch needs a bot author and a diff that passes the bot rule', () =
       'bots',
     ),
   ).toEqual(['tools/x.ts is not a dependency file.']);
-  expect(blockers(facts({}, { headRefName: 'fix/typo' }), 'medium')).toEqual([
-    "The head branch is neither an agent's (clutch/cl-) nor a bot's (renovate/, gardening/, clutch-sync/).",
+});
+
+test('a bot-authored PR on any branch is an agent PR, and a clutch/cl- branch still is', () => {
+  const botOpened = facts({}, { headRefName: 'feature/x', author: app });
+  expect(isAgentPr(botOpened.pr)).toBe(true);
+  expect(blockers(botOpened, 'low')).toEqual([]);
+  expect(blockers(botOpened, 'bots')).toEqual([
+    'Agent PRs auto-merge from the step low. The step is bots.',
   ]);
+  expect(isAgentPr(facts().pr)).toBe(true);
+});
+
+test('a person-opened PR is refused, whatever its branch', () => {
+  const person = blockers(facts({}, { headRefName: 'feature/x' }), 'medium');
+  expect(person).toEqual([
+    'A person opened this pull request. Open it with `bun run pr open`, so the release bot opens it.',
+  ]);
+  expect(isAgentPr(facts({}, { headRefName: 'feature/x' }).pr)).toBe(false);
 });
 
 test('every failed condition gives its own reason, and a red main blocks everything', () => {
@@ -133,52 +138,6 @@ test('no verdict while a required check runs or for a draft or a non-agent branc
     'The pull request is not an open, ready agent PR.',
   );
 });
-
-/** Check runs of the head: a failed validate, then a newer one with `conclusion`. */
-const runs = (conclusion: string) =>
-  [
-    { id: 1, name: 'validate', status: 'completed', conclusion: 'failure' },
-    { id: 2, name: 'validate', status: 'completed', conclusion },
-    { id: 3, name: 'agent-review', status: 'completed', conclusion: 'success' },
-  ]
-    .map((line) => JSON.stringify({ ...line, app: 'github-actions' }))
-    .join('\n');
-
-/** A fake runner for a green, low-risk agent PR on a green main. `answers` override by prefix. */
-function fake(answers: Array<[string, Partial<Result>]> = [], pr: Partial<Facts['pr']> = {}) {
-  const calls: Array<string> = [];
-  const defaults: Array<[string, Partial<Result>]> = [
-    ['gh repo view --json nameWithOwner', { out: 'eggdev/clutch\n' }],
-    ['gh repo view --json defaultBranchRef', { out: 'main\n' }],
-    ['gh pr view', { out: JSON.stringify(facts({}, pr).pr) }],
-    ['gh api repos/eggdev/clutch/rules/branches/main', { out: '["validate"]' }],
-    ['gh api repos/eggdev/clutch/commits/main --jq .sha', { out: 'mainsha\n' }],
-    ['gh api --paginate repos/eggdev/clutch/commits/', { out: runs('success') }],
-    ['bun tools/clutch.ts risk', { out: '{"tier":"low"}' }],
-    ['gh api --paginate repos/eggdev/clutch/issues/7/comments', { out: 'LGTM\n' }],
-    [
-      'gh api --paginate repos/eggdev/clutch/pulls/7/files',
-      { out: JSON.stringify({ filename: 'bun.lock', patch: '-a\n+b' }) },
-    ],
-  ];
-  const run: Run = (command) => {
-    const line = command.join(' ');
-    calls.push(line);
-    const answer = [...answers, ...defaults].find(([prefix]) => line.startsWith(prefix))?.[1];
-    return Promise.resolve({ ok: true, out: '', err: '', ...answer });
-  };
-  return { run, calls };
-}
-
-const args = ['--pr', '7', '--head', head];
-const merges = (calls: Array<string>) => calls.filter((call) => call.startsWith('gh pr merge'));
-const comments = (calls: Array<string>) => calls.filter((call) => call.startsWith('gh pr comment'));
-
-async function decide(gh: ReturnType<typeof fake>, config: Config) {
-  const lines: Array<string> = [];
-  expect(await runAutoMerge(args, gh.run, config, (line) => lines.push(line))).toBe(0);
-  return lines;
-}
 
 test('on at the step bots queues a Renovate PR with a version-only diff, and says so once', async () => {
   const renovate = { headRefName: 'renovate/all-minor', author: app };
@@ -297,11 +256,7 @@ test('dry-run comments the verdict at its step, once per head, and merges nothin
   ]);
 });
 
-test('a person branch, a moved head or off mode acts on nothing', async () => {
-  const person = fake([], { headRefName: 'fix/typo' });
-  expect(await decide(person, { mode: 'on', step: 'medium' })).toEqual([
-    "Not judged: The head branch is neither an agent's (clutch/cl-) nor a bot's (renovate/, gardening/, clutch-sync/).",
-  ]);
+test('a moved head or off mode acts on nothing', async () => {
   const moved = fake([], { headRefOid: 'ffff' });
   expect(await decide(moved, { mode: 'on', step: 'medium' })).toEqual([
     `The head moved from ${head} to ffff. The run for the new head decides.`,

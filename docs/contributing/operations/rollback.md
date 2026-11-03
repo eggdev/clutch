@@ -79,7 +79,9 @@ bot's key. That run:
    runs on it. The PR links the original.
 4. Comments on the original PR, and asks for the reason for the revert.
 
-Merge the revert PR like any other, once its checks pass. When a later change
+When auto-merge merged the original PR, and the revert is low or medium risk,
+auto-merge takes the revert PR once its checks pass. It may merge while `main`
+is red, because it is the fix. Otherwise a person merges it. When a later change
 touches the same lines, the revert conflicts. The workflow then comments on the
 original PR and opens nothing, so revert it by hand or fix forward. Without the
 release bot, the default token opens the PR, and CI does not start on it.
@@ -99,7 +101,8 @@ when CI fails on a push to the default branch:
    Revert workflow and comments on the PR. A PR that a person merged gets no
    automatic revert: the person fixes forward or adds the label.
 
-The revert PR still merges like any other, once its checks pass.
+The revert PR merges as the revert section above says: auto-merge takes it when
+it may, and a person merges it otherwise.
 
 ### Tighten after a revert
 

@@ -1,12 +1,19 @@
 import { expect, test } from 'bun:test';
 
-import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
+import { botKind, renovateProblems, revertedPr, syncProblems } from '@tools/github/bot-rule';
 
 test('the bot comes from the head branch', () => {
   expect(botKind('renovate/all-minor')).toBe('renovate');
   expect(botKind('gardening/2026-11-02')).toBe('gardening');
   expect(botKind('clutch-sync/latest')).toBe('clutch-sync');
+  expect(botKind('revert/123')).toBe('revert');
   expect(botKind('clutch/cl-132-steps')).toBeNull();
+});
+
+test('a revert branch names the PR it reverts, and only a number does', () => {
+  expect(revertedPr('revert/123')).toBe('123');
+  expect(revertedPr('revert/abc')).toBeNull();
+  expect(revertedPr('clutch/cl-132-steps')).toBeNull();
 });
 
 test('a Renovate diff of versions, lockfiles, pinned actions and changesets passes', () => {
