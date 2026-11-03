@@ -8,7 +8,8 @@ a `serious` or `critical` violation. See
 It also imports `snap` from `@repo/journeys/testing/visual`. `snap(page, name)`
 captures the page at a mobile and a desktop width, in light and dark. On GitHub
 Actions it compares each shot with its baseline in `__screenshots__/` next to
-the journey, and fails on a change. A local run only writes the shots to
+the journey, and fails on a change. A snap name that `tools/flaky-tests.json`
+quarantines for the journey warns instead of failing. A local run only writes the shots to
 `test-results/visual/`. See
 [screenshots](https://github.com/eggdev/clutch/blob/main/docs/contributing/setup/verification.md#screenshots).
 
