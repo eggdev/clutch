@@ -15,7 +15,7 @@ import path from 'node:path';
  *
  * `--stale` also lists the records that wait too long: a proposal with no
  * choice after 14 days, and an adoption whose issue is done. Weekly gardening
- * runs it. Time never fails `validate`.
+ * reads the same list. Time never fails `validate`.
  */
 export const folder = 'docs/design/proposals';
 export const statuses = ['proposed', 'adopted', 'current', 'historical'] as const;

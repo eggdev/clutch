@@ -109,9 +109,9 @@ the owner as a new direction.
   when a current record still has its prototype.
 - **Replaced or dropped.** Set `status: historical` and say why in `retired`,
   such as "replaced by checkout-v2.md". Delete the prototype file.
-- **Stale.** Weekly gardening runs `bun tools/check-proposals.ts --stale`. It
-  lists a proposal with no choice after 14 days, and an adoption whose issue
-  is done. Ask once more, or retire it, or mark it current.
+- **Stale.** `bun tools/check-proposals.ts --stale` lists a proposal with no
+  choice after 14 days, and an adoption whose issue is done. Weekly gardening
+  reads the same list. Ask once more, or retire it, or mark it current.
 
 ## Ask the owner
 
