@@ -35,9 +35,10 @@ In `.clutch/issues`, the `status` field holds the state. Idea and Ready are
 both `todo`, and Active is `in_progress`. Blocked, Review and Done keep their
 names. An idea that is not ready has the owner's handle in `owner`, so no agent
 picks it. For a task that ends in a PR, `review` means the PR is open with
-green checks and its URL in `pr`, and `done` means the PR is merged. The PR's
-last commit sets `done` before the merge, because the default branch takes no
-direct pushes. The merge makes it true.
+green checks and its URL in `pr`, and `done` means the PR is merged. `pr open`
+commits `done` into the PR head before it pushes, because the default branch
+takes no direct pushes and a merge can come as soon as the checks pass. The
+merge makes it true.
 
 A preview task can be done when the working preview is verified. A release
 task is not done at preview or PR. A required device check that cannot run
