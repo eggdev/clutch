@@ -247,3 +247,30 @@ test('without a release tag, a sync without --to stops and says how to fix it', 
     'has no Clutch release tag',
   );
 });
+
+test('a merged .claude/settings.json is written as the project formatter leaves it, and --check stays clean', async () => {
+  await using template = await gitRepo({
+    'clutch.files.yaml': 'version: 1\nfiles:\n  - path: .claude/settings.json\n    rule: merge\n',
+    '.claude/settings.json': JSON.stringify({
+      sandbox: { filesystem: { allowRead: ['/tmp/.nx', '~/.nx'] } },
+    }),
+  });
+  const first = await gitOrThrow(template.root, 'rev-parse', 'HEAD');
+  // The project ignores .claude/** in its own config. A clone's config would format the file.
+  await using target = await project({
+    '.oxfmtrc.json': JSON.stringify({ ignorePatterns: ['.claude/**'] }),
+    '.claude/settings.json': JSON.stringify({ enabledPlugins: { nx: true } }),
+  });
+  const synced = await runSync({ root: target.root, template: template.root, to: first });
+  expect(synced.status).toBe('synced');
+  const written = await readFile(path.join(target.root, '.claude/settings.json'), 'utf-8');
+  expect(JSON.parse(written)).toEqual({
+    enabledPlugins: { nx: true },
+    sandbox: { filesystem: { allowRead: ['/tmp/.nx', '~/.nx'] } },
+  });
+  expect(written).toBe(`${JSON.stringify(JSON.parse(written), null, 2)}\n`);
+  await commitAll(target.root);
+  expect(
+    await runSync({ root: target.root, template: template.root, to: first, check: true }),
+  ).toMatchObject({ status: 'unchanged', changes: [] });
+});

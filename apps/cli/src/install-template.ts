@@ -8,9 +8,11 @@ import { formatFile } from '@/format';
 import { gitOrThrow } from '@/git';
 import { mergePackageJson } from '@/merge-package-json';
 import type { Conflict } from '@/merge-package-json';
+import { mergePrimitives } from '@/merge-primitives';
 import { fingerprint, gitBytes } from '@/review-source';
 import { writeEntry } from '@/sync/engine';
 import type { SyncFile } from '@/sync/engine';
+import { bodyHash, pinFile } from '@/sync/pin';
 import { lineagePath, loadClutchSource } from '@/sync/source';
 
 type FileAction = { path: string; action: 'added' | 'replaced' | 'merged' };
@@ -43,9 +45,17 @@ function mergeLines(project: string, template: string): Merged {
 
 export const mergers: Record<
   string,
-  (project: string, template: string, keep?: (path: string) => boolean) => Merged
+  (
+    project: string,
+    template: string,
+    keep?: (path: string) => boolean,
+    delivered?: (folder: string) => boolean,
+  ) => Merged
 > = {
   'package.json': mergeJson,
+  // The registry keeps the project's primitives. Each shipped folder joins its primitive.
+  'primitives.yaml': (project, template, _keep, delivered = () => false) =>
+    mergePrimitives(project, template, delivered),
   // Agent hook configs. A project keeps its own hooks and settings, and gains the template's hooks.
   'settings.json': mergeJson,
   'hooks.json': mergeJson,
@@ -149,8 +159,13 @@ async function planInstall(
       planned.files.push({ path: file, action: 'added' });
     }
   }
+  // The pin in mise.toml is a managed file for install, and sync moves its version after that.
+  const managedFiles = new Map(source.managed.files);
+  if (source.pin) {
+    managedFiles.set(pinFile, source.pin);
+  }
   for (const rule of ['managed', 'seed'] as const) {
-    const files = rule === 'managed' ? source.managed.files : source.seed;
+    const files = rule === 'managed' ? managedFiles : source.seed;
     for (const [file, theirs] of files) {
       const mine = await project.read(file);
       if (!mine) {
@@ -272,12 +287,20 @@ export async function installTemplate(options: {
   };
   await mkdir(path.join(root, path.dirname(manifestPath)), { recursive: true });
   await writeFile(path.join(root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
+  // Sync compares the pin's file by its body, so the lineage records that, as sync does.
+  const pinBody = source.pin ? bodyHash(source.pin.content.toString()) : undefined;
+  if (pinBody && planned.kept[pinFile]) {
+    planned.kept[pinFile] = pinBody;
+  }
   const lineage = {
     schemaVersion: 1,
     templateRepo: '',
     templateCommit: commit,
     ...(source.release ? { release: source.release } : {}),
-    files: Object.fromEntries([...source.managed.files].map(([name, file]) => [name, file.hash])),
+    files: {
+      ...Object.fromEntries([...source.managed.files].map(([name, file]) => [name, file.hash])),
+      ...(pinBody ? { [pinFile]: pinBody } : {}),
+    },
     ...(Object.keys(planned.kept).length > 0 ? { kept: planned.kept } : {}),
   };
   await mkdir(path.join(root, path.dirname(lineagePath)), { recursive: true });

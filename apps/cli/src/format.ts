@@ -9,13 +9,23 @@ export const cliRoot = path.resolve(import.meta.dir, '../../..');
  */
 export const inClone = () => Bun.file(path.join(cliRoot, 'clutch.files.yaml')).exists();
 
-/** The clone's formatter, or the project's when the CLI runs as the release binary. */
+/**
+ * The formatter that writes the project's files. The project's own config comes
+ * first: its `ignorePatterns` are relative to the config file, so a clone's
+ * config would format files that the project's formatter leaves alone, such as
+ * `.claude/**`. The release binary has no clone, so it always uses the project's.
+ */
 async function formatter(root: string) {
-  for (const base of [cliRoot, root]) {
+  let config: string | undefined;
+  for (const file of [path.join(root, '.oxfmtrc.json'), path.join(cliRoot, '.oxfmtrc.json')]) {
+    if (!config && (await Bun.file(file).exists())) {
+      config = file;
+    }
+  }
+  for (const base of [root, cliRoot]) {
     const bin = path.join(base, 'node_modules/.bin/oxfmt');
     if (await Bun.file(bin).exists()) {
-      const config = path.join(base, '.oxfmtrc.json');
-      return (await Bun.file(config).exists()) ? [bin, '--config', config] : [bin];
+      return config ? [bin, '--config', config] : [bin];
     }
   }
   throw new Error(`Could not find oxfmt. Run \`bun install\` in ${root} first.`);

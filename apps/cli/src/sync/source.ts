@@ -1,8 +1,9 @@
 import { parse } from 'yaml';
 
 import { releaseAt } from '@/release';
-import { gitBytes, safeRelative, tree } from '@/review-source';
+import { fingerprint, gitBytes, safeRelative, tree } from '@/review-source';
 import type { SyncFile, SyncSource } from '@/sync/engine';
+import { pinFile, pinVersion, setPin } from '@/sync/pin';
 
 const filesList = 'clutch.files.yaml';
 /** The record of what the last sync or install wrote, in each project. */
@@ -32,7 +33,23 @@ export type ClutchSource = {
   managed: SyncSource;
   merge: Map<string, SyncFile>;
   seed: Map<string, SyncFile>;
+  /** Clutch's `mise.toml`, whose pin sync moves on its own. See sync/pin.ts. Null when not selected. */
+  pin: SyncFile | null;
 };
+
+/** Clutch's `mise.toml` with its pin set to the release that it syncs to, so install and sync write the same pin. */
+function pinned(file: SyncFile | null, release: string | null): SyncFile | null {
+  const text = file?.content.toString();
+  const content = text && release ? setPin(text, pinVersion(release)) : null;
+  if (!file || content === null) {
+    return file;
+  }
+  return {
+    mode: file.mode,
+    content: Buffer.from(content),
+    hash: fingerprint(file.mode, Buffer.from(content)),
+  };
+}
 
 const covers = (entry: string, file: string) =>
   entry.endsWith('/') ? file.startsWith(entry) : file === entry;
@@ -122,13 +139,21 @@ export async function loadClutchSource(
       throw new Error(`${filesList}: ${entry.path} matches no committed file.`);
     }
   }
+  // The pin in mise.toml is planned apart from the managed files, so a release never asks about it.
+  const release = await releaseAt(template, commit);
+  const pin = pinned(managed.get(pinFile) ?? null, release);
+  managed.delete(pinFile);
   const baseline = new Map(Object.entries(list.known ?? {}));
   const roots = [
     ...list.files
-      .filter((entry) => entry.rule === 'managed' && (!only || selected(entry, entry.path, only)))
+      .filter(
+        (entry) =>
+          entry.rule === 'managed' &&
+          entry.path !== pinFile &&
+          (!only || selected(entry, entry.path, only)),
+      )
       .map((entry) => entry.path),
     ...(list.retired ?? []),
   ];
-  const release = await releaseAt(template, commit);
-  return { commit, release, managed: { files: managed, baseline, roots }, merge, seed };
+  return { commit, release, managed: { files: managed, baseline, roots }, merge, seed, pin };
 }

@@ -1,6 +1,6 @@
 # Static analysis (SAST) on each PR, on each push to main, and weekly, so a new
 # rule finds old code too. The `sast` job is the required check, so one
-# ruleset fits every repository. See docs/contributing/capabilities/codeql-sast.md.
+# ruleset fits every repository. See https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/codeql-sast.md.
 #
 # `sast` in clutch.yaml picks the engine: auto (the default), codeql or semgrep.
 # Under auto, where GitHub code scanning takes results (a public repository, or
@@ -77,7 +77,7 @@ jobs:
             auto) if [ "$scanning" = true ]; then ENGINE=codeql; else ENGINE=semgrep; fi ;;
             codeql)
               if [ "$scanning" != true ]; then
-                echo "::error title=CodeQL cannot run::sast is codeql, but this private repository has no GitHub Code Security, so code scanning takes no results. Turn on Code Security, or set sast to auto or semgrep in clutch.yaml. See docs/contributing/capabilities/codeql-sast.md."
+                echo "::error title=CodeQL cannot run::sast is codeql, but this private repository has no GitHub Code Security, so code scanning takes no results. Turn on Code Security, or set sast to auto or semgrep in clutch.yaml. See https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/codeql-sast.md."
                 exit 1
               fi
               ENGINE=codeql

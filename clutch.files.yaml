@@ -131,6 +131,9 @@ files:
   - path: docs/
     rule: seed
   # Files that both sides edit.
+  # The primitives registry: each folder that sync ships joins the primitive that owns it.
+  - path: docs/contributing/architecture/primitives.yaml
+    rule: merge
   - path: package.json
     rule: merge
   - path: .gitignore

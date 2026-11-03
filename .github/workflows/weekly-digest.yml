@@ -1,6 +1,6 @@
 # Every Monday, writes a doctor and metrics digest for each repository in
 # `fleet` in clutch.yaml to the job summary. See
-# docs/contributing/capabilities/factory-observability.md#weekly-digest.
+# https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/factory-observability.md#weekly-digest.
 #
 # It reads the other repositories as the release bot: each job mints an
 # installation token for one repository, read-only, from the bot's key in the
@@ -97,7 +97,7 @@ jobs:
         env:
           REPO: ${{ matrix.repo }}
         run: |
-          message="The release bot cannot read $REPO with Contents, Metadata, Administration, Actions and Pull requests (read). Install the bot on it, and grant those permissions. See docs/contributing/capabilities/factory-observability.md#weekly-digest."
+          message="The release bot cannot read $REPO with Contents, Metadata, Administration, Actions and Pull requests (read). Install the bot on it, and grant those permissions. See https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/factory-observability.md#weekly-digest."
           echo "::notice title=Skipped $REPO::$message"
           printf '## %s\n\nSkipped. %s\n' "$REPO" "$message" >> "$GITHUB_STEP_SUMMARY"
       - if: steps.bot.outcome == 'success'

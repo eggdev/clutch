@@ -1,6 +1,6 @@
 {
   // The repository's dev container. tools/cloud-env.sh installs mise, the
-  // pinned tools and the packages. See docs/contributing/capabilities/cloud-agent-vm.md.
+  // pinned tools and the packages. See https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/cloud-agent-vm.md.
   "name": "${localWorkspaceFolderBasename}",
   // Debian, pinned by digest.
   "image": "mcr.microsoft.com/devcontainers/base:2.2.5-trixie@sha256:71b6fe7c4e07ec747a94a72b2a17f2f8c286eaa7b1c59862888df764efb8b6c6",
