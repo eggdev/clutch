@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.51.0 (2026-11-03)
+
+### Features
+
+- feat(pr): answer every review finding before merge (CL-415)
+
 ## 0.50.0 (2026-11-03)
 
 ### Features
