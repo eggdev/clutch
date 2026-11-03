@@ -8,7 +8,7 @@ rule, delete the rule from this page in the same PR.
 ## How agent review runs
 
 `.github/workflows/agent-review.yml` runs on each pull request that is not a
-draft. It runs the Claude Code GitHub Action with this page as its rules, under the base branch's `CLAUDE.md` and `AGENTS.md`.
+draft. It runs the Claude Code GitHub Action with this page as its rules, under the base branch's `CLAUDE.md`, `AGENTS.md` and `.claude/`.
 
 1. The agent reads the diff and the pages that the diff touches.
 2. It posts an inline comment for each finding.
