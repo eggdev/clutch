@@ -9,7 +9,9 @@ import { findBase } from '@tools/check-base';
  * deletes a test file, renames it to a name that does not run, or lowers the
  * number of tests or assertions in a test file. A deleted test passes when the
  * same change deletes the module it tests, or when tools/test-integrity-allow.json
- * lists the test file with a reason. See docs/contributing/testing.md#test-integrity.
+ * the same change adds the test file to tools/test-integrity-allow.json with a
+ * reason. An entry that an earlier change added covers nothing. See
+ * docs/contributing/testing.md#test-integrity.
  */
 export const allowList = 'tools/test-integrity-allow.json';
 const testFile = /(?:\.(?:test|spec)\.[cm]?[jt]sx?|\.pw\.[jt]s)$/u;
@@ -21,6 +23,11 @@ type Counts = { tests: number; assertions: number };
 function git(root: string, ...args: Array<string>): string | null {
   const run = Bun.spawnSync(['git', '-C', root, ...args]);
   return run.exitCode === 0 ? run.stdout.toString() : null;
+}
+
+/** The `files` map of an allow list file's text. Missing text lists nothing. */
+function filesIn(text: string | null): Record<string, string> {
+  return text === null ? {} : (JSON.parse(text).files ?? {});
 }
 
 export function countsOf(source: string): Counts {
@@ -38,9 +45,7 @@ export function modulesOf(file: string): Array<string> {
 
 function readAllowList(root: string): { files: Record<string, string>; problems: Array<string> } {
   const file = path.join(root, allowList);
-  const files: Record<string, string> = existsSync(file)
-    ? (JSON.parse(readFileSync(file, 'utf-8')).files ?? {})
-    : {};
+  const files = filesIn(existsSync(file) ? readFileSync(file, 'utf-8') : null);
   const problems = Object.entries(files)
     .filter(([, reason]) => !reason.trim())
     .map(([name]) => `${allowList}: \`${name}\` has no reason. Say why the test can go.`);
@@ -56,6 +61,10 @@ export function checkTestIntegrity(root: string, base: string | null): Array<str
     throw new Error(`git diff against ${base} failed.`);
   }
   const { files: allowed, problems } = readAllowList(root);
+  const listedAtBase = filesIn(git(root, 'show', `${base}:${allowList}`));
+  // An entry covers a file only when this change adds it or changes its reason.
+  const covers = (file: string) =>
+    Object.hasOwn(allowed, file) && allowed[file] !== listedAtBase[file];
   const changes = listed
     .split('\n')
     .filter(Boolean)
@@ -66,24 +75,36 @@ export function checkTestIntegrity(root: string, base: string | null): Array<str
       .map(([, before]) => before),
   );
   for (const [status, before, after] of changes) {
-    if (!testFile.test(before) || status.startsWith('A') || Object.hasOwn(allowed, before)) {
+    if (!testFile.test(before) || status.startsWith('A') || covers(before)) {
       continue;
     }
+    // An entry that is listed but does not cover the file predates this change.
+    const predates = Object.hasOwn(allowed, before);
+    const stale = `${allowList} lists this file, but its entry predates this change. Rewrite the reason in this change, or delete the entry.`;
     const now = status.startsWith('R') ? after : before;
     if (status.startsWith('D') || !testFile.test(now)) {
       if (modulesOf(before).some((module) => deleted.has(module))) {
         continue;
       }
+      const what = status.startsWith('D')
+        ? 'deletes it'
+        : `renames it to ${now}, which no test runner runs`;
+      const advice = predates
+        ? stale
+        : `A different reason goes in ${allowList} for a person to review.`;
       problems.push(
-        `${before}: the change ${status.startsWith('D') ? 'deletes it' : `renames it to ${now}, which no test runner runs`}. Keep the test, or delete the module it tests in the same change. A different reason goes in ${allowList} for a person to review.`,
+        `${before}: the change ${what}. Keep the test, or delete the module it tests in the same change. ${advice}`,
       );
       continue;
     }
     const was = countsOf(git(root, 'show', `${base}:${before}`) ?? '');
     const is = countsOf(readFileSync(path.join(root, now), 'utf-8'));
     if (is.tests < was.tests || is.assertions < was.assertions) {
+      const advice = predates
+        ? stale
+        : `Restore what the tests prove, or list the file in ${allowList} with a reason for a person to review.`;
       problems.push(
-        `${now}: tests ${was.tests} -> ${is.tests}, assertions ${was.assertions} -> ${is.assertions}. A change may not lower either. Restore what the tests prove, or list the file in ${allowList} with a reason for a person to review.`,
+        `${now}: tests ${was.tests} -> ${is.tests}, assertions ${was.assertions} -> ${is.assertions}. A change may not lower either. ${advice}`,
       );
     }
   }
