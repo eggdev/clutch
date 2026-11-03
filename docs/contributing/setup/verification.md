@@ -74,6 +74,46 @@ Each web journey also calls `accessible(page, 'where')` from
 a `serious` or `critical` axe violation. See
 [accessibility checks](../capabilities/a11y-checks.md).
 
+### Screenshots
+
+A web journey calls `snap(page, 'name')` from `@repo/journeys/testing/visual`
+at a stable point, the same way it calls `accessible`. A gallery or component
+page is a journey that opens each group and snaps it. `snap` captures the page
+4 times, at 390 px and 1280 px wide, in the light and dark schemes. It changes
+the viewport and the `dark` class on `<html>` in place. Then it puts them back,
+so the journey's next step sees the page it left.
+
+Each shot is deterministic. Animations are off, the caret is hidden, fonts are
+loaded, and `snap` takes shots until two in a row match. The locale is `en-US`
+and the time zone UTC. Pass `mask` for a region that changes on each run, such
+as a generated name. A screen that shows the time sets the clock first with
+`page.clock.setFixedTime`.
+
+The baselines are committed PNG files:
+
+```text
+features/<name>/journeys/__screenshots__/<snap>-<mobile|desktop>-<light|dark>.png
+```
+
+CI is the only renderer. Fonts and anti-aliasing differ between machines, so a
+local run compares nothing. It writes every shot to `test-results/visual/` for
+you to look at. In CI, `snap` compares each shot with its baseline, allowing
+0.1% of the pixels to differ. A missing or changed baseline fails the
+`journeys` check. The job uploads each changed or new shot, at its baseline
+path, as the `visual-screenshots` artifact.
+
+To change a screen on purpose:
+
+1. Push the change. The `journeys` check fails on the screenshots that moved.
+2. Run `mise exec -- bun run visual pull <pr>`. It downloads the artifact of
+   the PR's latest CI run and writes the changed and new shots into the
+   baselines.
+3. Look at each PNG, commit them, and say in the PR body what changed on screen
+   and why.
+
+To seed a baseline from a design, copy its PNG to the baseline path. CI
+confirms it, or fails and uploads the real shot.
+
 The `feature` generator writes a draft journey and its flow. Replace the draft
 goal with the real one before the feature ships.
 
