@@ -1,3 +1,6 @@
+import path from 'node:path';
+
+import { ownerFindings } from '@tools/github/auto-merge';
 import { marker } from '@tools/github/auto-merge-rules';
 import { must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
@@ -65,15 +68,6 @@ export function blockingCount(body: string) {
   return /\bno (?:blocking )?findings\b/iu.test(text) ? 0 : null;
 }
 
-/**
- * The `owner` findings in an agent review comment: the summary lists each
- * finding as a bullet that starts with its level, such as "- `owner`: ...".
- * Auto-merge leaves a PR with one for the owner. See docs/contributing/review.md.
- */
-export function ownerCount(body: string) {
-  return [...plain(body).matchAll(/^\s*-\s*owner\b/gimu)].length;
-}
-
 type Comment = { body: string; login: string };
 
 /** The comments on a PR, oldest first. */
@@ -99,19 +93,92 @@ function latestReview(posted: Array<Comment>) {
     .findLast((note) => note.body.trimStart().startsWith('## Agent review'));
 }
 
-/**
- * Whether an `owner` finding still waits for the owner: the one rule that
- * `pr status` and `pr merge` both apply. It waits until the PR is approved,
- * even where no GitHub rule asks for an approval.
- */
-export function waitsForOwner(owner: number, reviewDecision: string | null | undefined) {
-  return owner > 0 && reviewDecision !== 'APPROVED';
+const root = path.resolve(import.meta.dir, '../..');
+
+/** The default owner in CODEOWNERS: the owner of the `*` rule, else the login that the file names most. */
+function codeownersDefault(text: string) {
+  const counts = new Map<string, number>();
+  let star: string | undefined;
+  for (const line of text.split('\n')) {
+    const [pattern, ...owners] = line.replace(/#.*$/u, '').trim().split(/\s+/u);
+    const people = owners
+      .filter((owner) => owner.startsWith('@') && !owner.includes('/'))
+      .map((owner) => owner.slice(1));
+    if (!pattern || people.length === 0) {
+      continue;
+    }
+    if (pattern === '*') {
+      star = people[0];
+    }
+    for (const person of people) {
+      counts.set(person, (counts.get(person) ?? 0) + 1);
+    }
+  }
+  return star ?? [...counts].toSorted((a, b) => b[1] - a[1])[0]?.[0];
 }
 
-/** The `owner` findings of the latest agent review on PR `number`. `pr merge` asks here too. */
-export async function ownerFindings(run: Run, number: string) {
-  const review = latestReview(await comments(run, number));
-  return review ? ownerCount(review.body) : 0;
+/**
+ * The owner whose approval answers agent review's owner findings: `automerge.owner`
+ * in clutch.yaml, else the default owner in .github/CODEOWNERS. Tools may not
+ * import from apps, so this reads only those two places.
+ */
+export async function ownerLogin(): Promise<string | undefined> {
+  const config = Bun.file(path.join(root, 'clutch.yaml'));
+  if (await config.exists()) {
+    const { automerge } = (Bun.YAML.parse(await config.text()) ?? {}) as {
+      automerge?: { owner?: unknown };
+    };
+    if (typeof automerge?.owner === 'string' && automerge.owner.trim()) {
+      return automerge.owner.trim().replace(/^@/u, '');
+    }
+  }
+  const codeowners = Bun.file(path.join(root, '.github/CODEOWNERS'));
+  return (await codeowners.exists()) ? codeownersDefault(await codeowners.text()) : undefined;
+}
+
+type Review = { login: string; state: string; commit: string };
+
+/**
+ * The reviews on PR `number`, oldest first. The REST list gives each review's
+ * commit: `gh pr view --json latestReviews` leaves it empty.
+ */
+async function reviews(run: Run, number: string): Promise<Array<Review>> {
+  const out = await must(run, [
+    'gh',
+    'api',
+    '--paginate',
+    `repos/{owner}/{repo}/pulls/${number}/reviews?per_page=100`,
+    '--jq',
+    '.[] | {login: .user.login, state, commit: .commit_id}',
+  ]);
+  return out
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Review);
+}
+
+/**
+ * Whether agent review's owner findings still wait for the owner, the one rule
+ * that `pr status` and `pr merge` both apply. They wait until the owner's latest
+ * review approves the head commit, so a dismissed approval or one on an older
+ * commit does not count. With no owner to name, GitHub's approval decides.
+ */
+export async function waitsForOwner(
+  run: Run,
+  number: string,
+  pr: { headRefOid: string; reviewDecision?: string | null },
+  findings: number,
+) {
+  if (findings === 0) {
+    return false;
+  }
+  const owner = await ownerLogin();
+  if (owner === undefined) {
+    return pr.reviewDecision !== 'APPROVED';
+  }
+  const all = await reviews(run, number);
+  const latest = all.findLast((review) => review.login === owner);
+  return latest?.state !== 'APPROVED' || latest.commit !== pr.headRefOid;
 }
 
 /** The status checks that the rules of `branch` require. None when the token cannot read them. */
@@ -167,7 +234,9 @@ export async function prStatus(run: Run, number: string) {
   const dryRun = notes.findLast((note) => note.body.includes(marker(pr.headRefOid)));
   const count = (state: State) => all.filter((check) => check.state === state).length;
   const blocking = reviewComment ? blockingCount(reviewComment.body) : null;
-  const owner = reviewComment ? ownerCount(reviewComment.body) : 0;
+  // The owner findings are the annotations of the latest agent-review run on the head, as auto-merge reads them.
+  const findings = await ownerFindings(run, '{owner}/{repo}', pr.headRefOid);
+  const owner = findings.length;
   // A repository without agent review has no review to wait for.
   const reviewed =
     blocking === 0 || (blocking === null && !all.some((check) => check.name === 'agent-review'));
@@ -177,7 +246,7 @@ export async function prStatus(run: Run, number: string) {
   const review =
     pr.reviewDecision || (pr.mergeStateStatus === 'BLOCKED' ? 'BLOCKED by a rule' : '');
   const approved =
-    !waitsForOwner(owner, pr.reviewDecision) && (review === '' || review === 'APPROVED');
+    !(await waitsForOwner(run, number, pr, owner)) && (review === '' || review === 'APPROVED');
   const ready =
     pr.state === 'OPEN' &&
     pr.mergeable === 'MERGEABLE' &&

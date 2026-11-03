@@ -138,7 +138,7 @@ export const ownerAnnotation = 'Owner review needed';
  * counts, and only that job can write its annotations, so an agent cannot
  * remove one the way it could remove a label.
  */
-async function ownerFindings(run: Run, repo: string, sha: string) {
+export async function ownerFindings(run: Run, repo: string, sha: string) {
   const ids = await gh(
     run,
     'api',
