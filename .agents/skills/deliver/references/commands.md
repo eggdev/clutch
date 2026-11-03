@@ -28,6 +28,7 @@ its options, and so does `bun run pr --help`.
 | `bun run clutch doctor [--remote]`       | You want each capability's state, or GitHub's. | Reading workflows and settings by hand.      |
 | `bun run clutch doctor --check`          | You changed `clutch.yaml` or a capability.     | Guessing whether a waiver still holds.       |
 | `bun run clutch ratchet check` / `update`  | A ratchet count went up or down.               | Counting old violations by hand.             |
+| `bun run visual pull <pr>`               | The `journeys` check failed on screenshots that you changed on purpose. | Rendering baselines on your machine, which never match CI. |
 | `bun run clutch risk [--base <ref>]`     | You want a change's risk tier before a PR.     | Judging the tier from the file list.         |
 | `bun run clutch labels [--title <title>]` | You want a change's kind, area and size labels, or its size warning, before a PR. | Choosing `kind/`, `area/` and `size/` labels by hand. |
 | `bun run clutch ruleset [--apply]`       | A file in `.github/rulesets/` changed, or you want to know if GitHub matches it. | `gh api` POST or PUT on the rulesets endpoint. |

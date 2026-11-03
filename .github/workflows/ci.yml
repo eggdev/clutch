@@ -130,3 +130,14 @@ jobs:
           name: journey-traces
           path: test-results/journeys
           if-no-files-found: ignore
+      # Each screenshot that `snap` took, at its baseline path. `bun run visual
+      # pull <pr>` copies the changed ones into the baselines. See
+      # docs/contributing/setup/verification.md#screenshots.
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-screenshots
+          path: test-results/visual
+          if-no-files-found: ignore
+          retention-days: 14

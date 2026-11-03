@@ -24,7 +24,8 @@
     "recap:classify": "bun tools/recap/classify-primitives.ts",
     "recap:upsert": "bun tools/recap/upsert-recap-block.ts",
     "clutch": "bun tools/clutch.ts",
-    "pr": "bun tools/github/pr.ts"
+    "pr": "bun tools/github/pr.ts",
+    "visual": "bun tools/journeys/visual-pull.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

@@ -35,7 +35,7 @@ function addJourneyFlow(tree: Tree, id: string) {
       role: 'the dev actor in one browser context, against the dev servers',
       ownsStack: true,
       timeoutSeconds: 300,
-      artifactPaths: ['test-results/journeys'],
+      artifactPaths: ['test-results/journeys', 'test-results/visual'],
       commands: [journeyCommand(id)],
     },
   };

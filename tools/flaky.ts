@@ -28,6 +28,19 @@ export function quarantined(root: string): Array<FlakyTest> {
   return Array.isArray(data.tests) ? data.tests : [];
 }
 
+/** A web journey file, whose `snap` names may be quarantined too. */
+export const journeyFile = /(?:^|\/)journeys\/[^/]+\.pw\.ts$/u;
+
+/**
+ * A journey screenshot, quarantined by its `snap` name. `snap` in
+ * `packages/journeys` reads these entries itself, because a package may not
+ * import `tools/`.
+ */
+const isSnap = (test: FlakyTest) => journeyFile.test(test.file);
+
+/** The quarantined `bun test` tests, which the test runs leave out. */
+export const bunTests = (tests: ReadonlyArray<FlakyTest>) => tests.filter((test) => !isSnap(test));
+
 const escape = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 
 /**

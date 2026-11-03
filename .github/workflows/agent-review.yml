@@ -266,3 +266,70 @@ jobs:
             done < <(grep '^- ' "$RUNNER_TEMP/prior-owner.md")
             echo "Earlier owner findings not named as resolved: ${raised}."
           fi
+      # Visual review: when the PR adds, changes or removes a screenshot
+      # baseline, the cheapest image model compares each before and after with
+      # the PR's intent and the design rules. It runs the default branch's copy
+      # of the script, so a PR cannot change what judges it. With no baseline
+      # change it stops here, with no install and no API call. See
+      # docs/contributing/review.md#visual-review.
+      - name: List the changed screenshots
+        id: visual
+        if: always() && steps.credential.outputs.present == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Fail closed: a diff that cannot run must not read as "no change".
+          if ! changed="$(git diff --name-only --no-renames "$BASE_SHA"...HEAD -- ':(glob)**/__screenshots__/*.png')"; then
+            echo "::error title=Visual review did not run::git diff against the base failed, so the changed screenshots are unknown. Re-run the job."
+            exit 1
+          fi
+          count="$(printf '%s' "$changed" | grep -c . || true)"
+          echo "Changed screenshot baselines: $count"
+          if [ "$count" != 0 ] && ! git cat-file -e "$BASE_SHA:tools/journeys/visual-review.ts" 2>/dev/null; then
+            echo "::notice title=Visual review off::The default branch has no tools/journeys/visual-review.ts yet."
+            count=0
+          fi
+          if [ "$count" != 0 ]; then
+            git show "$BASE_SHA:tools/journeys/visual-review.ts" > "$RUNNER_TEMP/visual-review.ts"
+          fi
+          echo "changed=$count" >> "$GITHUB_OUTPUT"
+      - if: always() && steps.visual.outputs.changed != '' && steps.visual.outputs.changed != '0'
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          install_args: bun
+      - name: Prepare the visual review
+        if: always() && steps.visual.outputs.changed != '' && steps.visual.outputs.changed != '0'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: bun "$RUNNER_TEMP/visual-review.ts" prepare "$RUNNER_TEMP/visual"
+      - name: Compare the screenshots
+        id: visual-model
+        if: always() && steps.visual.outputs.changed != '' && steps.visual.outputs.changed != '0'
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          allowed_bots: '*'
+          prompt: |
+            Read the file `${{ runner.temp }}/visual/prompt.md` and do what it says.
+            It lists the screenshot pairs to judge and the rules. Return the
+            structured result only. Post nothing to the pull request.
+          claude_args: |
+            --model ${{ vars.CLUTCH_VISUAL_MODEL || 'claude-haiku-5-5' }}
+            --allowedTools "Read"
+            --add-dir ${{ runner.temp }}/visual
+            --json-schema '{"type":"object","properties":{"pairs":{"type":"array","items":{"type":"object","properties":{"path":{"type":"string"},"explained":{"type":"boolean"},"broken":{"type":"boolean"},"note":{"type":"string"}},"required":["path","explained","broken","note"]}},"summary":{"type":"string"}},"required":["pairs","summary"]}'
+      - name: Post the visual review
+        if: always() && steps.visual.outputs.changed != '' && steps.visual.outputs.changed != '0'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          RESULT: ${{ steps.visual-model.outputs.structured_output }}
+        run: bun "$RUNNER_TEMP/visual-review.ts" report "$RUNNER_TEMP/visual"

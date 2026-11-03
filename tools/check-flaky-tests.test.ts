@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import path from 'node:path';
 
 import { checkFlakyTests } from '@tools/check-flaky-tests';
-import { excludePattern, onlyPattern } from '@tools/flaky';
+import { bunTests, excludePattern, onlyPattern } from '@tools/flaky';
 import type { FlakyTest } from '@tools/flaky';
 import { inRepo } from '@tools/testing/in-repo';
 
@@ -76,11 +76,25 @@ test('a wrong name, a missing file, a non-bun file, a duplicate or a missing fie
     expect.stringContaining(
       'tools/gone.test.ts "a sometimes slow thing finishes": the file does not exist',
     ),
-    expect.stringContaining('only bun test files can be quarantined'),
+    expect.stringContaining('only bun test files and journey screenshots can be quarantined'),
     expect.stringContaining('add reason. Each entry needs file, name, issue, until and reason.'),
     expect.stringContaining('is listed twice. Keep one.'),
     expect.stringContaining('is listed twice. Keep one.'),
   ]);
+});
+
+test('a journey screenshot may be quarantined by its snap name, and leaves the bun test runs alone', async () => {
+  const snapEntry = entry({ file: 'features/notes/journeys/notes-sync.pw.ts', name: 'notes-open' });
+  expect(
+    await inRepo(
+      {
+        ...repo([snapEntry]),
+        'features/notes/journeys/notes-sync.pw.ts': "await snap(page, 'notes-open');\n",
+      },
+      (root) => checkFlakyTests(root, today),
+    ),
+  ).toEqual([]);
+  expect(bunTests([snapEntry, entry()])).toEqual([entry()]);
 });
 
 /** Runs `bun test` on the fixture file with a `-t` pattern, and returns the pass count. */

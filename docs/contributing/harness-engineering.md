@@ -118,6 +118,8 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | An override that turns a lint rule off                                            | `oxlint.config.ts`                                                                                                  |
 | A raised file-size budget                                                         | `tools/file-size-budgets.json`                                                                                      |
+| A screenshot baseline replaced with CI's shot                                     | `bun run visual pull`, which rewrites `__screenshots__/*.png`; the PR body gives the reason                         |
+| Pixel noise a screenshot may show without a baseline change                       | `maxDiffPixelRatio` in `packages/journeys/testing/visual.ts`: 0.1% of the pixels                                    |
 | A knip ignore or entry                                                            | `knip.jsonc`                                                                                                        |
 | An import exception                                                               | `primitives.yaml`, `exceptions`                                                                                     |
 | A transaction-safe service                                                        | `primitives.yaml`, `transactionSafe`                                                                                |
@@ -130,7 +132,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A path kept out of a risk tier                                                    | `.clutch/risk.yaml`, a rule's `except`                                                                              |
 | A zizmor finding the owner accepted                                               | `# zizmor: ignore[<audit>]` in the workflow                                                                         |
 | A file whose old lint violations a ratchet holds                                  | `.clutch/ratchets.json`: a ratchet that a lint rule reads, such as `design-system-only`                             |
-| A flaky test kept out of the blocking runs                                        | `tools/flaky-tests.json`, with an issue and an expiry                                                               |
+| A flaky test or journey screenshot kept out of the blocking runs                  | `tools/flaky-tests.json`, with an issue and an expiry                                                               |
 | A Semgrep false positive                                                          | `nosemgrep: rule-id -- reason` on the line, which `check-suppressions` enforces                                     |
 | A Semgrep rule off for the whole repository                                       | `sast.yml`, `--exclude-rule`                                                                                        |
 | A file that tooling reads but sets no rule                                        | `tools/guardrail-files.json`, `exempt`                                                                              |

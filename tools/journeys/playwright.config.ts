@@ -16,6 +16,10 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   forbidOnly: true,
+  // `snap` in @repo/journeys/testing/visual compares with these baselines in
+  // CI. A missing baseline fails, so `visual pull` adds it from the CI shots.
+  snapshotPathTemplate: '{testDir}/{testFileDir}/__screenshots__/{arg}{ext}',
+  updateSnapshots: 'none',
   reporter: 'list',
   timeout: Number(process.env.JOURNEY_BUDGET_MS ?? 60_000),
   expect: { timeout: 10_000 },
@@ -23,5 +27,8 @@ export default defineConfig({
     ...devices['Desktop Chrome'],
     baseURL: process.env.JOURNEY_BASE_URL,
     trace: 'retain-on-failure',
+    // The same text and dates on every machine, for the screenshots.
+    locale: 'en-US',
+    timezoneId: 'UTC',
   },
 });

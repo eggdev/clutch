@@ -75,15 +75,15 @@ skip it in the file. The lint rule `repo-tests/no-hidden-tests` refuses
 `test.skip` and `test.skipIf`.
 
 The quarantine is [`tools/flaky-tests.json`](../../tools/flaky-tests.json).
-Each entry names one test:
+Each entry names one `bun test` test, or one screenshot of a web journey:
 
-| Field    | What it holds                                                    |
-| -------- | ---------------------------------------------------------------- |
-| `file`   | The `bun test` file, such as `tools/check-db.test.ts`.           |
-| `name`   | The exact name in the test call, also inside a `describe` block. |
-| `issue`  | The open issue that owns the fix. Its `owner` owns the test.     |
-| `until`  | The last day of the quarantine, at most 30 days ahead.           |
-| `reason` | What failed and where, such as the CI run.                       |
+| Field    | What it holds                                                                                                              |
+| -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `file`   | The `bun test` file, such as `tools/check-db.test.ts`, or a web journey.                                                   |
+| `name`   | The exact name in the test call, also inside a `describe` block. For a journey, the name in a `snap(page, '<name>')` call. |
+| `issue`  | The open issue that owns the fix. Its `owner` owns the test.                                                               |
+| `until`  | The last day of the quarantine, at most 30 days ahead.                                                                     |
+| `reason` | What failed and where, such as the CI run.                                                                                 |
 
 - `tools/test-budget.ts` runs each `bun test` target. It leaves the
   quarantined tests out, so they cannot block a merge.
@@ -93,6 +93,11 @@ Each entry names one test:
 - `check-flaky-tests` fails on an expired entry, or an entry whose issue is
   missing or `done`. It also fails on a name that is not in the file, and on an
   expiry more than 30 days ahead. A new date needs a new reason in review.
+- A journey entry quarantines one screenshot of a web journey. `snap` still
+  compares and uploads that shot, but a change writes a warning on the test
+  instead of failing the `journeys` check. A missing baseline still fails.
+  The `bun test` runs ignore the entry. See
+  [screenshots](./setup/verification.md#screenshots).
 - Remove the entry in the PR that fixes the test.
 - The nightly [flake hunt](../../.github/workflows/flake-hunt.yml) runs the
   tools tests 20 times on the same code. Each test that passes on some runs and

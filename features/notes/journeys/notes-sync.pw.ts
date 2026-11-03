@@ -10,7 +10,7 @@
  *
  * | User action | Expected observation | Proof |
  * | --- | --- | --- |
- * | Open notes on two devices | Each shows the General space, and axe finds no serious violation on the home or notes page | heading assertion, axe check |
+ * | Open notes on two devices | Each shows the General space, and axe finds no serious violation on the home or notes page | heading assertion, axe check, `notes-open` screenshots |
  * | Add a note on the first device | The second device shows it, with no reload | value assertion |
  * | Rename the note on the first device | The second device shows the new title | value assertion |
  * | Rename it again while the first device is offline | The first device shows it at once, the second does not | value assertions |
@@ -18,12 +18,13 @@
  *
  * Failure condition: a rename that the server never confirms stays only on the first device.
  * Driver: `mise exec -- bun run journey notes-sync`
- * Evidence: the Playwright list output, and a trace and the axe report in `test-results/journeys/` on failure
+ * Evidence: the Playwright list output, the screenshots in `test-results/visual/`, and a trace and the axe report in `test-results/journeys/` on failure
  * Limits: one actor and one space. It does not prove sign-out, access rules or a server restore.
  */
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { accessible } from '@repo/journeys/testing/a11y';
+import { snap } from '@repo/journeys/testing/visual';
 
 /** The title field of the note that has this saved title. */
 function note(page: Page, title: string) {
@@ -50,7 +51,11 @@ test('a note syncs to another device, also after an offline rename', async ({ br
   const second = await browser.newContext();
   const writer = await first.newPage();
   const reader = await second.newPage();
+  await writer.goto('/');
+  await expect(writer.getByRole('button', { name: 'Open notes' })).toBeVisible();
+  await snap(writer, 'home');
   await openNotes(writer);
+  await snap(writer, 'notes-open');
   await openNotes(reader);
 
   const run = Date.now().toString(36);

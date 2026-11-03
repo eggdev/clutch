@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { quarantined, registryFile } from '@tools/flaky';
+import { journeyFile, quarantined, registryFile } from '@tools/flaky';
 import type { FlakyTest } from '@tools/flaky';
 
 /**
@@ -50,9 +50,9 @@ function entryProblems(root: string, entry: FlakyTest, today: string): Array<str
     ];
   }
   const problems: Array<string> = [];
-  if (!bunTest.test(entry.file)) {
+  if (!bunTest.test(entry.file) && !journeyFile.test(entry.file)) {
     problems.push(
-      `${where}: only bun test files can be quarantined. Fix the test, or file an issue.`,
+      `${where}: only bun test files and journey screenshots can be quarantined. Fix the test, or file an issue.`,
     );
   } else if (!existsSync(path.join(root, entry.file))) {
     problems.push(`${where}: the file does not exist. Fix the path, or remove the entry.`);

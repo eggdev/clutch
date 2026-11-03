@@ -1,4 +1,4 @@
 {
-  "description": "Quarantined flaky tests. Each one has an open issue that owns its fix, a reason, and an expiry at most 30 days ahead. The blocking test runs leave these tests out, and a non-blocking CI step runs each one 3 times and reports. check-flaky-tests fails on an expired entry, on a missing or done issue, and on a name that is not in the file. See docs/contributing/testing.md#flaky-tests.",
+  "description": "Quarantined flaky tests. Each one has an open issue that owns its fix, a reason, and an expiry at most 30 days ahead. The blocking test runs leave these tests out, and a non-blocking CI step runs each one 3 times and reports. An entry whose file is a web journey (features/<name>/journeys/<id>.pw.ts) names a snap: the journey still compares that screenshot, but a change warns instead of failing. check-flaky-tests fails on an expired entry, on a missing or done issue, and on a name that is not in the file. See docs/contributing/testing.md#flaky-tests.",
   "tests": []
 }
