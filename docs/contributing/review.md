@@ -137,7 +137,7 @@ Each PR carries labels that tools and people route on:
 | `kind/<type>`    | The [Labels workflow](../../.github/workflows/labels.yml) | The conventional type of the PR title, such as `kind/fix`.                                                            |
 | `area/<part>`    | The Labels workflow                                       | Each workspace package or top folder the PR touches, such as `area/cli`.                                              |
 | `size/<S to XL>` | The Labels workflow                                       | The changed lines. Above `pr_size.warn` the run warns, and it never fails.                                            |
-| `risk/<tier>`    | The [Risk workflow](../../.github/workflows/risk.yml)     | The paths in `.clutch/risk.yaml`. See [risk](../../apps/cli/README.md#risk).                                          |
+| `risk/<tier>`    | The [Labels workflow](../../.github/workflows/labels.yml) | The paths in `.clutch/risk.yaml`. See [risk](../../apps/cli/README.md#risk).                                          |
 | `one-way-door`   | A person                                                  | The change is one-way. See [two-way and one-way doors](../principles/two-way-doors.md).                               |
 | `revert`         | A person, or auto-revert                                  | Adding it to a merged PR starts its [revert](./operations/rollback.md#revert-a-merged-pull-request).                  |
 | `drill`          | A person                                                  | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the brake or the metric. |

@@ -99,6 +99,8 @@ export async function checksDoneAt(
  * The decide job of run `id`: its conclusion, and when it started in
  * milliseconds. Null when the run has no decide job. The run's own
  * conclusion is not used, since a run whose decide job was skipped did not decide.
+ * A decide job whose Decide step was skipped found no PR to judge, so it did
+ * not decide either, and counts as skipped.
  */
 async function decideJob(run: Run, repo: string, id: number) {
   const out = await gh(
@@ -107,14 +109,17 @@ async function decideJob(run: Run, repo: string, id: number) {
     '--paginate',
     `repos/${repo}/actions/runs/${id}/jobs`,
     '--jq',
-    '.jobs[] | select(.name == "decide") | [.conclusion, .started_at] | @tsv',
+    '.jobs[] | select(.name == "decide") | [.conclusion, .started_at, ([.steps[]? | select(.name == "Decide") | .conclusion][0] // "")] | @tsv',
   );
   const line = out.split('\n').find(Boolean);
   if (!line) {
     return null;
   }
-  const [conclusion, startedAt] = line.split('\t');
-  return { conclusion: conclusion || null, startedAt: Date.parse(startedAt) };
+  const [conclusion, startedAt, step] = line.split('\t');
+  return {
+    conclusion: step === 'skipped' ? 'skipped' : conclusion || null,
+    startedAt: Date.parse(startedAt),
+  };
 }
 
 /**

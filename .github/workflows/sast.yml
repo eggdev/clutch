@@ -1,6 +1,8 @@
 # Static analysis (SAST) on each PR, on each push to main, and weekly, so a new
-# rule finds old code too. The `sast` job is the required check, so one
-# ruleset fits every repository. See https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/codeql-sast.md.
+# rule finds old code too. One `sast` job picks the engine, scans and is the
+# required check, so one ruleset fits every repository and a private
+# repository pays for one runner. A pull request that changes only Markdown,
+# images or the friction log skips the scan, since no scanned file changed. See https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/codeql-sast.md.
 #
 # `sast` in clutch.yaml picks the engine: auto (the default), codeql or semgrep.
 # Under auto, where GitHub code scanning takes results (a public repository, or
@@ -34,21 +36,21 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  engine:
+  # The required check.
+  sast:
     runs-on: ubuntu-26.04
-    timeout-minutes: 5
+    timeout-minutes: 25
     permissions:
       contents: read
-      # Reads the code scanning alerts list, to see whether code scanning is on.
-      security-events: read
-    outputs:
-      engine: ${{ steps.pick.outputs.engine }}
+      # Reads the code scanning alerts list, to see whether code scanning is
+      # on, and uploads CodeQL results. Permissions are per job, so the
+      # Semgrep path holds them too, unused.
+      security-events: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: clutch.yaml
-          sparse-checkout-cone-mode: false
       - name: Pick the engine
         id: pick
         env:
@@ -90,47 +92,38 @@ jobs:
           esac
           echo "::notice title=SAST engine::$ENGINE (sast: $CHOICE)"
           echo "engine=$ENGINE" >> "$GITHUB_OUTPUT"
-
-  codeql:
-    needs: engine
-    if: needs.engine.outputs.engine == 'codeql'
-    name: analyze (${{ matrix.language }})
-    runs-on: ubuntu-26.04
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        # actions covers the workflows. python covers tools/verification and the skill scripts.
-        language: [javascript-typescript, actions, python]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # A pull request that changes only Markdown, images and the friction log
+      # leaves every scanned file as the base has it, and the base was scanned
+      # on its push. Changesets and tracker issues are Markdown too. GitHub lists at most 300 files,
+      # so a longer list always scans.
+      - name: Skip a docs-only pull request
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          scan=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            files="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE_SHA...$HEAD_SHA" --jq '.files[].filename')"
+            count="$(printf '%s\n' "$files" | grep -c . || true)"
+            code="$(printf '%s\n' "$files" | grep -vE '\.(md|png|webp)$|^\.clutch/friction\.jsonl$' | grep -c . || true)"
+            if [ "$count" -gt 0 ] && [ "$count" -lt 300 ] && [ "$code" = 0 ]; then
+              scan=false
+              echo "::notice title=SAST skipped::This pull request changes only Markdown, images or the friction log, so no scanned file changed."
+            fi
+          fi
+          echo "scan=$scan" >> "$GITHUB_OUTPUT"
+      # CodeQL reads each language here without a build, so one job runs all
+      # three. actions covers the workflows. python covers tools/verification
+      # and the skill scripts.
+      - if: steps.pick.outputs.engine == 'codeql' && steps.scope.outputs.scan == 'true'
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
-          persist-credentials: false
-      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          languages: ${{ matrix.language }}
-          # Each language here is interpreted, so CodeQL reads the source without a build.
+          languages: javascript-typescript, actions, python
           build-mode: none
-      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          category: /language:${{ matrix.language }}
-
-  semgrep:
-    needs: engine
-    if: needs.engine.outputs.engine == 'semgrep'
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-    # Semgrep Community Edition, the LGPL engine, pinned by digest. It needs no
-    # account and no token, and uploads nothing.
-    container:
-      image: semgrep/semgrep:1.182.1@sha256:451b3d875c00dac7ed5db5293e584a07de11449a409c10b3c2d2652f429630b6
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      - if: steps.pick.outputs.engine == 'codeql' && steps.scope.outputs.scan == 'true'
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
       # A finding fails the job and prints in the log. A false positive gets
       # `nosemgrep: rule-id -- reason` on its line or the line above, and
       # check-suppressions rejects one without a reason. Each rule turned off
@@ -139,32 +132,15 @@ jobs:
       #   repository's own config, never from outside input.
       # - the minimum release age rules want 7 days. bunfig.toml and
       #   renovate.json wait 3 days, and dep_min_age checks that.
-      - name: Scan
-        run: >-
-          semgrep scan --config p/default --error --metrics off --disable-version-check
-          --exclude-rule javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
-          --exclude-rule package_managers.bun.bun-missing-minimum-release-age.bun-missing-minimum-release-age
-          --exclude-rule package_managers.renovate.renovate-missing-minimum-release-age.renovate-missing-minimum-release-age
-
-  # The required check. It passes only when the picked engine passed.
-  sast:
-    needs: [engine, codeql, semgrep]
-    if: always()
-    runs-on: ubuntu-26.04
-    timeout-minutes: 5
-    steps:
-      - name: Check the engine's result
-        env:
-          ENGINE: ${{ needs.engine.outputs.engine }}
-          RESULTS: ${{ toJSON(needs) }}
-        run: |
-          if [ -z "$ENGINE" ]; then
-            echo "::error title=SAST did not run::The engine job failed. Read its log."
-            exit 1
-          fi
-          result="$(printf '%s' "$RESULTS" | jq -r --arg engine "$ENGINE" '.[$engine].result')"
-          echo "$ENGINE: $result"
-          if [ "$result" != success ]; then
-            echo "::error title=SAST failed::$ENGINE ended with $result. Read the $ENGINE job's log."
-            exit 1
-          fi
+      # Semgrep Community Edition, the LGPL engine, pinned by digest. It needs
+      # no account and no token, and uploads nothing.
+      - name: Scan with Semgrep
+        if: steps.pick.outputs.engine == 'semgrep' && steps.scope.outputs.scan == 'true'
+        uses: docker://semgrep/semgrep:1.182.1@sha256:451b3d875c00dac7ed5db5293e584a07de11449a409c10b3c2d2652f429630b6
+        with:
+          entrypoint: semgrep
+          args: >-
+            scan --config p/default --error --metrics off --disable-version-check
+            --exclude-rule javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+            --exclude-rule package_managers.bun.bun-missing-minimum-release-age.bun-missing-minimum-release-age
+            --exclude-rule package_managers.renovate.renovate-missing-minimum-release-age.renovate-missing-minimum-release-age

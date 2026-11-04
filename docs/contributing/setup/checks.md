@@ -259,7 +259,7 @@ Two more jobs repeat checks that a local hook also runs, because
 PR's commits with gitleaks. The `commits` job checks each PR commit message
 with the `commit-msg` rule in [Git hooks](#git-hooks).
 
-The [Risk workflow](../../../.github/workflows/risk.yml) labels each PR
+The [Labels workflow](../../../.github/workflows/labels.yml) labels each PR
 `risk/low`, `risk/medium`, `risk/high` or `risk/one-way-door` from the paths it
 touches. It runs `clutch risk` from the base branch, with the rules in
 `.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk). The
