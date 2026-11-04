@@ -150,7 +150,7 @@ function checkUnique(entry: Entry, field: string, key: string, add: Add) {
   }
 }
 
-function checkBenchmarks(tree: Tree, agents: Set<string>, models: Map<string, string>, add: Add) {
+function checkBenchmarks(tree: Tree, agents: Set<string>, models: Map<string, Model>, add: Add) {
   for (const benchmark of tree.benchmarks) {
     const { agent, configs } = benchmark.data;
     if (typeof agent === 'string' && !agents.has(agent)) {
