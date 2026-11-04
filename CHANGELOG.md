@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.53.4 (2026-11-04)
+
+### Fixes and maintenance
+
+- docs(skills): name both reasons a Decide step skips
+
 ## 0.53.3 (2026-11-04)
 
 ### Fixes and maintenance
