@@ -7,11 +7,16 @@ name: Labels
 # one-way-door label exists, which a person adds when a change is one-way
 # (docs/principles/two-way-doors.md), and the revert label, which a person adds
 # to a merged PR to revert it.
-# risk/<tier> comes from risk.yml. See docs/contributing/agent-review.md#labels.
+# It also sets risk/<tier>, the risk tier from the paths it touches. The rules
+# live in .clutch/risk.yaml. The tier comes from the base branch's CLI and
+# rules, so a pull request cannot lower its own tier. A label set with
+# GITHUB_TOKEN starts no other workflow, so auto-merge computes the tier
+# itself. See docs/contributing/agent-review.md#labels and apps/cli/README.md#risk.
 #
 # Two jobs, so the pull request's code never runs with a write token. compute
-# runs the head's CLI with a read-only token, since the labels describe the
-# change and gate nothing. apply writes the labels and checks out no code.
+# runs the head's CLI for the labels and the base's CLI for the tier, with a
+# read-only token, since the labels describe the change and gate nothing.
+# apply writes the labels and checks out no code.
 
 on:
   pull_request:
@@ -37,6 +42,7 @@ jobs:
       contents: read
     outputs:
       labels: ${{ steps.labels.outputs.json }}
+      tier: ${{ steps.tier.outputs.tier }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -60,6 +66,32 @@ jobs:
           if [ -n "$warning" ]; then
             echo "::warning title=Large pull request::$warning"
           fi
+      # The tier comes from the base branch's CLI and rules. The checkout has
+      # the base already, since fetch-depth is 0.
+      - name: Check out the base branch
+        id: base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git checkout --quiet --detach "origin/$BASE_REF"
+          if [ -f .clutch/risk.yaml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Risk off::The base branch has no .clutch/risk.yaml, so the pull request gets no risk label."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.base.outputs.present == 'true'
+        run: bun install --frozen-lockfile
+      - name: Compute the tier
+        id: tier
+        if: steps.base.outputs.present == 'true'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          bun run --silent clutch risk --base "origin/$BASE_REF" --head "$HEAD_SHA" --json > "$RUNNER_TEMP/risk.json"
+          echo "tier=$(jq -r '.tier' "$RUNNER_TEMP/risk.json")" >> "$GITHUB_OUTPUT"
+          bun run --silent clutch risk --base "origin/$BASE_REF" --head "$HEAD_SHA"
 
   apply:
     needs: compute
@@ -75,6 +107,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           LABELS: ${{ needs.compute.outputs.labels }}
+          TIER: ${{ needs.compute.outputs.tier }}
         run: |
           # Retries a gh call up to 3 times on a transient GitHub error, which is a
           # 5xx, no server, a timeout or a reset connection. Only the reads, the
@@ -102,6 +135,11 @@ jobs:
           done
           wanted="$(printf '%s' "$LABELS" | jq -r '.apply[].name')"
           owned="$(printf '%s' "$LABELS" | jq -r '.owned | join("|")')"
+          # risk/<tier> is owned here too. Without a tier, the risk labels stay.
+          if [ -n "$TIER" ]; then
+            wanted="$(printf '%s\nrisk/%s' "$wanted" "$TIER")"
+            owned="$owned|risk/"
+          fi
           current="$(gh_retry gh api "repos/$GH_REPO/issues/$PR/labels" --jq '.[].name')"
           for old in $(printf '%s\n' "$current" | grep -E "^($owned)" || true); do
             if ! printf '%s\n' "$wanted" | grep -qxF "$old"; then

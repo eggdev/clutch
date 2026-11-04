@@ -18,9 +18,10 @@ name: Auto-merge
 # green PR once on its final check state, and again only when its head changes
 # or its last decide job fails. After a push that changes a rule, it decides
 # every eligible PR again. A dispatch runs only from the default branch and
-# judges the head the PR has then. The find job reads that head, and decide and
-# merge queue on it, so a dispatch and an event run for the same head never
-# decide at once. The scripts retry a gh read on a transient GitHub error, and
+# judges the head the PR has then. The decide job finds the PR and its head.
+# It queues on the PR, and merge on the head, so a dispatch and an event run
+# for the same PR never decide at once. One job finds and decides, since each job bills
+# at least a minute in a private repository. The scripts retry a gh read on a transient GitHub error, and
 # never a write (tools/github/command.ts).
 
 run-name: "Auto-merge${{ inputs.pr && format(' #{0}', inputs.pr) || '' }}"
@@ -46,12 +47,12 @@ permissions:
   contents: read
 
 jobs:
-  find:
+  decide:
     # Every pull request from this repository, never a fork. The script judges
     # each one by its author and branch, so a person's PR gets only a refusal. A
     # push to main also completes CI, and is no pull request. A dispatch from
     # any branch but the default one is refused, and so is a fork's PR, which the
-    # Find step refuses for a dispatch.
+    # Find step refuses for a dispatch. A run that finds no PR judges nothing.
     if: >-
       (github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository) ||
@@ -60,26 +61,39 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     runs-on: ubuntu-26.04
-    timeout-minutes: 5
+    timeout-minutes: 10
+    # One decision at a time for each pull request, so two runs cannot both
+    # comment. A dispatch and an event run on the same PR queue here. A
+    # workflow_run that names no PR falls back to its head commit.
+    concurrency:
+      group: auto-merge-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr || github.event.workflow_run.head_sha }}
+      cancel-in-progress: false
     permissions:
       contents: read
-      pull-requests: read
+      checks: read
+      # The verdict comments.
+      pull-requests: write
+    # The merge job takes over when a PR may merge at the step.
     outputs:
-      number: ${{ steps.pr.outputs.number }}
+      merge: ${{ steps.decide.outputs.merge }}
+      step: ${{ steps.decide.outputs.step }}
+      pr: ${{ steps.pr.outputs.number }}
       head: ${{ steps.pr.outputs.head }}
     steps:
       - name: Find the pull request
         id: pr
+        # The limit that the find job had.
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
-          # This job has no checkout, so gh needs the repository named.
+          # This step runs before the checkout, so gh needs the repository named.
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             # A dispatch judges the head that the PR has now. A fork's PR is
-            # refused, as the workflow_run path refuses it: the decide job skips.
+            # refused, as the workflow_run path refuses it: the run judges nothing.
             pr_view="$(gh pr view "$PR" --json headRefOid,isCrossRepository --jq '.headRefOid + " " + (.isCrossRepository | tostring)')"
             read -r HEAD_SHA cross <<< "$pr_view"
             if [ "$cross" != false ]; then
@@ -94,38 +108,17 @@ jobs:
           fi
           echo "number=$PR" >> "$GITHUB_OUTPUT"
           echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-
-  decide:
-    needs: find
-    # Only when the find job found a PR that this run may judge.
-    if: needs.find.outputs.number != ''
-    runs-on: ubuntu-26.04
-    timeout-minutes: 10
-    # One decision at a time for each head commit, so two runs cannot both
-    # comment. A dispatch and an event run on the same head queue here.
-    concurrency:
-      group: auto-merge-${{ needs.find.outputs.head }}
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      checks: read
-      # The verdict comments.
-      pull-requests: write
-    # The merge job takes over when a PR may merge at the step.
-    outputs:
-      merge: ${{ steps.decide.outputs.merge }}
-      step: ${{ steps.decide.outputs.step }}
-      pr: ${{ needs.find.outputs.number }}
-      head: ${{ needs.find.outputs.head }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Only when this run found a PR that it may judge.
+      - if: steps.pr.outputs.number != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ needs.find.outputs.head }}
+          ref: ${{ steps.pr.outputs.head }}
           # The risk diff needs the merge base, and the default branch runs the rules.
           fetch-depth: 0
       - name: Check out the default branch
         id: base
+        if: steps.pr.outputs.number != ''
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
@@ -147,8 +140,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           # Write merge=true and the step for the merge job, never merge here.
           AUTOMERGE_HANDOFF: '1'
-          PR: ${{ needs.find.outputs.number }}
-          HEAD_SHA: ${{ needs.find.outputs.head }}
+          PR: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head }}
         run: |
           set -o pipefail
           bun tools/github/auto-merge.ts --pr "$PR" --head "$HEAD_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
