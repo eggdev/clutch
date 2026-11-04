@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.54.0 (2026-11-04)
+
+### Features
+
+- feat(review): hold for the owner only the hard core (CL-419)
+- feat(babysit): babysit every agent PR from a workflow (CL-420)
+
 ## 0.53.7 (2026-11-04)
 
 ### Fixes and maintenance
