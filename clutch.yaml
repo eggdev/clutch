@@ -9,7 +9,7 @@ template:
 # that adopts it is done. clutch doctor --check enforces both.
 capabilities:
   root_agents_md: adopted
-  nested_agent_rules: { status: waived, reason: Lands in CL-307., issue: CL-307 }
+  nested_agent_rules: adopted
   skills_dir: adopted
   factory_as_code: adopted
   friction_log: adopted

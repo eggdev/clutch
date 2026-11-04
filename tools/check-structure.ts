@@ -8,8 +8,9 @@ import { sections } from '@tools/lint/import-policy.mjs';
  * The shape of each package and feature. A package has only section folders
  * and a few config files at its top. A feature has its gate, `screens/`,
  * `components/` and `journeys/`. The generators make these shapes; this check
- * rejects any other. `check-journeys` checks the journeys, and
- * `check-primitives` checks that each one has a primitive. See
+ * rejects any other. An `AGENTS.md` file and its `CLAUDE.md` include can also
+ * sit at the top. `check-journeys` checks the journeys, and `check-primitives`
+ * checks that each one has a primitive. See
  * docs/contributing/architecture/index.md.
  */
 const projectFiles = new Set([
@@ -18,6 +19,8 @@ const projectFiles = new Set([
   'tsconfig.lib.json',
   'tsconfig.spec.json',
   'README.md',
+  'AGENTS.md',
+  'CLAUDE.md',
 ]);
 const packageFiles = new Set([...projectFiles, 'drizzle.config.ts']);
 const featureFolders = new Set(['screens', 'components', 'journeys']);

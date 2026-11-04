@@ -11,6 +11,8 @@ test('a package with only sections and config files, and a feature with its gate
       {
         'packages/billing/package.json': manifest,
         'packages/billing/README.md': '# Billing\n',
+        'packages/billing/AGENTS.md': '# Billing agent rules\n',
+        'packages/billing/CLAUDE.md': '@AGENTS.md\n',
         'packages/billing/drizzle.config.ts': '',
         'packages/billing/types/invoice.ts': '',
         'packages/billing/repo/migrations/.gitkeep': '',
