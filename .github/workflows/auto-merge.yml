@@ -82,6 +82,8 @@ jobs:
     steps:
       - name: Find the pull request
         id: pr
+        # The limit that the find job had.
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
           # This step runs before the checkout, so gh needs the repository named.
