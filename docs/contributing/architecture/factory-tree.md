@@ -136,6 +136,11 @@ Compare the pull request with its issue. Return one label and one sentence that 
 | `passingScore` | Yes      | 0 to 1. A run passes when its label scores this or more                                                      |
 | `samplingRate` | Yes      | A whole number from 0 to 100: the percent of runs that the scorer grades                                     |
 
+`clutch score <scorer> --pr <number>` runs a scorer on one pull request. See
+the [CLI reference](https://github.com/eggdev/clutch/blob/main/apps/cli/README.md#score).
+A score comment starts with the marker
+`<!-- clutch-score:<scorer>:<label>:<score>:<head sha> -->`.
+
 ## benchmark.md
 
 ```markdown
@@ -185,10 +190,18 @@ models:
   - id: qwen3.8-27b
     harness: qwen
     where: The Spark, llama-swap at 127.0.0.1:8092
+    base_url: http://127.0.0.1:8092/v1
 ```
 
-Each item has an `id` and a `harness`. `where` is optional: it says where the
-model runs and how to reach it.
+| Key        | Required | Value                                                                                          |
+| ---------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `id`       | Yes      | The model id that the harness or the server takes                                              |
+| `harness`  | Yes      | `claude`, `codex` or `qwen`                                                                    |
+| `where`    | No       | Where the model runs and how to reach it                                                       |
+| `base_url` | No       | The base URL of an OpenAI-compatible server for the model, such as `http://localhost:11434/v1` |
+
+`clutch score` sends a scorer's prompt to `base_url` with the `id` as the
+model. Ollama takes `qwen3.6` for `qwen3.6:latest`.
 
 ## Rules across files
 
@@ -202,6 +215,8 @@ these rules:
   in `agents/`.
 - A scorer's `judge` is an `id` in `models.yaml`, or a lowercase kebab-case
   name of a person.
+- A scorer whose `judge` has the harness `qwen` needs the `base_url` of that
+  model.
 - A tree has at most 1 `foreman`.
 - A scorer has at least 1 label that passes and 1 label that fails. No 2
   labels have the same `value`.

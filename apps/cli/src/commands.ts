@@ -11,6 +11,7 @@ import { metricsCommand } from '@/metrics-command';
 import { ratchetCommand } from '@/ratchet-command';
 import { riskCommand } from '@/risk-command';
 import { rulesetCommand } from '@/ruleset-command';
+import { scoreCommand } from '@/score-command';
 import { syncCommand } from '@/sync-command';
 import { worktreeCommand } from '@/worktree-command';
 
@@ -53,6 +54,13 @@ export const commands: Record<string, Command> = {
     summary:
       'Run each task of a benchmark suite with each of its models, in scratch clones, and print pass, time and lines. A whole run writes its result file.',
     run: benchCommand,
+  },
+  score: {
+    usage:
+      'clutch score <scorer> --pr <number> [--root DIR] [--repo OWNER/NAME] [--json] [--post] [--sample]',
+    summary:
+      "Judge one pull request with a scorer of the factory tree, on the model in the scorer's judge. --post adds the score as a PR comment.",
+    run: (args, cwd) => scoreCommand(args, cwd),
   },
   init: {
     usage: 'clutch init [--root DIR] [--mode sync|doctor] [--adopt] [--yes]',

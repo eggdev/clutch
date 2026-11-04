@@ -15,7 +15,8 @@ async function keys(root: string) {
   return problems.map((problem) => `${problem.file} ${problem.key}`);
 }
 
-const models = 'models:\n  - id: opus\n    harness: claude\n  - id: qwen\n    harness: qwen\n';
+const qwenUrl = '    base_url: http://localhost:11434/v1\n';
+const models = `models:\n  - id: opus\n    harness: claude\n  - id: qwen\n    harness: qwen\n${qwenUrl}`;
 const runner = 'description: A box.\nmachine: box\nt3_environment: local\nworkspace: worktree\n';
 const agent = (role: string, extra = '') =>
   `---\nrole: ${role}\ndescription: An agent.\nharness: claude\nmodel: opus\nrunner: box\n${extra}---\n\nDo the work.\n`;
@@ -184,6 +185,32 @@ test('a benchmark needs a known agent, known models and unique names', async () 
     'benchmarks/compare/benchmark.md': benchmark(config('opus', 'opus'), task('one')),
   });
   expect(await keys(one.root)).toEqual(['benchmarks/compare/benchmark.md configs']);
+});
+
+test('a scorer whose judge runs with qwen needs the base_url of its model', async () => {
+  const files = { ...base, 'scorers/fit/scorer.md': scorer(label('pass', 1) + label('fail', 0)) };
+  await using missing = await tree({
+    ...files,
+    'models.yaml': models.replace(qwenUrl, ''),
+  });
+  expect(await problemsOf(missing.root)).toEqual([
+    {
+      file: 'scorers/fit/scorer.md',
+      key: 'judge',
+      reason: '"qwen" runs with qwen, so its item in models.yaml needs a base_url.',
+    },
+  ]);
+  await using bad = await tree({
+    ...files,
+    'models.yaml': models.replace('http://localhost:11434/v1', 'localhost:11434'),
+  });
+  expect(await keys(bad.root)).toEqual(['models.yaml models[1].base_url']);
+  await using claude = await tree({
+    ...files,
+    'models.yaml': `${models}  - id: sonnet\n    harness: claude\n`,
+    'scorers/fit/scorer.md': files['scorers/fit/scorer.md'].replace('judge: qwen', 'judge: sonnet'),
+  });
+  expect(await keys(claude.root)).toEqual([]);
 });
 
 test('each trigger type takes its own keys', async () => {

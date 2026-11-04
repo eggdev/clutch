@@ -3,8 +3,9 @@ import type { Entry, Problem, Tree } from '@/factory/tree';
 
 /**
  * The rules that read more than one file: each name that points at another
- * file, at most 1 foreman, and labels that can pass and fail. A key that
- * already has a schema problem is skipped, so each mistake is reported once.
+ * file, at most 1 foreman, labels that can pass and fail, and a base_url for
+ * each qwen judge. A key that already has a schema problem is skipped, so
+ * each mistake is reported once.
  */
 
 const person = new RegExp(namePattern, 'u');
@@ -12,13 +13,15 @@ const show = (value: unknown) => JSON.stringify(value);
 
 type Add = (entry: Entry, key: string, reason: string) => void;
 
+type Model = { harness: string; baseUrl?: unknown };
+
 function modelIds(tree: Tree) {
-  const ids = new Map<string, string>();
+  const ids = new Map<string, Model>();
   const list = tree.models?.data.models;
   for (const model of Array.isArray(list) ? list : []) {
-    const { id, harness } = (model ?? {}) as { id?: unknown; harness?: unknown };
+    const { id, harness, base_url } = (model ?? {}) as Record<string, unknown>;
     if (typeof id === 'string' && typeof harness === 'string') {
-      ids.set(id, harness);
+      ids.set(id, { harness, baseUrl: base_url });
     }
   }
   return ids;
@@ -39,7 +42,7 @@ function checkModels(tree: Tree, add: Add) {
   }
 }
 
-function checkAgents(tree: Tree, models: Map<string, string>, add: Add) {
+function checkAgents(tree: Tree, models: Map<string, Model>, add: Add) {
   const runners = new Set(tree.runners.map((runner) => runner.name));
   let foreman: Entry | undefined;
   for (const agent of tree.agents) {
@@ -52,11 +55,11 @@ function checkAgents(tree: Tree, models: Map<string, string>, add: Add) {
         add(agent, 'model', `${show(model)} needs models.yaml, and the tree has none.`);
       } else if (!models.has(model)) {
         add(agent, 'model', `${show(model)} is not an id in models.yaml.`);
-      } else if (typeof harness === 'string' && models.get(model) !== harness) {
+      } else if (typeof harness === 'string' && models.get(model)?.harness !== harness) {
         add(
           agent,
           'harness',
-          `models.yaml runs ${model} with ${models.get(model)}, not ${harness}.`,
+          `models.yaml runs ${model} with ${models.get(model)?.harness}, not ${harness}.`,
         );
       }
     }
@@ -107,7 +110,7 @@ function checkLabels(scorer: Entry, add: Add) {
   }
 }
 
-function checkScorers(tree: Tree, agents: Set<string>, models: Map<string, string>, add: Add) {
+function checkScorers(tree: Tree, agents: Set<string>, models: Map<string, Model>, add: Add) {
   for (const scorer of tree.scorers) {
     const { agents: graded, judge } = scorer.data;
     for (const [index, agent] of (Array.isArray(graded) ? graded : []).entries()) {
@@ -120,6 +123,14 @@ function checkScorers(tree: Tree, agents: Set<string>, models: Map<string, strin
         scorer,
         'judge',
         `${show(judge)} is not an id in models.yaml, or a person's name in lowercase kebab case.`,
+      );
+    }
+    const model = typeof judge === 'string' ? models.get(judge) : undefined;
+    if (model?.harness === 'qwen' && model.baseUrl === undefined) {
+      add(
+        scorer,
+        'judge',
+        `${show(judge)} runs with qwen, so its item in models.yaml needs a base_url.`,
       );
     }
     checkLabels(scorer, add);

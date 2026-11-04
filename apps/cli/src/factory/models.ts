@@ -32,6 +32,12 @@ export const modelsKind: Kind = {
               description: 'The agent CLI that runs the model.',
             },
             where: text('Where the model runs and how to reach it.'),
+            base_url: {
+              type: 'string',
+              pattern: '^https?://\\S+$',
+              description:
+                'The base URL of an OpenAI-compatible server for the model, such as http://localhost:11434/v1. A scorer that judges with a qwen model needs it.',
+            },
           },
         },
       },

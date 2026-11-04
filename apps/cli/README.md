@@ -190,6 +190,44 @@ For each pair, the command does these steps:
 - The [factory tree](../../docs/contributing/architecture/factory-tree.md#benchmarkmd)
   page names the keys of `benchmark.md`.
 
+## Score
+
+`clutch score <scorer> --pr <number>` judges one pull request with a scorer
+of the factory tree. The scorer's `judge` is a model in `models.yaml`. The
+command sends the judge prompt, the labels and the pull request to the model's
+`base_url`, an OpenAI-compatible server. The model returns 1 label and 1
+reason. The score is the label's score. The pull request passes when its score
+is the `passingScore` or more.
+
+```sh
+mise exec -- bun run clutch score acceptance-criteria --pr 203
+mise exec -- bun run clutch score acceptance-criteria --pr 203 --json --post
+mise exec -- bun run clutch score task-compliance --pr 203 --root ../c-suite
+```
+
+- The prompt holds the title, the description, the list of changed files and
+  the diff. It also holds the `.clutch/issues` file at the head commit, when
+  the title or the branch names an issue id, such as `CL-426`. A part that is
+  too long is cut, and the prompt says so. The budget fits a model with a
+  32,768-token context.
+- The command reads the pull request with `gh api` GET requests. `--repo
+  OWNER/NAME` reads another repository. The default is the `origin` remote.
+- The tree root is `factory.root` in `clutch.yaml`, or `factory/`. `--root DIR`
+  reads the tree at `DIR`, so a project can run a scorer of another tree. The
+  whole tree must pass `clutch factory --check`.
+- A person's judge, or a model without `base_url`, cannot score. The command
+  sends no API key, so it calls only a server that needs no key.
+- When a reply has no valid label, the command asks the model 1 more time.
+- `--post` adds the score as a PR comment, which starts with the marker
+  `<!-- clutch-score:<scorer>:<label>:<score>:<head sha> -->`. A second run on
+  the same head edits that comment.
+- `--sample` scores the pull request only when it falls in the scorer's
+  `samplingRate`. A hash of the scorer, the repository and the number makes
+  the choice, so each sweep picks the same pull requests.
+- `--json` prints the score, the reason, the seconds of the call and each cut.
+- The command exits 0 with a score, also with a score that fails, and 0 when
+  `--sample` skips the pull request. It exits 1 when it cannot score.
+
 ## Worktree
 
 `clutch worktree` makes a separate checkout for one task, so several agents or

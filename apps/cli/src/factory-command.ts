@@ -29,7 +29,7 @@ async function isFolder(dir: string) {
  * the project root. `base` is the folder that the output shows paths from.
  * `explicit` is true when a person named the root, so a missing folder fails.
  */
-async function treeRoot(cwd: string, flag: string | undefined) {
+export async function treeRoot(cwd: string, flag: string | undefined) {
   if (flag !== undefined) {
     return { dir: path.resolve(cwd, flag), base: cwd, explicit: true };
   }
