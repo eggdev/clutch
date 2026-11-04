@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.53.5 (2026-11-04)
+
+### Fixes and maintenance
+
+- fix(tools): take Neighborhood's fixes to managed files (CL-425)
+
 ## 0.53.4 (2026-11-04)
 
 ### Fixes and maintenance
