@@ -1,179 +1,7 @@
 import { expect, test } from 'bun:test';
 
-import type { Gh } from '@/doctor/remote';
 import { metricsReport, renderMetrics, renderVerdicts, verdictReport } from '@/metrics/report';
-
-const repo = 'acme/shop';
-const now = new Date('2026-10-15T00:00:00Z');
-const bot = { login: 'release-app[bot]', type: 'Bot' };
-const person = { login: 'jane', type: 'User' };
-
-/**
- * A fake `gh` that answers GET routes from `routes`, by path without the
- * query. Any write fails.
- */
-function fakeGh(routes: Record<string, unknown>) {
-  const calls: Array<Array<string>> = [];
-  const gh: Gh = (args) => {
-    calls.push(args);
-    const [route = ''] = (args.at(-1) ?? '').split('?');
-    const answer = routes[route];
-    if (args.some((arg) => ['-X', '--method', '-f', '-F', '--input'].includes(arg))) {
-      return Promise.resolve({ ok: false, out: '', err: 'writes are not allowed' });
-    }
-    if (answer === undefined) {
-      return Promise.resolve({ ok: false, out: '', err: 'gh: Not Found (HTTP 404)' });
-    }
-    return Promise.resolve({ ok: true, out: JSON.stringify(answer), err: '' });
-  };
-  return { gh, calls };
-}
-
-type Shape = {
-  mergedBy: object;
-  title: string;
-  trailer: string;
-  ref: string;
-  author: object;
-  labels: Array<string>;
-  files: Array<[string, number, number]>;
-  comments?: Array<string>;
-};
-
-const pullRoutes = (number: number, shape: Shape) => ({
-  [`repos/${repo}/pulls/${number}/commits`]: [
-    { commit: { message: `${shape.title}\n\n${shape.trailer}` } },
-  ],
-  [`repos/${repo}/pulls/${number}/files`]: shape.files.map(([filename, additions, deletions]) => ({
-    filename,
-    additions,
-    deletions,
-  })),
-  [`repos/${repo}/pulls/${number}`]: {
-    title: shape.title,
-    created_at: '2026-10-10T00:00:00Z',
-    merged_at: `2026-10-10T0${number}:00:00Z`,
-    merged_by: shape.mergedBy,
-    user: shape.author,
-    labels: shape.labels.map((name) => ({ name })),
-    head: { sha: `head${number}`, ref: shape.ref },
-    merge_commit_sha: `m${number}`,
-  },
-  [`repos/${repo}/issues/${number}/timeline`]: [
-    ...(shape.comments ?? []).map((body) => ({ event: 'commented', user: bot, body })),
-    { event: 'merged', actor: shape.mergedBy },
-  ],
-  [`repos/${repo}/commits/head${number}/check-runs`]: {
-    check_runs: [
-      {
-        name: 'validate',
-        status: 'completed',
-        conclusion: 'success',
-        completed_at: '2026-10-10T00:30:00Z',
-      },
-    ],
-  },
-});
-
-const routes = {
-  'search/issues': { items: [{ number: 1 }, { number: 2 }] },
-  // An agent PR that auto-merge merged at the low step, with a lockfile that does not count.
-  ...pullRoutes(1, {
-    mergedBy: bot,
-    title: 'feat: add x',
-    trailer: 'Co-authored-by: Claude <noreply@anthropic.com>',
-    ref: 'clutch/cl-001-x',
-    author: { login: 'jane', type: 'User' },
-    labels: ['risk/low', 'kind/feat'],
-    files: [
-      ['src/x.ts', 100, 20],
-      ['bun.lock', 4000, 1000],
-    ],
-    comments: ['<!-- automerge-enabled:low:abc1234 -->\nAuto-merge is on.'],
-  }),
-  // A Renovate PR that a person merged.
-  ...pullRoutes(2, {
-    mergedBy: person,
-    title: 'Revert "feat: add x"',
-    trailer: '',
-    ref: 'renovate/x',
-    author: { login: 'renovate[bot]', type: 'Bot' },
-    labels: ['risk/medium'],
-    files: [['src/x.ts', 20, 100]],
-  }),
-  [`repos/${repo}/rules/branches/main`]: [
-    {
-      type: 'required_status_checks',
-      parameters: { required_status_checks: [{ context: 'validate' }] },
-    },
-  ],
-  [`repos/${repo}/commits`]: [
-    { sha: 'm2', parents: [{ sha: 'm1' }], commit: { message: 'Revert "feat: add x"' } },
-    { sha: 'm1', parents: [{ sha: 'm0' }], commit: { message: 'feat: add x' } },
-  ],
-  [`repos/${repo}/commits/m0/check-runs`]: { check_runs: [] },
-  [`repos/${repo}/commits/m1/check-runs`]: {
-    check_runs: [
-      {
-        name: 'validate',
-        status: 'completed',
-        conclusion: 'failure',
-        completed_at: '2026-10-10T01:00:00Z',
-      },
-    ],
-  },
-  [`repos/${repo}/commits/m2/check-runs`]: {
-    check_runs: [
-      {
-        name: 'validate',
-        status: 'completed',
-        conclusion: 'success',
-        completed_at: '2026-10-10T02:15:00Z',
-      },
-    ],
-  },
-  [`repos/${repo}/actions/runs`]: {
-    workflow_runs: [
-      {
-        conclusion: 'success',
-        run_started_at: '2026-10-10T00:00:00Z',
-        updated_at: '2026-10-10T00:04:00Z',
-      },
-    ],
-  },
-  [`repos/${repo}`]: { default_branch: 'main' },
-  // The open risk-tighten issues. A pull request with the label is not one.
-  [`repos/${repo}/issues`]: [
-    { number: 7, title: 'Tighten risk? #2 was reverted', html_url: 'u7' },
-    { number: 8, title: 'A PR', html_url: 'u8', pull_request: {} },
-  ],
-  [`repos/${repo}/issues/comments`]: [
-    {
-      id: 11,
-      html_url: `https://github.com/${repo}/pull/1#issuecomment-11`,
-      body: '<!-- automerge-dry-run:head1 -->\n**Auto-merge dry run:** this pull request would auto-merge at head1.',
-      created_at: '2026-10-10T00:40:00Z',
-      issue_url: `https://api.github.com/repos/${repo}/issues/1`,
-      reactions: { '+1': 1, '-1': 0 },
-    },
-    {
-      id: 12,
-      html_url: `https://github.com/${repo}/pull/2#issuecomment-12`,
-      body: '<!-- automerge-dry-run:head2 -->\n**Auto-merge dry run:** this pull request would not auto-merge at head2.\n\n- The risk tier is medium, not low.\n\nOwner: react 👍 if you agree with this verdict, or 👎 if not.',
-      created_at: '2026-10-10T01:40:00Z',
-      issue_url: `https://api.github.com/repos/${repo}/issues/2`,
-      reactions: { '+1': 0, '-1': 0 },
-    },
-    { body: 'LGTM', created_at: '2026-10-10T01:50:00Z', issue_url: 'x/2', reactions: {} },
-  ],
-  // The owner's 👍 on the first verdict. A stranger's 👍 on the second does not count.
-  [`repos/${repo}/issues/comments/11/reactions`]: [
-    { content: '+1', user: { login: 'jane', type: 'User' } },
-  ],
-  [`repos/${repo}/issues/comments/12/reactions`]: [
-    { content: '+1', user: { login: 'visitor', type: 'User' } },
-  ],
-};
+import { fakeGh, now, person, pullRoutes, repo, routes } from '@/testing/metrics-routes';
 
 test('the report reads only gh api GET routes and fills every field', async () => {
   const { gh, calls } = fakeGh(routes);
@@ -263,12 +91,19 @@ test('a drill revert is merged but counts apart from the reverts, on the PRs and
 });
 
 test('another repository has no issues count, and an unreadable section names its reason', async () => {
-  const { [`repos/${repo}/actions/runs`]: _runs, ...rest } = routes;
+  const {
+    [`repos/${repo}/actions/runs`]: _runs,
+    [`repos/${repo}/actions/workflows/agent-review.yml/runs`]: _reviews,
+    ...rest
+  } = routes;
   const { gh } = fakeGh(rest);
   const report = await metricsReport({ gh, repo, days: 14, now });
   expect(report.issuesDone).toBeNull();
   expect(report.ci).toBeNull();
   expect(report.unavailable.ci).toContain('HTTP 404');
+  // With no agent review workflow, only submitted reviews count as a first review.
+  expect(report.unavailable.agentReview).toContain('HTTP 404');
+  expect(report.factory.cycleTimeHours.toFirstReview.count).toBe(0);
   expect(report.unavailable.issuesDone).toContain('.clutch/issues');
 });
 
@@ -354,4 +189,52 @@ test('with no owner, no reaction is a grade, and the report says why', async () 
   expect(verdicts.agreement).toMatchObject({ agreed: 0, streak: 0 });
   const report = await metricsReport({ gh, repo, days: 14, now, owner: null });
   expect(report.unavailable.verdictOwner).toContain('no reaction counts as a grade');
+});
+
+test('the factory numbers lead the report, from reviews, agent review and the in_progress commit', async () => {
+  const issueCommits = `repos/${repo}/commits?path=${encodeURIComponent('.clutch/issues/CL-001.md')}&until=${encodeURIComponent('2026-10-09T22:00:00Z')}`;
+  const { gh } = fakeGh({
+    ...routes,
+    // CL-001 went in_progress 10 hours before its branch's first commit.
+    [issueCommits]: [
+      {
+        sha: 'i1',
+        parents: [{ sha: 'm0' }],
+        author: person,
+        commit: {
+          message: 'chore(tracker): start CL-001',
+          author: { date: '2026-10-09T12:00:00Z' },
+        },
+      },
+    ],
+    [`repos/${repo}/commits/i1`]: {
+      files: [
+        { filename: '.clutch/issues/CL-001.md', patch: '-status: todo\n+status: in_progress' },
+      ],
+    },
+    // A person reviewed PR 2 ten minutes before agent review finished.
+    [`repos/${repo}/issues/2/timeline`]: [
+      { event: 'reviewed', state: 'approved', user: person, submitted_at: '2026-10-10T00:10:00Z' },
+      { event: 'merged', actor: person },
+    ],
+  });
+  const report = await metricsReport({ gh, repo, days: 14, now });
+  expect(report.factory).toMatchObject({
+    definitions: 'warp-2026-11-04',
+    merged: 2,
+    // Renovate's PR has only a bot's commit, and a review by a person is not a push.
+    autonomy: { autonomous: 2, merged: 2, share: 1, humanPushed: [] },
+    cycleTimeHours: {
+      toPr: { p50: 7, p90: 11, count: 2 },
+      toFirstReview: { count: 2 },
+      toMerge: { p50: 8.5, p90: 12.1, count: 2 },
+    },
+    // PR 2 is `Revert "feat: add x"`, so it reverts PR 1.
+    reverts: { reverted: 1, merged: 2, rate: 0.5, overBrake: true, pulls: [1] },
+  });
+  expect(report.factory.cycleTimeHours.toFirstReview.p90).toBe(11.3);
+  const text = renderMetrics(report);
+  expect(text.indexOf('Autonomy')).toBeLessThan(text.indexOf('Merged PRs'));
+  expect(text).toContain('100% (2 of 2 PRs with no human code push)');
+  expect(text).toContain('50% (1 of 2: #1), brake 2%');
 });

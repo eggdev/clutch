@@ -7,6 +7,9 @@ import type {
   WorkflowRun,
 } from '@/metrics/compute';
 import { verdictReasons } from '@/metrics/compute';
+import type { FactoryPull } from '@/metrics/factory';
+import { factoryReader, toPullCommit } from '@/metrics/factory-reader';
+import type { ApiPullCommit } from '@/metrics/factory-reader';
 import { enabledMarker } from '@/metrics/pulls';
 import type { PullShape } from '@/metrics/pulls';
 
@@ -28,6 +31,7 @@ type TimelineEvent = {
   user?: Account;
   state?: string;
   body?: string;
+  submitted_at?: string;
 };
 type ApiCheckRun = {
   name: string;
@@ -107,10 +111,13 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
     );
   }
 
-  async function mergedPull(number: number): Promise<MergedPull & PullShape> {
-    const [pull, timeline, commits, files] = await Promise.all([
+  const factory = factoryReader(repo, get, list);
+
+  async function mergedPull(number: number): Promise<MergedPull & PullShape & FactoryPull> {
+    const [pull, timeline, apiCommits, files] = await Promise.all([
       get<{
         title: string;
+        body: string | null;
         created_at: string;
         merged_at: string;
         merged_by: Account;
@@ -120,12 +127,22 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
         merge_commit_sha: string | null;
       }>(`repos/${repo}/pulls/${number}`),
       list<TimelineEvent>(`repos/${repo}/issues/${number}/timeline`),
-      list<{ commit: { message: string } }>(`repos/${repo}/pulls/${number}/commits`),
+      list<ApiPullCommit>(`repos/${repo}/pulls/${number}/commits`),
       list<{ filename: string; additions: number; deletions: number }>(
         `repos/${repo}/pulls/${number}/files`,
       ),
     ]);
-    const runs = await checkRuns(pull.head.sha, 'latest');
+    const commits = apiCommits.map(toPullCommit);
+    const [runs, started] = await Promise.all([
+      checkRuns(pull.head.sha, 'latest'),
+      factory.inProgressAt(pull.title, pull.head.ref, commits[0]?.authoredAt),
+    ]);
+    const reviews = timeline
+      .filter((event) => event.event === 'reviewed' && event.state !== 'pending')
+      .map((event) => event.submitted_at)
+      .filter((at): at is string => Boolean(at));
+    // Agent review's runs join later, from one list for every PR. See `withAgentReview`.
+    const [firstReviewAt] = reviews.toSorted();
     const green = runs
       .filter((run) => run.conclusion === 'success' && run.completed_at)
       .map((run) => run.completed_at ?? '')
@@ -144,7 +161,11 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
       mergedAt: pull.merged_at,
       humanAction: human,
       lastGreenAt: green.at(-1),
-      commitMessages: commits.map((commit) => commit.commit.message),
+      commitMessages: commits.map((commit) => commit.message),
+      body: pull.body ?? '',
+      commits,
+      firstReviewAt,
+      inProgressAt: started,
       headRef: pull.head.ref,
       author: {
         login: pull.user?.login ?? '',
@@ -210,6 +231,8 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
     mergedPulls(numbers: Array<number>) {
       return Promise.all(numbers.map((number) => limit(() => mergedPull(number))));
     },
+
+    agentReviewRuns: factory.agentReviewRuns,
 
     /**
      * The first-parent commits of `branch` since `since`, oldest first, with

@@ -633,7 +633,8 @@ mise exec -- bun run clutch ruleset --apply
 ## Metrics
 
 `clutch metrics` reports how pull requests flow through a repository over a
-window: merges per day, the share merged with no human action, the hours from
+window. It prints the factory numbers first: autonomy, cycle time and reverts,
+with Warp's definitions. Then it prints merges per day, the share merged with no human action, the hours from
 open to merge, main-red minutes, reverts, the agent share from
 `Co-authored-by` trailers and agent branches, PR size, the merges with no
 human action by auto-merge step, CI run times, the issues done and the
@@ -648,6 +649,11 @@ mise exec -- bun run clutch metrics --verdicts
 ```
 
 - `--since` takes a number of days, such as `14d`, the default.
+- `--json` puts the factory numbers in the top-level `factory` object, with
+  a count of PRs for each and one row for each PR. `factory.definitions` names
+  the version of the rules, so a reader such as C-Suite can pin what each
+  number means. `clutch metrics --repo eggdev/neighborhood --json | jq .factory`
+  reads them for one project.
 - A revert PR labelled `drill` is a rehearsal. It is counted as a drill, not a
   revert, in the reverts and the revert rate. `--json` has `reverts.drills`.
 - `--json` prints the report for a digest. A section that GitHub does not
