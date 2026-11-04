@@ -150,7 +150,7 @@ test('add_on_sync is only for a seed entry', async () => {
     'docs/index.md': 'index\n',
     'factory/models.yaml': 'models\n',
   });
-  expect(loadClutchSource(template.root, 'HEAD')).rejects.toThrow(
+  await expect(loadClutchSource(template.root, 'HEAD')).rejects.toThrow(
     'factory/ has add_on_sync. Only a seed entry takes it',
   );
 });
