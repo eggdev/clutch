@@ -70,7 +70,8 @@
     ".gitleaksignore"
   ],
   "exempt": {
-    "AGENTS.md": "check-file-size measures its length, and the doc checks read it as a doc. It sets no rule.",
+    "AGENTS.md": "check-file-size measures the length of each AGENTS.md file, check-structure allows one in a package, and the doc checks read it as a doc. It sets no rule.",
+    "CLAUDE.md": "It holds one line that includes AGENTS.md. check-structure allows it in a package. It sets no rule.",
     "README.md": "check-structure allows it in a package, and the doc checks read it as a doc. It sets no rule.",
     "docs/contributing/documentation.md": "check-docs-temporal skips it because it quotes the changelog phrases. It sets no rule.",
     "tools/recap/classify-primitives.ts": "It writes the PR recap block. It enforces no rule.",
