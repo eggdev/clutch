@@ -21,6 +21,28 @@ The gap is the layers that let the factory run without its owner:
 - **Measurement.** No number says whether a change to the factory helped.
 - **Learning loops.** Failures and friction do not turn into checks by themselves.
 
+## The factory stack test week
+
+From 2026-11-05 to 2026-11-11, the factory stack runs ahead of the phase order
+(C-Suite decisions D-018 and D-019). C-Suite's `docs/stack.md` gives each
+layer a Clutch row with a "Done when". Each issue sits in the phase that its
+work fits, and the coordinator gives it to a lane in the layer order below.
+Layer 00 comes first, because the other rows build on its schema.
+
+| Layer                | Clutch issues                                                   | Neighborhood proof        |
+| -------------------- | --------------------------------------------------------------- | ------------------------- |
+| 00 Factories as code | CL-514 (schema and check), CL-515 (capability and starter tree) | CL-608                    |
+| 03 Inference         | CL-426 (a scorer on Qwen on the Spark)                          |                           |
+| 04 Improvement       | CL-141 (autonomy, cycle time, reverts), CL-427 (benchmark)      | CL-141 reads Neighborhood |
+| 02 Compute           | CL-312 (setup and check commands), CL-313 (verify agent)        | CL-609                    |
+| 05 Orchestration     | CL-314 (5 stage agents)                                         | CL-610                    |
+| 01 Data and context  | CL-516 (agent files link their docs)                            | CL-611                    |
+| 06 Access            | CL-517 (intake labels and states)                               | CL-611                    |
+
+Neighborhood's alpha goes to Patrick on 2026-11-06. Its goals win over this
+work when they compete for a lane. Neighborhood changes only through its own
+sync PRs, under its own rules.
+
 ## The evidence behind the order
 
 The plan follows a study of 75 repositories that ship with agents. It scored
