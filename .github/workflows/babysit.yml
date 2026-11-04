@@ -152,15 +152,16 @@ jobs:
             in it only when the right result is clear from both sides.
             Otherwise leave the markers in place and say so.
             Never weaken a check, skip a test, raise a budget or add an
-            exemption to make something pass. Then run
-            `cd pr && mise exec -- bun run validate`. Do not run git commit or
-            git push. Return the final answers (same shape, with a fix you
+            exemption to make something pass. Do not run validate, git or
+            any script from the PR: a later step, which holds no key, runs
+            validate and commits. Return the final answers (same shape, with a fix you
             could not make turned into `owner` and its reason), and the
             commit message alone in `message`: a Conventional Commit subject
             of 72 characters or fewer, a blank line, then a short body.
           claude_args: |
             --model ${{ vars.CLUTCH_BABYSIT_FIX_MODEL || 'claude-sonnet-5-5' }}
-            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(cd pr && mise exec -- bun run validate),Bash(cd pr && mise exec -- bun run validate:*),Bash(cd pr && git diff:*),Bash(cd pr && git status:*),Bash(gh pr view:*),Bash(gh pr diff:*)"
+            # No command that runs the PR's code, such as validate: this step holds the API key.
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr view:*),Bash(gh pr diff:*)"
             --json-schema '{"type":"object","properties":{"message":{"type":"string"},"items":{"type":"array","items":{"type":"object","properties":{"kind":{"enum":["thread","comment","check"]},"ref":{"type":"string"},"decision":{"enum":["must-fix","cheap-fix","no-change","owner","flaky"]},"reason":{"type":"string"},"reply":{"type":"string"}},"required":["kind","ref","decision","reason","reply"]}}},"required":["message","items"]}'
       - name: Validate the fix
         id: validate

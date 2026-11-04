@@ -54,8 +54,10 @@ answers it.
 The workflow runs steps 3 and 4 as two model calls. Triage uses
 `claude-haiku-5-5` (`CLUTCH_BABYSIT_TRIAGE_MODEL`). The fix runs only when an
 item needs one, on `claude-sonnet-5-5` (`CLUTCH_BABYSIT_FIX_MODEL`). The models
-edit files and return decisions. They hold no token that can push. The bot
-token is minted after every step that runs the PR's code.
+edit files and return decisions. They hold no token that can push, and they run
+no code from the PR, because they hold the API key. A later step with no key
+runs validate and makes the commit. The bot token is minted after that, and the
+push runs from a fresh repository that never ran the PR's code.
 
 ## Decide
 
