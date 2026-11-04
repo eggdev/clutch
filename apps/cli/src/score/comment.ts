@@ -1,4 +1,5 @@
 import type { Gh } from '@/doctor/remote';
+import { upsertComment } from '@/pr-comment';
 import type { Cut } from '@/score/prompt';
 
 /** One score of one pull request, as `clutch score` prints and posts it. */
@@ -64,47 +65,20 @@ export function commentBody(score: Score) {
   return `${lines.join('\n')}\n`;
 }
 
-type ApiComment = { id: number; html_url: string; body?: string };
-
 /**
  * Adds the score comment to the pull request. When the PR already has a
  * comment from the same scorer for the same head commit, edits that comment,
  * so a second run adds no second comment.
  */
-export async function postScore(gh: Gh, score: Score) {
-  const comments: Array<ApiComment> = [];
-  for (let page = 1; page <= 100; page += 1) {
-    const result = await gh([
-      'api',
-      `repos/${score.repo}/issues/${score.pr}/comments?per_page=100&page=${page}`,
-    ]);
-    if (!result.ok) {
-      throw new Error(`gh api: could not list the comments of #${score.pr}. ${result.err.trim()}`);
-    }
-    const found = JSON.parse(result.out) as Array<ApiComment>;
-    comments.push(...found);
-    if (found.length < 100) {
-      break;
-    }
-  }
-  const earlier = comments.find((comment) => {
-    const marker = parseScoreMarker(comment.body ?? '');
-    return marker?.scorer === score.scorer && marker.head === score.head;
+export function postScore(gh: Gh, score: Score) {
+  return upsertComment({
+    gh,
+    repo: score.repo,
+    pr: score.pr,
+    body: commentBody(score),
+    earlier: (body) => {
+      const marker = parseScoreMarker(body);
+      return marker?.scorer === score.scorer && marker.head === score.head;
+    },
   });
-  const route = earlier
-    ? `repos/${score.repo}/issues/comments/${earlier.id}`
-    : `repos/${score.repo}/issues/${score.pr}/comments`;
-  const result = await gh([
-    'api',
-    '-X',
-    earlier ? 'PATCH' : 'POST',
-    route,
-    '-f',
-    `body=${commentBody(score)}`,
-  ]);
-  if (!result.ok) {
-    throw new Error(`gh api ${route}: ${result.err.trim() || 'failed'}`);
-  }
-  const comment = JSON.parse(result.out) as ApiComment;
-  return { url: comment.html_url, edited: Boolean(earlier) };
 }

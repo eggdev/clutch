@@ -13,6 +13,7 @@ import { riskCommand } from '@/risk-command';
 import { rulesetCommand } from '@/ruleset-command';
 import { scoreCommand } from '@/score-command';
 import { syncCommand } from '@/sync-command';
+import { verifyCommand } from '@/verify-command';
 import { worktreeCommand } from '@/worktree-command';
 
 type Command = {
@@ -61,6 +62,13 @@ export const commands: Record<string, Command> = {
     summary:
       "Judge one pull request with a scorer of the factory tree, on the model in the scorer's judge. --post adds the score as a PR comment.",
     run: (args, cwd) => scoreCommand(args, cwd),
+  },
+  verify: {
+    usage:
+      'clutch verify post --pr <number> [--repo OWNER/NAME] [--head SHA] [--note TEXT] [--json] <png>...',
+    summary:
+      'Commit the screenshots of a verify run to the verify-shots branch, and post or edit the one verify comment on the PR.',
+    run: (args, cwd) => verifyCommand(args, cwd),
   },
   init: {
     usage: 'clutch init [--root DIR] [--mode sync|doctor] [--adopt] [--yes]',

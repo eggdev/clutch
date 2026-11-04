@@ -229,6 +229,38 @@ mise exec -- bun run clutch score task-compliance --pr 203 --root ../c-suite
 - The command exits 0 with a score, also with a score that fails, and 0 when
   `--sample` skips the pull request. It exits 1 when it cannot score.
 
+## Verify
+
+`clutch verify post --pr <number> <png>...` shows the screenshots of a verify
+run on a pull request. The `verify` agent in
+[`factory/agents/verify/agent.md`](../../factory/agents/verify/agent.md)
+drives the app, then calls it.
+
+```sh
+mise exec -- bun run clutch verify post --pr 212 /tmp/verify-212/mobile.png /tmp/verify-212/desktop.png
+mise exec -- bun run clutch verify post --pr 212 --head <sha> --note "The home screen loads." --json /tmp/verify-212/mobile.png
+```
+
+- GitHub has no API that attaches an image to a comment. So the command
+  commits each PNG to the orphan branch `verify-shots`, at
+  `<pr>/<head sha>/<name>.png`, and links it by its
+  `https://github.com/<owner>/<repo>/blob/<commit>/<path>?raw=true` URL. The
+  default branch never holds a screenshot. The name is the file name without
+  `.png`.
+- It commits with the Git data API through `gh api`. It does not touch the
+  local checkout, so no Git hook runs. When another run moves the branch
+  first, it commits again on the new tip, up to 3 times.
+- A PR has one verify comment. It starts with the marker
+  `<!-- clutch-verify:<head sha> -->` and names the head commit. A second run
+  edits that comment, and the marker then names the new head.
+- `--head SHA` is the commit that verify drove. When the PR head is another
+  commit, the command posts nothing and exits 1.
+- `--note TEXT` adds what verify drove and saw. `--repo OWNER/NAME` posts on
+  another repository. The default is the `origin` remote.
+- Each file must be a PNG of at most 10 MB. In a private repository, only a
+  reader with access sees the screenshots.
+- The command exits 0 when the comment is up, and 1 on any failure.
+
 ## Worktree
 
 `clutch worktree` makes a separate checkout for one task, so several agents or
