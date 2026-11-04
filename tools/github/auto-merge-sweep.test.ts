@@ -84,13 +84,14 @@ const checkRuns = (green: boolean) =>
 
 /**
  * A fake repository: the open PRs, their green checks unless `pending` names a
- * head, the Auto-merge runs, and each run's decide job as `[conclusion, startedAt]`.
+ * head, the Auto-merge runs, and each run's decide job as `[conclusion, startedAt]`,
+ * with the conclusion of its Decide step third when the test names it.
  */
 function world(
   prs: Array<Listed>,
   options: {
     runs?: Array<Judged>;
-    decides?: Record<number, [string | null, string]>;
+    decides?: Record<number, [string | null, string, string?]>;
     pending?: Array<string>;
   } = {},
 ) {
@@ -109,10 +110,12 @@ function world(
       `gh api --paginate repos/${repo}/commits/${item.headRefOid}/check-runs`,
       { out: checkRuns(true) },
     ]),
-    ...Object.entries(decides).map(([id, [conclusion, startedAt]]): [string, Partial<Result>] => [
-      `gh api --paginate repos/${repo}/actions/runs/${id}/jobs`,
-      { out: `${conclusion ?? ''}\t${startedAt}` },
-    ]),
+    ...Object.entries(decides).map(
+      ([id, [conclusion, startedAt, step = '']]): [string, Partial<Result>] => [
+        `gh api --paginate repos/${repo}/actions/runs/${id}/jobs`,
+        { out: `${conclusion ?? ''}\t${startedAt}\t${step}` },
+      ],
+    ),
   ];
   return fake(answers);
 }
@@ -134,6 +137,22 @@ test('a decide job that was skipped did not decide, so the PR is chosen, even wh
     decides: { 70: ['skipped', '2026-11-02T10:00:30Z'] },
   });
   expect(await chosen(gh.run, 'schedule')).toEqual([7]);
+});
+
+test('a decide job that found no PR, so its Decide step was skipped, did not decide', async () => {
+  const gh = world([pr(7)], {
+    runs: [judged({ databaseId: 70, conclusion: 'success' })],
+    decides: { 70: ['success', '2026-11-02T10:00:30Z', 'skipped'] },
+  });
+  expect(await chosen(gh.run, 'schedule')).toEqual([7]);
+});
+
+test('a decide job whose Decide step ran holds the PR', async () => {
+  const gh = world([pr(7)], {
+    runs: [judged({ databaseId: 70, conclusion: 'success' })],
+    decides: { 70: ['success', '2026-11-02T10:00:30Z', 'success'] },
+  });
+  expect(await chosen(gh.run, 'schedule')).toEqual([]);
 });
 
 test('a failed decide is chosen again', async () => {

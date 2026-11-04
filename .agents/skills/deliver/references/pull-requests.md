@@ -299,10 +299,10 @@ At each step, the PR also needs all of these:
 - No required check is red on the default branch's latest commit. A red
   `main` stops every auto-merge until it is green again, except a revert PR.
 - Agent review left no `owner` finding on its head, unless the PR is a pure
-  Clutch sync, as above. A change that weakens a
-  check, a lint rule, a budget or a test gets one, whatever its path. See
-  [review](../../../../docs/contributing/review.md#owner-findings). The owner
-  merges such a PR.
+  Clutch sync, as above. A change to the hard core gets one, and so does a
+  change that weakens a check that gates the merge, whatever its path. See
+  [owner findings](../../../../docs/contributing/review.md#owner-findings). The
+  owner merges such a PR.
 
 The workflow runs when CI or agent review completes, and it runs the default
 branch's rules. It skips a run whose branch lives in a fork, because that run
@@ -330,7 +330,8 @@ The sweep (`.github/workflows/auto-merge-sweep.yml`) dispatches the Auto-merge
 workflow for up to 20 PRs a run, least recently decided first. Hourly, it
 decides a green PR once, on its final check state. It decides that PR again only
 when its head changes, or when its last decide job fails. A decide job that was
-skipped did not decide. A PR held at the last step, which posts no verdict, is
+skipped did not decide, and neither did one whose Decide step was skipped:
+it found no PR to judge, or the default branch has no auto-merge rules. A PR held at the last step, which posts no verdict, is
 therefore left alone. A push to `main` that changes an auto-merge rule file
 decides every eligible PR again, since each last decision used the old rules.
 

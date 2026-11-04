@@ -8,20 +8,20 @@ Rank 16 of the researched practices. About two thirds of the leading repositorie
 
 ## How Clutch runs it
 
-`.github/workflows/sast.yml` runs on each pull request, on each push to the default branch and weekly. Its `sast` job is the required check, so one ruleset fits public and private repositories. Its `engine` job reads `sast` in `clutch.yaml`, which kickoff sets:
+`.github/workflows/sast.yml` runs on each pull request, on each push to the default branch and weekly. Its one `sast` job picks the engine, scans and is the required check. So one ruleset fits public and private repositories, and a private repository pays for one runner. A pull request that changes only Markdown, images or the friction log skips the scan, since no scanned file changed. The job picks the engine from `sast` in `clutch.yaml`, which kickoff sets:
 
 - `auto`, the default, picks the engine from the table below.
-- `codeql` always runs CodeQL. Where code scanning takes no results, the `engine` job in `sast.yml` exits with an error, so the `sast` check fails.
+- `codeql` always runs CodeQL. Where code scanning takes no results, the `sast` job exits with an error, so the `sast` check fails.
 - `semgrep` always runs Semgrep, even on a public repository.
 
 Under `auto`:
 
 | Repository                                                                | Engine                                                                                                           | Findings                                                   |
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Code scanning takes results: a public repository, or GitHub Code Security | CodeQL, one `analyze` job per language                                                                           | The Security tab, as code scanning alerts                  |
+| Code scanning takes results: a public repository, or GitHub Code Security | CodeQL, all languages in the one `sast` job                                                                      | The Security tab, as code scanning alerts                  |
 | A private repository without GitHub Code Security                         | [Semgrep Community Edition](https://semgrep.dev/docs/getting-started/quickstart-oss), with the `p/default` rules | The job log. A finding fails the job. Nothing is uploaded. |
 
-The `engine` job asks GitHub for the code scanning alerts list. A 403 means the repository has no Code Security, so Semgrep runs. A notice on the run names the engine.
+The `sast` job asks GitHub for the code scanning alerts list. A 403 means the repository has no Code Security, so Semgrep runs. A notice on the run names the engine.
 
 ### Private repositories
 
@@ -54,7 +54,7 @@ Fix the code first. When the finding is wrong, name the rule and the reason on i
 1. Sync `.github/workflows/sast.yml` from Clutch, or write a workflow like it.
 2. Run it on each pull request, on each push to the default branch and on a weekly schedule.
 3. Pin each action and image to a full digest.
-4. Grant `contents: read` at the top level. Grant `security-events: write` to the CodeQL job only.
+4. Grant `contents: read` at the top level. Grant `security-events: write` only to the job that runs CodeQL.
 5. List each language of the repository for CodeQL, such as `javascript-typescript` and `actions`.
 6. Keep CodeQL default setup off in the code security settings on GitHub: GitHub refuses the workflow's results while default setup is on.
 7. Make `sast` a required check in the main ruleset.
