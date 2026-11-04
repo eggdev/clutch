@@ -1,8 +1,8 @@
 # Static analysis (SAST) on each PR, on each push to main, and weekly, so a new
 # rule finds old code too. One `sast` job picks the engine, scans and is the
 # required check, so one ruleset fits every repository and a private
-# repository pays for one runner. A pull request that changes only docs,
-# tracker files or images skips the scan, since no scanned file changed. See https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/codeql-sast.md.
+# repository pays for one runner. A pull request that changes only Markdown,
+# images or the friction log skips the scan, since no scanned file changed. See https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/codeql-sast.md.
 #
 # `sast` in clutch.yaml picks the engine: auto (the default), codeql or semgrep.
 # Under auto, where GitHub code scanning takes results (a public repository, or
@@ -43,7 +43,8 @@ jobs:
     permissions:
       contents: read
       # Reads the code scanning alerts list, to see whether code scanning is
-      # on, and uploads CodeQL results.
+      # on, and uploads CodeQL results. Permissions are per job, so the
+      # Semgrep path holds them too, unused.
       security-events: write
       actions: read
     steps:
@@ -91,8 +92,9 @@ jobs:
           esac
           echo "::notice title=SAST engine::$ENGINE (sast: $CHOICE)"
           echo "engine=$ENGINE" >> "$GITHUB_OUTPUT"
-      # A docs-only pull request leaves every scanned file as the base has it,
-      # and the base was scanned on its push. GitHub lists at most 300 files,
+      # A pull request that changes only Markdown, images and the friction log
+      # leaves every scanned file as the base has it, and the base was scanned
+      # on its push. Changesets and tracker issues are Markdown too. GitHub lists at most 300 files,
       # so a longer list always scans.
       - name: Skip a docs-only pull request
         id: scope
@@ -105,10 +107,10 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
             files="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE_SHA...$HEAD_SHA" --jq '.files[].filename')"
             count="$(printf '%s\n' "$files" | grep -c . || true)"
-            code="$(printf '%s\n' "$files" | grep -vE '\.(md|png|webp)$|^\.changeset/|^\.clutch/(issues/|friction\.jsonl$)' | grep -c . || true)"
+            code="$(printf '%s\n' "$files" | grep -vE '\.(md|png|webp)$|^\.clutch/friction\.jsonl$' | grep -c . || true)"
             if [ "$count" -gt 0 ] && [ "$count" -lt 300 ] && [ "$code" = 0 ]; then
               scan=false
-              echo "::notice title=SAST skipped::This pull request changes only docs, tracker files or images, so no scanned file changed."
+              echo "::notice title=SAST skipped::This pull request changes only Markdown, images or the friction log, so no scanned file changed."
             fi
           fi
           echo "scan=$scan" >> "$GITHUB_OUTPUT"
