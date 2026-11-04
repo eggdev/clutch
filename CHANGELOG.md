@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.53.7 (2026-11-04)
+
+### Fixes and maintenance
+
+- chore(clutch): record a journeys run.test flake
+
 ## 0.53.6 (2026-11-04)
 
 ### Fixes and maintenance
