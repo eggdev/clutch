@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -64,13 +65,21 @@ export function renderResult(result: BenchResult) {
   return `${pairs}\n\n${totals}`;
 }
 
-/** `<date>-<short sha>.json` in the suite's `results/` folder. */
+/**
+ * `<date>-<short sha>.json` in the suite's `results/` folder. A second run on
+ * the same day at the same commit gets `-2`, then `-3`, so no result is lost.
+ */
 export function resultFile(suiteDir: string, result: BenchResult) {
-  return path.join(
+  const stem = path.join(
     suiteDir,
     'results',
-    `${result.date.slice(0, 10)}-${result.commit.slice(0, 7)}.json`,
+    `${result.date.slice(0, 10)}-${result.commit.slice(0, 7)}`,
   );
+  let file = `${stem}.json`;
+  for (let count = 2; existsSync(file); count += 1) {
+    file = `${stem}-${count}.json`;
+  }
+  return file;
 }
 
 export async function writeResult(file: string, result: BenchResult) {

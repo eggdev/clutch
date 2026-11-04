@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { agentEnv, limits, readAgentOutput } from '@/bench/harness';
+import type { ClaudeSummary } from '@/bench/harness';
 import { renderResult } from '@/bench/report';
 import { runPair } from '@/bench/run';
 import type { Suite } from '@/bench/suite';
@@ -11,7 +12,12 @@ import { gitOrThrow } from '@/git';
 import { gitRepo } from '@/testing/git-repo';
 
 const main = path.join(import.meta.dir, '..', 'main.ts');
-const summary = '{"type":"result","subtype":"success","is_error":false,"num_turns":4}';
+const summary = JSON.stringify({
+  type: 'result',
+  subtype: 'success',
+  is_error: false,
+  num_turns: 4,
+} satisfies ClaudeSummary);
 
 /**
  * A stand-in `claude` in its own folder. It keeps its prompt, arguments,
@@ -166,6 +172,10 @@ test('a whole run grades each pair, writes the result and removes each clone', a
     });
     expect(await exists(call.cwd)).toBe(false);
   }
+
+  expect(await clutch(repo.root, fake.dir, 'demo')).toMatchObject({ code: 0 });
+  const both = await readdir(folder);
+  expect(both.toSorted()).toEqual([name.replace('.json', '-2.json'), name]);
 });
 
 test('--task and --config run some pairs and write no result', async () => {
@@ -200,7 +210,7 @@ test('a wrong name, a wrong flag value or a harness bench cannot run is an error
   await repo.write({
     'factory/benchmarks/demo/benchmark.md': benchmark(commit, ['big', 'local']),
   });
-  expect(await clutch(repo.root, fake.dir, 'demo', '--config', 'local')).toMatchObject({
+  expect(await clutch(repo.root, fake.dir, 'demo')).toMatchObject({
     code: 1,
     stderr: expect.stringContaining('clutch bench runs only claude models today.'),
   });
@@ -257,7 +267,12 @@ test('a failed agent and a failed setup are exits, and both remove the clone', a
 
 test('the summary line gives the exit and the turns', () => {
   expect(readAgentOutput(0, false, `log\n${summary}\n`)).toEqual({ exit: 'done', turns: 4 });
-  const maxed = '{"subtype":"error_max_turns","is_error":true,"num_turns":80}';
+  const maxed = JSON.stringify({
+    type: 'result',
+    subtype: 'error_max_turns',
+    is_error: true,
+    num_turns: 80,
+  } satisfies ClaudeSummary);
   expect(readAgentOutput(1, false, maxed)).toEqual({ exit: 'turns', turns: 80 });
   expect(readAgentOutput(0, true, '')).toEqual({ exit: 'timeout', turns: undefined });
   expect(readAgentOutput(1, false, 'not json')).toEqual({ exit: 'error', turns: undefined });

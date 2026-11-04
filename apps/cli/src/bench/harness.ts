@@ -15,7 +15,7 @@ const allowed = [
   'Glob',
   'Grep',
   'TodoWrite',
-  'Bash(mise exec:*)',
+  'Bash(mise exec -- bun:*)',
   'Bash(bun:*)',
   'Bash(bunx:*)',
   'Bash(git status:*)',
@@ -36,13 +36,18 @@ const allowed = [
 ];
 const denied = ['Bash(git push:*)', 'Bash(gh:*)', 'Bash(bun run pr:*)', 'WebFetch', 'WebSearch'];
 
-/** The command that runs `model` with `harness`. It reads the prompt on stdin. */
-export function agentCommand(harness: string, model: string) {
+/** Throws when bench cannot run `model` with `harness`. */
+export function checkHarness(harness: string, model: string) {
   if (harness !== 'claude') {
     throw new Error(
       `clutch bench runs only claude models today. ${model} uses ${harness}. See apps/cli/README.md#bench.`,
     );
   }
+}
+
+/** The command that runs `model` with `harness`. It reads the prompt on stdin. */
+export function agentCommand(harness: string, model: string) {
+  checkHarness(harness, model);
   return [
     'claude',
     '--print',
@@ -65,9 +70,21 @@ export function agentCommand(harness: string, model: string) {
 /** Why the agent stopped. */
 export type Exit = 'done' | 'turns' | 'timeout' | 'error' | 'setup';
 
+/**
+ * The keys that bench reads from the last line of `claude --print
+ * --output-format json`. The CLI prints more keys. A run that stops at the
+ * turn limit has the subtype `error_max_turns`.
+ */
+export type ClaudeSummary = {
+  type: 'result';
+  subtype: 'success' | 'error_max_turns' | 'error_during_execution';
+  is_error: boolean;
+  num_turns: number;
+};
+
 /** Reads why a `claude --output-format json` run stopped, and its turn count. */
 export function readAgentOutput(code: number, timedOut: boolean, stdout: string) {
-  let summary: { subtype?: unknown; num_turns?: unknown; is_error?: unknown } = {};
+  let summary: Partial<Record<keyof ClaudeSummary, unknown>> = {};
   try {
     summary = JSON.parse(stdout.trim().split('\n').at(-1) ?? '');
   } catch {

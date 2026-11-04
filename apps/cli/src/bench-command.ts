@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { limits } from '@/bench/harness';
+import { checkHarness, limits } from '@/bench/harness';
 import { renderResult, resultFile, writeResult } from '@/bench/report';
 import type { BenchResult } from '@/bench/report';
 import { liveCheckouts, runPair } from '@/bench/run';
@@ -63,6 +63,9 @@ export async function benchCommand(args: Array<string>, cwd: string) {
   const suite = await loadSuite(treeDir, name);
   const configs = pick(suite.configs, values.config, '--config');
   const tasks = pick(suite.tasks, values.task, '--task');
+  for (const config of configs) {
+    checkHarness(config.harness, config.model);
+  }
   const logs = await mkdtemp(path.join(tmpdir(), `clutch-bench-${name}-logs-`));
   const progress = (text: string) => (values.json ? console.error(text) : console.log(text));
   progress(

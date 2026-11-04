@@ -184,8 +184,9 @@ For each pair, the command does these steps:
 - Only `claude` models run today. A run uses `claude --print` on the plan that
   the CLI is signed in to. The command removes `ANTHROPIC_API_KEY` from the
   agent's environment, so a run never bills per token. The agent may edit
-  files and run `mise`, `bun` and read-only `git` commands. It cannot push or
-  run `gh`.
+  files, run `bun` and `mise exec -- bun`, read files with `git`, and run
+  `git add` and `git commit`. It may not run `gh`, `git push` or
+  `bun run pr`, and the clone has no remote to push to.
 - The [factory tree](../../docs/contributing/architecture/factory-tree.md#benchmarkmd)
   page names the keys of `benchmark.md`.
 
