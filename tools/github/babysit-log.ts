@@ -91,7 +91,11 @@ export function addRound(log: BabysitLog, round: Round, answered: Array<number>)
   };
 }
 
-const cell = (text: string) => text.replaceAll('|', '\\|').replaceAll(/\s+/gu, ' ').trim();
+/** A table cell: one line, at most 300 characters. */
+const cell = (text: string) => {
+  const flat = text.replaceAll('|', '\\|').replaceAll(/\s+/gu, ' ').trim();
+  return flat.length > 300 ? `${flat.slice(0, 299)}…` : flat;
+};
 
 function renderRound(round: Round, index: number) {
   const lines = [
@@ -104,7 +108,7 @@ function renderRound(round: Round, index: number) {
     `- Cost: $${round.cost.usd.toFixed(3)} (${round.cost.models.join(', ') || 'no model'})`,
   ];
   if (round.note) {
-    lines.push(`- Note: ${round.note}`);
+    lines.push(`- Note: ${cell(round.note)}`);
   }
   if (round.items.length > 0) {
     lines.push(
@@ -122,10 +126,34 @@ function renderRound(round: Round, index: number) {
   return lines.join('\n');
 }
 
+/** The JSON stays under this many characters, so the comment never passes GitHub's 65536. */
+const jsonLimit = 40_000;
+/** The rendered rounds stay under this many characters, beside the JSON. */
+const markdownLimit = 20_000;
+
+/** The log with its oldest rounds dropped until its JSON fits. Answered ids stay. */
+export function fitted(log: BabysitLog): BabysitLog {
+  let { rounds } = log;
+  while (rounds.length > 1 && JSON.stringify({ ...log, rounds }).length > jsonLimit) {
+    rounds = rounds.slice(1);
+  }
+  return { ...log, rounds };
+}
+
 /** The whole comment body: the newest round first, then the hidden JSON. */
 export function renderLog(log: BabysitLog) {
   const total = log.rounds.reduce((sum, round) => sum + round.cost.usd, 0);
-  const rounds = log.rounds.map(renderRound).toReversed().slice(0, shownRounds);
+  // The newest rounds that fit beside the JSON. The JSON and the artifacts keep the rest.
+  const rounds: Array<string> = [];
+  let size = 0;
+  for (const [index, round] of [...log.rounds.entries()].toReversed()) {
+    const text = renderRound(round, index);
+    if (rounds.length >= shownRounds || (rounds.length > 0 && size + text.length > markdownLimit)) {
+      break;
+    }
+    rounds.push(text);
+    size += text.length;
+  }
   return [
     logHeading,
     '',
@@ -133,7 +161,7 @@ export function renderLog(log: BabysitLog) {
     '',
     ...rounds.flatMap((text) => [text, '']),
     // `>` is escaped, so no text in the JSON can close the HTML comment.
-    `${logMarker}${JSON.stringify(log).replaceAll('>', '\\u003e')}-->`,
+    `${logMarker}${JSON.stringify(fitted(log)).replaceAll('>', '\\u003e')}-->`,
   ].join('\n');
 }
 

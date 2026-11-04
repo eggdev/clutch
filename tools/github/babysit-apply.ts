@@ -38,12 +38,18 @@ export function outcomeOf(
       note: 'The merge with the base needs a judgment call. A person resolves it.',
     };
   }
-  const left = items.filter(
-    (i) => (i.decision === 'owner' && !i.resolved) || (fixes.has(i.decision) && !pushed),
-  );
+  // A fix that did not pass validate is left open, and a person looks at it.
+  const unfixed = items.filter((i) => fixes.has(i.decision) && !pushed);
+  if (unfixed.length > 0) {
+    return {
+      outcome: 'stuck',
+      note: `${unfixed.length} fix(es) did not pass validate, so nothing was pushed.`,
+    };
+  }
+  const owner = items.filter((i) => i.decision === 'owner' && !i.resolved);
   return {
-    outcome: left.some((i) => i.decision === 'owner') ? 'waiting-owner' : 'done',
-    note: left.length > 0 ? `${left.length} item(s) left open.` : '',
+    outcome: owner.length > 0 ? 'waiting-owner' : 'done',
+    note: owner.length > 0 ? `${owner.length} item(s) wait for the owner.` : '',
   };
 }
 

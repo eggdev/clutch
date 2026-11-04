@@ -224,6 +224,9 @@ test('an owner item leaves the round waiting for the owner', () => {
   expect(outcomeOf([{ ...item, decision: 'owner' }], null, 'none').outcome).toBe('waiting-owner');
   expect(outcomeOf([{ ...item, decision: 'no-change' }], null, 'none').outcome).toBe('done');
   expect(outcomeOf([], null, 'conflict-stuck').outcome).toBe('stuck');
+  // A fix that did not pass validate pushes nothing, and the round is stuck, not done.
+  expect(outcomeOf([{ ...item, decision: 'must-fix' }], null, 'none').outcome).toBe('stuck');
+  expect(outcomeOf([{ ...item, decision: 'must-fix' }], 'abc', 'none').outcome).toBe('done');
 });
 
 test('apply replies in each thread, resolves the answered ones, reruns a flaky check and writes the log', async () => {
@@ -328,6 +331,9 @@ test('the owner is asked only when nothing but the approval is left', () => {
     ownerStep({ ...status, agentReview: { posted: true, blocking: 1, owner: 0 } }, false, false),
   ).toBe('keep');
   expect(ownerStep(status, true, true)).toBe('keep');
+  // An open thread or a stuck round is work left, so the request waits.
+  expect(ownerStep(status, false, false, true)).toBe('keep');
+  expect(ownerStep(status, false, true, true)).toBe('withdraw');
   expect(ownerStep({ ...status, mergeState: 'CLEAN', ready: true }, false, false)).toBe('keep');
 });
 

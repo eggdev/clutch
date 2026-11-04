@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import {
   addRound,
   emptyLog,
+  fitted,
   parseLog,
   renderDisposition,
   renderLog,
@@ -93,4 +94,17 @@ test('the disposition answers each agent review finding the log answered, latest
     ].join('\n'),
   );
   expect(renderDisposition(emptyLog())).toBeNull();
+});
+
+test('the log drops its oldest rounds to stay inside a comment', () => {
+  const big = round({ note: 'x'.repeat(5000) });
+  let log = emptyLog();
+  for (let i = 0; i < 30; i += 1) {
+    log = addRound(log, { ...big, head: `h${i}` }, [i]);
+  }
+  const kept = fitted(log);
+  expect(JSON.stringify(kept).length).toBeLessThanOrEqual(40_000);
+  expect(kept.rounds.at(-1)?.head).toBe('h29');
+  expect(kept.answered.length).toBe(30);
+  expect(renderLog(log).length).toBeLessThan(65_536);
 });
