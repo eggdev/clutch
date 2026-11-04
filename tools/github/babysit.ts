@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util';
 
 import { isAgentPr as agentRule } from '@tools/github/auto-merge-rules';
 import { roundsToday } from '@tools/github/babysit-log';
-import { readPr } from '@tools/github/babysit-read';
+import { isBlocking, readPr } from '@tools/github/babysit-read';
 import type { Comment, FailedCheck, PrState, Thread } from '@tools/github/babysit-read';
 import { retrying } from '@tools/github/command';
 import { must } from '@tools/github/github';
@@ -90,7 +90,10 @@ export function plan(state: PrState, now: string): Plan {
   // A thread is open work until the babysitter has the last word in it.
   const threads = state.threads.filter((t) => !answeredByBabysitter(t.comments.at(-1)?.body ?? ''));
   // The owner's approval of the head answers each thread the babysitter left for the owner.
-  const approvedThreads = state.approved ? state.threads.filter((t) => !threads.includes(t)) : [];
+  // A blocking finding is never answered by the approval: only a fix closes it.
+  const approvedThreads = state.approved
+    ? state.threads.filter((t) => !threads.includes(t) && !isBlocking(t.comments[0]?.body))
+    : [];
   const comments = state.comments.filter(
     (c) =>
       !answered.has(c.id) && !answeredByBabysitter(c.body) && !machine.some((m) => m.test(c.body)),

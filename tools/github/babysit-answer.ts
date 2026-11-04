@@ -1,6 +1,7 @@
 import { replyMarker } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
 import type { Decision, Item } from '@tools/github/babysit-log';
+import { isBlocking } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
 
@@ -65,9 +66,6 @@ export type Context = {
 const unanswered = 'the agent gave no decision';
 
 const firstLine = (body = '') => body.trimStart().split('\n')[0]?.slice(0, 200) ?? '';
-
-/** A finding that starts with `blocking`, as agent review writes it. */
-const isBlocking = (finding: string) => /^[^A-Za-z0-9]*blocking\b/iu.test(finding);
 
 /**
  * A `blocking` finding must not merge until it is fixed, so only a fix closes

@@ -140,11 +140,13 @@ jobs:
         run: |
           out="$RUNNER_TEMP/answered-threads.md"
           # A failed listing only means the review may repeat a finding, so it warns and goes on.
-          # The GraphQL variables are not shell variables.
-          # shellcheck disable=SC2016
-          if ! gh api graphql -F owner="${REPO%/*}" -F name="${REPO#*/}" -F number="$PR" -f query='
-            query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) {
-              reviewThreads(first: 100) { nodes { isResolved path line comments(first: 20) { nodes { body } } } } } } }' \
+          # A quoted heredoc keeps the GraphQL variables away from the shell.
+          query="$(cat <<'GRAPHQL'
+          query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) {
+            reviewThreads(first: 100) { nodes { isResolved path line comments(first: 20) { nodes { body } } } } } } }
+          GRAPHQL
+          )"
+          if ! gh api graphql -F owner="${REPO%/*}" -F name="${REPO#*/}" -F number="$PR" -f query="$query" \
             --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved) | select(.comments.nodes | map(.body | contains("clutch-babysit")) | any) | "- \(.path):\(.line // 0): \(.comments.nodes[0].body | split("\n")[0][0:200]) => \(.comments.nodes[-1].body | split("\n")[0][0:200])"' > "$out"; then
             echo "::warning title=Answered threads unknown::The review threads could not be listed, so a finding may be raised again."
           fi

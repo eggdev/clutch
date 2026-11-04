@@ -8,6 +8,9 @@ import type { Run } from '@tools/github/stack';
  * one GraphQL call plus one compare call. See .agents/skills/babysit-pr/SKILL.md.
  */
 
+/** A finding that starts with `blocking`, as agent review writes it. Only a fix closes its thread. */
+export const isBlocking = (finding = '') => /^[^A-Za-z0-9]*blocking\b/iu.test(finding.trimStart());
+
 export type Comment = { id: number; author: string; body: string; at: string; url: string };
 export type Thread = {
   id: string;

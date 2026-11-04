@@ -356,3 +356,16 @@ test('only a fix closes a blocking finding; any other answer leaves it for the o
   expect(blockingGuard(answer, 'note: rename')?.decision).toBe('no-change');
   expect(blockingGuard(undefined, 'blocking: x')).toBeUndefined();
 });
+
+test("the owner's approval never closes a blocking finding's thread", () => {
+  const blocking: Thread = {
+    ...thread('T8', `The fix did not pass validate.\n\n${replyMarker}`),
+    comments: [
+      { id: 21, author: 'github-actions', body: 'blocking: docs did not move', at: now, url: '' },
+      { id: 22, author: 'eggdev', body: `Left for the owner.\n\n${replyMarker}`, at: now, url: '' },
+    ],
+  };
+  const next = plan(state({ threads: [blocking], approved: true }), now);
+  expect(next.approvedThreads).toEqual([]);
+  expect(next.skip).toBe('nothing to do');
+});
