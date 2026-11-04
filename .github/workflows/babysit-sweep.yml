@@ -65,4 +65,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || '' }}
-        run: bun tools/github/babysit.ts sweep --repo "$GITHUB_REPOSITORY" ${PR:+--pr "$PR"}
+        run: |
+          # Until the default branch has the babysitter, there is nothing to dispatch.
+          if [ ! -f tools/github/babysit.ts ]; then
+            echo "::notice title=Babysitter off::The default branch has no tools/github/babysit.ts yet."
+            exit 0
+          fi
+          bun tools/github/babysit.ts sweep --repo "$GITHUB_REPOSITORY" ${PR:+--pr "$PR"}
