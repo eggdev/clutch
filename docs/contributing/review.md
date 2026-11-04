@@ -22,8 +22,9 @@ A rule below says which level it gives. When a rule does not say, the level is
 ## Owner findings
 
 An `owner` finding holds the PR until the owner approves it, so it has two
-causes only. Start the finding with its cause, `hard core` or `weaker check`.
-Any other concern is a `note`, or `blocking` when another rule says so.
+causes only. Start the finding with its level, `owner`, then name its cause,
+`hard core` or `weaker check`. Any other concern is a `note`, or `blocking`
+when another rule says so.
 
 1. **Hard core.** The diff changes a path of the `one-way-door` tier of
    [`.clutch/risk.yaml`](../../.clutch/risk.yaml). That is the merge gate, credentials, a
@@ -35,8 +36,8 @@ Any other concern is a `note`, or `blocking` when another rule says so.
    less on code that already exists. Such a check is a required status check or one of its steps, a lint rule, a budget, a ratchet or a test. Agent review itself is one too. The check is weaker when it is turned off,
    skipped, loosened or deleted, or when a budget rises. A test is weaker when
    a test or an assertion goes while the behavior it guards stays, or when it
-   asserts less. A new exemption, ignore, knip entry or allow-list entry for
-   existing files is weaker too. Name the check and what it stops catching.
+   asserts less. A new exemption, ignore, knip entry or allow-list entry is
+   weaker too, whichever files it covers. Name the check and what it stops catching.
    That holds with or without a reason in the PR description.
 
 These are not `owner`:
