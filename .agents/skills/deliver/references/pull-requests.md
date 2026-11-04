@@ -330,7 +330,8 @@ The sweep (`.github/workflows/auto-merge-sweep.yml`) dispatches the Auto-merge
 workflow for up to 20 PRs a run, least recently decided first. Hourly, it
 decides a green PR once, on its final check state. It decides that PR again only
 when its head changes, or when its last decide job fails. A decide job that was
-skipped did not decide. A PR held at the last step, which posts no verdict, is
+skipped did not decide, and neither did one whose Decide step was skipped
+because it found no PR to judge. A PR held at the last step, which posts no verdict, is
 therefore left alone. A push to `main` that changes an auto-merge rule file
 decides every eligible PR again, since each last decision used the old rules.
 
