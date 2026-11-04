@@ -1,3 +1,4 @@
+import { benchCommand } from '@/bench-command';
 import { checksCommand } from '@/checks-command';
 import { doctorCommand } from '@/doctor-command';
 import { factoryCommand } from '@/factory-command';
@@ -46,6 +47,12 @@ export const commands: Record<string, Command> = {
     summary:
       'Check the factory tree: its agents, automations, runners, scorers and models. Exits 1 on a problem.',
     run: factoryCommand,
+  },
+  bench: {
+    usage: 'clutch bench <name> [--config NAME] [--task NAME] [--json]',
+    summary:
+      'Run each task of a benchmark suite with each of its models, in scratch clones, and print pass, time and lines. A whole run writes its result file.',
+    run: benchCommand,
   },
   init: {
     usage: 'clutch init [--root DIR] [--mode sync|doctor] [--adopt] [--yes]',

@@ -144,6 +144,51 @@ mise exec -- bun run clutch factory --write-schemas apps/cli/schemas/factory
 - The [factory tree](../../docs/contributing/architecture/factory-tree.md)
   page names each path and each key.
 
+## Bench
+
+`clutch bench <name>` runs the suite in `benchmarks/<name>/benchmark.md` of
+the factory tree. It runs each task with each config, one pair at a time, and
+prints pass or fail, time, changed lines and turns for each pair. Then it
+prints the passes, time and lines of each config.
+
+```sh
+mise exec -- bun run clutch bench implement-models
+mise exec -- bun run clutch bench implement-models --task cl-116-release-changeset --config sonnet
+mise exec -- bun run clutch bench implement-models --json
+```
+
+For each pair, the command does these steps:
+
+1. It clones the task's `commit` alone into a new folder in the temp folder.
+   The clone has no remote and no later history, so the agent cannot push or
+   read the answer.
+2. It runs the `setup` commands of the agent's runner in the clone.
+3. It runs the agent's model with the agent's prompt, the rules of a
+   benchmark run and the text of the task's `issue`. The run stops after 20
+   minutes or 80 turns.
+4. It counts the lines that differ from `commit`, then runs the task's
+   `check` in the clone. Exit 0 passes. `$CLUTCH_BENCH_REPO` holds the path of
+   the repository, so a check can fetch test files that the agent never saw.
+5. It removes the clone, also after a failure, a timeout or Ctrl-C.
+
+- A run of the whole suite writes
+  `benchmarks/<name>/results/<date>-<short sha>.json`, from the commit that
+  ran it. Commit that file. `--task NAME` and `--config NAME` pick some pairs,
+  and such a run writes no file. Each flag can repeat.
+- `--json` prints the result as JSON, and the progress goes to stderr.
+- The exit of each pair is `done`, `turns` (the turn limit), `timeout`,
+  `error` (the agent failed) or `setup` (the clone or the setup failed). The
+  check alone decides pass or fail.
+- The log of each pair stays in a `clutch-bench-<name>-logs-*` folder in the
+  temp folder. The command prints its path.
+- Only `claude` models run today. A run uses `claude --print` on the plan that
+  the CLI is signed in to. The command removes `ANTHROPIC_API_KEY` from the
+  agent's environment, so a run never bills per token. The agent may edit
+  files and run `mise`, `bun` and read-only `git` commands. It cannot push or
+  run `gh`.
+- The [factory tree](../../docs/contributing/architecture/factory-tree.md#benchmarkmd)
+  page names the keys of `benchmark.md`.
+
 ## Worktree
 
 `clutch worktree` makes a separate checkout for one task, so several agents or

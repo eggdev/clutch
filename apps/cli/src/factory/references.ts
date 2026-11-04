@@ -126,6 +126,41 @@ function checkScorers(tree: Tree, agents: Set<string>, models: Map<string, strin
   }
 }
 
+/** Adds a problem for each item of `list` whose `key` repeats an earlier item's. */
+function checkUnique(entry: Entry, field: string, key: string, add: Add) {
+  const list = entry.data[field];
+  const seen = new Set<unknown>();
+  for (const [index, item] of (Array.isArray(list) ? list : []).entries()) {
+    const value = (item as Record<string, unknown> | null)?.[key];
+    if (seen.has(value)) {
+      add(entry, `${field}[${index}].${key}`, `${show(value)} is the ${key} of an earlier item.`);
+    }
+    seen.add(value);
+  }
+}
+
+function checkBenchmarks(tree: Tree, agents: Set<string>, models: Map<string, string>, add: Add) {
+  for (const benchmark of tree.benchmarks) {
+    const { agent, configs } = benchmark.data;
+    if (typeof agent === 'string' && !agents.has(agent)) {
+      add(benchmark, 'agent', `No folder agents/${agent}/ with an agent.md.`);
+    }
+    for (const [index, config] of (Array.isArray(configs) ? configs : []).entries()) {
+      const { model } = (config ?? {}) as { model?: unknown };
+      if (typeof model !== 'string' || models.has(model)) {
+        continue;
+      }
+      const reason = tree.models
+        ? `${show(model)} is not an id in models.yaml.`
+        : `${show(model)} needs models.yaml, and the tree has none.`;
+      add(benchmark, `configs[${index}].model`, reason);
+    }
+    checkUnique(benchmark, 'configs', 'name', add);
+    checkUnique(benchmark, 'configs', 'model', add);
+    checkUnique(benchmark, 'tasks', 'name', add);
+  }
+}
+
 /** Adds a problem to `tree.problems` for each broken rule across files. */
 export function checkReferences(tree: Tree) {
   const flagged = new Set(tree.problems.map((problem) => `${problem.file}\0${problem.key}`));
@@ -140,6 +175,7 @@ export function checkReferences(tree: Tree) {
   checkAgents(tree, models, add);
   checkAutomations(tree, agents, add);
   checkScorers(tree, agents, models, add);
+  checkBenchmarks(tree, agents, models, add);
 }
 
 /** The problems sorted by file, in the order each file reported them. */

@@ -6,7 +6,7 @@ import { parse } from 'yaml';
 
 import { agentKind } from '@/factory/agent';
 import { automationKind } from '@/factory/automation';
-import { benchmarkPath } from '@/factory/benchmark';
+import { benchmarkKind } from '@/factory/benchmark';
 import { namePattern } from '@/factory/common';
 import type { Kind } from '@/factory/common';
 import { check } from '@/factory/json-schema';
@@ -26,7 +26,7 @@ export type Tree = {
   automations: Array<Entry>;
   runners: Array<Entry>;
   scorers: Array<Entry>;
-  benchmarks: Array<string>;
+  benchmarks: Array<Entry>;
   models?: Entry;
   problems: Array<Problem>;
 };
@@ -174,8 +174,7 @@ export async function readTree(root: string): Promise<Tree> {
   const automations = await readKindFolders(root, automationKind, problems);
   const runners = await readRunners(root, problems);
   const scorers = await readKindFolders(root, scorerKind, problems);
-  const benchmarkFolders = await readFolders(root, benchmarkPath, problems);
-  const benchmarks = benchmarkFolders.map((item) => item.file);
+  const benchmarks = await readKindFolders(root, benchmarkKind, problems);
   const modelsText = await readText(path.join(root, modelsKind.path));
   const models =
     modelsText === null

@@ -147,6 +147,45 @@ test('a scorer needs known agents, a known judge, and labels that pass and fail'
   ]);
 });
 
+const sha = '3d3c42e5aac5ba805825da76410c181273ba90b1';
+const benchmark = (configs: string, tasks: string) =>
+  `---\ndescription: Compares models.\nagent: implement\nconfigs:\n${configs}tasks:\n${tasks}---\n\nWhat it measures.\n`;
+const config = (configName: string, model: string) =>
+  `  - name: ${configName}\n    model: ${model}\n`;
+const task = (taskName: string, commit = sha) =>
+  `  - name: ${taskName}\n    commit: ${commit}\n    issue: .clutch/issues/CL-001.md\n    check: bun test\n`;
+
+test('a benchmark needs a known agent, known models and unique names', async () => {
+  await using good = await tree({
+    ...base,
+    'benchmarks/compare/benchmark.md': benchmark(
+      config('opus', 'opus') + config('qwen', 'qwen'),
+      task('one'),
+    ),
+  });
+  expect(await keys(good.root)).toEqual([]);
+  await using bad = await tree({
+    ...base,
+    'benchmarks/compare/benchmark.md': benchmark(
+      config('opus', 'opus') + config('opus', 'opus') + config('gpt', 'gpt-9'),
+      task('one') + task('one', 'abc1234'),
+    ).replace('agent: implement', 'agent: ghost'),
+  });
+  expect(await keys(bad.root)).toEqual([
+    'benchmarks/compare/benchmark.md tasks[1].commit',
+    'benchmarks/compare/benchmark.md agent',
+    'benchmarks/compare/benchmark.md configs[2].model',
+    'benchmarks/compare/benchmark.md configs[1].name',
+    'benchmarks/compare/benchmark.md configs[1].model',
+    'benchmarks/compare/benchmark.md tasks[1].name',
+  ]);
+  await using one = await tree({
+    ...base,
+    'benchmarks/compare/benchmark.md': benchmark(config('opus', 'opus'), task('one')),
+  });
+  expect(await keys(one.root)).toEqual(['benchmarks/compare/benchmark.md configs']);
+});
+
 test('each trigger type takes its own keys', async () => {
   await using good = await tree({
     ...base,

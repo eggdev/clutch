@@ -194,6 +194,8 @@ exclude:
   - .claude/skills/verify
   # The capability registry belongs to Clutch. Projects read the copy in their Clutch checkout.
   - docs/contributing/capabilities/registry.yaml
+  # Clutch's benchmark suites pin Clutch's own commits, so they cannot run in a project.
+  - factory/benchmarks/
   # Tests that compile apps/cli, which only Clutch has, so they cannot pass in a project.
   - tools/github/project.test.ts
   - tools/release/binaries.test.ts

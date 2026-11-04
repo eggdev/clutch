@@ -15,7 +15,7 @@ as `check-factory`, so `pre-push` and CI run it too.
 | `runners/<name>.yaml`              | A machine that runs agents                     | None             |
 | `scorers/<name>/scorer.md`         | A judge that grades the runs of some agents    | The judge prompt |
 | `models.yaml`                      | Each model that an agent or a scorer may name  | None             |
-| `benchmarks/<name>/benchmark.md`   | Reserved for benchmark suites                  | Not checked      |
+| `benchmarks/<name>/benchmark.md`   | A suite that compares models on pinned tasks   | What it measures |
 
 - The paths start at the tree root. The tree root is `factory/` at the project
   root. Set `factory.root` in `clutch.yaml` to move it. `root: .` puts the
@@ -25,8 +25,7 @@ as `check-factory`, so `pre-push` and CI run it too.
   a kind's folder that is not an item of that kind is a problem. An item
   folder can hold other files beside its main file.
 - Skills live in `.agents/skills/`, so the tree has no `skills/` folder.
-- The check needs a `benchmark.md` in each folder in `benchmarks/`. It does
-  not read the keys of that file. CL-427 defines them.
+- A benchmark folder can hold a `results/` folder beside its `benchmark.md`.
 - A project with no tree at the default `factory/` passes with a notice. A
   root that `--root` or `factory.root` names must be a folder, or the check
   fails. `apps/cli/src/factory-command.test.ts` tests both cases.
@@ -137,6 +136,45 @@ Compare the pull request with its issue. Return one label and one sentence that 
 | `passingScore` | Yes      | 0 to 1. A run passes when its label scores this or more                                                      |
 | `samplingRate` | Yes      | A whole number from 0 to 100: the percent of runs that the scorer grades                                     |
 
+## benchmark.md
+
+```markdown
+---
+description: Compares Opus and Sonnet on the implement agent.
+agent: implement
+configs:
+  - name: opus
+    model: claude-opus-5-5
+  - name: sonnet
+    model: claude-sonnet-5-5
+tasks:
+  - name: cl-116-release-changeset
+    commit: 25076894f5bbd0853aecf252d88d422aeef18352
+    issue: .clutch/issues/CL-116.md
+    check: mise exec -- bun test tools/check-changeset.test.ts
+---
+
+The suite measures how well each model builds a small issue.
+```
+
+| Key           | Required | Value                                                                  |
+| ------------- | -------- | ---------------------------------------------------------------------- |
+| `description` | Yes      | One line that says what the suite compares                             |
+| `agent`       | Yes      | The name of a folder in `agents/`. Each run sends its prompt           |
+| `configs`     | Yes      | 2 to 6 maps of `name` and `model`. `model` is an `id` in `models.yaml` |
+| `tasks`       | Yes      | 1 to 20 maps of `name`, `commit`, `issue` and `check`. See below       |
+
+| Task key | Value                                                                                     |
+| -------- | ----------------------------------------------------------------------------------------- |
+| `name`   | The name that the results and `--task` use                                                |
+| `commit` | The full SHA of the commit that the task starts from                                      |
+| `issue`  | The path of the issue file at `commit`, from the repository root. The agent gets its text |
+| `check`  | The shell command that grades the result in the clone. Exit 0 passes                      |
+
+`models.yaml` gives the harness of each config. `clutch bench <name>` runs the
+suite and writes its results to `results/` in the suite folder. See the
+[CLI reference](https://github.com/eggdev/clutch/blob/main/apps/cli/README.md#bench).
+
 ## models.yaml
 
 ```yaml
@@ -168,15 +206,19 @@ these rules:
 - A scorer has at least 1 label that passes and 1 label that fails. No 2
   labels have the same `value`.
 - No 2 items in `models.yaml` have the same `id`.
+- A benchmark's `agent` names a folder in `agents/`, and each config's `model`
+  is an `id` in `models.yaml`. No 2 configs have the same `name` or `model`,
+  and no 2 tasks have the same `name`.
 
 ## JSON Schema files
 
-Each kind has a JSON Schema (draft 2020-12) file, so a repository without
-Clutch can check the same keys:
+Each kind has a JSON Schema (draft 2020-12) file. With these files, a
+repository without Clutch can check the same keys:
 [agent](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/agent.schema.json),
 [automation](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/automation.schema.json),
 [runner](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/runner.schema.json),
-[scorer](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/scorer.schema.json)
+[scorer](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/scorer.schema.json),
+[benchmark](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/benchmark.schema.json)
 and
 [models](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/models.schema.json).
 A Markdown kind's schema checks the YAML between the `---` lines.

@@ -79,6 +79,7 @@ test('--write-schemas writes a JSON Schema file for each kind', async () => {
   expect(written.toSorted()).toEqual([
     'agent.schema.json',
     'automation.schema.json',
+    'benchmark.schema.json',
     'models.schema.json',
     'runner.schema.json',
     'scorer.schema.json',
