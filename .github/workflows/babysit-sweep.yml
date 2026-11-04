@@ -44,9 +44,10 @@ jobs:
       !(github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, 'clutch-babysit'))
     runs-on: ubuntu-26.04
     timeout-minutes: 10
-    concurrency:
-      group: babysit-sweep-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || github.event_name }}
-      cancel-in-progress: false
+    # No concurrency group. A group keeps one waiting run and cancels the
+    # others, and a cancelled run shows as a failed check on the PR. Each
+    # sweep only reads and dispatches, and babysit.yml runs one round per PR
+    # at a time, so two sweeps at once cost one extra read.
     permissions:
       # gh workflow run dispatches the round.
       actions: write

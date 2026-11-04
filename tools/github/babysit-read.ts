@@ -48,14 +48,8 @@ export type PrState = {
   logId: number | null;
 };
 
-const failing = new Set([
-  'FAILURE',
-  'TIMED_OUT',
-  'CANCELLED',
-  'ACTION_REQUIRED',
-  'STARTUP_FAILURE',
-  'ERROR',
-]);
+// A cancelled run is not red: a newer run, or a newer push, took its place.
+const failing = new Set(['FAILURE', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'ERROR']);
 
 const query = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {

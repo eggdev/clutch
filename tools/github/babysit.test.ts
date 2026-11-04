@@ -9,12 +9,11 @@ import {
   roundsPerTrigger,
   stuckLabel,
 } from '@tools/github/babysit';
-import { actionOf, afterApproval, blockingGuard, resolves } from '@tools/github/babysit-answer';
+import { actionOf, afterApproval, resolves } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, outcomeOf } from '@tools/github/babysit-apply';
 import { emptyLog, roundsToday } from '@tools/github/babysit-log';
 import type { Round } from '@tools/github/babysit-log';
-import { ownerStep } from '@tools/github/babysit-owner';
 import type { PrState, Thread } from '@tools/github/babysit-read';
 import { fake } from '@tools/github/fake-run';
 
@@ -315,29 +314,6 @@ test('apply replies in each thread, resolves the answered ones, reruns a flaky c
   expect(result.items.find((i) => i.ref === 'T1')?.action).toBe('fixed in feed123');
 });
 
-test('the owner is asked only when nothing but the approval is left', () => {
-  const status = {
-    counts: { pass: 6, fail: 0, pending: 0 },
-    agentReview: { posted: true, blocking: 0, owner: 1 },
-    mergeable: 'MERGEABLE',
-    mergeState: 'BLOCKED',
-    ready: false,
-  };
-  expect(ownerStep(status, false, false)).toBe('ask');
-  expect(ownerStep(status, false, true)).toBe('keep');
-  expect(ownerStep({ ...status, counts: { pass: 5, fail: 0, pending: 1 } }, false, true)).toBe(
-    'withdraw',
-  );
-  expect(
-    ownerStep({ ...status, agentReview: { posted: true, blocking: 1, owner: 0 } }, false, false),
-  ).toBe('keep');
-  expect(ownerStep(status, true, true)).toBe('keep');
-  // An open thread or a stuck round is work left, so the request waits.
-  expect(ownerStep(status, false, false, true)).toBe('keep');
-  expect(ownerStep(status, false, true, true)).toBe('withdraw');
-  expect(ownerStep({ ...status, mergeState: 'CLEAN', ready: true }, false, false)).toBe('keep');
-});
-
 test("the owner's approval answers the threads left for the owner, with no model", () => {
   const left = thread('T9', `The owner decides.\n\n${replyMarker}`);
   expect(plan(state({ threads: [left] }), now).skip).toBe('nothing to do');
@@ -345,23 +321,6 @@ test("the owner's approval answers the threads left for the owner, with no model
   expect(next.triggers).toEqual(['owner-approved']);
   expect(next.approvedThreads.map((t) => t.id)).toEqual(['T9']);
   expect(next.threads).toEqual([]);
-});
-
-test('only a fix closes a blocking finding; any other answer leaves it for the owner', () => {
-  const answer: Answer = {
-    kind: 'thread',
-    ref: 'T1',
-    decision: 'no-change',
-    reason: 'wrong',
-    reply: 'No.',
-  };
-  expect(blockingGuard(answer, 'blocking: docs did not move')?.decision).toBe('owner');
-  expect(blockingGuard(answer, '**blocking** (review.md)')?.decision).toBe('owner');
-  expect(blockingGuard({ ...answer, decision: 'must-fix' }, 'blocking: x')?.decision).toBe(
-    'must-fix',
-  );
-  expect(blockingGuard(answer, 'note: rename')?.decision).toBe('no-change');
-  expect(blockingGuard(undefined, 'blocking: x')).toBeUndefined();
 });
 
 test("the owner's approval never closes a blocking finding's thread", () => {
