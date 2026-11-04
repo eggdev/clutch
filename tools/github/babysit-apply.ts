@@ -18,6 +18,7 @@ import { readPr } from '@tools/github/babysit-read';
 import { retrying } from '@tools/github/command';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
+import { ownerLogin } from '@tools/github/status';
 
 /**
  * The deterministic half of a round. The agent decides and edits files; this
@@ -192,7 +193,7 @@ if (import.meta.main) {
   });
   try {
     const repo = values.repo ?? process.env.GITHUB_REPOSITORY ?? '';
-    const owner = values.owner ?? '';
+    const owner = values.owner ?? (await ownerLogin()) ?? '';
     const plan = JSON.parse(await readFile(values.plan ?? '', 'utf-8')) as Plan;
     const now = new Date().toISOString();
     const cost = {

@@ -4,7 +4,7 @@ import { readPr } from '@tools/github/babysit-read';
 import { retrying } from '@tools/github/command';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
-import { prStatus } from '@tools/github/status';
+import { ownerLogin, prStatus } from '@tools/github/status';
 import type { PrStatus } from '@tools/github/status';
 
 /**
@@ -74,7 +74,7 @@ if (import.meta.main) {
     const step = await askOwnerLast(
       retrying,
       values.repo ?? '',
-      values.owner ?? '',
+      values.owner ?? (await ownerLogin()) ?? '',
       Number(values.pr),
     );
     console.log(`#${values.pr}: ${step} the owner's review request.`);

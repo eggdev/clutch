@@ -1,41 +1,19 @@
-# Babysits each open agent PR until it merges: syncs it with its base, answers
-# every comment and review thread, fixes what needs a fix, and keeps one
-# `## Babysit log` comment. See .agents/skills/babysit-pr/SKILL.md.
+# Babysits one agent PR: syncs it with its base, answers every comment and
+# review thread, fixes what needs a fix, and keeps one `## Babysit log`
+# comment. Babysit sweep (babysit-sweep.yml) dispatches it for each PR with
+# work. See .agents/skills/babysit-pr/SKILL.md.
 #
-# Two jobs. `sweep` runs on each event that can leave work on a PR (a review, a
-# comment, a finished CI or agent review run, a push to main, the half-hourly schedule).
-# It reads the PR and dispatches a round only when there is work and the caps
-# allow it. `babysit` is that round. It runs from the default branch only, so
-# the release bot's key in the release environment never reaches a PR's copy
-# of this file. The agent steps edit files and return decisions. They hold no
-# token that can push. A later step validates, pushes with the bot token (so CI
-# and agent review run on the new head) and replies, resolves and logs through
-# tools/github/babysit-apply.ts.
+# It runs from the default branch only, so the release bot's key in the
+# release environment never reaches a PR's copy of this file. The agent steps
+# edit files and return decisions. They hold no token that can push. A later
+# step validates, pushes with the bot token (so CI and agent review run on the
+# new head) and replies, resolves and logs through tools/github/babysit-apply.ts.
 #
 # Set the CLUTCH_BABYSIT repository variable to `off` to stop every round.
 # Label a PR `babysit:off` to leave it alone.
 name: Babysit
 
 on:
-  pull_request_review:
-    types: [submitted]
-  pull_request_review_comment:
-    types: [created]
-  # The sweep job runs the default branch's code only, never the PR's, and only reads and dispatches.
-  issue_comment: # zizmor: ignore[dangerous-triggers]
-    types: [created]
-  # A finished CI or agent review run. Neither a check suite nor a comment that
-  # the Actions token makes starts a workflow, so this is how agent review's
-  # findings and a red check reach the sweep. The sweep job admits only branches
-  # of this repository and runs the default branch's code.
-  workflow_run: # zizmor: ignore[dangerous-triggers]
-    workflows: [CI, Agent review]
-    types: [completed]
-  push:
-    branches: [main]
-  schedule:
-    # Every half hour, away from the top of the hour and the auto-merge sweep.
-    - cron: '23,53 * * * *'
   workflow_dispatch:
     inputs:
       pr:
@@ -48,41 +26,8 @@ permissions:
   contents: read
 
 jobs:
-  sweep:
-    # Never answer the babysitter's own comments, and skip comments on issues.
-    if: >-
-      github.event_name != 'workflow_dispatch' && vars.CLUTCH_BABYSIT != 'off' &&
-      !(github.event_name == 'workflow_run' && github.event.workflow_run.head_repository.full_name != github.repository) &&
-      !(github.event_name == 'issue_comment' && (!github.event.issue.pull_request || contains(github.event.comment.body, 'clutch-babysit'))) &&
-      !(github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, 'clutch-babysit'))
-    runs-on: ubuntu-26.04
-    timeout-minutes: 10
-    concurrency:
-      group: babysit-sweep-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || github.event_name }}
-      cancel-in-progress: false
-    permissions:
-      # gh workflow run dispatches the round.
-      actions: write
-      contents: read
-      pull-requests: read
-      checks: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # The default branch's rules, also on a review event, which checks out the PR's merge ref.
-          ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: false
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - name: Dispatch a round for each PR with work
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || '' }}
-          OWNER: ${{ vars.CLUTCH_OWNER || github.repository_owner }}
-        run: bun tools/github/babysit.ts sweep --repo "$GITHUB_REPOSITORY" --owner "$OWNER" ${PR:+--pr "$PR"}
-
   babysit:
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch && vars.CLUTCH_BABYSIT != 'off'
+    if: github.ref_name == github.event.repository.default_branch && vars.CLUTCH_BABYSIT != 'off'
     runs-on: ubuntu-26.04
     timeout-minutes: 45
     # The release bot's key. The environment admits only the default branch.
@@ -97,7 +42,6 @@ jobs:
       actions: read
     env:
       PR: ${{ inputs.pr }}
-      OWNER: ${{ vars.CLUTCH_OWNER || github.repository_owner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -109,7 +53,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          bun tools/github/babysit.ts plan --repo "$GITHUB_REPOSITORY" --owner "$OWNER" --pr "$PR" > "$RUNNER_TEMP/plan.json"
+          bun tools/github/babysit.ts plan --repo "$GITHUB_REPOSITORY" --pr "$PR" > "$RUNNER_TEMP/plan.json"
           jq -r '"skip=\(.skip // "")", "stuck=\(.stuck)", "sync=\(.sync)", "approved=\(.approved)", "red=\(.failed | length > 0)", "head=\(.head)", "model=\((.threads + .comments + .failed) | length > 0)"' "$RUNNER_TEMP/plan.json" >> "$GITHUB_OUTPUT"
           jq -r '.skip // "work: \(.triggers | join(", "))"' "$RUNNER_TEMP/plan.json"
           gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json headRefName,baseRefName --jq '"head_ref=\(.headRefName)", "base_ref=\(.baseRefName)"' >> "$GITHUB_OUTPUT"
@@ -301,21 +245,21 @@ jobs:
           done
           out="$RUNNER_TEMP/babysit-$PR-$GITHUB_RUN_ID.json"
           if [ -n "$SKIP" ]; then
-            bun tools/github/babysit-apply.ts --repo "$GITHUB_REPOSITORY" --owner "$OWNER" --plan "$RUNNER_TEMP/plan.json" --stuck "$SKIP" --event "$EVENT" --run "$RUN_URL" --out "$out"
+            bun tools/github/babysit-apply.ts --repo "$GITHUB_REPOSITORY" --plan "$RUNNER_TEMP/plan.json" --stuck "$SKIP" --event "$EVENT" --run "$RUN_URL" --out "$out"
             exit 0
           fi
           sync=none
           if [ "$SYNC" != none ]; then
             if [ "$OK" = conflict ]; then sync=conflict-stuck; elif [ -n "$PUSHED" ]; then sync=merge; fi
           fi
-          bun tools/github/babysit-apply.ts --repo "$GITHUB_REPOSITORY" --owner "$OWNER" --plan "$RUNNER_TEMP/plan.json" \
+          bun tools/github/babysit-apply.ts --repo "$GITHUB_REPOSITORY" --plan "$RUNNER_TEMP/plan.json" \
             --answers "$RUNNER_TEMP/answers.json" --pushed "$PUSHED" --sync "$sync" --cost "$cost" --models "$models" \
             --event "$EVENT" --run "$RUN_URL" --out "$out"
       - name: Ask the owner only when nothing is left
         if: always() && steps.bot.outcome == 'success' && steps.plan.outputs.skip == ''
         env:
           GH_TOKEN: ${{ steps.bot.outputs.token }}
-        run: bun tools/github/babysit-owner.ts --repo "$GITHUB_REPOSITORY" --owner "$OWNER" --pr "$PR"
+        run: bun tools/github/babysit-owner.ts --repo "$GITHUB_REPOSITORY" --pr "$PR"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

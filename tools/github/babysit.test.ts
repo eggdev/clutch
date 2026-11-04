@@ -9,7 +9,7 @@ import {
   roundsPerTrigger,
   stuckLabel,
 } from '@tools/github/babysit';
-import { actionOf, afterApproval, resolves } from '@tools/github/babysit-answer';
+import { actionOf, afterApproval, blockingGuard, resolves } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, outcomeOf } from '@tools/github/babysit-apply';
 import { emptyLog, roundsToday } from '@tools/github/babysit-log';
@@ -36,6 +36,7 @@ const state = (fields: Partial<PrState> = {}): PrState => ({
   open: true,
   fork: false,
   author: 'app/eggdev-clutch-bot',
+  authorIsBot: true,
   head: 'abc1234def',
   headRef: 'clutch/cl-420-babysit',
   base: 'main',
@@ -132,9 +133,16 @@ test('a comment the log answered is not asked again', () => {
 });
 
 test('only agent PRs, never a fork, a draft or a PR labelled off', () => {
-  expect(isAgentPr({ author: 'eggdev', headRef: 'feature/x', fork: false })).toBe(false);
-  expect(isAgentPr({ author: 'eggdev', headRef: 'clutch/cl-1-x', fork: false })).toBe(true);
-  expect(isAgentPr({ author: 'app/eggdev-clutch-bot', headRef: 'x', fork: true })).toBe(false);
+  const pr = { author: 'eggdev', authorIsBot: false, fork: false };
+  expect(isAgentPr({ ...pr, headRef: 'feature/x' })).toBe(false);
+  expect(isAgentPr({ ...pr, headRef: 'clutch/cl-1-x' })).toBe(true);
+  expect(
+    isAgentPr({ author: 'eggdev-clutch-bot', authorIsBot: true, headRef: 'x', fork: true }),
+  ).toBe(false);
+  // A Renovate PR is a bot PR, which auto-merge judges by the bot rule, not an agent PR.
+  expect(
+    isAgentPr({ author: 'renovate', authorIsBot: true, headRef: 'renovate/x', fork: false }),
+  ).toBe(false);
   const work = { threads: [thread('T1')] };
   expect(plan(state({ ...work, draft: true }), now).skip).toBe('closed or draft');
   expect(plan(state({ ...work, labels: ['babysit:off'] }), now).skip).toBe('labelled babysit:off');
@@ -330,4 +338,21 @@ test("the owner's approval answers the threads left for the owner, with no model
   expect(next.triggers).toEqual(['owner-approved']);
   expect(next.approvedThreads.map((t) => t.id)).toEqual(['T9']);
   expect(next.threads).toEqual([]);
+});
+
+test('only a fix closes a blocking finding; any other answer leaves it for the owner', () => {
+  const answer: Answer = {
+    kind: 'thread',
+    ref: 'T1',
+    decision: 'no-change',
+    reason: 'wrong',
+    reply: 'No.',
+  };
+  expect(blockingGuard(answer, 'blocking: docs did not move')?.decision).toBe('owner');
+  expect(blockingGuard(answer, '**blocking** (review.md)')?.decision).toBe('owner');
+  expect(blockingGuard({ ...answer, decision: 'must-fix' }, 'blocking: x')?.decision).toBe(
+    'must-fix',
+  );
+  expect(blockingGuard(answer, 'note: rename')?.decision).toBe('no-change');
+  expect(blockingGuard(undefined, 'blocking: x')).toBeUndefined();
 });

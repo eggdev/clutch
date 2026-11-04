@@ -66,11 +66,32 @@ const unanswered = 'the agent gave no decision';
 
 const firstLine = (body = '') => body.trimStart().split('\n')[0]?.slice(0, 200) ?? '';
 
+/** A finding that starts with `blocking`, as agent review writes it. */
+const isBlocking = (finding: string) => /^[^A-Za-z0-9]*blocking\b/iu.test(finding);
+
+/**
+ * A `blocking` finding must not merge until it is fixed, so only a fix closes
+ * its thread. A model that answers it any other way leaves it for the owner.
+ */
+export function blockingGuard(answer: Answer | undefined, finding: string): Answer | undefined {
+  if (!answer || !isBlocking(finding) || fixes.has(answer.decision)) {
+    return answer;
+  }
+  return {
+    ...answer,
+    decision: 'owner',
+    reason: `a blocking finding closes only with a fix; the triage said ${answer.decision}: ${answer.reason}`,
+  };
+}
+
 export async function answerThreads({ run, repo, plan, answers, pushed }: Context) {
   const items: Array<Item> = [];
   for (const thread of plan.threads) {
-    const answer = answers.find((a) => a.kind === 'thread' && a.ref === thread.id);
     const first = thread.comments[0];
+    const answer = blockingGuard(
+      answers.find((a) => a.kind === 'thread' && a.ref === thread.id),
+      firstLine(first?.body),
+    );
     const base = {
       kind: 'thread' as const,
       ref: thread.id,

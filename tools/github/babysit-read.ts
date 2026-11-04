@@ -27,6 +27,8 @@ export type PrState = {
   open: boolean;
   fork: boolean;
   author: string;
+  /** The author is a GitHub App or a bot account. */
+  authorIsBot: boolean;
   head: string;
   headRef: string;
   base: string;
@@ -55,7 +57,7 @@ const failing = new Set([
 const query = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {
     number url isDraft state isCrossRepository headRefOid headRefName baseRefName mergeable
-    author { login }
+    author { login __typename }
     labels(first: 30) { nodes { name } }
     commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
       __typename
@@ -112,7 +114,7 @@ type PrNode = {
   headRefName: string;
   baseRefName: string;
   mergeable: string;
-  author: { login: string } | null;
+  author: { login: string; __typename?: string } | null;
   labels: { nodes: Array<{ name: string }> };
   commits: {
     nodes: Array<{ commit: { statusCheckRollup: { contexts: { nodes: Array<Context> } } | null } }>;
@@ -194,6 +196,7 @@ export async function readPr(
     open: pr.state === 'OPEN',
     fork: pr.isCrossRepository,
     author: pr.author?.login ?? 'ghost',
+    authorIsBot: pr.author?.__typename === 'Bot',
     head: pr.headRefOid,
     headRef: pr.headRefName,
     base: pr.baseRefName,

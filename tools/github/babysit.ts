@@ -1,11 +1,13 @@
 import { parseArgs } from 'node:util';
 
+import { isAgentPr as agentRule } from '@tools/github/auto-merge-rules';
 import { roundsToday } from '@tools/github/babysit-log';
 import { readPr } from '@tools/github/babysit-read';
 import type { Comment, FailedCheck, PrState, Thread } from '@tools/github/babysit-read';
 import { retrying } from '@tools/github/command';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
+import { ownerLogin } from '@tools/github/status';
 
 /**
  * The babysitter's view of one agent PR: what still needs a round, and
@@ -65,13 +67,18 @@ export type Plan = {
   stuck: boolean;
 };
 
-/** An agent PR: the release bot opened it, or an agent's `clutch/cl-` branch. Never a fork. */
-export function isAgentPr(state: Pick<PrState, 'author' | 'headRef' | 'fork'>) {
+/** An agent PR, by the rule auto-merge uses, and never a fork. A Renovate or other bot branch is not one. */
+export function isAgentPr(state: Pick<PrState, 'author' | 'authorIsBot' | 'headRef' | 'fork'>) {
   return (
     !state.fork &&
-    (state.author.startsWith('app/') ||
-      state.author.endsWith('[bot]') ||
-      state.headRef.startsWith('clutch/cl-'))
+    agentRule({
+      state: 'OPEN',
+      isDraft: false,
+      baseRefName: '',
+      headRefOid: '',
+      headRefName: state.headRef,
+      author: { login: state.author, is_bot: state.authorIsBot },
+    })
   );
 }
 
@@ -182,7 +189,8 @@ async function openPrs(run: Run, repo: string) {
     .filter((p) => !p.isDraft)
     .filter((p) =>
       isAgentPr({
-        author: p.author.is_bot ? `app/${p.author.login.replace(/^app\//u, '')}` : p.author.login,
+        author: p.author.login,
+        authorIsBot: p.author.is_bot,
         headRef: p.headRefName,
         fork: p.isCrossRepository,
       }),
@@ -231,7 +239,7 @@ if (import.meta.main) {
   });
   try {
     const repo = values.repo ?? process.env.GITHUB_REPOSITORY ?? '';
-    const owner = values.owner ?? process.env.CLUTCH_OWNER ?? '';
+    const owner = values.owner ?? (await ownerLogin()) ?? '';
     const now = new Date().toISOString();
     const number = values.pr ? Number(values.pr) : null;
     if (positionals[0] === 'sweep') {

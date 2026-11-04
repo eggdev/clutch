@@ -13,8 +13,9 @@ draft. It runs the Claude Code GitHub Action with [review](./review.md) as its r
 
 1. The agent reads the diff and the pages that the diff touches.
 2. It reads the threads that the babysitter already answered and resolved. It
-   does not raise a `blocking` or `note` finding again on the same path for
-   the same rule, unless the diff changed its cause.
+   does not raise a `note` finding again on the same path for the same rule,
+   unless the diff changed its cause. It raises a `blocking` finding whenever
+   its cause is in the diff.
 3. It posts an inline comment for each finding.
 4. It posts one summary comment that lists each finding and its level.
 5. It returns the number of blocking findings and each `owner` finding to the
