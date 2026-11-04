@@ -11,26 +11,21 @@ import { latestRelease } from '@/release';
 import { localFile } from '@/review-source';
 import { apply, plan, writeEntry } from '@/sync/engine';
 import type { Change, SyncFile } from '@/sync/engine';
+import {
+  managedRecord,
+  nextLineage,
+  readLineage,
+  recordChanges,
+  reviewRecord,
+} from '@/sync/lineage';
+import type { ProjectLineage } from '@/sync/lineage';
 import { planMerges } from '@/sync/merges';
 import { pinFile, planPinFile } from '@/sync/pin';
 import type { PinAnswer } from '@/sync/pin';
-import { seedChangesSince } from '@/sync/seed-changes';
+import { planSeeds } from '@/sync/seed-adds';
 import type { SeedChange } from '@/sync/seed-changes';
 import { lineagePath, loadClutchSource } from '@/sync/source';
 import type { ClutchSource } from '@/sync/source';
-
-const reviewRecord = '.review/tooling.json';
-
-type Lineage = {
-  schemaVersion: 1;
-  templateRepo: string;
-  templateCommit: string;
-  /** The Clutch release of `templateCommit`. Absent for a commit between releases. */
-  release?: string;
-  files: Record<string, string>;
-  /** Managed files the project kept over Clutch's copy, with the Clutch hash it declined. */
-  kept?: Record<string, string>;
-};
 
 export type SyncResult = {
   schemaVersion: 1;
@@ -49,24 +44,9 @@ export type SyncResult = {
   mergeClashes: Array<{ file: string; key: string }>;
   /** Project-owned pages whose Clutch copy changed since the last sync. Information only. See sync/seed-changes.ts. */
   seedChanges: Array<SeedChange>;
-  /** Why seedChanges could not be read, or null. */
+  /** Why seedChanges, or the seed files that sync adds, could not be read. Null when both could. */
   seedChangesNote: string | null;
 };
-
-/** The last lineage. A project that only has review tooling starts from `.review/tooling.json`. */
-async function readLineage(root: string) {
-  const current = await localFile(root, lineagePath);
-  const legacy = current ? null : await localFile(root, reviewRecord);
-  const record = current ?? legacy;
-  const parsed = record ? (JSON.parse(record.content.toString()) as Partial<Lineage>) : {};
-  return {
-    previous: current,
-    legacy,
-    files: parsed.files ?? {},
-    kept: parsed.kept ?? {},
-    release: parsed.release ?? null,
-  };
-}
 
 /**
  * Settles the edited managed files. `take` replaces a file with Clutch's copy,
@@ -116,67 +96,11 @@ async function unpinnedConfig(root: string) {
   return doc.toString();
 }
 
-const under = (roots: Array<string>, file: string) =>
-  roots.some((root) => (root.endsWith('/') ? file.startsWith(root) : file === root));
-
-/** Entries of `record` that a sync scoped to `roots` must keep as they are. */
-function outside(record: Record<string, string>, roots: Array<string> | null) {
-  return roots
-    ? Object.fromEntries(Object.entries(record).filter(([file]) => !under(roots, file)))
-    : {};
-}
-
-/** The lineage after this sync. A scoped sync keeps the records of the files outside its scope. */
-function nextLineage(input: {
-  repo: string | undefined;
-  source: Awaited<ReturnType<typeof loadClutchSource>>;
-  lineage: Awaited<ReturnType<typeof readLineage>>;
-  scope: Array<string> | null;
-  kept: Record<string, string>;
-  pinHash: string | undefined;
-}): Lineage {
-  const { source, lineage, scope } = input;
-  const next: Lineage = {
-    schemaVersion: 1,
-    templateRepo: input.repo ?? '',
-    templateCommit: source.commit,
-    ...(source.release ? { release: source.release } : {}),
-    files: {
-      ...outside(lineage.files, scope),
-      ...Object.fromEntries([...source.managed.files].map(([file, entry]) => [file, entry.hash])),
-      ...(input.pinHash ? { [pinFile]: input.pinHash } : {}),
-    },
-  };
-  const kept = { ...outside(lineage.kept, scope), ...input.kept };
-  if (Object.keys(kept).length > 0) {
-    next.kept = kept;
-  }
-  return next;
-}
-
-/** The changes to the lineage, the old pin in clutch.yaml and the old review record. */
-function recordChanges(
-  lineage: Awaited<ReturnType<typeof readLineage>>,
-  lineageText: string,
-  unpinned: string | null,
-): Array<Change> {
-  const changes: Array<Change> = [];
-  if (lineage.previous?.content.toString() !== lineageText) {
-    changes.push({ path: lineagePath, action: lineage.previous ? 'update' : 'add' });
-  }
-  if (unpinned) {
-    changes.push({ path: 'clutch.yaml', action: 'update' });
-  }
-  if (lineage.legacy) {
-    changes.push({ path: reviewRecord, action: 'remove' });
-  }
-  return changes;
-}
-
-/** Writes the merged files, the pin, the lineage and clutch.yaml without its old pin, after the engine wrote the managed files. */
+/** Writes the merged files, the new seed files, the pin, the lineage and clutch.yaml without its old pin, after the engine wrote the managed files. */
 async function writeRest(
   root: string,
   merged: Map<string, string>,
+  seeds: Map<string, SyncFile>,
   lineageText: string,
   unpinned: string | null,
   legacy: boolean,
@@ -189,6 +113,9 @@ async function writeRest(
     if (file.endsWith('.json')) {
       await formatFile(root, file);
     }
+  }
+  for (const [file, entry] of seeds) {
+    await writeEntry(root, file, entry);
   }
   if (pinText !== null) {
     await writeFile(path.join(root, pinFile), pinText);
@@ -218,7 +145,7 @@ function pinAnswer(answers: { keep: Array<string>; take: Array<string> }): PinAn
 async function pinStep(
   root: string,
   source: ClutchSource,
-  lineage: Awaited<ReturnType<typeof readLineage>>,
+  lineage: ProjectLineage,
   scope: Array<string> | null,
   answers: { keep: Array<string>; take: Array<string> },
 ) {
@@ -256,21 +183,32 @@ const deliveredFolder = (root: string, source: ClutchSource) => (folder: string)
   existsSync(path.join(root, folder)) ||
   [...source.managed.files.keys()].some((file) => file.startsWith(folder));
 
-/** The lineage entries that the managed plan records. The pin is planned apart, so its entry is not in the plan. */
-function managedRecord(
-  lineage: Awaited<ReturnType<typeof readLineage>>,
-  scope: Array<string> | null,
+/**
+ * Adds the files that sync writes outside the managed plan to `inspected`, so
+ * apply checks them before its first write: each merge file, each new seed
+ * file, which must still be absent, and the pin.
+ */
+function inspectOthers(
+  inspected: Map<string, string | null>,
+  merged: Map<string, string | null>,
+  seeds: Map<string, SyncFile>,
+  pin: Awaited<ReturnType<typeof pinStep>>,
 ) {
-  const record = scope
-    ? Object.fromEntries(Object.entries(lineage.files).filter(([file]) => under(scope, file)))
-    : lineage.files;
-  return Object.fromEntries(Object.entries(record).filter(([file]) => file !== pinFile));
+  for (const [file, hash] of merged) {
+    inspected.set(file, hash);
+  }
+  for (const file of seeds.keys()) {
+    inspected.set(file, null);
+  }
+  if (pin.planned) {
+    inspected.set(pinFile, pin.file?.hash ?? null);
+  }
 }
 
 /**
  * Moves the project at `root` to the Clutch revision `to`, read from the Clutch
- * checkout `template`. Without `to`, it uses the latest Clutch release. Seed
- * files are never touched.
+ * checkout `template`. Without `to`, it uses the latest Clutch release. Sync
+ * never changes a seed file. It adds a new one once, as sync/seed-adds.ts says.
  */
 export async function runSync(options: {
   root: string;
@@ -328,22 +266,17 @@ export async function runSync(options: {
   });
   const lineageText = `${JSON.stringify(next, null, 2)}\n`;
   const unpinned = scope ? null : await unpinnedConfig(root);
+  const seeds = await planSeeds({ root, template: options.template, lineage, source, repo });
   const changes = [
     ...managed.changes,
     ...merges.changes,
+    ...[...seeds.adds.keys()].map((file) => ({ path: file, action: 'add' }) as const),
     ...(pin.changed ? [{ path: pinFile, action: pin.file ? 'update' : 'add' } as const] : []),
     ...recordChanges(lineage, lineageText, unpinned),
   ];
   if (lineage.legacy) {
     managed.inspected.set(reviewRecord, lineage.legacy.hash);
   }
-  const seeds = await seedChangesSince({
-    root,
-    template: options.template,
-    from: lineage.release,
-    source,
-    repo,
-  });
   const result: SyncResult = {
     schemaVersion: 1,
     status: 'unchanged',
@@ -366,13 +299,16 @@ export async function runSync(options: {
   if (options.check) {
     return { ...result, status: 'planned' };
   }
-  for (const [file, hash] of merges.inspected) {
-    managed.inspected.set(file, hash);
-  }
-  if (pin.planned) {
-    managed.inspected.set(pinFile, pin.file?.hash ?? null);
-  }
+  inspectOthers(managed.inspected, merges.inspected, seeds.adds, pin);
   await apply(root, source.managed, managed, lineagePath);
-  await writeRest(root, merges.writes, lineageText, unpinned, lineage.legacy !== null, pin.text);
+  await writeRest(
+    root,
+    merges.writes,
+    seeds.adds,
+    lineageText,
+    unpinned,
+    lineage.legacy !== null,
+    pin.text,
+  );
   return { ...result, status: 'synced' };
 }

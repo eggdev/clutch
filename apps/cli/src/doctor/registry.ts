@@ -29,6 +29,7 @@ export type Rule =
   | { workflow: WorkflowMatch }
   | { yaml: { file: string; path: string } }
   | { remote: string }
+  | { factory: 'agents' | 'check' }
   | { any: Array<Rule> }
   | { all: Array<Rule> };
 
@@ -76,6 +77,8 @@ const kindChecks: Record<string, (value: unknown) => string | undefined> = {
       ? undefined
       : 'Expected { file: <path>, path: <dotted path> }.',
   remote: (value) => (text(value) ? undefined : 'Expected a probe name.'),
+  factory: (value) =>
+    value === 'agents' || value === 'check' ? undefined : 'Expected agents or check.',
 };
 
 function checkRule(rule: unknown, at: string, fail: (field: string, message: string) => void) {

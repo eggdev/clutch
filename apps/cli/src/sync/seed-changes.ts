@@ -17,7 +17,7 @@ function seeLink(
 }
 
 /** The commit of `release`. A shallow checkout, as the sync workflow makes, may lack the tag, so it is fetched. */
-async function releaseCommit(template: string, release: string) {
+export async function releaseCommit(template: string, release: string) {
   const ref = `${release}^{commit}`;
   let found = await git(template, 'rev-parse', '--verify', '--quiet', ref);
   if (!found.ok) {
@@ -67,7 +67,7 @@ async function changedPaths(template: string, base: string, target: string, seed
 
 /**
  * The seed pages whose Clutch copy changed between the project's last release,
- * `from`, and the sync's target. Sync never writes a seed page, so the project
+ * `from`, and the sync's target. Sync never changes a seed page, so the project
  * ports each change by hand. A page the project deleted is not listed. It is
  * information only: when `from` cannot be read, the note says why and the list is empty.
  */

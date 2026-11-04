@@ -13,6 +13,7 @@
   "dep_automation": "present",
   "dep_min_age": "present",
   "dev_bootstrap": "present",
+  "factory_as_code": "present",
   "factory_observability": "present",
   "file_size_caps": "present",
   "flake_hunter": "present",

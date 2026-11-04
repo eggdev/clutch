@@ -419,8 +419,8 @@ mise exec -- bun run clutch init --root ../bar-savvy-web --mode doctor --yes
   `vX.Y.Z` tag in the clone.
 - In `sync` mode, init also writes the seeds that the managed tooling reads:
   `.clutch/risk.yaml` for the Labels workflow and `clutch risk`, and
-  `.changeset/README.md`. Install writes every seed, and sync never writes
-  one, so init fills the gap. It keeps a copy that the project already has.
+  `.changeset/README.md`. Install writes every seed, and sync adds only a new
+  `add_on_sync` seed, so init fills the gap. It keeps a copy that the project already has.
 - Init refuses a repository that already has `clutch.yaml`.
 
 ### Start a new project from Clutch
@@ -446,6 +446,12 @@ names the files and gives each one a rule. The longest matching path decides.
 | `managed` | Replaces the file. A file that the project edited needs a decision.  |
 | `merge`   | Merges the project's copy with Clutch's copy.                        |
 | `seed`    | Nothing. Install writes it once, and the project owns it after that. |
+
+`add_on_sync: true` on a `seed` entry makes sync add each file under it that
+Clutch added since the project's last sync, when the project has no file at
+that path. So the file arrives once, as install writes it, and the project owns
+it after that. Sync does not add a file again that the project deleted. The
+factory tree at `factory/` uses it.
 
 ```sh
 mise exec -- bun run clutch sync --root ../shop --check
@@ -665,6 +671,7 @@ for what each number counts.
 repository can adopt, and the rules that detect it. `clutch doctor` reads it.
 
 Each rule checks the files that git tracks. An untracked file never counts.
+`factory: check` is the one exception: it runs the check on the working tree.
 
 | Rule                                  | Passes when                                                               |
 | ------------------------------------- | ------------------------------------------------------------------------- |
@@ -675,6 +682,8 @@ Each rule checks the files that git tracks. An untracked file never counts.
 | `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                              |
 | `yaml: { file, path }`                | The dotted path holds a value in the YAML or JSON file that is not empty. |
 | `remote: <probe>`                     | The GitHub setting holds. It is unknown without `--remote`.               |
+| `factory: agents`                     | Git tracks an `agents/*/agent.md` in the [factory tree](#factory) root.   |
+| `factory: check`                      | The factory tree has an agent and passes `clutch factory --check`.        |
 | `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.              |
 
 A capability is present when every `detect` rule passes. It is partial when

@@ -2,7 +2,9 @@ import path from 'node:path';
 
 import { parse } from 'yaml';
 
+import { loadClutchConfig } from '@/clutch-config/load';
 import type { Rule, WorkflowMatch } from '@/doctor/registry';
+import { checkFactoryTree, factoryTreeRoot } from '@/factory/check';
 
 type Outcome = 'pass' | 'fail' | 'unknown';
 export type RuleResult = { outcome: Outcome; evidence: Array<string> };
@@ -136,6 +138,39 @@ function hasPath(doc: unknown, dotted: string) {
   return typeof value !== 'object' || Object.keys(value).length > 0;
 }
 
+/** The factory tree root from the project root, or a result that says why it is unknown. */
+async function factoryRoot(ctx: Context): Promise<string | RuleResult> {
+  const loaded = await loadClutchConfig(ctx.root);
+  if (loaded.kind === 'invalid') {
+    return { outcome: 'unknown', evidence: ['clutch.yaml is not valid'] };
+  }
+  return factoryTreeRoot(loaded.kind === 'loaded' ? loaded.config : undefined);
+}
+
+/** `agents`: git tracks an agent file in the tree. `check`: the tree in the working tree passes `clutch factory --check`. */
+async function factoryRule(rule: { factory: 'agents' | 'check' }, ctx: Context) {
+  const root = await factoryRoot(ctx);
+  if (typeof root !== 'string') {
+    return root;
+  }
+  if (rule.factory === 'agents') {
+    const found = matching(ctx.files, path.posix.join(root, 'agents/*/agent.md'));
+    return found.length > 0 ? pass(found) : fail;
+  }
+  const { counts, problems } = await checkFactoryTree(path.join(ctx.root, root));
+  if (counts.agents === 0) {
+    return fail;
+  }
+  return problems.length === 0
+    ? pass(['clutch factory --check passes'])
+    : {
+        outcome: 'fail' as const,
+        evidence: [
+          `clutch factory --check finds ${problems.length} ${problems.length === 1 ? 'problem' : 'problems'}`,
+        ],
+      };
+}
+
 /** Combines child results. An unknown child counts only when every child is unknown. */
 function combine(kind: 'any' | 'all', results: Array<RuleResult>): RuleResult {
   const evidence = results.flatMap((result) => result.evidence);
@@ -198,6 +233,7 @@ const evaluators: Record<string, Evaluator> = {
     ctx.remote && ctx.probe
       ? ctx.probe(rule.remote)
       : Promise.resolve({ outcome: 'unknown', evidence: [`remote ${rule.remote} not checked`] }),
+  factory: factoryRule,
 };
 
 /** Evaluates one rule against the repository in `ctx`. */

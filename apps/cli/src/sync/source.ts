@@ -15,6 +15,8 @@ type Entry = {
   rule: 'managed' | 'merge' | 'seed';
   capability?: string;
   group?: string;
+  /** A seed entry only: sync adds a file here that is new in Clutch, once. See sync/seed-adds.ts. */
+  add_on_sync?: boolean;
 };
 type FilesList = {
   version: number;
@@ -33,6 +35,8 @@ export type ClutchSource = {
   managed: SyncSource;
   merge: Map<string, SyncFile>;
   seed: Map<string, SyncFile>;
+  /** The seed files under an `add_on_sync` entry. Sync adds each one that is new in Clutch, once. */
+  addOnSync: Set<string>;
   /** Clutch's `mise.toml`, whose pin sync moves on its own. See sync/pin.ts. Null when not selected. */
   pin: SyncFile | null;
 };
@@ -63,6 +67,11 @@ function checkList(list: FilesList) {
     if (!rules.has(entry.rule)) {
       throw new Error(
         `${filesList}: ${entry.path} has the rule ${entry.rule}. Use managed, merge or seed.`,
+      );
+    }
+    if (entry.add_on_sync !== undefined && (entry.add_on_sync !== true || entry.rule !== 'seed')) {
+      throw new Error(
+        `${filesList}: ${entry.path} has add_on_sync. Only a seed entry takes it, and only as true.`,
       );
     }
   }
@@ -125,6 +134,7 @@ export async function loadClutchSource(
   const merge = new Map<string, SyncFile>();
   const seed = new Map<string, SyncFile>();
   const byRule = { managed, merge, seed };
+  const addOnSync = new Set<string>();
   for (const [file, content] of all) {
     const entry = entryFor(list, file);
     if (!excluded.some((item) => covers(item, file)) && selected(entry, file, only)) {
@@ -132,6 +142,9 @@ export async function loadClutchSource(
         throw new Error('Project-specific verify must be generated, never distributed by sync.');
       }
       byRule[entry?.rule ?? 'seed'].set(file, content);
+      if (entry?.add_on_sync) {
+        addOnSync.add(file);
+      }
     }
   }
   for (const entry of list.files) {
@@ -155,5 +168,13 @@ export async function loadClutchSource(
       .map((entry) => entry.path),
     ...(list.retired ?? []),
   ];
-  return { commit, release, managed: { files: managed, baseline, roots }, merge, seed, pin };
+  return {
+    commit,
+    release,
+    managed: { files: managed, baseline, roots },
+    merge,
+    seed,
+    addOnSync,
+    pin,
+  };
 }

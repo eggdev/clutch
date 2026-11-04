@@ -1,3 +1,4 @@
+import type { ClutchConfig } from '@/clutch-config/schema';
 import { checkReferences, sortProblems } from '@/factory/references';
 import { readTree } from '@/factory/tree';
 
@@ -16,4 +17,9 @@ export async function checkFactoryTree(root: string) {
     },
     problems: sortProblems(tree.problems),
   };
+}
+
+/** The tree root from the project root: `factory.root` in clutch.yaml, or `factory`. */
+export function factoryTreeRoot(config: ClutchConfig | undefined) {
+  return config?.factory?.root ?? 'factory';
 }

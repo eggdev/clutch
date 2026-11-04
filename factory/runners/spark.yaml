@@ -1,0 +1,10 @@
+# The DGX Spark. All development runs here. Each lane gets its own git worktree,
+# and the setup commands make the worktree ready. They match worktree.setup in clutch.yaml.
+description: The DGX Spark sandbox for all development.
+machine: spark
+t3_environment: a3789960-af7f-4761-ae81-b7f6fc8968d2
+ssh: agent-dgx
+workspace: worktree
+setup:
+  - mise trust --quiet
+  - mise exec -- bun install

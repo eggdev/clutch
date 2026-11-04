@@ -1,0 +1,19 @@
+# Each model that an agent or a scorer in this tree may name. An agent's model
+# must be an id in this list, with the same harness. See the models.yaml section of
+# https://github.com/eggdev/clutch/blob/main/docs/contributing/architecture/factory-tree.md.
+models:
+  - id: claude-opus-5-5
+    harness: claude
+    where: Anthropic, through Claude Code in T3
+  - id: claude-sonnet-5-5
+    harness: claude
+    where: Anthropic, through Claude Code in T3
+  - id: qwen3.6
+    harness: qwen
+    where: Spark, Ollama at localhost:11434, OpenAI API
+  - id: qwen3.8-27b
+    harness: qwen
+    where: Spark, llama-swap at 127.0.0.1:8092, OpenAI API, loads on demand
+  - id: gpt-6-luna
+    harness: codex
+    where: OpenAI, through the Codex CLI in T3. The default model of Codex on the Spark

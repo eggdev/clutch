@@ -47,6 +47,18 @@ capabilities:
       - any:
           - file: .agents/skills/*/SKILL.md
           - file: .claude/skills/*/SKILL.md
+  - id: factory_as_code
+    name: Factory as code (agents, runners and models in a checked tree)
+    category: Agent context
+    phase: P5
+    level: extra
+    effort: M
+    doc: docs/contributing/capabilities/factory-as-code.md
+    detect:
+      # Git tracks an agent file in the tree at factory.root, or factory/.
+      - factory: agents
+      # The tree passes clutch factory --check. A tree that fails is partial.
+      - factory: check
   - id: friction_log
     name: Friction logs / agent learnings file
     category: Scale loops

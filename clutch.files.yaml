@@ -2,7 +2,8 @@
 # The longest matching path decides the rule for a file.
 #   managed: sync replaces it. A project edit needs a person's keep-or-take decision.
 #   merge:   sync merges the project's copy with Clutch's copy.
-#   seed:    install writes it once. Sync never touches it again.
+#   seed:    install writes it once. Sync never touches it again. With add_on_sync: true,
+#            sync also adds a file that is new in Clutch since the last sync, once.
 # See apps/cli/README.md#sync.
 version: 1
 files:
@@ -159,6 +160,12 @@ files:
   - path: SECURITY.md
     rule: seed
     capability: secret_scanning
+  # The factory tree: the stage agents, the runner and the models. The project tunes each
+  # prompt, so it owns the tree. Sync adds a tree file that is new in Clutch, once.
+  - path: factory/
+    rule: seed
+    capability: factory_as_code
+    add_on_sync: true
   # Risk tiers by path. A project tunes the paths to its own layout.
   - path: .clutch/risk.yaml
     rule: seed

@@ -3,11 +3,10 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { loadClutchConfig } from '@/clutch-config/load';
-import { checkFactoryTree } from '@/factory/check';
+import { checkFactoryTree, factoryTreeRoot } from '@/factory/check';
 import { writeSchemaFiles } from '@/factory/schema-files';
 import { git } from '@/git';
 
-const defaultRoot = 'factory';
 const schemaPage = 'docs/contributing/architecture/factory-tree.md';
 
 /** The repository that holds `cwd`, or `cwd` when it is not in one. */
@@ -39,12 +38,12 @@ async function treeRoot(cwd: string, flag: string | undefined) {
   if (loaded.kind === 'invalid') {
     throw new Error('clutch.yaml is not valid. Run `clutch doctor --check` to see why.');
   }
-  const root = loaded.kind === 'loaded' ? loaded.config.factory?.root : undefined;
+  const config = loaded.kind === 'loaded' ? loaded.config : undefined;
   // A named root must exist, so a missing folder cannot turn the check into a notice.
   return {
-    dir: path.resolve(project, root ?? defaultRoot),
+    dir: path.resolve(project, factoryTreeRoot(config)),
     base: project,
-    explicit: root !== undefined,
+    explicit: config?.factory?.root !== undefined,
   };
 }
 
