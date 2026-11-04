@@ -8,10 +8,10 @@ Rank 16 of the researched practices. About two thirds of the leading repositorie
 
 ## How Clutch runs it
 
-`.github/workflows/sast.yml` runs on each pull request, on each push to the default branch and weekly. Its `sast` job is the required check, so one ruleset fits public and private repositories. Its `engine` job reads `sast` in `clutch.yaml`, which kickoff sets:
+`.github/workflows/sast.yml` runs on each pull request, on each push to the default branch and weekly. Its one `sast` job picks the engine, scans and is the required check. So one ruleset fits public and private repositories, and a private repository pays for one runner. A pull request that changes only Markdown, images, changesets or tracker files skips the scan, since no scanned file changed. The job picks the engine from `sast` in `clutch.yaml`, which kickoff sets:
 
 - `auto`, the default, picks the engine from the table below.
-- `codeql` always runs CodeQL. Where code scanning takes no results, the `engine` job in `sast.yml` exits with an error, so the `sast` check fails.
+- `codeql` always runs CodeQL. Where code scanning takes no results, the `sast` job exits with an error, so the `sast` check fails.
 - `semgrep` always runs Semgrep, even on a public repository.
 
 Under `auto`:
@@ -21,7 +21,7 @@ Under `auto`:
 | Code scanning takes results: a public repository, or GitHub Code Security | CodeQL, one `analyze` job per language                                                                           | The Security tab, as code scanning alerts                  |
 | A private repository without GitHub Code Security                         | [Semgrep Community Edition](https://semgrep.dev/docs/getting-started/quickstart-oss), with the `p/default` rules | The job log. A finding fails the job. Nothing is uploaded. |
 
-The `engine` job asks GitHub for the code scanning alerts list. A 403 means the repository has no Code Security, so Semgrep runs. A notice on the run names the engine.
+The `sast` job asks GitHub for the code scanning alerts list. A 403 means the repository has no Code Security, so Semgrep runs. A notice on the run names the engine.
 
 ### Private repositories
 
