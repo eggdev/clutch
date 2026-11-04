@@ -23,7 +23,7 @@
   "git_hooks": "present",
   "mcp_config": "present",
   "merge_queue": "missing",
-  "nested_agent_rules": "missing",
+  "nested_agent_rules": "present",
   "oidc_ci": "missing",
   "pr_size_limits": "present",
   "pr_template": "present",
