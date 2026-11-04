@@ -259,6 +259,17 @@ these rules:
   is an `id` in `models.yaml`. No 2 configs have the same `name` or `model`,
   and no 2 tasks have the same `name`.
 
+## Ready for the factory
+
+`clutch factory --check` also reads the project's intake: the labels and the
+tracker states that mark work as ready for the factory. `factory.intake` in
+`clutch.yaml` names them, and a "Ready for the factory" section in
+`.clutch/README.md` names the same values. The check fails when the two
+disagree. It runs when the section exists or when `clutch.yaml` sets
+`factory.intake`, and `--root` skips it. The
+[factory as code capability](../capabilities/factory-as-code.md#ready-for-the-factory)
+gives the keys and the format of the section.
+
 ## JSON Schema files
 
 Each kind has a JSON Schema (draft 2020-12) file. With these files, a

@@ -61,3 +61,12 @@ test('a dependency that is blocked or in progress holds the issue back, even wit
   ];
   expect(nextIssue(issues, { stack: true })).toBeUndefined();
 });
+
+test('ready names the states that come next, from factory.intake.tracker', () => {
+  const issues = [
+    issue('CL-001', { status: 'blocked' }),
+    issue('CL-002', { status: 'in_progress' }),
+  ];
+  expect(nextIssue(issues)).toBeUndefined();
+  expect(nextIssue(issues, { ready: ['todo', 'blocked'] })?.id).toBe('CL-001');
+});

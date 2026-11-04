@@ -54,6 +54,36 @@ The starter agents read these docs:
 
 The [factory tree schema](../architecture/factory-tree.md#agentmd) says how to write `reads` and its links.
 
+## Ready for the factory
+
+C-Suite's intake starts a lane for work that a project marks as ready. `factory.intake` in `clutch.yaml` names that work:
+
+```yaml
+factory:
+  intake:
+    github: [factory] # issue labels that C-Suite's GitHub intake watches
+    linear: [] # Linear issue labels
+    tracker: [todo] # .clutch/issues states, for an issue with owner: agent outside later
+```
+
+| Key       | Default     | Value                                                                                                      |
+| --------- | ----------- | ---------------------------------------------------------------------------------------------------------- |
+| `github`  | `[factory]` | GitHub issue labels. C-Suite's `github-intake` automation watches `factory`                                |
+| `linear`  | `[]`        | Linear issue labels                                                                                        |
+| `tracker` | `[todo]`    | At least 1 state from `todo`, `in_progress`, `blocked`, `review` and `done`. `clutch issues next` reads it |
+
+The project's tracker docs name the same values in a "Ready for the factory" section of `.clutch/README.md`. The section has one list line for each key, and each value is in backticks. A tracker state is written as `` `status: <state>` ``:
+
+```markdown
+## Ready for the factory
+
+- GitHub: an issue with the label `factory`.
+- Linear: no label.
+- Tracker: an issue file with `status: todo` and `owner: agent`, outside the `later` phase.
+```
+
+`clutch factory --check` fails when the section and `clutch.yaml` disagree, or when `clutch.yaml` sets `factory.intake` and the section is missing. Without `factory.intake`, a section must name the defaults. A project with neither passes. The check makes no label in GitHub. Make the label once, in the repository's settings or with `gh label create factory`.
+
 ## Waive
 
 Set `factory_as_code` to `waived` in `clutch.yaml` with a reason. A waiver is reasonable when no agent works on the repository without a person who starts it by hand.

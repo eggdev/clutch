@@ -2,6 +2,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { intakeOf } from '@/clutch-config/intake';
+import { loadClutchConfig } from '@/clutch-config/load';
 import { formatFile, formatText } from '@/format';
 import { git } from '@/git';
 import { newIssue } from '@/issues/new';
@@ -103,6 +105,15 @@ async function checkTracker(root: string, issues: Array<Issue>, fresh: boolean) 
   return current ? 0 : 2;
 }
 
+/** The tracker states that `factory.intake.tracker` in clutch.yaml marks as ready. */
+async function readyStates(root: string) {
+  const loaded = await loadClutchConfig(root);
+  if (loaded.kind === 'invalid') {
+    throw new Error('clutch.yaml is not valid. Run `clutch doctor --check` to see why.');
+  }
+  return intakeOf(loaded.kind === 'loaded' ? loaded.config : undefined).tracker;
+}
+
 async function run(args: Array<string>, cwd: string): Promise<number> {
   const { values, positionals } = parseArgs({
     args,
@@ -134,7 +145,7 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
   }
 
   if (action === 'next' && rest.length === 0) {
-    const issue = nextIssue(issues, { stack: values.stack });
+    const issue = nextIssue(issues, { stack: values.stack, ready: await readyStates(root) });
     if (values.json) {
       console.log(JSON.stringify({ schemaVersion: 1, issue: issue ?? null }));
     } else {

@@ -94,3 +94,13 @@ fleet:
   # epic/refactor until CL-705 moves Bar Savvy to main.
   - repo: blockmen-group/bar-savvy-web
     ref: epic/refactor
+# The work that is ready for the factory. C-Suite's GitHub intake starts a lane for an
+# issue with a label in github. tracker names the .clutch/issues states that are ready,
+# for an issue with owner: agent outside later. clutch issues next reads it.
+# .clutch/README.md#ready-for-the-factory names the same values, and
+# clutch factory --check fails when the two disagree.
+factory:
+  intake:
+    github: [factory]
+    linear: []
+    tracker: [todo]

@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util';
 
 import { loadClutchConfig } from '@/clutch-config/load';
 import { checkFactoryTree, factoryTreeRoot } from '@/factory/check';
+import { checkIntakeDoc } from '@/factory/intake-doc';
 import { writeSchemaFiles } from '@/factory/schema-files';
 import { git } from '@/git';
 
@@ -29,11 +30,12 @@ async function isFolder(dir: string) {
  * the project root. `base` is the folder that the output shows paths from.
  * `explicit` is true when a person named the root, so a missing folder fails.
  * `project` is the repository that holds `cwd`, where `reads` paths start.
+ * `config` is the project's clutch.yaml, read only when no `--root` is given.
  */
 export async function treeRoot(cwd: string, flag: string | undefined) {
   const project = await projectRoot(cwd);
   if (flag !== undefined) {
-    return { dir: path.resolve(cwd, flag), base: cwd, explicit: true, project };
+    return { dir: path.resolve(cwd, flag), base: cwd, explicit: true, project, config: undefined };
   }
   const loaded = await loadClutchConfig(project);
   if (loaded.kind === 'invalid') {
@@ -46,6 +48,7 @@ export async function treeRoot(cwd: string, flag: string | undefined) {
     base: project,
     explicit: config?.factory?.root !== undefined,
     project,
+    config,
   };
 }
 
@@ -57,38 +60,57 @@ function display(base: string, file: string) {
   return relative.startsWith('..') ? file : relative;
 }
 
+/** Prints each problem, then the count, and returns the exit code 1. */
+function report(problems: Array<{ file: string; key: string; reason: string }>) {
+  for (const problem of problems) {
+    console.error(`${problem.file}: ${problem.key ? `${problem.key}: ` : ''}${problem.reason}`);
+  }
+  const noun = problems.length === 1 ? 'problem' : 'problems';
+  console.error(`\nclutch factory --check found ${problems.length} ${noun}. See ${schemaPage}.`);
+  return 1;
+}
+
 async function runCheck(cwd: string, flag: string | undefined, json: boolean) {
   const root = await treeRoot(cwd, flag);
   const shown = `${display(root.base, root.dir)}/`;
+  // `--root` checks one tree. The intake section belongs to the project, so only the project check reads it.
+  const intake = flag === undefined ? await checkIntakeDoc(root.project, root.config) : [];
+  const intakeProblems = intake.map((problem) => ({
+    ...problem,
+    file: display(root.base, path.join(root.project, problem.file)),
+  }));
   if (!(await isFolder(root.dir))) {
     if (root.explicit) {
       console.error(`${shown} is not a folder.`);
       return 1;
     }
     const notice = `No factory tree at ${shown}. Nothing to check.`;
-    console.log(json ? JSON.stringify({ root: shown, notice, problems: [] }) : notice);
+    if (json) {
+      console.log(JSON.stringify({ root: shown, notice, problems: intakeProblems }));
+      return intakeProblems.length > 0 ? 1 : 0;
+    }
+    if (intakeProblems.length > 0) {
+      return report(intakeProblems);
+    }
+    console.log(notice);
     return 0;
   }
-  const { counts, problems } = await checkFactoryTree(root.dir, root.project);
-  const located = problems.map((problem) => ({
-    ...problem,
-    file: display(root.base, path.join(root.dir, problem.file)),
-  }));
+  const { counts, problems: treeProblems } = await checkFactoryTree(root.dir, root.project);
+  const problems = [
+    ...treeProblems.map((problem) => ({
+      ...problem,
+      file: display(root.base, path.join(root.dir, problem.file)),
+    })),
+    ...intakeProblems,
+  ];
   if (json) {
-    console.log(JSON.stringify({ root: shown, counts, problems: located }, null, 2));
+    console.log(JSON.stringify({ root: shown, counts, problems }, null, 2));
     return problems.length > 0 ? 1 : 0;
   }
-  for (const problem of located) {
-    console.error(`${problem.file}: ${problem.key ? `${problem.key}: ` : ''}${problem.reason}`);
+  if (problems.length > 0) {
+    return report(problems);
   }
   const files = Object.values(counts).reduce((sum, count) => sum + count, 0);
-  if (problems.length > 0) {
-    const noun = problems.length === 1 ? 'problem' : 'problems';
-    console.error(
-      `\nThe factory tree at ${shown} has ${problems.length} ${noun}. See ${schemaPage}.`,
-    );
-    return 1;
-  }
   if (files === 0) {
     console.log(`No factory files in ${shown}. Nothing to check.`);
     return 0;

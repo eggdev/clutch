@@ -265,3 +265,33 @@ test('factory is optional and takes a root folder inside the project', () => {
   expect(paths({ ...valid, factory: { root: 'factory', intake: [] } })).toEqual(['factory.intake']);
   expect(paths({ ...valid, factory: 'factory' })).toEqual(['factory']);
 });
+
+test('factory.intake takes labels and tracker states, with a default for each key', () => {
+  const read = (factory: unknown) => validateClutchConfig({ ...valid, factory }).config?.factory;
+  expect(read({ intake: {} })).toEqual({
+    intake: { github: ['factory'], linear: [], tracker: ['todo'] },
+  });
+  expect(read({ root: '.', intake: { linear: ['Agent'], tracker: ['todo', 'blocked'] } })).toEqual({
+    root: '.',
+    intake: { github: ['factory'], linear: ['Agent'], tracker: ['todo', 'blocked'] },
+  });
+  expect(read({ intake: { github: [] } })?.intake?.github).toEqual([]);
+  expect(paths({ ...valid, factory: { intake: { github: [''] } } })).toEqual([
+    'factory.intake.github',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { github: ['factory', 'factory'] } } })).toEqual([
+    'factory.intake.github',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { linear: 'Agent' } } })).toEqual([
+    'factory.intake.linear',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { tracker: [] } } })).toEqual([
+    'factory.intake.tracker',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { tracker: ['ready'] } } })).toEqual([
+    'factory.intake.tracker',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { jira: ['x'] } } })).toEqual([
+    'factory.intake.jira',
+  ]);
+});

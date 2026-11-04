@@ -1,5 +1,6 @@
 import { isObject, isStringList, unknownKeys } from '@/clutch-config/checks';
 import type { Errors } from '@/clutch-config/checks';
+import type { Intake } from '@/clutch-config/intake';
 import { readAutoRevert, readFactory, readJourneys } from '@/clutch-config/optional-keys';
 
 const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
@@ -60,8 +61,12 @@ export type ClutchConfig = {
   agentReview?: { missingCredential: (typeof missingCredentials)[number] };
   /** The app that a web journey drives. Without it, the runner finds the one web app under apps/. */
   journeys?: { webApp: string };
-  /** The folder of the factory tree, from the project root. `factory` by default. */
-  factory?: { root: string };
+  /**
+   * `root`: the folder of the factory tree, from the project root. `factory` by
+   * default. `intake`: the labels and the tracker states that are ready for the
+   * factory. See `clutch-config/intake.ts`.
+   */
+  factory?: { root?: string; intake?: Intake };
 };
 
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */

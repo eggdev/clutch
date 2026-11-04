@@ -97,7 +97,8 @@ mise exec -- bun run clutch issues --check
 ```
 
 - `next` prints the first `todo` issue for an agent whose dependencies are
-  done. With `--stack`, a dependency in review also counts, up to 3 stacked
+  done. `factory.intake.tracker` in `clutch.yaml` can name other ready
+  states. With `--stack`, a dependency in review also counts, up to 3 stacked
   PRs. A `later` issue never comes next.
 - `set` changes the frontmatter of one issue. It leaves `.clutch/TRACKER.md`
   alone: the release workflow regenerates it on the default branch, so a pull
@@ -139,6 +140,9 @@ mise exec -- bun run clutch factory --write-schemas apps/cli/schemas/factory
 
 - The tree root is `factory.root` in `clutch.yaml`, or `factory/` without it.
   `--root DIR` checks the tree at `DIR`, from the current folder.
+- Without `--root`, the check also compares the "Ready for the factory"
+  section of `.clutch/README.md` with `factory.intake` in `clutch.yaml`. See
+  [factory as code](../../docs/contributing/capabilities/factory-as-code.md#ready-for-the-factory).
 - An agent's `reads` paths start at the project root: the git repository that
   holds the current folder. Each one must exist, and the prompt must link it.
 - `--json` prints the root, the count of each kind and the problems.

@@ -85,3 +85,18 @@ test('--write-schemas writes a JSON Schema file for each kind', async () => {
     'scorer.schema.json',
   ]);
 });
+
+test('the check fails when the intake section of the tracker disagrees with clutch.yaml', async () => {
+  await using repo = await gitRepo({
+    'clutch.yaml': config('factory:\n  intake:\n    github: [factory]\n'),
+    '.clutch/README.md':
+      '# Tracker\n\n## Ready for the factory\n\n- GitHub: `agent`.\n- Linear: none.\n- Tracker: `status: todo`.\n',
+  });
+  const result = await clutch(repo.root, '--check');
+  expect(result).toMatchObject({ code: 1, stdout: '' });
+  expect(result.stderr).toContain(
+    '.clutch/README.md: github: The section names `agent`, and factory.intake.github in clutch.yaml names `factory`.',
+  );
+  const tree = await clutch(repo.root, '--check', '--root', 'factory');
+  expect(tree.stderr).toContain('factory/ is not a folder.');
+});
