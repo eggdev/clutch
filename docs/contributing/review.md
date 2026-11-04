@@ -48,8 +48,8 @@ These are not `owner`:
 - A test whose expectation moved with an intended change, and which asserts
   the same amount.
 - A tool that does not gate the merge, such as `pr status`, `pr merge`, a
-  skill's script, a generator or a dev tool. The ruleset and auto-merge are
-  the gate. Examples: #153, #154 and #173.
+  skill's script or a dev tool. The ruleset and auto-merge are the gate.
+  Examples: #153, #154 and #173. A file that configures a check still counts when the change weakens that check. Examples: `tools/validate.ts`, `tools/testing/**`, or a generator that a check runs.
 - A guardrail file that changed and is not weaker. Say what it makes stronger,
   as a `note`.
 - A product defect. That is `blocking` or a `note`.
