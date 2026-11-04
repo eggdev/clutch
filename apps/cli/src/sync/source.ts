@@ -15,7 +15,7 @@ type Entry = {
   rule: 'managed' | 'merge' | 'seed';
   capability?: string;
   group?: string;
-  /** A seed entry only: sync adds a file here that is new in Clutch, once. See sync/seed-adds.ts. */
+  /** A seed entry only: sync adds a file here that the project lacks, once. See sync/seed-adds.ts. */
   add_on_sync?: boolean;
 };
 type FilesList = {
@@ -35,7 +35,7 @@ export type ClutchSource = {
   managed: SyncSource;
   merge: Map<string, SyncFile>;
   seed: Map<string, SyncFile>;
-  /** The seed files under an `add_on_sync` entry. Sync adds each one that is new in Clutch, once. */
+  /** The seed files under an `add_on_sync` entry. Sync adds each one that the project lacks, once. */
   addOnSync: Set<string>;
   /** Clutch's `mise.toml`, whose pin sync moves on its own. See sync/pin.ts. Null when not selected. */
   pin: SyncFile | null;
