@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.53.3 (2026-11-04)
+
+### Fixes and maintenance
+
+- ci(sast): run SAST in one job, and skip a docs-only PR (CL-422)
+- ci(labels): compute the risk tier in the labels workflow (CL-423)
+- ci(auto-merge): find the pull request in the decide job (CL-424)
+
 ## 0.53.2 (2026-11-04)
 
 ### Fixes and maintenance
