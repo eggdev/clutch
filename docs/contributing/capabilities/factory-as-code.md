@@ -17,8 +17,8 @@ A tree that fails the check is partial, and the evidence says how many problems 
 
 ## Adopt
 
-1. Run `clutch sync`. A project that has no tree gets Clutch's starter tree at `factory/` once. It holds the 5 stage agents `triage`, `spec`, `implement`, `review` and `verify`, the runner `runners/spark.yaml` and `models.yaml`. The tree is a seed, so the project owns it after that.
-2. Tune each agent's prompt to the project. Change a runner or a model when the project runs on other machines.
+1. Run `clutch sync`. A project that has no tree gets Clutch's starter tree at `factory/` once. It holds the 5 stage agents `triage`, `spec`, `implement`, `review` and `verify`, the runner `runners/spark.yaml`, the scorer `scorers/acceptance-criteria/` and `models.yaml`. The tree is a seed, so the project owns it after that.
+2. Tune each agent's prompt to the project. Change a runner or a model when the project runs on other machines. Set the `base_url` of each Qwen model in `models.yaml` to its server, or change the scorer's `judge`.
 3. Run `mise exec -- bun run clutch factory --check`. The [factory tree schema](../architecture/factory-tree.md) names each path and key.
 4. Set `factory_as_code` to `adopted` in `clutch.yaml`.
 
