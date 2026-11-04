@@ -70,6 +70,17 @@ const runner =
 const agent =
   '---\nrole: implement\ndescription: Builds.\nharness: claude\nmodel: big\nrunner: box\n---\n\nDo the work.\n';
 const issue = '# CL-001: Write the answer\n\nWrite answer.txt.\n';
+// The project's setup runs after the runner's, so it sees the runner's file.
+const config = [
+  'schemaVersion: 1',
+  'project: shop',
+  'template: { repo: eggdev/clutch, mode: sync }',
+  'capabilities: {}',
+  'worktree:',
+  '  root: ../shop.worktrees',
+  "  setup: ['test -f .setup-ran && touch .project-setup-ran']",
+  '',
+].join('\n');
 
 function benchmark(commit: string, configs = ['big', 'small']) {
   const items = configs.map((model) => `  - name: ${model}\n    model: ${model}\n`).join('');
@@ -82,7 +93,7 @@ function benchmark(commit: string, configs = ['big', 'small']) {
     '  - name: alpha',
     `    commit: ${commit}`,
     '    issue: .clutch/issues/CL-001.md',
-    '    check: test -f answer.txt && test -f .setup-ran',
+    '    check: test -f answer.txt && test -f .project-setup-ran',
     '  - name: beta',
     `    commit: ${commit}`,
     '    issue: .clutch/issues/CL-001.md',
@@ -97,6 +108,7 @@ function benchmark(commit: string, configs = ['big', 'small']) {
 /** A repo with a factory tree and an issue, and a `demo` suite pinned to its first commit. */
 async function project(configs?: Array<string>) {
   const repo = await gitRepo({
+    'clutch.yaml': config,
     'factory/models.yaml': models,
     'factory/runners/box.yaml': runner,
     'factory/agents/implement/agent.md': agent,
@@ -152,7 +164,8 @@ test('a whole run grades each pair, writes the result and removes each clone', a
     'beta big true done',
     'beta small false done',
   ]);
-  expect(result.runs[0]).toMatchObject({ model: 'big', lines: 1, files: 2, turns: 4 });
+  // answer.txt, and the file that each of the two setups writes.
+  expect(result.runs[0]).toMatchObject({ model: 'big', lines: 1, files: 3, turns: 4 });
   expect(run.stdout).toContain('Task   Config  Result  Exit  Time  Lines  Turns');
   expect(run.stdout).toContain('small   small  1/2');
   expect(run.stdout).toContain('Wrote factory/benchmarks/demo/results/');

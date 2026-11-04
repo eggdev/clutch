@@ -162,7 +162,8 @@ For each pair, the command does these steps:
 1. It clones the task's `commit` alone into a new folder in the temp folder.
    The clone has no remote and no later history, so the agent cannot push or
    read the answer.
-2. It runs the `setup` commands of the agent's runner in the clone.
+2. It runs the `setup` commands of the agent's runner in the clone, then the
+   `worktree.setup` commands from the clone's own `clutch.yaml`.
 3. It runs the agent's model with the agent's prompt, the rules of a
    benchmark run and the text of the task's `issue`. The run stops after 20
    minutes or 80 turns.

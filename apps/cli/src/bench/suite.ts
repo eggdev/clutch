@@ -13,6 +13,7 @@ export type Suite = {
   name: string;
   agent: string;
   prompt: string;
+  /** The runner's setup. Each clone runs its own `worktree.setup` from clutch.yaml after it. */
   setup: Array<string>;
   configs: Array<BenchConfig>;
   tasks: Array<BenchTask>;

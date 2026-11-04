@@ -9,6 +9,7 @@ import { agentCommand, agentEnv, limits, readAgentOutput } from '@/bench/harness
 import type { Exit } from '@/bench/harness';
 import type { BenchConfig, BenchTask, Suite } from '@/bench/suite';
 import { git, gitOrThrow } from '@/git';
+import { worktreeSettings } from '@/worktree/settings';
 
 /** The outcome of one task with one config. */
 export type PairResult = {
@@ -127,8 +128,24 @@ async function changed(dir: string, commit: string) {
 }
 
 /**
- * Runs one task with one config: clone the commit, run the runner's setup,
- * run the agent with the issue, count the changed lines, run the check.
+ * The setup of the clone at `dir`: the runner's setup, then `worktree.setup`
+ * from the clone's own clutch.yaml, as `clutch worktree new` runs them. Null
+ * when that clutch.yaml is not valid.
+ */
+async function setupOf(dir: string, runnerSetup: Array<string>, log: WriteStream) {
+  try {
+    const { setup } = await worktreeSettings(dir);
+    return [...runnerSetup, ...setup];
+  } catch (error) {
+    log.write(`${(error as Error).message}\n`);
+    return null;
+  }
+}
+
+/**
+ * Runs one task with one config: clone the commit, run the runner's setup and
+ * the project's setup, run the agent with the issue, count the changed lines,
+ * run the check.
  * The clone is removed at the end, also after a failure.
  */
 export async function runPair(
@@ -150,9 +167,10 @@ export async function runPair(
     const issue = cloneError
       ? null
       : await readFile(path.join(dir, task.issue), 'utf-8').catch(() => null);
-    let setupOk = issue !== null;
-    log.write(setupOk || cloneError ? '' : `No ${task.issue} at ${task.commit}.\n`);
-    for (const step of setupOk ? suite.setup : []) {
+    log.write(issue !== null || cloneError ? '' : `No ${task.issue} at ${task.commit}.\n`);
+    const steps = issue === null ? null : await setupOf(dir, suite.setup, log);
+    let setupOk = steps !== null;
+    for (const step of steps ?? []) {
       log.write(`$ ${step}\n`);
       const result = await exec(shell(step), { cwd: dir, env, minutes: limits.checkMinutes }, log);
       if (result.code !== 0 || result.timedOut) {
