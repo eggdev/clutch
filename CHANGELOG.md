@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.53.2 (2026-11-04)
+
+### Fixes and maintenance
+
+- chore(clutch): record design-proposal first-run friction
+
 ## 0.53.1 (2026-11-03)
 
 ### Fixes and maintenance
