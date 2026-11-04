@@ -4,7 +4,7 @@ name: Agent review
 # job fails when the agent returns a blocking finding. Whether that blocks a
 # merge is a branch rule of each project. An owner finding, such as a weaker
 # check, passes the job with an annotation, and auto-merge then leaves the PR
-# for the owner. See docs/contributing/review.md.
+# for the owner. See docs/contributing/agent-review.md.
 
 on:
   pull_request:
@@ -52,10 +52,10 @@ jobs:
               missing="$(yq -r '.agentReview.missingCredential // "notice"' base/clutch.yaml)"
             fi
             if [ "$missing" = fail ]; then
-              echo "::error title=Agent review did not run::No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret reached this run, and agentReview.missingCredential in clutch.yaml is fail. A fork PR gets no secrets. See docs/contributing/review.md."
+              echo "::error title=Agent review did not run::No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret reached this run, and agentReview.missingCredential in clutch.yaml is fail. A fork PR gets no secrets. See docs/contributing/agent-review.md."
               exit 1
             fi
-            echo "::notice title=Agent review off::Add the ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret to turn on agent review. See docs/contributing/review.md."
+            echo "::notice title=Agent review off::Add the ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret to turn on agent review. See docs/contributing/agent-review.md."
             echo "present=false" >> "$GITHUB_OUTPUT"
           else
             echo "present=true" >> "$GITHUB_OUTPUT"
@@ -83,7 +83,7 @@ jobs:
         if: steps.credential.outputs.present == 'true'
         run: |
           if [ ! -d .base-instructions ]; then
-            echo "::error title=Base instructions missing::.base-instructions was not checked out, so the reviewer would run on the PR's own instructions. See docs/contributing/review.md."
+            echo "::error title=Base instructions missing::.base-instructions was not checked out, so the reviewer would run on the PR's own instructions. See docs/contributing/agent-review.md."
             exit 1
           fi
           for file in CLAUDE.md AGENTS.md; do
@@ -169,7 +169,8 @@ jobs:
                `owner` or `note`, and name the rule from review.md. An `owner`
                finding then names its cause, `hard core` or `weaker check`, as
                the "Owner findings" section of review.md defines them. A concern
-               with neither cause is a `note`.
+               with neither cause keeps the level its rule gives, `blocking` or
+               `note`.
             5. Post one summary comment with `gh pr comment`. Its first line
                must be exactly `## Agent review`, which the status command
                matches. List each finding with its level, or say that you

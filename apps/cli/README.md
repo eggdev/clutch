@@ -347,7 +347,7 @@ alone. See [rollback](../../docs/contributing/operations/rollback.md#auto-revert
 
 `agentReview.missingCredential` tells `agent-review.yml` what to do without an
 Anthropic credential: pass with a notice, or fail. Set `fail` once
-`agent-review` is a required check. See [review](../../docs/contributing/review.md).
+`agent-review` is a required check. See [agent review](../../docs/contributing/agent-review.md).
 
 `journeys.webApp` names the app that `bun run journey` drives in a browser. Set
 it when a repository has more than one app with a web entry, which is an Nx
