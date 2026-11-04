@@ -292,7 +292,8 @@ mise exec -- bun run clutch agent mark review --pr 214 --note-file /tmp/review-2
   comment. `--head` defaults to the PR's head.
 - `mark` with `--issue` and no `--pr` saves the marker in
   `<git common folder>/clutch-stages/<id>.json`, for a stage that runs before
-  the PR exists. The first mark with both `--pr` and `--issue` posts the saved
+  the PR exists. It replaces a saved marker of the same stage. The first mark
+  with both `--pr` and `--issue` posts the saved
   markers first, then its own, and deletes the file.
 - `--root DIR` names the factory tree. The default is `factory.root` in
   `clutch.yaml`, else `factory`. `--repo OWNER/NAME` reads another

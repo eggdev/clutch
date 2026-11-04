@@ -29,11 +29,13 @@ the issue below, the PR when it exists, and the repository.
 
    ```sh
    mise exec -- bun run pr open --title "<type>(<scope>): <subject> (CL-NNN)" \
-     --body-file /tmp/pr-CL-NNN.md [--base <the lane's base branch>]
+     --body-file /tmp/pr-CL-NNN.md --base <base>
    ```
 
-   Follow `.agents/skills/deliver/references/pull-requests.md` for the base.
-   `pr open` marks the issue `done` in the PR head.
+   The base is the branch that this checkout started from, when that branch
+   has an open PR. Else it is the default branch. Follow the stack rules in
+   `.agents/skills/deliver/references/pull-requests.md`. `pr open` marks the
+   issue `done` in the PR head.
 
 ## Next runs: fix the review
 

@@ -182,6 +182,8 @@ test('clutch agent mark saves the early stages, then posts them before the stage
 
   const triage = ['mark', 'triage', '--issue', 'CL-428', '--note', 'Verdict: ready.'];
   expect(await agentCommand(triage, repo.root, { gh })).toBe(0);
+  const early = ['mark', 'spec', '--issue', 'CL-428', '--head', 'c'.repeat(40), '--note', 'Old.'];
+  expect(await agentCommand(early, repo.root, { gh })).toBe(0);
   expect(await agentCommand(['mark', 'spec', '--issue', 'CL-428'], repo.root, { gh })).toBe(0);
   expect(printed()).toContain(`Saved the triage marker on ${sha.slice(0, 7)}.`);
   expect(fake.state.comments).toEqual([]);

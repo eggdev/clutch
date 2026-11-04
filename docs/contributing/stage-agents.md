@@ -88,7 +88,8 @@ mise exec -- bun run clutch agent mark review --pr <number> --issue CL-NNN \
 - `triage` and `spec` run before the PR exists. Their mark takes `--issue` and
   no `--pr`, and saves the marker in the Git common folder, under
   `clutch-stages/CL-NNN.json`. Each worktree of the clone sees that file, and
-  no commit picks it up. The first mark with both `--pr` and `--issue`, which
+  no commit picks it up. A second saved mark of the same stage replaces the
+  first one. The first mark with both `--pr` and `--issue`, which
   `implement` makes, posts the saved markers first, in the order they ran.
 
 A PR that went through a whole lane run has at least 5 markers:

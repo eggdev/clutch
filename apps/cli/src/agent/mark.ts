@@ -61,7 +61,8 @@ export type MarkResult =
 /**
  * Records that a stage ran. With a PR, it posts one comment that starts with
  * the stage marker, or edits the comment with the same marker. Before the PR
- * exists, it saves the marker under the issue id. The first mark with both the
+ * exists, it saves the marker under the issue id, in place of an earlier one
+ * of the same stage. The first mark with both the
  * PR and the issue posts the saved markers first, in the order they ran.
  */
 export async function markStage(options: {
@@ -82,7 +83,8 @@ export async function markStage(options: {
     const head = options.head ?? (await gitOrThrow(root, 'rev-parse', 'HEAD'));
     const file = await savedFile(root, issue);
     const earlier = await readSaved(file);
-    const saved = earlier.filter((stage) => stage.role !== role || stage.head !== head);
+    // A stage that runs again before the PR exists replaces its own work, so only its latest marker stays.
+    const saved = earlier.filter((stage) => stage.role !== role);
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, `${JSON.stringify([...saved, { role, head, note }], null, 2)}\n`);
     return { status: 'saved', role, head, file };
