@@ -261,7 +261,7 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
   lines matches one of those regular expressions. `tools/codeowners.ts` leaves
   such a rule out of CODEOWNERS, which cannot express it.
 - The rules and the CLI come from the working tree. The
-  [Risk workflow](../../.github/workflows/risk.yml) checks out the base
+  [Labels workflow](../../.github/workflows/labels.yml) checks out the base
   branch first, so a pull request cannot lower its own tier. It labels the
   pull request `risk/<tier>` and removes any other `risk/` label.
 - `--json` prints the tier and each file with its tier and the pattern that
@@ -394,7 +394,7 @@ mise exec -- bun run clutch init --root ../bar-savvy-web --mode doctor --yes
 - `--adopt` compares the files with the latest Clutch release, the newest
   `vX.Y.Z` tag in the clone.
 - In `sync` mode, init also writes the seeds that the managed tooling reads:
-  `.clutch/risk.yaml` for the Risk workflow and `clutch risk`, and
+  `.clutch/risk.yaml` for the Labels workflow and `clutch risk`, and
   `.changeset/README.md`. Install writes every seed, and sync never writes
   one, so init fills the gap. It keeps a copy that the project already has.
 - Init refuses a repository that already has `clutch.yaml`.

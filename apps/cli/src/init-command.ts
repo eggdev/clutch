@@ -29,7 +29,7 @@ File a new issue with \`clutch issues new\`. See
 /**
  * The seed files that the managed tooling reads. Install writes every seed,
  * and sync never writes one, so init writes these for a project that adopts
- * Clutch without install. The Risk workflow and `clutch risk` read risk.yaml.
+ * Clutch without install. The Labels workflow and `clutch risk` read risk.yaml.
  */
 const toolingSeeds = ['.clutch/risk.yaml', '.changeset/README.md'];
 
