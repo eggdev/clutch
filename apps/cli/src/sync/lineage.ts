@@ -17,6 +17,8 @@ type Lineage = {
   files: Record<string, string>;
   /** Managed files the project kept over Clutch's copy, with the Clutch hash it declined. */
   kept?: Record<string, string>;
+  /** Each `add_on_sync` seed file that install or sync wrote or found. Sync never adds one of them again. */
+  seeded?: Array<string>;
 };
 
 /** The last lineage. A project that only has review tooling starts from `.review/tooling.json`. */
@@ -31,7 +33,7 @@ export async function readLineage(root: string) {
     files: parsed.files ?? {},
     kept: parsed.kept ?? {},
     release: parsed.release ?? null,
-    commit: parsed.templateCommit ?? null,
+    seeded: parsed.seeded ?? [],
   };
 }
 
@@ -71,6 +73,11 @@ export function nextLineage(input: {
   const kept = { ...outside(lineage.kept, scope), ...input.kept };
   if (Object.keys(kept).length > 0) {
     next.kept = kept;
+  }
+  // Each add_on_sync file is now in the project, from this sync or before it, or the project deleted it.
+  const seeded = [...new Set([...lineage.seeded, ...source.addOnSync])].toSorted();
+  if (seeded.length > 0) {
+    next.seeded = seeded;
   }
   return next;
 }

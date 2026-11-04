@@ -116,27 +116,31 @@ test('a sync keeps a file that the project wrote at a path that Clutch adds', as
   expect(await read(target.root, 'factory/models.yaml')).toBe('project models\n');
 });
 
-test('a sync that cannot read the commit of its last sync adds nothing, and says why', async () => {
+test('a sync adds the files that an older sync skipped, since the lineage does not list them', async () => {
   await using template = await clutch();
   await using target = await project();
   await runSync({ root: target.root, template: template.root, to: 'v1.0.0' });
   await commitAll(target.root);
+  // A Clutch binary from before add_on_sync moved the project to v1.1.0, and added no tree.
   const lineage = JSON.parse(await read(target.root, lineagePath));
-  const { release: _, ...unreleased } = lineage;
+  const commit = await gitOrThrow(template.root, 'rev-parse', 'v1.1.0^{commit}');
   await writeFile(
     path.join(target.root, lineagePath),
-    JSON.stringify({ ...unreleased, templateCommit: 'f'.repeat(40) }),
+    JSON.stringify({ ...lineage, templateCommit: commit, release: 'v1.1.0' }),
   );
   await commitAll(target.root);
 
-  const planned = await runSync({
-    root: target.root,
-    template: template.root,
-    to: 'v1.1.0',
-    check: true,
-  });
-  expect(planned.changes.some((change) => change.path.startsWith('factory/'))).toBe(false);
-  expect(planned.seedChangesNote).toContain('added no new seed file');
+  const synced = await runSync({ root: target.root, template: template.root, to: 'v1.2.0' });
+  expect(synced.changes.filter((change) => change.path.startsWith('factory/'))).toEqual([
+    { path: 'factory/agents/implement/agent.md', action: 'add' },
+    { path: 'factory/agents/verify/agent.md', action: 'add' },
+    { path: 'factory/models.yaml', action: 'add' },
+  ]);
+  expect(JSON.parse(await read(target.root, lineagePath)).seeded).toEqual([
+    'factory/agents/implement/agent.md',
+    'factory/agents/verify/agent.md',
+    'factory/models.yaml',
+  ]);
 });
 
 test('add_on_sync is only for a seed entry', async () => {

@@ -350,3 +350,23 @@ test('a project starts a fresh changelog, and keeps its own when it has one', as
     '# Changelog\n\n## 2.0.0\n',
   );
 });
+
+test('the lineage lists each add_on_sync seed, so a later sync never adds one again', async () => {
+  await using template = await gitRepo({
+    'clutch.files.yaml': `${copyList}  - path: factory/\n    rule: seed\n    add_on_sync: true\n`,
+    'AGENTS.md': '# Template agents\n',
+    'tools/check.ts': 'export {};\n',
+    'factory/models.yaml': 'models: []\n',
+  });
+  await using project = await gitRepo({ 'package.json': '{}' }, { name: 'shop' });
+
+  await install(project.root, template.root);
+
+  const lineage = JSON.parse(
+    await readFile(path.join(project.root, '.clutch/lineage.json'), 'utf-8'),
+  );
+  expect(lineage.seeded).toEqual(['factory/models.yaml']);
+  expect(await readFile(path.join(project.root, 'factory/models.yaml'), 'utf-8')).toBe(
+    'models: []\n',
+  );
+});

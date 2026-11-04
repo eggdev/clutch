@@ -448,10 +448,11 @@ names the files and gives each one a rule. The longest matching path decides.
 | `seed`    | Nothing. Install writes it once, and the project owns it after that. |
 
 `add_on_sync: true` on a `seed` entry makes sync add each file under it that
-Clutch added since the project's last sync, when the project has no file at
-that path. So the file arrives once, as install writes it, and the project owns
-it after that. Sync does not add a file again that the project deleted. The
-factory tree at `factory/` uses it.
+the project does not have, once. The project owns the file after that.
+`seeded` in `.clutch/lineage.json` lists each such file that install or sync
+wrote or found, so sync does not add a file again that the project deleted.
+The factory tree at `factory/` uses it. Put `add_on_sync` only on a new entry.
+On an older entry, sync adds back each file that a project deleted before.
 
 ```sh
 mise exec -- bun run clutch sync --root ../shop --check

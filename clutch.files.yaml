@@ -3,7 +3,7 @@
 #   managed: sync replaces it. A project edit needs a person's keep-or-take decision.
 #   merge:   sync merges the project's copy with Clutch's copy.
 #   seed:    install writes it once. Sync never touches it again. With add_on_sync: true,
-#            sync also adds a file that is new in Clutch since the last sync, once.
+#            sync also adds a file that the project lacks, once. Use it only on a new entry.
 # See apps/cli/README.md#sync.
 version: 1
 files:
@@ -161,7 +161,7 @@ files:
     rule: seed
     capability: secret_scanning
   # The factory tree: the stage agents, the runner and the models. The project tunes each
-  # prompt, so it owns the tree. Sync adds a tree file that is new in Clutch, once.
+  # prompt, so it owns the tree. Sync adds a tree file that the project lacks, once.
   - path: factory/
     rule: seed
     capability: factory_as_code

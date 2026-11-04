@@ -302,6 +302,8 @@ export async function installTemplate(options: {
       ...(pinBody ? { [pinFile]: pinBody } : {}),
     },
     ...(Object.keys(planned.kept).length > 0 ? { kept: planned.kept } : {}),
+    // Install writes each seed, so sync never adds an add_on_sync file again. See sync/seed-adds.ts.
+    ...(source.addOnSync.size > 0 ? { seeded: [...source.addOnSync].toSorted() } : {}),
   };
   await mkdir(path.join(root, path.dirname(lineagePath)), { recursive: true });
   await writeFile(path.join(root, lineagePath), `${JSON.stringify(lineage, null, 2)}\n`);

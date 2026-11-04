@@ -17,7 +17,7 @@ function seeLink(
 }
 
 /** The commit of `release`. A shallow checkout, as the sync workflow makes, may lack the tag, so it is fetched. */
-export async function releaseCommit(template: string, release: string) {
+async function releaseCommit(template: string, release: string) {
   const ref = `${release}^{commit}`;
   let found = await git(template, 'rev-parse', '--verify', '--quiet', ref);
   if (!found.ok) {

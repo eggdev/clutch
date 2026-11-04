@@ -22,7 +22,8 @@ import type { ProjectLineage } from '@/sync/lineage';
 import { planMerges } from '@/sync/merges';
 import { pinFile, planPinFile } from '@/sync/pin';
 import type { PinAnswer } from '@/sync/pin';
-import { planSeeds } from '@/sync/seed-adds';
+import { seedAdds } from '@/sync/seed-adds';
+import { seedChangesSince } from '@/sync/seed-changes';
 import type { SeedChange } from '@/sync/seed-changes';
 import { lineagePath, loadClutchSource } from '@/sync/source';
 import type { ClutchSource } from '@/sync/source';
@@ -44,7 +45,7 @@ export type SyncResult = {
   mergeClashes: Array<{ file: string; key: string }>;
   /** Project-owned pages whose Clutch copy changed since the last sync. Information only. See sync/seed-changes.ts. */
   seedChanges: Array<SeedChange>;
-  /** Why seedChanges, or the seed files that sync adds, could not be read. Null when both could. */
+  /** Why seedChanges could not be read, or null. */
   seedChangesNote: string | null;
 };
 
@@ -266,17 +267,24 @@ export async function runSync(options: {
   });
   const lineageText = `${JSON.stringify(next, null, 2)}\n`;
   const unpinned = scope ? null : await unpinnedConfig(root);
-  const seeds = await planSeeds({ root, template: options.template, lineage, source, repo });
+  const added = await seedAdds(root, source, lineage.seeded);
   const changes = [
     ...managed.changes,
     ...merges.changes,
-    ...[...seeds.adds.keys()].map((file) => ({ path: file, action: 'add' }) as const),
+    ...[...added.keys()].map((file) => ({ path: file, action: 'add' }) as const),
     ...(pin.changed ? [{ path: pinFile, action: pin.file ? 'update' : 'add' } as const] : []),
     ...recordChanges(lineage, lineageText, unpinned),
   ];
   if (lineage.legacy) {
     managed.inspected.set(reviewRecord, lineage.legacy.hash);
   }
+  const seeds = await seedChangesSince({
+    root,
+    template: options.template,
+    from: lineage.release,
+    source,
+    repo,
+  });
   const result: SyncResult = {
     schemaVersion: 1,
     status: 'unchanged',
@@ -299,12 +307,12 @@ export async function runSync(options: {
   if (options.check) {
     return { ...result, status: 'planned' };
   }
-  inspectOthers(managed.inspected, merges.inspected, seeds.adds, pin);
+  inspectOthers(managed.inspected, merges.inspected, added, pin);
   await apply(root, source.managed, managed, lineagePath);
   await writeRest(
     root,
     merges.writes,
-    seeds.adds,
+    added,
     lineageText,
     unpinned,
     lineage.legacy !== null,
