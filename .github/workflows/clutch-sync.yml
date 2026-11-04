@@ -1,5 +1,7 @@
 # Opens a pull request that moves the project to the latest Clutch release, as
-# Renovate opens one for a dependency. Each hour it compares the release in
+# Renovate opens one for a dependency. It runs only when a person starts it
+# (Actions, Clutch sync, Run workflow), since a project catches up when it
+# needs to, and a schedule billed a run each hour. It compares the release in
 # .clutch/lineage.json with the newest vX.Y.Z tag of the Clutch repository
 # that clutch.yaml names. When the project is behind, it runs clutch sync,
 # refreshes the lockfile, and pushes the result to the clutch-sync/latest
@@ -11,8 +13,6 @@
 name: Clutch sync
 
 on:
-  schedule:
-    - cron: '23 * * * *'
   workflow_dispatch:
 
 # Least privilege. The bot's token pushes the branch and opens the PR.

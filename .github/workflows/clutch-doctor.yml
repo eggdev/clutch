@@ -3,7 +3,7 @@
 # caller's clutch.yaml names. sync --check warns when the project is behind
 # that release within the grace window (template.grace_days, 14 days by
 # default, and the same major version), and fails after it. The Clutch sync
-# workflow opens the PR that takes each release. A caller adds one job:
+# workflow, run by hand, opens the PR that takes a release. A caller adds one job:
 #
 #   jobs:
 #     clutch:
