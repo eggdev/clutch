@@ -316,6 +316,7 @@
           "check-journeys",
           "check-clutch",
           "check-clutch-issues",
+          "check-factory",
           "check-ratchets",
           "check-changeset"
         ]
@@ -394,6 +395,13 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/clutch.ts ratchet check"
+        },
+        "cache": false
+      },
+      "check-factory": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/clutch.ts factory --check"
         },
         "cache": false
       },

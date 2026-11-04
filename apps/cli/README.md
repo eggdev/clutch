@@ -122,6 +122,26 @@ projects, and the root checks. See
 [only what changed](../../docs/contributing/setup/checks.md#only-what-changed).
 It exits with the check's own code.
 
+## Factory
+
+`clutch factory --check [--root DIR] [--json]` checks the project's factory
+tree: its agents, automations, runners, scorers and models. Each problem names
+the file, the key and the reason, and the command exits 1. A project with no
+tree passes with a notice. `validate` runs it as `check-factory`.
+
+```sh
+mise exec -- bun run clutch factory --check
+mise exec -- bun run clutch factory --check --root ../c-suite --json
+mise exec -- bun run clutch factory --write-schemas apps/cli/schemas/factory
+```
+
+- The tree root is `factory.root` in `clutch.yaml`, or `factory/` without it.
+  `--root DIR` checks the tree at `DIR`, from the current folder.
+- `--json` prints the root, the count of each kind and the problems.
+- `--write-schemas DIR` writes a JSON Schema file for each kind into `DIR`.
+- The [factory tree](../../docs/contributing/architecture/factory-tree.md)
+  page names each path and each key.
+
 ## Worktree
 
 `clutch worktree` makes a separate checkout for one task, so several agents or
@@ -328,6 +348,8 @@ pr_size: # optional
   exclude: [] # globs whose lines do not count, such as generated code
 agentReview: # optional
   missingCredential: notice # notice (the default) or fail
+factory: # optional
+  root: factory # the default: the folder of the factory tree. . is the project root
 journeys: # optional
   webApp: apps/app # the app that web journeys drive. Without it, the one app under apps/ with a web entry
 fleet: # optional: the repositories the weekly digest reads

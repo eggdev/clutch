@@ -38,3 +38,29 @@ export function readJourneys(value: unknown, errors: Errors) {
   }
   return { webApp: value.webApp };
 }
+
+/**
+ * `factory.root` is the folder of the factory tree, from the project root.
+ * It stays inside the project, so `.` is allowed and `..` is not.
+ */
+export function readFactory(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'factory', message: 'Expected a map with root.' });
+    return;
+  }
+  unknownKeys(value, ['root'], 'factory', errors);
+  const { root } = value;
+  if (
+    typeof root !== 'string' ||
+    !root.trim() ||
+    root.startsWith('/') ||
+    root.split(/[\\/]/u).includes('..')
+  ) {
+    errors.push({
+      path: 'factory.root',
+      message: 'Expected a folder inside the project, such as factory or .',
+    });
+    return;
+  }
+  return { root };
+}

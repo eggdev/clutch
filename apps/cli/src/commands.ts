@@ -1,5 +1,6 @@
 import { checksCommand } from '@/checks-command';
 import { doctorCommand } from '@/doctor-command';
+import { factoryCommand } from '@/factory-command';
 import { frictionCommand } from '@/friction-command';
 import { initCommand } from '@/init-command';
 import { installCommand } from '@/install-command';
@@ -39,6 +40,12 @@ export const commands: Record<string, Command> = {
       'clutch doctor [--root DIR] [--json] [--remote [--repo OWNER/NAME]] [--category C] [--phase P]\nclutch doctor --check\nclutch doctor --write-baseline [--allow-downgrade]',
     summary: 'Report which capabilities a repository has, next to what its clutch.yaml declares.',
     run: doctorCommand,
+  },
+  factory: {
+    usage: 'clutch factory --check [--root DIR] [--json]\nclutch factory --write-schemas DIR',
+    summary:
+      'Check the factory tree: its agents, automations, runners, scorers and models. Exits 1 on a problem.',
+    run: factoryCommand,
   },
   init: {
     usage: 'clutch init [--root DIR] [--mode sync|doctor] [--adopt] [--yes]',

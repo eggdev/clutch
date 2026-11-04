@@ -128,6 +128,8 @@ feature folder with other parts. The
   check for each one
 - [Styling](./styling.md): the token roles, the theme, the platforms and the
   styling checks
+- [Factory tree](./factory-tree.md): the agent, automation, runner, scorer
+  and model files, and `check-factory`, which rejects a bad tree
 
 <!-- kickoff: One link for each other system page, with when to open it. Each user journey from kickoff gets a page, and so does each package with real rules (authentication, jobs). -->
 

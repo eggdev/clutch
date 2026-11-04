@@ -244,3 +244,14 @@ test('journeys is optional and takes the folder of the web app under apps/', () 
   ]);
   expect(paths({ ...valid, journeys: 'apps/app' })).toEqual(['journeys']);
 });
+
+test('factory is optional and takes a root folder inside the project', () => {
+  expect(validateClutchConfig(valid).config?.factory).toBeUndefined();
+  expect(validateClutchConfig({ ...valid, factory: { root: '.' } }).config?.factory).toEqual({
+    root: '.',
+  });
+  expect(paths({ ...valid, factory: { root: '../c-suite' } })).toEqual(['factory.root']);
+  expect(paths({ ...valid, factory: { root: '/srv/tree' } })).toEqual(['factory.root']);
+  expect(paths({ ...valid, factory: { root: 'factory', intake: [] } })).toEqual(['factory.intake']);
+  expect(paths({ ...valid, factory: 'factory' })).toEqual(['factory']);
+});

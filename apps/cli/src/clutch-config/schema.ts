@@ -1,6 +1,6 @@
 import { isObject, isStringList, unknownKeys } from '@/clutch-config/checks';
 import type { Errors } from '@/clutch-config/checks';
-import { readAutoRevert, readJourneys } from '@/clutch-config/optional-keys';
+import { readAutoRevert, readFactory, readJourneys } from '@/clutch-config/optional-keys';
 
 const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
 const modes = ['sync', 'doctor'] as const;
@@ -59,6 +59,8 @@ export type ClutchConfig = {
   agentReview?: { missingCredential: (typeof missingCredentials)[number] };
   /** The app that a web journey drives. Without it, the runner finds the one web app under apps/. */
   journeys?: { webApp: string };
+  /** The folder of the factory tree, from the project root. `factory` by default. */
+  factory?: { root: string };
 };
 
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
@@ -78,6 +80,7 @@ const topKeys = [
   'pr_size',
   'agentReview',
   'journeys',
+  'factory',
 ];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
 const capabilityId = /^[a-z][a-z0-9_]*$/u;
@@ -325,6 +328,7 @@ const optionalSections: Record<string, (value: unknown, errors: Errors) => unkno
   agentReview: readAgentReview,
   pr_size: readPrSize,
   journeys: readJourneys,
+  factory: readFactory,
 };
 
 /** Checks parsed `clutch.yaml` data. Returns the typed config only when there is no error. */
