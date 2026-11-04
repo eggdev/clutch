@@ -18,9 +18,9 @@ name: Auto-merge
 # green PR once on its final check state, and again only when its head changes
 # or its last decide job fails. After a push that changes a rule, it decides
 # every eligible PR again. A dispatch runs only from the default branch and
-# judges the head the PR has then. The decide job finds the PR and its head,
-# and decide and merge queue on the PR, so a dispatch and an event run for the
-# same PR never decide at once. One job finds and decides, since each job bills
+# judges the head the PR has then. The decide job finds the PR and its head.
+# It queues on the PR, and merge on the head, so a dispatch and an event run
+# for the same PR never decide at once. One job finds and decides, since each job bills
 # at least a minute in a private repository. The scripts retry a gh read on a transient GitHub error, and
 # never a write (tools/github/command.ts).
 
