@@ -50,7 +50,7 @@ test('several web entries without journeys.webApp fail, and name each app and th
     },
     (folder) =>
       expect(webAppOf(folder)).toBe(
-        'Several apps under apps/ have a web entry: apps/web, apps/admin. Name the app that the web journeys drive in clutch.yaml with `journeys: { webApp: apps/<name> }`.',
+        'Several apps under apps/ have a web entry: apps/admin, apps/web. Name the app that the web journeys drive in clutch.yaml with `journeys: { webApp: apps/<name> }`.',
       ),
   );
 });
