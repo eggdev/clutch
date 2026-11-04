@@ -3,85 +3,8 @@
 This page holds the review rules for each pull request. Agent review, Cursor
 Bugbot and a person who reviews read the same list. The rules here are the
 rules that no lint rule, type or check enforces yet. When a check covers a
-rule, delete the rule from this page in the same PR.
-
-## How agent review runs
-
-`.github/workflows/agent-review.yml` runs on each pull request that is not a
-draft. It runs the Claude Code GitHub Action with this page as its rules, under the base branch's `CLAUDE.md`, `AGENTS.md` and `.claude/`.
-
-1. The agent reads the diff and the pages that the diff touches.
-2. It posts an inline comment for each finding.
-3. It posts one summary comment that lists each finding and its level.
-4. It returns the number of blocking findings and each `owner` finding to the
-   workflow.
-
-The agent reads the full diff from the checkout, not from the API, so a large
-PR is reviewed whole. The job also counts every inline `owner` comment, so a
-short structured answer alone cannot let a PR through. A failed listing of
-this head's comments is reported as a warning. A failed listing of the earlier
-heads' comments fails the job, so a re-run lists them again.
-
-The job fails when the agent returns one or more blocking findings. The job
-also fails when the agent returns no result. An `owner` finding passes the
-job, so the owner can still merge the PR. The job writes an "Owner review
-needed" annotation for it. Auto-merge reads that annotation on the head and
-leaves the PR for the owner. See
-[auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
-
-An owner finding carries over to each new head until the diff removes its cause and the review says so. A silent drop still holds the PR.
-
-The agent runs on the cheapest Claude model, `claude-haiku-5-5`. To choose
-another model, set the `CLUTCH_AGENT_MODEL` repository variable to its id. The
-gardening workflow reads the same variable.
-
-When the repository has no `ANTHROPIC_API_KEY` secret and no
-`CLAUDE_CODE_OAUTH_TOKEN` secret, the job writes a notice and passes. A pull
-request from a fork gets no secrets, so the same notice applies. Set
-`agentReview.missingCredential: fail` in `clutch.yaml` to fail the job
-instead, so a green `agent-review` check proves that a review ran. The job
-reads the setting from the base branch, so a pull request cannot change it.
-Clutch sets `fail`. A fork pull request then fails agent review, and the owner
-reviews it.
-
-The main ruleset in `.github/rulesets/main.json` makes `agent-review` a
-required status check, so a blocking finding blocks the merge. A project that
-has not set up the credential keeps the default, `notice`, and the check
-passes with a notice until the project adopts it.
-
-### Visual review
-
-The same job reviews the pixels too. When a PR adds, changes or removes a
-screenshot baseline (a PNG in a `__screenshots__/` folder, see
-[screenshots](./setup/verification.md#screenshots)), these steps run:
-
-1. The default branch's copy of `tools/journeys/visual-review.ts` writes each
-   before and after PNG, and a prompt with the PR title and body.
-2. `claude-haiku-5-5` reads each pair and returns one verdict for it. A pair
-   is `explained` when the PR says what changed on that screen. It is `broken`
-   when the after image shows a defect. A defect is clipped or overlapping text,
-   missing content, poor contrast, a scheme mix-up or an unstyled element. Set
-   the `CLUTCH_VISUAL_MODEL` repository variable to use another model.
-3. The script posts one comment with the before and after pictures and the
-   verdicts. A new head edits that comment. The job fails when a pair is
-   unexplained or broken, or has no verdict.
-
-A PR that changes no baseline skips these steps, with no install and no API
-call. A PR that changes a baseline on purpose and says why in its body passes,
-so it can still merge with no person. To clear a block, fix the screen, or say
-what changed and why in the PR body. Then re-run the `agent-review` job.
-
-The job runs the default branch's copy of the script, so a PR cannot change
-the code that judges it. It copies the rule pages from the default branch too. The prompt fences the PR title
-and body as data, and says that `broken` comes from the image alone. The model
-still reads that text in the same prompt, so a body written to sway it can. The
-weekly digest shows the owner each change that passed.
-While the default branch has no `tools/journeys/visual-review.ts`, the steps
-write a "Visual review off" notice and skip, and a baseline change passes
-unreviewed. That lasts until the PR that adds the script merges. A review of 2 pairs measured $0.006 to $0.008 on
-`claude-haiku-5-5`, most of it the Claude Code prompt, which is cached.
-
-<!-- kickoff: Whether the agent-review job is a required status check on the main branch, and who reviews when the agent finds a blocking problem. -->
+rule, delete the rule from this page in the same PR. How the agent review job
+runs, and the labels each PR carries, are in [agent review](./agent-review.md).
 
 ## Finding levels
 
@@ -96,24 +19,58 @@ Each finding has one level:
 A rule below says which level it gives. When a rule does not say, the level is
 `note`.
 
+## Owner findings
+
+An `owner` finding holds the PR until the owner approves it, so it has two
+causes only. Start the finding with its level, `owner`, then name its cause,
+`hard core` or `weaker check`. Any other concern is a `note`, or `blocking`
+when another rule says so.
+
+1. **Hard core.** The diff changes a path of the `one-way-door` tier of
+   [`.clutch/risk.yaml`](../../.clutch/risk.yaml). That is the merge gate, credentials, a
+   workflow's permissions or secrets, auth and access, migrations, billing,
+   infra and deploy, and decision records and policy docs. CODEOWNERS or
+   auto-merge already holds such a PR, so the finding says what the owner
+   should look at.
+2. **A weaker check.** The change makes a check that gates the merge catch
+   less on code that already exists. Such a check is a required status check or one of its steps, a lint rule, a budget, a ratchet or a test. Agent review itself is one too. The check is weaker when it is turned off,
+   skipped, loosened or deleted, or when a budget rises. A test is weaker when
+   a test or an assertion goes while the behavior it guards stays, or when it
+   asserts less. A new exemption, ignore, knip entry or allow-list entry is
+   weaker too, whichever files it covers. Name the check and what it stops catching.
+   That holds with or without a reason in the PR description.
+
+These are not `owner`:
+
+- A new check or a new feature, with its own tolerance, threshold or option.
+  It catches more than before, not less. Example: #185's pixel tolerance in a
+  new screenshot compare.
+- A test whose expectation moved with an intended change, and which asserts
+  the same amount.
+- A tool that does not gate the merge, such as `pr status`, `pr merge`, a
+  skill's script or a dev tool. The ruleset and auto-merge are the gate.
+  Examples: #153, #154 and #173. A file that configures a check still counts when the change weakens that check. Examples: `tools/validate.ts`, `tools/testing/**`, or a generator that a check runs.
+- A guardrail file that changed and is not weaker. Say what it makes stronger,
+  as a `note`.
+- A product defect. That is `blocking` or a `note`.
+
 ## Always flag
 
 Flag these on each pull request, also when a check passes. A check can pass
 while its rules get weaker. Most PRs merge with no person, so these findings
 are how a weaker check reaches the owner.
 
-- **A weaker check.** A change can turn off, skip, loosen or delete a check,
-  a lint rule, a budget, a test or a required status check. It can also
-  weaken agent review itself. Whatever the path, that finding is `owner`.
-  That holds with or without a reason in the PR description. Name what gets
-  weaker. A stronger check is a `note`.
+- **A weaker check**, as [owner findings](#owner-findings) defines it, is
+  `owner`. A stronger check is a `note`.
 - **A changed guardrail file.** [`tools/guardrail-files.json`](../../tools/guardrail-files.json)
   lists the files that configure a check. Say what the change makes weaker or
-  stronger. A weaker rule is `owner`.
+  stronger. Only a weaker rule is `owner`.
 - **A new escape hatch.** The
   [escape hatch table](./harness-engineering.md#guardrail-files) lists where
-  each one lives. Name the rule that the hatch turns off, and the reason the PR
-  gives. A new hatch is `owner`. A hatch with no reason is `blocking`.
+  each one lives. A hatch turns off a check for some files or cases. Name the
+  rule that the hatch turns off, and the reason the PR gives. A new hatch is
+  `owner`. A hatch with no reason is `blocking`. A new option of a new feature
+  is not a hatch.
 - **A weaker or deleted test.** Flag a test that asserts less than before, a
   deleted test whose module still exists, and a new entry in
   `tools/test-integrity-allow.json`. Each one is `owner`. A deleted test with
@@ -122,31 +79,12 @@ are how a weaker check reaches the owner.
   or flow works, the page that owns it must change in the same PR. The
   placement table is in
   [keep agent context lean](../principles/lean-agent-context.md#where-guidance-goes).
-  A missing page change is `blocking`.
+  A missing page change is `blocking`. A change to how the agent review job
+  runs moves [agent review](./agent-review.md), not this page.
 - **A changed native fingerprint with no native change.** The recorded native
   fingerprint decides when a native build runs. Its gate is in `tools/native`.
   A fingerprint change with no change to native code, native config or a
   native dependency is `blocking`.
-
-## Labels
-
-Each PR carries labels that tools and people route on:
-
-| Label            | Set by                                                    | From                                                                                                                  |
-| ---------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `kind/<type>`    | The [Labels workflow](../../.github/workflows/labels.yml) | The conventional type of the PR title, such as `kind/fix`.                                                            |
-| `area/<part>`    | The Labels workflow                                       | Each workspace package or top folder the PR touches, such as `area/cli`.                                              |
-| `size/<S to XL>` | The Labels workflow                                       | The changed lines. Above `pr_size.warn` the run warns, and it never fails.                                            |
-| `risk/<tier>`    | The [Labels workflow](../../.github/workflows/labels.yml) | The paths in `.clutch/risk.yaml`. See [risk](../../apps/cli/README.md#risk).                                          |
-| `one-way-door`   | A person                                                  | The change is one-way. See [two-way and one-way doors](../principles/two-way-doors.md).                               |
-| `revert`         | A person, or auto-revert                                  | Adding it to a merged PR starts its [revert](./operations/rollback.md#revert-a-merged-pull-request).                  |
-| `drill`          | A person                                                  | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the brake or the metric. |
-
-The workflows replace a stale `kind/`, `area/`, `size/` or `risk/` label on each push.
-The Labels workflow also creates `one-way-door`, `revert` and `drill`, so a person can always add
-them. `risk/one-way-door` comes from paths. `one-way-door` is a person's call
-about a change that the paths do not show, such as one that breaks a hard
-invariant.
 
 ## Hard invariants
 

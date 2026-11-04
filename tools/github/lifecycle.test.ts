@@ -232,6 +232,29 @@ test('failures reports a job log that GitHub no longer has', async () => {
   }
   expect(logged.join('\n')).toContain('The log is not available: gh: HTTP 404');
 });
+test('failures reports a job that never started, with its annotation', async () => {
+  const gh = fake([
+    ['gh pr view 7', view([check('validate', 'CANCELLED'), check('agent-review', 'SUCCESS')])],
+    rules,
+    comments(),
+    ['gh api repos/{owner}/{repo}/actions/jobs/8/logs', { ok: false, err: 'gh: HTTP 404' }],
+    [
+      'gh api repos/{owner}/{repo}/check-runs/8/annotations',
+      { out: 'The job was not started because recent account payments have failed.\n' },
+    ],
+  ]);
+  const logged: Array<string> = [];
+  const original = console.log;
+  console.log = (text: string) => logged.push(text);
+  try {
+    expect(await runPr(['failures', '7'], gh.run, noWrite)).toBe(0);
+  } finally {
+    console.log = original;
+  }
+  expect(logged.join('\n')).toContain(
+    'The log is not available: gh: HTTP 404\nAnnotations:\nThe job was not started because recent account payments have failed.',
+  );
+});
 
 test('wait keeps waiting while GitHub still shows an older head than the checkout', async () => {
   const old = {

@@ -11,7 +11,7 @@ name: Labels
 # live in .clutch/risk.yaml. The tier comes from the base branch's CLI and
 # rules, so a pull request cannot lower its own tier. A label set with
 # GITHUB_TOKEN starts no other workflow, so auto-merge computes the tier
-# itself. See docs/contributing/review.md#labels and apps/cli/README.md#risk.
+# itself. See docs/contributing/agent-review.md#labels and apps/cli/README.md#risk.
 #
 # Two jobs, so the pull request's code never runs with a write token. compute
 # runs the head's CLI for the labels and the base's CLI for the tier, with a

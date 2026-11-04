@@ -4,7 +4,7 @@ name: Agent review
 # job fails when the agent returns a blocking finding. Whether that blocks a
 # merge is a branch rule of each project. An owner finding, such as a weaker
 # check, passes the job with an annotation, and auto-merge then leaves the PR
-# for the owner. See docs/contributing/review.md.
+# for the owner. See docs/contributing/agent-review.md.
 
 on:
   pull_request:
@@ -52,10 +52,10 @@ jobs:
               missing="$(yq -r '.agentReview.missingCredential // "notice"' base/clutch.yaml)"
             fi
             if [ "$missing" = fail ]; then
-              echo "::error title=Agent review did not run::No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret reached this run, and agentReview.missingCredential in clutch.yaml is fail. A fork PR gets no secrets. See docs/contributing/review.md."
+              echo "::error title=Agent review did not run::No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret reached this run, and agentReview.missingCredential in clutch.yaml is fail. A fork PR gets no secrets. See docs/contributing/agent-review.md."
               exit 1
             fi
-            echo "::notice title=Agent review off::Add the ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret to turn on agent review. See docs/contributing/review.md."
+            echo "::notice title=Agent review off::Add the ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret to turn on agent review. See docs/contributing/agent-review.md."
             echo "present=false" >> "$GITHUB_OUTPUT"
           else
             echo "present=true" >> "$GITHUB_OUTPUT"
@@ -83,7 +83,7 @@ jobs:
         if: steps.credential.outputs.present == 'true'
         run: |
           if [ ! -d .base-instructions ]; then
-            echo "::error title=Base instructions missing::.base-instructions was not checked out, so the reviewer would run on the PR's own instructions. See docs/contributing/review.md."
+            echo "::error title=Base instructions missing::.base-instructions was not checked out, so the reviewer would run on the PR's own instructions. See docs/contributing/agent-review.md."
             exit 1
           fi
           for file in CLAUDE.md AGENTS.md; do
@@ -130,6 +130,28 @@ jobs:
             echo "None." > "$out"
           fi
           echo "Earlier owner findings to recheck: $(grep -c '^- ' "$out" || true)"
+      # The babysitter answers each finding in its thread and resolves the ones it fixed or declined with a reason. A new head must not raise those again. See .agents/skills/babysit-pr/SKILL.md.
+      - name: Collect answered threads
+        if: steps.credential.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          out="$RUNNER_TEMP/answered-threads.md"
+          # A failed listing only means the review may repeat a finding, so it warns and goes on.
+          # A quoted heredoc keeps the GraphQL variables away from the shell.
+          query="$(cat <<'GRAPHQL'
+          query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) {
+            reviewThreads(first: 100) { nodes { isResolved path line comments(first: 20) { nodes { body } } } } } } }
+          GRAPHQL
+          )"
+          if ! gh api graphql -F owner="${REPO%/*}" -F name="${REPO#*/}" -F number="$PR" -f query="$query" \
+            --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved) | select(.comments.nodes | map(.body | contains("clutch-babysit")) | any) | "- \(.path):\(.line // 0): \(.comments.nodes[0].body | split("\n")[0][0:200]) => \(.comments.nodes[-1].body | split("\n")[0][0:200])"' > "$out"; then
+            echo "::warning title=Answered threads unknown::The review threads could not be listed, so a finding may be raised again."
+          fi
+          [ -s "$out" ] || echo "None." > "$out"
+          echo "Answered threads: $(grep -c '^- ' "$out" || true)"
       - name: Review the pull request
         id: review
         if: steps.credential.outputs.present == 'true'
@@ -163,15 +185,25 @@ jobs:
                cause, and then name it under "Resolved owner findings" in the
                summary, quoting its `path:line` from that file, with the line
                of the diff that resolves it.
-            4. For each finding, post one inline comment with
+            4. Read `${{ runner.temp }}/answered-threads.md`. Each line is a
+               finding that a resolved thread already answered, and the answer.
+               Do not raise a `note` finding again on the same path for the
+               same rule, unless the diff changed its cause since the answer.
+               Raise a `blocking` finding whenever its cause is in the diff,
+               answered or not. Earlier owner findings follow step 3.
+            5. For each finding, post one inline comment with
                `mcp__github_inline_comment__create_inline_comment` and
                `confirmed: true`. Start it with the level, `blocking`,
-               `owner` or `note`, and name the rule from review.md.
-            5. Post one summary comment with `gh pr comment`. Its first line
+               `owner` or `note`, and name the rule from review.md. An `owner`
+               finding then names its cause, `hard core` or `weaker check`, as
+               the "Owner findings" section of review.md defines them. A concern
+               with neither cause keeps the level its rule gives, `blocking` or
+               `note`.
+            6. Post one summary comment with `gh pr comment`. Its first line
                must be exactly `## Agent review`, which the status command
                matches. List each finding with its level, or say that you
                found none.
-            6. Return the number of blocking findings, one line for each
+            7. Return the number of blocking findings, one line for each
                `owner` finding, and a one-line summary.
 
             Report a problem only when the diff shows it. Do not post praise.
@@ -271,7 +303,7 @@ jobs:
       # the PR's intent and the design rules. It runs the default branch's copy
       # of the script, so a PR cannot change what judges it. With no baseline
       # change it stops here, with no install and no API call. See
-      # docs/contributing/review.md#visual-review.
+      # docs/contributing/agent-review.md#visual-review.
       - name: List the changed screenshots
         id: visual
         if: always() && steps.credential.outputs.present == 'true'

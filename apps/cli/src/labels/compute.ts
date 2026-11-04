@@ -51,6 +51,20 @@ const drillLabel: Label = {
   description: 'A rehearsal: its revert does not count toward the revert brake or metric.',
 };
 
+/**
+ * The labels of the PR babysitter. It adds `babysit:stuck` when a cap or a
+ * conflict stops it. A person adds `babysit:off` to keep it away from a PR.
+ * See .agents/skills/babysit-pr/SKILL.md#bounds.
+ */
+const babysitLabels: Array<Label> = [
+  {
+    name: 'babysit:stuck',
+    color: 'fbca04',
+    description: 'The babysitter stopped here. Its Babysit log comment says why.',
+  },
+  { name: 'babysit:off', color: 'd4d4d4', description: 'The babysitter leaves this PR alone.' },
+];
+
 /** `kind/<type>` from a conventional title, such as `feat(cli)!: add x`, or nothing. */
 export function kindLabel(title: string): Label | undefined {
   const type = /^(\w+)(?:\([^)]*\))?!?:\s/u.exec(title)?.[1];
@@ -143,5 +157,5 @@ export function changeLabels(title: string, files: Array<string>, workspaces: Ar
       description: `Changes ${area === 'root' ? 'files at the repository root' : area}.`,
     })),
   ];
-  return { apply, define: [...apply, oneWayDoor, revertLabel, drillLabel] };
+  return { apply, define: [...apply, oneWayDoor, revertLabel, drillLabel, ...babysitLabels] };
 }

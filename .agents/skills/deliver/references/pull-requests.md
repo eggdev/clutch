@@ -93,14 +93,19 @@ Do not merge either kind with `pr merge` until the owner says so. `pr status` co
 
 ## Follow a pull request to green
 
-Between open and merge, use the [babysit-pr](../../babysit-pr/SKILL.md) skill.
-It decides what to do with each failure, on top of the commands below.
+Between open and merge, the [Babysit workflow](../../../../.github/workflows/babysit.yml)
+runs the [babysit-pr](../../babysit-pr/SKILL.md) skill on every agent PR. It
+syncs the PR with its base by merge, answers every review thread and comment,
+fixes what needs a fix, resolves each answered thread and keeps a
+`## Babysit log` comment. The main ruleset requires each review thread to be
+resolved before a merge. A session that follows its own PR runs the same
+skill with the commands below.
 
 | Command                                 | When to use it                                                                                                              |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `bun run pr status <number> [--json]`   | Before each decision. It shows the required checks, the agent review's blocking count, the dry-run verdict, the review decision and the mergeable state at the head commit. A PR that a rule still blocks, such as one waiting on a code-owner review, is not ready. |
 | `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending and GitHub shows the commit that the checkout has, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
-| `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. |
+| `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. A job with no log, such as one that never started, gets its check run's annotations instead. |
 | `bun run pr findings <number> [--check]` | After the checks finish, and after each new review. It lists every agent review finding from every head, and which ones the `## Review disposition` comment answers. See [answer each finding](#answer-each-finding). |
 | `bun run pr sync <number, branch or id>` | When GitHub reports the PR as conflicting. It rebases on the PR's base, takes the base's copy of `.clutch/TRACKER.md` if an older branch still committed it, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits, even when another clone rewrote the base. On a PR in the middle of a stack, it keeps the PRs above it linked. After a rebase that you finished by hand, it rebases as usual. |
 | `bun run pr ready <id> <number>`        | Optional, once the PR exists. It adds the PR link to the issue's `done` record, commits only the issue file as `chore(tracker): mark <id> done`, and pushes. It makes no commit when the issue already says `done` with that link. The release regenerates `.clutch/TRACKER.md` on `main`. |
@@ -182,10 +187,13 @@ stale reviews. So the owner approves a batch once:
 2. Ask the owner to approve every PR in the stack in one sitting.
 3. Run `bun run pr merge <top>`. It merges the whole stack, bottom up, in one
    step.
-4. After the approval, never push to a PR unless GitHub reports it as `DIRTY`
-   (`pr status` shows the merge state). A `CLEAN` PR merges as it is, since the
-   ruleset does not require an up-to-date branch. A `DIRTY` PR needs
-   `pr sync`, and then a new approval.
+4. After the approval, push only a sync with the base or a blocking fix.
+   GitHub dismisses the approval only when a push changes the PR's diff. A
+   sync that merges or rebases a moved base, with no conflict, keeps it, as
+   [Clutch's CL-419](https://github.com/eggdev/clutch/blob/main/.clutch/issues/CL-419.md) measured. A conflict that the
+   sync resolves, or a fix, changes the diff and needs a new approval. A
+   `CLEAN` PR merges as it is, since the ruleset does not require an
+   up-to-date branch.
 
 ## Merge
 
@@ -299,10 +307,10 @@ At each step, the PR also needs all of these:
 - No required check is red on the default branch's latest commit. A red
   `main` stops every auto-merge until it is green again, except a revert PR.
 - Agent review left no `owner` finding on its head, unless the PR is a pure
-  Clutch sync, as above. A change that weakens a
-  check, a lint rule, a budget or a test gets one, whatever its path. See
-  [review](../../../../docs/contributing/review.md#finding-levels). The owner
-  merges such a PR.
+  Clutch sync, as above. A change to the hard core gets one, and so does a
+  change that weakens a check that gates the merge, whatever its path. See
+  [owner findings](../../../../docs/contributing/review.md#owner-findings). The
+  owner merges such a PR.
 
 The workflow runs when CI or agent review completes, and it runs the default
 branch's rules. It skips a run whose branch lives in a fork, because that run

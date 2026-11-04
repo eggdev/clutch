@@ -84,17 +84,27 @@ export async function failures(run: Run, checks: Array<Check>): Promise<Array<Fa
       `repos/{owner}/{repo}/actions/jobs/${job}/logs`,
       '--allow-escape-sequences',
     ]);
-    // A cancelled job, or one past log retention, has no log to read.
-    found.push(
-      log.ok
-        ? { check: check.name, url: check.url, ...readJobLog(log.out) }
-        : {
-            check: check.name,
-            url: check.url,
-            tasks: [],
-            tail: `The log is not available: ${log.err.trim() || 'gh failed'}`,
-          },
-    );
+    if (log.ok) {
+      found.push({ check: check.name, url: check.url, ...readJobLog(log.out) });
+      continue;
+    }
+    // A cancelled job, one past log retention, or one that never started has no
+    // log. Its annotations still say why, such as a billing or a runner problem.
+    // An Actions job's id is its check run's id.
+    const notes = await run([
+      'gh',
+      'api',
+      `repos/{owner}/{repo}/check-runs/${job}/annotations`,
+      '--jq',
+      '.[].message',
+    ]);
+    const why = notes.ok && notes.out.trim() ? `\nAnnotations:\n${notes.out.trim()}` : '';
+    found.push({
+      check: check.name,
+      url: check.url,
+      tasks: [],
+      tail: `The log is not available: ${log.err.trim() || 'gh failed'}${why}`,
+    });
   }
   return found;
 }

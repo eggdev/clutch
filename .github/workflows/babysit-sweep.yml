@@ -1,0 +1,75 @@
+# Decides which agent PRs need a babysitter round, and dispatches Babysit
+# (babysit.yml) for each one. It runs on each event that can leave work on a PR:
+# a review, a comment, a finished CI or agent review run, a push to main, and
+# the half-hourly schedule. It checks out and runs only the default branch's
+# code, never a PR's, and only reads and dispatches. So the round, which runs a
+# PR's code, lives in a workflow that only a dispatch starts. See
+# .agents/skills/babysit-pr/SKILL.md.
+#
+# Set the CLUTCH_BABYSIT repository variable to `off` to stop every round.
+name: Babysit sweep
+
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+  # The sweep job runs the default branch's code only, never the PR's, and only reads and dispatches.
+  issue_comment: # zizmor: ignore[dangerous-triggers]
+    types: [created]
+  # A finished CI or agent review run. Neither a check suite nor a comment that
+  # the Actions token makes starts a workflow, so this is how agent review's
+  # findings and a red check reach the sweep. The sweep job admits only branches
+  # of this repository and runs the default branch's code.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI, Agent review]
+    types: [completed]
+  push:
+    branches: [main]
+  schedule:
+    # Every half hour, away from the top of the hour and the auto-merge sweep.
+    - cron: '23,53 * * * *'
+
+# Least privilege. The sweep job grants what it needs.
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    # Never answer the babysitter's own comments, and skip comments on issues.
+    if: >-
+      vars.CLUTCH_BABYSIT != 'off' &&
+      !(github.event_name == 'workflow_run' && github.event.workflow_run.head_repository.full_name != github.repository) &&
+      !(github.event_name == 'issue_comment' && (!github.event.issue.pull_request || contains(github.event.comment.body, 'clutch-babysit'))) &&
+      !(github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, 'clutch-babysit'))
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    # No concurrency group. A group keeps one waiting run and cancels the
+    # others, and a cancelled run shows as a failed check on the PR. Each
+    # sweep only reads and dispatches, and babysit.yml runs one round per PR
+    # at a time, so two sweeps at once cost one extra read.
+    permissions:
+      # gh workflow run dispatches the round.
+      actions: write
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The default branch's rules, also on a review event, which checks out the PR's merge ref.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Dispatch a round for each PR with work
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || '' }}
+        run: |
+          # Until the default branch has the babysitter, there is nothing to dispatch.
+          if [ ! -f tools/github/babysit.ts ]; then
+            echo "::notice title=Babysitter off::The default branch has no tools/github/babysit.ts yet."
+            exit 0
+          fi
+          bun tools/github/babysit.ts sweep --repo "$GITHUB_REPOSITORY" ${PR:+--pr "$PR"}

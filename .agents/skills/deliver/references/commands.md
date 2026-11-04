@@ -40,7 +40,9 @@ its options, and so does `bun run pr --help`.
 
 See [pull requests](./pull-requests.md) for the rules behind each one. The
 [babysit-pr](../../babysit-pr/SKILL.md) skill strings them into rounds that
-take a PR to green.
+take a PR to green. The Babysit workflow runs those rounds with
+`bun tools/github/babysit.ts plan|sweep`, `bun tools/github/babysit-apply.ts`
+and `bun tools/github/babysit-owner.ts`.
 
 | Command                                                  | Use it when                                          | It replaces                                     |
 | -------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------- |
