@@ -102,6 +102,9 @@ Linear's webhook details expose its signing secret. Use T3's `request_secret`
 private card, then save the one-use `secretRef` in the webhook signature:
 header `linear-signature`, HMAC-SHA256, hex encoding, empty prefix. Set delivery
 freshness to one minute and keep the task disabled until the signature is set.
+Set every schedule field, the signature included, in one save. A later save
+that passes `schedule` without `signature` clears the stored secret, and the
+owner has to paste it again. After that save, change `enabled` alone.
 Never accept unsigned production delivery or put the secret in code or chat.
 
 Enable after checking route, status filters and signature configuration. Test

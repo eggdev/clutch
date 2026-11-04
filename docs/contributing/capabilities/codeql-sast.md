@@ -47,7 +47,7 @@ Fix the code first. When the finding is wrong, name the rule and the reason on i
 
 <!-- kickoff: The SAST engine from the setup checklist, as sast in clutch.yaml (auto, codeql or semgrep), and the reason. -->
 
-`clutch doctor` reports this capability as present when a workflow uses `github/codeql-action/`, a workflow runs `semgrep scan`, or the `code_scanning_default_setup` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`. Without that flag, the probe is unknown and the workflow rules decide. See the `codeql_sast` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when a workflow uses `github/codeql-action/`, a workflow runs `semgrep scan` or the `semgrep/semgrep` image, or the `code_scanning_default_setup` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`. Without that flag, the probe is unknown and the workflow rules decide. See the `codeql_sast` entry in [the registry](./registry.yaml).
 
 ## Adopt
 
