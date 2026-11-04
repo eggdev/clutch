@@ -93,8 +93,13 @@ Do not merge either kind with `pr merge` until the owner says so. `pr status` co
 
 ## Follow a pull request to green
 
-Between open and merge, use the [babysit-pr](../../babysit-pr/SKILL.md) skill.
-It decides what to do with each failure, on top of the commands below.
+Between open and merge, the [Babysit workflow](../../../../.github/workflows/babysit.yml)
+runs the [babysit-pr](../../babysit-pr/SKILL.md) skill on every agent PR. It
+syncs the PR with its base by merge, answers every review thread and comment,
+fixes what needs a fix, resolves each answered thread and keeps a
+`## Babysit log` comment. The main ruleset requires each review thread to be
+resolved before a merge. A session that follows its own PR runs the same
+skill with the commands below.
 
 | Command                                 | When to use it                                                                                                              |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -182,10 +187,13 @@ stale reviews. So the owner approves a batch once:
 2. Ask the owner to approve every PR in the stack in one sitting.
 3. Run `bun run pr merge <top>`. It merges the whole stack, bottom up, in one
    step.
-4. After the approval, never push to a PR unless GitHub reports it as `DIRTY`
-   (`pr status` shows the merge state). A `CLEAN` PR merges as it is, since the
-   ruleset does not require an up-to-date branch. A `DIRTY` PR needs
-   `pr sync`, and then a new approval.
+4. After the approval, push only a sync with the base or a blocking fix.
+   GitHub dismisses the approval only when a push changes the PR's diff. A
+   sync that merges or rebases a moved base, with no conflict, keeps it, as
+   [Clutch's CL-419](https://github.com/eggdev/clutch/blob/main/.clutch/issues/CL-419.md) measured. A conflict that the
+   sync resolves, or a fix, changes the diff and needs a new approval. A
+   `CLEAN` PR merges as it is, since the ruleset does not require an
+   up-to-date branch.
 
 ## Merge
 

@@ -9,13 +9,22 @@ changes how the job runs updates this page and needs no approval for it.
 ## How it runs
 
 `.github/workflows/agent-review.yml` runs on each pull request that is not a
-draft. It runs the Claude Code GitHub Action with this page as its rules, under the base branch's `CLAUDE.md`, `AGENTS.md` and `.claude/`.
+draft. It runs the Claude Code GitHub Action with [review](./review.md) as its rules, under the base branch's `CLAUDE.md`, `AGENTS.md` and `.claude/`.
 
 1. The agent reads the diff and the pages that the diff touches.
-2. It posts an inline comment for each finding.
-3. It posts one summary comment that lists each finding and its level.
-4. It returns the number of blocking findings and each `owner` finding to the
+2. It reads the threads that the babysitter already answered and resolved. It
+   does not raise a `blocking` or `note` finding again on the same path for
+   the same rule, unless the diff changed its cause.
+3. It posts an inline comment for each finding.
+4. It posts one summary comment that lists each finding and its level.
+5. It returns the number of blocking findings and each `owner` finding to the
    workflow.
+
+Each inline comment opens a review thread. The main ruleset requires every
+thread to be resolved before a merge. The
+[babysitter](../../.agents/skills/babysit-pr/SKILL.md) answers each one: it
+fixes it, or replies with the reason and resolves it, or leaves it open for
+the owner. The owner's approval of the head resolves the owner's threads.
 
 The agent reads the full diff from the checkout, not from the API, so a large
 PR is reviewed whole. The job also counts every inline `owner` comment, so a
@@ -88,18 +97,20 @@ unreviewed. That lasts until the PR that adds the script merges. A review of 2 p
 
 Each PR carries labels that tools and people route on:
 
-| Label            | Set by                                                    | From                                                                                                                  |
-| ---------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `kind/<type>`    | The [Labels workflow](../../.github/workflows/labels.yml) | The conventional type of the PR title, such as `kind/fix`.                                                            |
-| `area/<part>`    | The Labels workflow                                       | Each workspace package or top folder the PR touches, such as `area/cli`.                                              |
-| `size/<S to XL>` | The Labels workflow                                       | The changed lines. Above `pr_size.warn` the run warns, and it never fails.                                            |
-| `risk/<tier>`    | The [Risk workflow](../../.github/workflows/risk.yml)     | The paths in `.clutch/risk.yaml`. See [risk](../../apps/cli/README.md#risk).                                          |
-| `one-way-door`   | A person                                                  | The change is one-way. See [two-way and one-way doors](../principles/two-way-doors.md).                               |
-| `revert`         | A person, or auto-revert                                  | Adding it to a merged PR starts its [revert](./operations/rollback.md#revert-a-merged-pull-request).                  |
-| `drill`          | A person                                                  | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the brake or the metric. |
+| Label            | Set by                                                     | From                                                                                                                  |
+| ---------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `kind/<type>`    | The [Labels workflow](../../.github/workflows/labels.yml)  | The conventional type of the PR title, such as `kind/fix`.                                                            |
+| `area/<part>`    | The Labels workflow                                        | Each workspace package or top folder the PR touches, such as `area/cli`.                                              |
+| `size/<S to XL>` | The Labels workflow                                        | The changed lines. Above `pr_size.warn` the run warns, and it never fails.                                            |
+| `risk/<tier>`    | The [Risk workflow](../../.github/workflows/risk.yml)      | The paths in `.clutch/risk.yaml`. See [risk](../../apps/cli/README.md#risk).                                          |
+| `one-way-door`   | A person                                                   | The change is one-way. See [two-way and one-way doors](../principles/two-way-doors.md).                               |
+| `revert`         | A person, or auto-revert                                   | Adding it to a merged PR starts its [revert](./operations/rollback.md#revert-a-merged-pull-request).                  |
+| `drill`          | A person                                                   | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the brake or the metric. |
+| `babysit:stuck`  | The [babysitter](../../.agents/skills/babysit-pr/SKILL.md) | A cap or a conflict stopped it. Its `## Babysit log` comment says why. The owner's brief lists the PR.                |
+| `babysit:off`    | A person                                                   | The babysitter leaves the PR alone.                                                                                   |
 
 The workflows replace a stale `kind/`, `area/`, `size/` or `risk/` label on each push.
-The Labels workflow also creates `one-way-door`, `revert` and `drill`, so a person can always add
+The Labels workflow also creates `one-way-door`, `revert`, `drill` and the `babysit:` labels, so a person can always add
 them. `risk/one-way-door` comes from paths. `one-way-door` is a person's call
 about a change that the paths do not show, such as one that breaks a hard
 invariant.

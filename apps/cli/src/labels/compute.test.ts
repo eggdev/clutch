@@ -49,6 +49,8 @@ test('a change gets one kind and each area once, and the person labels are defin
     'one-way-door',
     'revert',
     'drill',
+    'babysit:stuck',
+    'babysit:off',
   ]);
   expect(labels.apply.map((label) => label.name)).not.toContain('revert');
   for (const label of labels.define) {
