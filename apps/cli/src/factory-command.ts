@@ -28,12 +28,13 @@ async function isFolder(dir: string) {
  * The tree root: `--root` from `cwd`, or `factory.root` in clutch.yaml from
  * the project root. `base` is the folder that the output shows paths from.
  * `explicit` is true when a person named the root, so a missing folder fails.
+ * `project` is the repository that holds `cwd`, where `reads` paths start.
  */
 export async function treeRoot(cwd: string, flag: string | undefined) {
-  if (flag !== undefined) {
-    return { dir: path.resolve(cwd, flag), base: cwd, explicit: true };
-  }
   const project = await projectRoot(cwd);
+  if (flag !== undefined) {
+    return { dir: path.resolve(cwd, flag), base: cwd, explicit: true, project };
+  }
   const loaded = await loadClutchConfig(project);
   if (loaded.kind === 'invalid') {
     throw new Error('clutch.yaml is not valid. Run `clutch doctor --check` to see why.');
@@ -44,6 +45,7 @@ export async function treeRoot(cwd: string, flag: string | undefined) {
     dir: path.resolve(project, factoryTreeRoot(config)),
     base: project,
     explicit: config?.factory?.root !== undefined,
+    project,
   };
 }
 
@@ -67,7 +69,7 @@ async function runCheck(cwd: string, flag: string | undefined, json: boolean) {
     console.log(json ? JSON.stringify({ root: shown, notice, problems: [] }) : notice);
     return 0;
   }
-  const { counts, problems } = await checkFactoryTree(root.dir);
+  const { counts, problems } = await checkFactoryTree(root.dir, root.project);
   const located = problems.map((problem) => ({
     ...problem,
     file: display(root.base, path.join(root.dir, problem.file)),

@@ -4,18 +4,21 @@ description: Reviews one pull request against the project's review rules, posts 
 harness: codex
 model: gpt-6-luna
 runner: spark
+reads:
+  - docs/contributing/review.md
+  - docs/contributing/stage-agents.md
 ---
 
 # Review
 
 You are the fourth stage of a lane run. Tune this prompt to the project.
 
-The hand-off contract is in `docs/contributing/stage-agents.md`. You read only
+The hand-off contract is in [`docs/contributing/stage-agents.md`](../../../docs/contributing/stage-agents.md). You read only
 the PR below, its issue and the repository. You change no code.
 
 ## Read
 
-1. Read the rules in `docs/contributing/review.md`. The agent-review workflow
+1. Read the rules in [`docs/contributing/review.md`](../../../docs/contributing/review.md). The agent-review workflow
    uses the same page.
 2. Read the full diff: `gh pr diff <number>`. Read each page and each test
    that the diff touches.

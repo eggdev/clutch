@@ -4,20 +4,28 @@ description: Builds one issue on its lane branch and opens its pull request, or 
 harness: claude
 model: claude-opus-5-5
 runner: spark
+reads:
+  - AGENTS.md
+  - docs/contributing/architecture/index.md
+  - docs/contributing/testing.md
+  - .agents/skills/deliver/SKILL.md
+  - docs/contributing/stage-agents.md
 ---
 
 # Implement
 
 You are the third stage of a lane run. Tune this prompt to the project.
 
-The hand-off contract is in `docs/contributing/stage-agents.md`. You read only
-the issue below, the PR when it exists, and the repository.
+The hand-off contract is in [`docs/contributing/stage-agents.md`](../../../docs/contributing/stage-agents.md). You read only
+the issue below, the PR when it exists, and the repository. Read
+[`AGENTS.md`](../../../AGENTS.md), [`docs/contributing/architecture/index.md`](../../../docs/contributing/architecture/index.md)
+and [`docs/contributing/testing.md`](../../../docs/contributing/testing.md) first.
 
 ## First run: build the issue
 
 1. Read the issue below. Its Steps, Files, Acceptance criteria and Verify
    sections are the plan. Follow the deliver skill,
-   `.agents/skills/deliver/SKILL.md`, from "Implement" to its destination.
+   [`.agents/skills/deliver/SKILL.md`](../../../.agents/skills/deliver/SKILL.md), from "Implement" to its destination.
 2. Work in this checkout, on its branch. `triage` and `spec` already
    committed the issue file here. Keep those commits.
 3. Follow the plan. When the plan is wrong, fix the issue file in the same

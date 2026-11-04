@@ -3,6 +3,9 @@ import type { Kind } from '@/factory/common';
 
 const roles = ['foreman', 'triage', 'spec', 'implement', 'review', 'verify', 'custom'];
 
+/** A path from the project root: no leading `/`, and no `.` or `..` part. */
+const projectPathPattern = '^(?!/)(?!(?:.*/)?\\.\\.?(?:/|$))\\S+$';
+
 /** `agents/<name>/agent.md`: one agent. The frontmatter holds its settings. */
 export const agentKind: Kind = {
   id: 'agent',
@@ -30,6 +33,19 @@ export const agentKind: Kind = {
       },
       model: text('An id in models.yaml.'),
       runner: name('The name of a file in runners/, without .yaml.'),
+      reads: {
+        type: 'array',
+        minItems: 1,
+        uniqueItems: true,
+        description:
+          'The docs that the agent must read. Each path must exist, and the prompt must link it as a Markdown link.',
+        items: {
+          type: 'string',
+          pattern: projectPathPattern,
+          description:
+            'A file or a folder, from the project root (the repository root, not the tree root).',
+        },
+      },
     },
   },
 };

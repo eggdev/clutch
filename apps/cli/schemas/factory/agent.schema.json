@@ -30,6 +30,17 @@
       "type": "string",
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "description": "The name of a file in runners/, without .yaml. A lowercase kebab-case name."
+    },
+    "reads": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "The docs that the agent must read. Each path must exist, and the prompt must link it as a Markdown link.",
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?!(?:.*/)?\\.\\.?(?:/|$))\\S+$",
+        "description": "A file or a folder, from the project root (the repository root, not the tree root)."
+      }
     }
   }
 }

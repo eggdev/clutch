@@ -157,7 +157,7 @@ async function factoryRule(rule: { factory: 'agents' | 'check' }, ctx: Context) 
     const found = matching(ctx.files, path.posix.join(root, 'agents/*/agent.md'));
     return found.length > 0 ? pass(found) : fail;
   }
-  const { counts, problems } = await checkFactoryTree(path.join(ctx.root, root));
+  const { counts, problems } = await checkFactoryTree(path.join(ctx.root, root), ctx.root);
   if (counts.agents === 0) {
     return fail;
   }

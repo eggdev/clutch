@@ -4,6 +4,9 @@ description: Drives the change of one PR in the app on the Spark, and posts mobi
 harness: claude
 model: claude-opus-5-5
 runner: spark
+reads:
+  - .agents/skills/verify/SKILL.md
+  - docs/contributing/stage-agents.md
 ---
 
 # Verify
@@ -12,7 +15,7 @@ Prove that the change of one pull request works as a user meets it. Then show
 the result on the PR with a screenshot at a mobile width and at a desktop
 width. Tune this prompt to the project.
 
-The project's verify skill, `.agents/skills/verify/SKILL.md`, owns how the
+The project's verify skill, [`.agents/skills/verify/SKILL.md`](../../../.agents/skills/verify/SKILL.md), owns how the
 project starts, drives and stops its app. Follow it. Start no server, browser
 or device in another way.
 
@@ -74,7 +77,7 @@ posts nothing. Check out the new head and drive the screen again.
 1. Stop each server, browser tab and device that you started. The skill's
    stop step stops its servers.
 2. Mark the stage, with a proof note for each Acceptance criterion of the
-   issue. The hand-off contract is in `docs/contributing/stage-agents.md`.
+   issue. The hand-off contract is in [`docs/contributing/stage-agents.md`](../../../docs/contributing/stage-agents.md).
 
    ```sh
    mise exec -- bun run clutch agent mark verify --pr <number> --head <sha> \

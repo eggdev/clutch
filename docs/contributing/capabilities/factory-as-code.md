@@ -24,6 +24,36 @@ A tree that fails the check is partial, and the evidence says how many problems 
 
 When Clutch changes its copy of a tree file, the sync PR names the file with a compare link. Port what applies.
 
+## Docs that agents read
+
+Each agent's `reads` names the docs that it must read, and its prompt links each one. `clutch factory --check` fails when a path does not exist, so a project whose docs do not follow Clutch's layout fails the check. Clutch's layout, from the project root:
+
+| Path                                      | Holds                                           |
+| ----------------------------------------- | ----------------------------------------------- |
+| `AGENTS.md`                               | The agent index: the validate command and a map |
+| `docs/contributing/index.md`              | The map of the contributor docs                 |
+| `docs/contributing/project-intent.md`     | What the project is for                         |
+| `docs/principles/`                        | The engineering principles                      |
+| `docs/contributing/architecture/index.md` | The map of the code                             |
+| `docs/contributing/testing.md`            | How to test a change                            |
+| `docs/contributing/review.md`             | The review rules and the finding levels         |
+| `docs/contributing/stage-agents.md`       | The hand-off contract between the stage agents  |
+| `.clutch/README.md`                       | The issue tracker and its states                |
+| `.agents/skills/deliver/SKILL.md`         | The deliver skill                               |
+| `.agents/skills/verify/SKILL.md`          | The project's own verify skill                  |
+
+The starter agents read these docs:
+
+| Agent       | `reads`                                                                                                                          |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `triage`    | `AGENTS.md`, `.clutch/README.md`, `docs/contributing/project-intent.md`, the deliver skill, the hand-off contract                |
+| `spec`      | `docs/contributing/architecture/index.md`, the deliver skill's research and design reference, the hand-off contract              |
+| `implement` | `AGENTS.md`, `docs/contributing/architecture/index.md`, `docs/contributing/testing.md`, the deliver skill, the hand-off contract |
+| `review`    | `docs/contributing/review.md`, the hand-off contract                                                                             |
+| `verify`    | The verify skill, the hand-off contract                                                                                          |
+
+The [factory tree schema](../architecture/factory-tree.md#agentmd) says how to write `reads` and its links.
+
 ## Waive
 
 Set `factory_as_code` to `waived` in `clutch.yaml` with a reason. A waiver is reasonable when no agent works on the repository without a person who starts it by hand.

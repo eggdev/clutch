@@ -18,8 +18,12 @@ import { frontmatter } from '@/issues/parse';
 /** A problem in one file of the tree. `file` is from the tree root. An empty `key` is the whole file. */
 export type Problem = { file: string; key: string; reason: string };
 
-/** One file of a kind, with its parsed settings. `data` is empty when the file does not parse. */
-export type Entry = { name: string; file: string; data: Record<string, unknown> };
+/**
+ * One file of a kind, with its parsed settings. `data` is empty when the file
+ * does not parse. `body` is the text after the frontmatter of a Markdown file,
+ * and empty for a YAML file.
+ */
+export type Entry = { name: string; file: string; data: Record<string, unknown>; body: string };
 
 export type Tree = {
   agents: Array<Entry>;
@@ -63,7 +67,13 @@ async function readText(file: string) {
 }
 
 /** Parses one file of `kind` and adds a problem for each way it breaks the schema. */
-function readEntry(kind: Kind, file: string, text: string, problems: Array<Problem>) {
+function readEntry(
+  kind: Kind,
+  file: string,
+  text: string,
+  problems: Array<Problem>,
+): Pick<Entry, 'data' | 'body'> {
+  const empty = { data: {}, body: '' };
   const add = (key: string, reason: string) => problems.push({ file, key, reason });
   let yaml = text;
   let body = '';
@@ -71,7 +81,7 @@ function readEntry(kind: Kind, file: string, text: string, problems: Array<Probl
     const block = frontmatter(text);
     if (!block) {
       add('', 'The file does not start with a --- frontmatter block.');
-      return {};
+      return empty;
     }
     ({ yaml } = block);
     body = text.slice(block.end);
@@ -81,7 +91,7 @@ function readEntry(kind: Kind, file: string, text: string, problems: Array<Probl
     data = parse(yaml);
   } catch (error) {
     add('', `Not valid YAML: ${error instanceof Error ? error.message : String(error)}`);
-    return {};
+    return empty;
   }
   const out: Array<{ key: string; reason: string }> = [];
   check(kind.schema, data ?? {}, '', out);
@@ -94,7 +104,7 @@ function readEntry(kind: Kind, file: string, text: string, problems: Array<Probl
       `The body is empty. It holds ${kind.body.charAt(0).toLowerCase()}${kind.body.slice(1)}`,
     );
   }
-  return isMap(data) ? data : {};
+  return { data: isMap(data) ? data : {}, body };
 }
 
 /**
@@ -136,7 +146,7 @@ async function readKindFolders(root: string, kind: Kind, problems: Array<Problem
   return found.map(({ name: itemName, file, text }) => ({
     name: itemName,
     file,
-    data: readEntry(kind, file, text, problems),
+    ...readEntry(kind, file, text, problems),
   }));
 }
 
@@ -162,7 +172,7 @@ async function readRunners(root: string, problems: Array<Problem>) {
       continue;
     }
     const text = await readFile(path.join(root, file), 'utf-8');
-    runners.push({ name: base, file, data: readEntry(runnerKind, file, text, problems) });
+    runners.push({ name: base, file, ...readEntry(runnerKind, file, text, problems) });
   }
   return runners;
 }
@@ -182,7 +192,7 @@ export async function readTree(root: string): Promise<Tree> {
       : {
           name: 'models',
           file: modelsKind.path,
-          data: readEntry(modelsKind, modelsKind.path, modelsText, problems),
+          ...readEntry(modelsKind, modelsKind.path, modelsText, problems),
         };
   return { agents, automations, runners, scorers, benchmarks, models, problems };
 }

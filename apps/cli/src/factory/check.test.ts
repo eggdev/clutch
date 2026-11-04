@@ -6,7 +6,7 @@ import { gitRepo } from '@/testing/git-repo';
 
 const fixtures = path.join(import.meta.dir, 'fixtures');
 async function problemsOf(root: string) {
-  const { problems } = await checkFactoryTree(root);
+  const { problems } = await checkFactoryTree(root, root);
   return problems;
 }
 
@@ -35,7 +35,7 @@ const automation = (trigger: string) =>
   `---\nagent: implement\ntrigger:\n${trigger}---\n\nStart.\n`;
 
 test('the good tree passes and counts each kind', async () => {
-  expect(await checkFactoryTree(path.join(fixtures, 'good'))).toEqual({
+  expect(await checkFactoryTree(path.join(fixtures, 'good'), fixtures)).toEqual({
     counts: { agents: 3, automations: 1, runners: 1, scorers: 1, benchmarks: 1, models: 1 },
     problems: [],
   });
@@ -65,7 +65,7 @@ test('each bad fixture names its file and its key', async () => {
 
 test('an empty folder has no files and no problems', async () => {
   await using dir = await tree({ 'README.md': '# Tree\n' });
-  const result = await checkFactoryTree(dir.root);
+  const result = await checkFactoryTree(dir.root, dir.root);
   expect(result.problems).toEqual([]);
   expect(Object.values(result.counts).every((count) => count === 0)).toBe(true);
 });

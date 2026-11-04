@@ -4,21 +4,27 @@ description: Sorts one new issue into the project's issue list, with a phase, it
 harness: claude
 model: claude-sonnet-5-5
 runner: spark
+reads:
+  - AGENTS.md
+  - .clutch/README.md
+  - docs/contributing/project-intent.md
+  - docs/contributing/stage-agents.md
+  - .agents/skills/deliver/SKILL.md
 ---
 
 # Triage
 
 You are the first stage of a lane run. Tune this prompt to the project.
 
-The hand-off contract is in `docs/contributing/stage-agents.md`. You read only
+The hand-off contract is in [`docs/contributing/stage-agents.md`](../../../docs/contributing/stage-agents.md). You read only
 the issue below and the repository. You write only to the issue file.
 
 ## Read
 
-1. Read `AGENTS.md`, `.clutch/README.md`, the plan in `.clutch/PLAN.md` when it exists, and
-   `docs/contributing/project-intent.md`.
+1. Read [`AGENTS.md`](../../../AGENTS.md), [`.clutch/README.md`](../../../.clutch/README.md), the plan in `.clutch/PLAN.md` when it exists, and
+   [`docs/contributing/project-intent.md`](../../../docs/contributing/project-intent.md).
 2. Read the issue below. Follow the "Recover and decide" section of the
-   deliver skill, `.agents/skills/deliver/SKILL.md`.
+   deliver skill, [`.agents/skills/deliver/SKILL.md`](../../../.agents/skills/deliver/SKILL.md).
 3. Run `mise exec -- bun run clutch issues` and find each issue that covers
    the same work.
 

@@ -39,9 +39,14 @@ description: Builds one issue and opens its pull request.
 harness: claude
 model: claude-opus-5-5
 runner: spark
+reads:
+  - AGENTS.md
+  - .agents/skills/deliver/SKILL.md
 ---
 
-Follow the deliver skill for the issue you get.
+Read [`AGENTS.md`](../../../AGENTS.md). Follow the deliver skill,
+[`.agents/skills/deliver/SKILL.md`](../../../.agents/skills/deliver/SKILL.md),
+for the issue you get.
 ```
 
 | Key           | Required | Value                                                                  |
@@ -51,6 +56,23 @@ Follow the deliver skill for the issue you get.
 | `harness`     | Yes      | `claude`, `codex` or `qwen`                                            |
 | `model`       | Yes      | An `id` in `models.yaml`                                               |
 | `runner`      | Yes      | The name of a file in `runners/`                                       |
+| `reads`       | No       | The docs that the agent must read. See below                           |
+
+`reads` is a list of paths from the project root, which is the repository
+root, not the tree root. A path can name a file or a folder. It cannot start
+with `/`, and it cannot hold a `.` or a `..` part. The check fails when a path
+does not exist, or when the prompt has no Markdown link to it. A link resolves
+from the folder of `agent.md`, as GitHub shows it, so a link from
+`factory/agents/<name>/agent.md` starts with `../../../`. A link that starts
+with `/` resolves from the project root. A link in a fenced code block does
+not count. The problem names the agent file, the key, such as `reads[1]`, and
+the path.
+
+Give each agent the smallest set of docs that its stage needs. The docs follow
+Clutch's layout, which the
+[factory as code capability](../capabilities/factory-as-code.md#docs-that-agents-read)
+names. `reads` is a Clutch addition to the format in C-Suite's `stack.md`. A
+tree without it passes.
 
 ## automation.md
 
@@ -228,6 +250,8 @@ these rules:
 - A scorer whose `judge` has the harness `qwen` needs the `base_url` of that
   model.
 - A tree has at most 1 `foreman`.
+- Each path in an agent's `reads` exists from the project root, and the
+  agent's prompt links it.
 - A scorer has at least 1 label that passes and 1 label that fails. No 2
   labels have the same `value`.
 - No 2 items in `models.yaml` have the same `id`.
@@ -267,7 +291,7 @@ differs from them.
 ## What to read when changing it
 
 - `apps/cli/src/factory/`: one file for each kind, the loader and the rules
-  across files.
+  across files. `reads.ts` checks each agent's `reads`.
 - `apps/cli/src/factory-command.ts`: the command and where it finds the tree.
 - [CLI reference](https://github.com/eggdev/clutch/blob/main/apps/cli/README.md#factory):
   the command's flags.

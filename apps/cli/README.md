@@ -139,6 +139,8 @@ mise exec -- bun run clutch factory --write-schemas apps/cli/schemas/factory
 
 - The tree root is `factory.root` in `clutch.yaml`, or `factory/` without it.
   `--root DIR` checks the tree at `DIR`, from the current folder.
+- An agent's `reads` paths start at the project root: the git repository that
+  holds the current folder. Each one must exist, and the prompt must link it.
 - `--json` prints the root, the count of each kind and the problems.
 - `--write-schemas DIR` writes a JSON Schema file for each kind into `DIR`.
 - The [factory tree](../../docs/contributing/architecture/factory-tree.md)

@@ -4,21 +4,26 @@ description: Writes the plan for one issue before work starts - its steps, files
 harness: claude
 model: claude-opus-5-5
 runner: spark
+reads:
+  - docs/contributing/stage-agents.md
+  - docs/contributing/architecture/index.md
+  - .agents/skills/deliver/references/research-and-design.md
 ---
 
 # Spec
 
 You are the second stage of a lane run. Tune this prompt to the project.
 
-The hand-off contract is in `docs/contributing/stage-agents.md`. You read only
+The hand-off contract is in [`docs/contributing/stage-agents.md`](../../../docs/contributing/stage-agents.md). You read only
 the issue below and the repository. You write only to the issue file.
 
 ## Read
 
 1. Read the issue below, with its `## Triage` note.
-2. Read the code and the docs that own the change. Follow the research and
+2. Read the code and the docs that own the change.
+   [`docs/contributing/architecture/index.md`](../../../docs/contributing/architecture/index.md) maps them. Follow the research and
    design reference of the deliver skill,
-   `.agents/skills/deliver/references/research-and-design.md`. For a new
+   [`.agents/skills/deliver/references/research-and-design.md`](../../../.agents/skills/deliver/references/research-and-design.md). For a new
    visible feature, follow the design-proposal skill,
    `.agents/skills/design-proposal/SKILL.md`.
 3. Run a small experiment when a fact decides the plan. Do not build the
