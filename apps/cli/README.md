@@ -479,12 +479,18 @@ mise exec -- bun run clutch sync --root ../shop --to v0.2.0
 
 ### Sync pull requests
 
-`.github/workflows/clutch-sync.yml` takes each release for the project, as
-Renovate takes a dependency update. Each hour it compares the release in
+`.github/workflows/clutch-sync.yml` takes a release for the project when a
+person starts it: Actions, Clutch sync, Run workflow. It has no schedule, so a
+project catches up when it needs to. It compares the release in
 `.clutch/lineage.json` with the newest Clutch release. When the project is
 behind, it runs `clutch sync --to <release>`, refreshes `bun.lock` and the
 TypeScript references, and pushes the result to `clutch-sync/latest` as the
-release bot. One PR stays open, and it moves to each new release.
+release bot. One PR stays open, and each run moves it to the newest release.
+`gh workflow run clutch-sync.yml` starts a run from a terminal.
+
+- While the project is behind, the `clutch / doctor` check warns. It fails
+  after `template.grace_days`, as [sync](#sync) says. No ruleset requires it,
+  so it reminds and never blocks a merge.
 
 - Auto-merge takes the PR at the step `bots`, when it passes the sync bot rule
   and its checks. See
