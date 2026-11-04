@@ -11,9 +11,11 @@ models:
   - id: qwen3.6
     harness: qwen
     where: Spark, Ollama at localhost:11434, OpenAI API
+    base_url: http://localhost:11434/v1
   - id: qwen3.8-27b
     harness: qwen
     where: Spark, llama-swap at 127.0.0.1:8092, OpenAI API, loads on demand
+    base_url: http://127.0.0.1:8092/v1
   - id: gpt-6-luna
     harness: codex
     where: OpenAI, through the Codex CLI in T3. The default model of Codex on the Spark
