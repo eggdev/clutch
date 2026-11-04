@@ -1,0 +1,79 @@
+{
+  "benchmark": "implement-models",
+  "date": "2026-11-04T19:11:04.026Z",
+  "commit": "7649c9da566f31e1db27898715120861b1b3fb9d",
+  "agent": "implement",
+  "limits": {
+    "minutes": 20,
+    "turns": 80,
+    "checkMinutes": 10
+  },
+  "runs": [
+    {
+      "task": "cl-116-release-changeset",
+      "config": "opus",
+      "model": "claude-opus-5-5",
+      "pass": false,
+      "exit": "done",
+      "seconds": 231,
+      "lines": 204,
+      "files": 4,
+      "turns": 26
+    },
+    {
+      "task": "cl-116-release-changeset",
+      "config": "sonnet",
+      "model": "claude-sonnet-5-5",
+      "pass": false,
+      "exit": "done",
+      "seconds": 196,
+      "lines": 139,
+      "files": 4,
+      "turns": 27
+    },
+    {
+      "task": "cl-103-pin-actions",
+      "config": "opus",
+      "model": "claude-opus-5-5",
+      "pass": false,
+      "exit": "done",
+      "seconds": 413,
+      "lines": 175,
+      "files": 12,
+      "turns": 62
+    },
+    {
+      "task": "cl-103-pin-actions",
+      "config": "sonnet",
+      "model": "claude-sonnet-5-5",
+      "pass": false,
+      "exit": "done",
+      "seconds": 98,
+      "lines": 60,
+      "files": 3,
+      "turns": 20
+    },
+    {
+      "task": "cl-504-fleet-key",
+      "config": "opus",
+      "model": "claude-opus-5-5",
+      "pass": false,
+      "exit": "done",
+      "seconds": 376,
+      "lines": 274,
+      "files": 8,
+      "turns": 62
+    },
+    {
+      "task": "cl-504-fleet-key",
+      "config": "sonnet",
+      "model": "claude-sonnet-5-5",
+      "pass": false,
+      "exit": "done",
+      "seconds": 289,
+      "lines": 191,
+      "files": 5,
+      "turns": 32
+    }
+  ]
+}
