@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.53.6 (2026-11-04)
+
+### Fixes and maintenance
+
+- ci(sync): run the Clutch sync only when a person starts it
+
 ## 0.53.5 (2026-11-04)
 
 ### Fixes and maintenance
