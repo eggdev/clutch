@@ -86,8 +86,10 @@ on those pages; this list only points at them.
 - [Setup](./setup/index.md): local services, configuration, checks
 - [Harness engineering](./harness-engineering.md): the agent-first loop, agent hooks, how to
   turn a repeated lesson into a check, and weekly gardening
-- [Review](./review.md): the review rules that no check catches yet, and how
-  agent review runs on each PR
+- [Review](./review.md): the review rules that no check catches yet, and when
+  a finding holds a PR for the owner
+- [Agent review](./agent-review.md): how the agent review job runs on each PR,
+  visual review, and the labels each PR carries
 - [Testing](./testing.md) and [end-to-end testing](./end-to-end-testing.md):
   journeys first, which test type to write, console output
 - [Journeys](./setup/verification.md#journeys): add a journey, run it, and

@@ -274,7 +274,7 @@ on each PR. It sets `kind/<type>` from the title and `area/<part>` for each
 workspace package or top folder the PR touches. It also sets `size/S` to
 `size/XL` by the changed lines. Above `pr_size.warn` in `clutch.yaml` the run
 warns. Size never fails a PR. See
-[labels](../review.md#labels).
+[labels](../agent-review.md#labels).
 
 <!-- kickoff: The globs of the project's payment and billing code, as the paths of the billing rule in .clutch/risk.yaml. Leave the list empty when the product bills nothing. -->
 

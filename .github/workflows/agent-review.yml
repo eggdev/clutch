@@ -166,7 +166,10 @@ jobs:
             4. For each finding, post one inline comment with
                `mcp__github_inline_comment__create_inline_comment` and
                `confirmed: true`. Start it with the level, `blocking`,
-               `owner` or `note`, and name the rule from review.md.
+               `owner` or `note`, and name the rule from review.md. An `owner`
+               finding then names its cause, `hard core` or `weaker check`, as
+               the "Owner findings" section of review.md defines them. A concern
+               with neither cause is a `note`.
             5. Post one summary comment with `gh pr comment`. Its first line
                must be exactly `## Agent review`, which the status command
                matches. List each finding with its level, or say that you
@@ -271,7 +274,7 @@ jobs:
       # the PR's intent and the design rules. It runs the default branch's copy
       # of the script, so a PR cannot change what judges it. With no baseline
       # change it stops here, with no install and no API call. See
-      # docs/contributing/review.md#visual-review.
+      # docs/contributing/agent-review.md#visual-review.
       - name: List the changed screenshots
         id: visual
         if: always() && steps.credential.outputs.present == 'true'

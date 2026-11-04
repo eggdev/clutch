@@ -9,7 +9,7 @@
  * prompt for the image model. `report` reads the model's verdicts from
  * `RESULT`, posts one PR comment with the before and after pictures, and exits
  * 1 when a change is unexplained or broken. See
- * docs/contributing/review.md#visual-review.
+ * docs/contributing/agent-review.md#visual-review.
  */
 import { appendFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -199,7 +199,7 @@ export function comment(
     '| --- | --- | --- | --- |',
     ...rows,
     '',
-    `<sub>Before is \`${where.base.slice(0, 7)}\`, after is \`${where.head.slice(0, 7)}\`. See docs/contributing/review.md#visual-review.</sub>`,
+    `<sub>Before is \`${where.base.slice(0, 7)}\`, after is \`${where.head.slice(0, 7)}\`. See docs/contributing/agent-review.md#visual-review.</sub>`,
   ].join('\n');
 }
 

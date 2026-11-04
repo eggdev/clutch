@@ -216,7 +216,7 @@ prints a warning. It never fails.
 `--json` adds the color and description of each label, the label prefixes
 that the command owns, and the person labels `one-way-door`, `revert` and
 `drill`, which the Labels workflow creates so a person can add them. See
-[labels](../../docs/contributing/review.md#labels).
+[labels](../../docs/contributing/agent-review.md#labels).
 
 ## Ratchets
 

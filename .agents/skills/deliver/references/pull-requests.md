@@ -301,7 +301,7 @@ At each step, the PR also needs all of these:
 - Agent review left no `owner` finding on its head, unless the PR is a pure
   Clutch sync, as above. A change that weakens a
   check, a lint rule, a budget or a test gets one, whatever its path. See
-  [review](../../../../docs/contributing/review.md#finding-levels). The owner
+  [review](../../../../docs/contributing/review.md#owner-findings). The owner
   merges such a PR.
 
 The workflow runs when CI or agent review completes, and it runs the default
