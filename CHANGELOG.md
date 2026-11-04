@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.1 (2026-11-04)
+
+### Fixes and maintenance
+
+- fix(journeys): list the web apps in a fixed order (CL-434)
+
 ## 0.54.0 (2026-11-04)
 
 ### Features
