@@ -72,7 +72,7 @@ GitHub does not record each idea in Warp's definitions. Where the data does not 
 
 - **Times** are in hours, rounded to 0.1. A time before the lane start, such as a PR opened before its first commit by a clock out of step, counts as 0.
 
-For the factory numbers, the report reads one list of the Agent review runs in the window. For each PR, it also reads the commits that touched its issue file. It then reads the detail of each such commit from before the first commit of the PR. A run of 14 days on 170 PRs sends about 1,500 GET requests. The GitHub limit is 5,000 an hour for each token.
+For the factory numbers, the report reads one list of the Agent review runs in the window. For each PR, it also reads the commits that touched its issue file. It then reads the detail of each such commit from before the first commit of the PR. A run of 14 days on 172 PRs sent 1,730 GET requests, and one on 50 PRs sent 432. The GitHub limit is 5,000 an hour for each token.
 
 ## Weekly digest
 
