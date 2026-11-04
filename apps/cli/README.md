@@ -237,6 +237,7 @@ PGlite database, and its own dev server names.
 
 ```sh
 mise exec -- bun run clutch worktree new cart-total --issue CL-201
+mise exec -- bun run clutch worktree new smoke --runner spark --check --json
 mise exec -- bun run clutch worktree list
 mise exec -- bun run clutch worktree rm cart-total
 mise exec -- bun run clutch worktree prune --dry-run
@@ -250,15 +251,30 @@ mise exec -- bun run clutch worktree prune --dry-run
 - It copies each `worktree.copy` file that exists, such as `.env.local`, from
   the main checkout. Then it runs each `worktree.setup` command in the new
   checkout. With `--issue`, it sets the issue to `in_progress` there.
+- The setup and the check come from the `clutch.yaml` of the new checkout, so
+  they match its code. The root and the copied files come from the main
+  checkout, because the command needs them before it makes the new checkout.
+- `--runner <name>` reads `runners/<name>.yaml` in the new checkout's factory
+  tree. It runs the runner's `setup` before `worktree.setup`. A runner that is
+  missing, breaks its schema, or has `workspace: main_checkout` stops the
+  command, and the new checkout is removed, because nothing ran in it.
+- `--check` runs `worktree.check` after the setup, and exits with its exit
+  code. A failed check keeps the checkout, so a person can look.
 - It prints the path, the branch, and the dev server names from
   `bun run dev --check` when the project has a `dev` script.
+- `--json` prints one line on stdout:
+  `{"path":…,"branch":…,"runner":…,"check":{"command":…,"exitCode":…,"passed":…}}`.
+  `runner` and `check` are null without their flags. The log and the output of
+  each command go to stderr. When the setup fails, the command exits 1 and
+  prints no JSON line.
 - `list [--json]` shows each checkout with its branch, its dirty state, the
   issue in its branch name, and its PR when `gh` is signed in.
-- The `worktree` block of `clutch.yaml` sets `root`, `copy` and `setup`.
-  Without it, the checkouts go in `../<repo>.worktrees`, nothing is copied,
-  and the setup is `mise trust --quiet` then `mise exec -- bun install`. mise
-  refuses a config file in a new folder until it is trusted, and the install
-  also installs the git hooks.
+- The `worktree` block of `clutch.yaml` sets `root`, `copy`, `setup` and
+  `check`. Without it, the checkouts go in `../<repo>.worktrees`, nothing is
+  copied, and the setup is `mise trust --quiet` then
+  `mise exec -- bun install`. mise refuses a config file in a new folder until
+  it is trusted, and the install also installs the git hooks. The check is
+  `mise exec -- bun run validate` when `check` is not set.
 - `rm <slug> [--force] [--base REF]` refuses a checkout with uncommitted
   changes, or with commits that neither the base nor a remote branch holds.
   `--force` removes it anyway. It first stops that checkout's dev servers with

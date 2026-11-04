@@ -33,18 +33,21 @@ fallback apply only outside `bun run dev`, which sets both.
 ## Settings
 
 The `worktree` block of `clutch.yaml` sets where the checkouts go, which
-untracked files to copy, and the setup commands:
+untracked files to copy, the setup commands, and the check command:
 
 ```yaml
 worktree:
   root: ../clutch.worktrees
   copy: [.env.local]
   setup: ['mise trust --quiet', 'mise exec -- bun install']
+  check: mise exec -- bun run validate
 ```
 
 Without the block, the checkouts go in `../<repo>.worktrees`, and nothing is
-copied. The setup is the two commands above. mise refuses a config file in a
-new folder until it is trusted.
+copied. The setup is the two commands above, and the check is `validate`.
+mise refuses a config file in a new folder until it is trusted.
+`clutch worktree new <slug> --check` runs the check after the setup, and
+exits with its result.
 
 ## Remove a checkout
 

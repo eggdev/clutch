@@ -25,7 +25,8 @@ export const runnerKind: Kind = {
       ssh: text('The SSH host alias that reaches the machine.'),
       setup: {
         type: 'array',
-        description: 'Shell commands that make the machine ready, in order.',
+        description:
+          "Shell commands that the machine needs before the project's own setup, in order. The project's setup and check commands are worktree.setup and worktree.check in clutch.yaml.",
         minItems: 1,
         items: text('A shell command.'),
       },

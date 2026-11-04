@@ -90,8 +90,6 @@ machine: spark
 t3_environment: a3789960-af7f-4761-ae81-b7f6fc8968d2
 ssh: agent-dgx
 workspace: worktree
-setup:
-  - mise trust --quiet
 ```
 
 | Key              | Required | Value                                                                                                            |
@@ -101,7 +99,19 @@ setup:
 | `t3_environment` | Yes      | The T3 environment id of the machine, or `local`                                                                 |
 | `workspace`      | Yes      | `worktree`: each lane gets its own git worktree. `main_checkout`: one agent at a time works in the main checkout |
 | `ssh`            | No       | The SSH host alias that reaches the machine                                                                      |
-| `setup`          | No       | A list of shell commands that make the machine ready, in order                                                   |
+| `setup`          | No       | A list of shell commands that the machine needs before the project's own setup, in order                         |
+
+Each command has one source. The project states its setup and its check in
+the `worktree` block of `clutch.yaml`: `worktree.setup` and `worktree.check`.
+A runner's `setup` holds only what its machine needs first, such as a tool
+that the project's setup calls. A runner has no `check` key, because no
+machine needs a different check yet.
+
+`clutch worktree new <slug> --runner <name> --check --json` launches a lane
+from the runner file. It refuses a runner whose `workspace` is
+`main_checkout`. It runs the runner's `setup`, then `worktree.setup`, then
+`worktree.check`, and prints the result as one JSON line. See
+[the CLI](../../../apps/cli/README.md#worktree).
 
 ## scorer.md
 

@@ -48,15 +48,20 @@ async function run(command: Array<string>, cwd: string) {
   return { code, out: out.trim(), err: err.trim() };
 }
 
-/** The real side effects of `clutch worktree new`. */
-function realSteps(repoRoot: string, base: string): NewWorktreeSteps {
+/**
+ * The real side effects of `clutch worktree new`. With `json`, each log line
+ * and the output of each command go to stderr, so stdout holds only the JSON
+ * line.
+ */
+function realSteps(repoRoot: string, base: string, json: boolean): NewWorktreeSteps {
   const remote = base.includes('/') ? base.slice(0, base.indexOf('/')) : null;
   return {
     backend: gitBackend(repoRoot),
     fetch: () =>
       remote ? git(repoRoot, 'fetch', '--quiet', remote) : Promise.resolve({ ok: true, err: '' }),
     shell: (command, cwd) =>
-      Bun.spawn(['sh', '-c', command], { cwd, stdio: ['inherit', 'inherit', 'inherit'] }).exited,
+      Bun.spawn(['sh', '-c', command], { cwd, stdio: ['inherit', json ? 2 : 'inherit', 'inherit'] })
+        .exited,
     startIssue: (issue, cwd) => issuesCommand(['set', issue, 'in_progress'], cwd),
     devCheck: async (cwd) => {
       const bun = Bun.which('bun');
@@ -66,7 +71,7 @@ function realSteps(repoRoot: string, base: string): NewWorktreeSteps {
       const result = await run([bun, 'run', 'dev', '--check'], cwd);
       return result.out || result.err || null;
     },
-    log: (line) => console.log(line),
+    log: (line) => (json ? console.error(line) : console.log(line)),
   };
 }
 
@@ -113,20 +118,33 @@ async function runCommand(args: Array<string>, cwd: string): Promise<number> {
     const { values, positionals } = parseArgs({
       args: rest,
       allowPositionals: true,
-      options: { issue: { type: 'string' }, base: { type: 'string' } },
+      options: {
+        issue: { type: 'string' },
+        base: { type: 'string' },
+        runner: { type: 'string' },
+        check: { type: 'boolean' },
+        json: { type: 'boolean' },
+      },
     });
     const base = values.base ?? (await defaultBase(repoRoot));
-    await newWorktree(
+    const json = values.json ?? false;
+    const made = await newWorktree(
       {
         repoRoot,
         slug: positionals[0],
         issue: values.issue,
         base,
         settings: await worktreeSettings(repoRoot),
+        runner: values.runner,
+        check: values.check ?? false,
       },
-      realSteps(repoRoot, base),
+      realSteps(repoRoot, base, json),
     );
-    return 0;
+    if (json) {
+      const { path: at, branch, runner, check } = made;
+      console.log(JSON.stringify({ path: at, branch, runner, check }));
+    }
+    return made.check?.exitCode ?? 0;
   }
   if (action === 'rm') {
     const { values, positionals } = parseArgs({
@@ -172,7 +190,7 @@ async function runCommand(args: Array<string>, cwd: string): Promise<number> {
     return 0;
   }
   throw new Error(
-    'Run clutch worktree new <slug> [--issue CL-NNN] [--base REF], clutch worktree list [--json], clutch worktree rm <slug> [--force], or clutch worktree prune [--dry-run] [--base REF].',
+    'Run clutch worktree new <slug> [--issue CL-NNN] [--base REF] [--runner NAME] [--check] [--json], clutch worktree list [--json], clutch worktree rm <slug> [--force], or clutch worktree prune [--dry-run] [--base REF].',
   );
 }
 
