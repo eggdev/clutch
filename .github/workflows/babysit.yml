@@ -169,6 +169,7 @@ jobs:
         env:
           RESULT: ${{ steps.fix.outputs.structured_output }}
           HEAD: ${{ steps.plan.outputs.head }}
+          PR: ${{ inputs.pr }}
         run: |
           if [ -n "$RESULT" ]; then printf '%s' "$RESULT" > "$RUNNER_TEMP/answers.json"; fi
           if git diff --name-only --diff-filter=U | grep -q . || git grep -lE '^(<<<<<<<|>>>>>>>) ' -- . >/dev/null 2>&1; then
@@ -182,7 +183,34 @@ jobs:
           fi
           mise install
           bun install --frozen-lockfile
-          if mise exec -- bun run validate; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; fi
+          if ! mise exec -- bun run validate; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Commit here, where no token exists. The PR's code has run in this
+          # checkout and may have set its hooks or git config, so the push step
+          # never runs git in it.
+          git config user.name "eggdev-clutch-bot[bot]"
+          git config user.email "eggdev-clutch-bot[bot]@users.noreply.github.com"
+          git add --all
+          if [ -f "$(git rev-parse --git-dir)/MERGE_HEAD" ]; then
+            git -c core.hooksPath=/dev/null commit --no-edit
+          elif ! git diff --cached --quiet; then
+            # The commits check reads each subject, so a message that fails the hook gets a plain one.
+            printf '%s' "$RESULT" | jq -r '.message // ""' > "$RUNNER_TEMP/message"
+            if ! bun "$GITHUB_WORKSPACE/tools/hooks/commit-msg.ts" "$RUNNER_TEMP/message"; then
+              printf 'fix: answer the review comments on #%s\n' "$PR" > "$RUNNER_TEMP/message"
+            fi
+            git -c core.hooksPath=/dev/null commit --file "$RUNNER_TEMP/message"
+          fi
+          commit="$(git rev-parse HEAD)"
+          # A fresh repository with no hooks and no config from the PR takes
+          # only the validated commit's objects, still with no token present.
+          git init --quiet "$RUNNER_TEMP/push"
+          git -C "$RUNNER_TEMP/push" config core.hooksPath /dev/null
+          git -C "$RUNNER_TEMP/push" fetch --quiet --no-tags "$PWD" "$commit"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "ok=true" >> "$GITHUB_OUTPUT"
       # The bot token comes after every step that runs the PR's code, so that code never sees it.
       - name: Get the release bot token
         id: bot
@@ -199,28 +227,17 @@ jobs:
       - name: Push
         id: push
         if: steps.validate.outputs.ok == 'true'
-        working-directory: pr
         env:
           GH_TOKEN: ${{ steps.bot.outputs.token }}
           HEAD_REF: ${{ steps.plan.outputs.head_ref }}
-          RESULT: ${{ steps.fix.outputs.structured_output }}
+          COMMIT: ${{ steps.validate.outputs.commit }}
         run: |
-          git config user.name "eggdev-clutch-bot[bot]"
-          git config user.email "eggdev-clutch-bot[bot]@users.noreply.github.com"
-          git add --all
-          if ! git diff --cached --quiet; then
-            # The commits check reads each subject, so a message that fails the hook gets a plain one.
-            printf '%s' "$RESULT" | jq -r '.message // ""' > "$RUNNER_TEMP/message"
-            if ! bun "$GITHUB_WORKSPACE/tools/hooks/commit-msg.ts" "$RUNNER_TEMP/message"; then
-              printf 'fix: answer the review comments on #%s\n' "$PR" > "$RUNNER_TEMP/message"
-            fi
-            git commit --file "$RUNNER_TEMP/message"
-          elif [ -f .git/MERGE_HEAD ]; then
-            git commit --no-edit
-          fi
+          # The repository that the Validate step made, with no hooks and no
+          # config from the PR. No code from the PR runs while the token is set.
+          cd "$RUNNER_TEMP/push"
           # No force: a push that someone else's push beat fails, and the next round starts over.
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$HEAD_REF"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$COMMIT:refs/heads/$HEAD_REF"
+          echo "sha=$COMMIT" >> "$GITHUB_OUTPUT"
       - name: Reply, resolve and log
         if: always() && steps.bot.outcome == 'success'
         env:

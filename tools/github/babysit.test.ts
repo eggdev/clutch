@@ -247,6 +247,7 @@ test('apply replies in each thread, resolves the answered ones, reruns a flaky c
           labels: { nodes: [] },
           commits: { nodes: [] },
           reviewThreads: { nodes: [] },
+          oldest: { nodes: [] },
           comments: { nodes: [] },
           reviews: { nodes: [] },
         },

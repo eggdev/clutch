@@ -69,6 +69,7 @@ const query = `query($owner: String!, $name: String!, $number: Int!) {
     } } } } } }
     reviewThreads(first: 100) { nodes { id isResolved isOutdated path line
       comments(first: 50) { nodes { databaseId author { login } body createdAt url } } } }
+    oldest: comments(first: 20) { nodes { databaseId author { login } body createdAt url } }
     comments(last: 100) { nodes { databaseId author { login } body createdAt url } }
     reviews(last: 50) { nodes { databaseId author { login } state body submittedAt url commit { oid } } }
   } } }`;
@@ -123,6 +124,8 @@ type PrNode = {
     nodes: Array<{ commit: { statusCheckRollup: { contexts: { nodes: Array<Context> } } | null } }>;
   };
   reviewThreads: { nodes: Array<ThreadNode> };
+  /** The first comments: the log is among them, also on a PR with more than 100. */
+  oldest: { nodes: Array<Node> };
   comments: { nodes: Array<Node> };
   reviews: { nodes: Array<ReviewNode> };
 };
@@ -169,7 +172,10 @@ export async function readPr(
       ? c.status !== 'COMPLETED'
       : c.state === 'PENDING' || c.state === 'EXPECTED',
   ).length;
-  const issueComments: Array<Comment> = pr.comments.nodes.map(comment);
+  const seen = new Set<number>();
+  const issueComments: Array<Comment> = [...pr.oldest.nodes, ...pr.comments.nodes]
+    .filter((node) => !seen.has(node.databaseId) && seen.add(node.databaseId))
+    .map(comment);
   const logComment = issueComments.findLast((c) => c.body.includes(logMarker));
   // A review's own body is a comment too. An approval with no words asks for nothing.
   const reviewBodies: Array<Comment> = pr.reviews.nodes
@@ -181,10 +187,8 @@ export async function readPr(
       at: r.submittedAt,
       url: r.url,
     }));
-  const ownerReview = pr.reviews.nodes.findLast(
-    (r) =>
-      r.author?.login === owner && ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'].includes(r.state),
-  );
+  // The rule of waitsForOwner in status.ts: the owner's latest review, in any state, approves this head.
+  const ownerReview = pr.reviews.nodes.findLast((r) => r.author?.login === owner);
   const compare = await run([
     'gh',
     'api',
