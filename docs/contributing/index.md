@@ -81,6 +81,8 @@ on those pages; this list only points at them.
 
 - [Agent workflow](./agent-workflow.md): lifecycle phases, exit conditions and
   readiness for bounded, parallel and triggered work
+- [Stage agents](./stage-agents.md): the hand-off contract of the `triage`,
+  `spec`, `implement`, `review` and `verify` agents in one lane run
 - [Delivery](./delivery.md): carry a feature, fix or refactor through review,
   verification and its authorized destination; resume from its task record
 - [Setup](./setup/index.md): local services, configuration, checks

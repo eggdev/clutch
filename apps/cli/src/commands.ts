@@ -1,3 +1,4 @@
+import { agentCommand } from '@/agent-command';
 import { benchCommand } from '@/bench-command';
 import { checksCommand } from '@/checks-command';
 import { doctorCommand } from '@/doctor-command';
@@ -62,6 +63,13 @@ export const commands: Record<string, Command> = {
     summary:
       "Judge one pull request with a scorer of the factory tree, on the model in the scorer's judge. --post adds the score as a PR comment.",
     run: (args, cwd) => scoreCommand(args, cwd),
+  },
+  agent: {
+    usage:
+      'clutch agent prompt <name> [--issue CL-NNN] [--pr <number>] [--root DIR] [--repo OWNER/NAME]\nclutch agent run <name> [--issue CL-NNN] [--pr <number>] [--root DIR] [--repo OWNER/NAME]\nclutch agent mark <stage> [--pr <number>] [--issue CL-NNN] [--head SHA] [--note TEXT | --note-file PATH] [--json]',
+    summary:
+      "Print the prompt of a stage agent with its issue or PR, run it with the agent's harness and model, or mark on the PR that a stage ran.",
+    run: (args, cwd) => agentCommand(args, cwd),
   },
   verify: {
     usage:

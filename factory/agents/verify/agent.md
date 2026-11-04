@@ -73,6 +73,17 @@ posts nothing. Check out the new head and drive the screen again.
 
 1. Stop each server, browser tab and device that you started. The skill's
    stop step stops its servers.
-2. Report the comment URL, each journey and its result, and each step that
+2. Mark the stage, with a proof note for each Acceptance criterion of the
+   issue. The hand-off contract is in `docs/contributing/stage-agents.md`.
+
+   ```sh
+   mise exec -- bun run clutch agent mark verify --pr <number> --head <sha> \
+     --note-file /tmp/verify-<number>/proof.md
+   ```
+
+   Write one line for each criterion in `proof.md`: the criterion, the
+   journey, command or screenshot that proves it, and its result.
+
+3. Report the comment URL, each journey and its result, and each step that
    failed, with its cause. Name the browser tool that you used. A change with
    no screen gets journey results and no screenshot.

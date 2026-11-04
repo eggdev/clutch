@@ -261,6 +261,43 @@ mise exec -- bun run clutch verify post --pr 212 --head <sha> --note "The home s
   reader with access sees the screenshots.
 - The command exits 0 when the comment is up, and 1 on any failure.
 
+## Agent
+
+`clutch agent` runs the 5 stage agents of a lane run: `triage`, `spec`,
+`implement`, `review` and `verify`. Each one is
+`factory/agents/<name>/agent.md` in the factory tree.
+[Stage agents](../../docs/contributing/stage-agents.md) is the hand-off
+contract between them.
+
+```sh
+mise exec -- bun run clutch agent prompt implement --issue CL-314
+mise exec -- bun run clutch agent run review --issue CL-314 --pr 214
+mise exec -- bun run clutch agent mark spec --issue CL-314 --note "Verdict: ready."
+mise exec -- bun run clutch agent mark review --pr 214 --note-file /tmp/review-214.md
+```
+
+- `prompt` prints the agent's body, then the issue file of `--issue` and the
+  title, URL, branches, head and body of `--pr`. It reads the PR with one
+  `gh api` call.
+- `run` sends the same prompt on stdin to the agent's harness, with the
+  agent's model: `claude -p --model <id> --permission-mode auto`, or
+  `codex exec -m <id> --sandbox workspace-write` with network access and the
+  Git common folder writable. It runs in the project root and exits with the
+  harness's code. A `qwen` agent fails with a clear message: print its prompt
+  and run it by hand.
+- Both refuse an agent whose file or `models.yaml` breaks the factory check.
+- `mark <stage>` posts one PR comment that starts with
+  `<!-- clutch-stage:<stage>:<head sha> -->`, then the note of `--note` or
+  `--note-file`. A second mark with the same stage and head edits that
+  comment. `--head` defaults to the PR's head.
+- `mark` with `--issue` and no `--pr` saves the marker in
+  `<git common folder>/clutch-stages/<id>.json`, for a stage that runs before
+  the PR exists. The first mark with both `--pr` and `--issue` posts the saved
+  markers first, then its own, and deletes the file.
+- `--root DIR` names the factory tree. The default is `factory.root` in
+  `clutch.yaml`, else `factory`. `--repo OWNER/NAME` reads another
+  repository. The default is the `origin` remote.
+
 ## Worktree
 
 `clutch worktree` makes a separate checkout for one task, so several agents or
