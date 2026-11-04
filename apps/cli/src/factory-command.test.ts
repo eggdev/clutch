@@ -33,6 +33,14 @@ test('a project with no tree passes with a notice', async () => {
   });
 });
 
+test('a factory.root that names a missing folder fails', async () => {
+  await using repo = await gitRepo({ 'clutch.yaml': config('factory:\n  root: gone\n') });
+  const result = await clutch(repo.root, '--check');
+  expect(result.code).toBe(1);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toContain('gone/ is not a folder.');
+});
+
 test('factory.root in clutch.yaml moves the tree, and a problem names the file and the key', async () => {
   await using repo = await gitRepo({
     'clutch.yaml': config('factory:\n  root: .\n'),

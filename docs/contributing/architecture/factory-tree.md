@@ -27,7 +27,9 @@ as `check-factory`, so `pre-push` and CI run it too.
 - Skills live in `.agents/skills/`, so the tree has no `skills/` folder.
 - The check needs a `benchmark.md` in each folder in `benchmarks/`. It does
   not read the keys of that file. CL-427 defines them.
-- A project with no tree passes with a notice.
+- A project with no tree at the default `factory/` passes with a notice. A
+  root that `--root` or `factory.root` names must be a folder, or the check
+  fails. `apps/cli/src/factory-command.test.ts` tests both cases.
 
 ## agent.md
 

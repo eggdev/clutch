@@ -28,6 +28,7 @@ async function isFolder(dir: string) {
 /**
  * The tree root: `--root` from `cwd`, or `factory.root` in clutch.yaml from
  * the project root. `base` is the folder that the output shows paths from.
+ * `explicit` is true when a person named the root, so a missing folder fails.
  */
 async function treeRoot(cwd: string, flag: string | undefined) {
   if (flag !== undefined) {
@@ -39,7 +40,12 @@ async function treeRoot(cwd: string, flag: string | undefined) {
     throw new Error('clutch.yaml is not valid. Run `clutch doctor --check` to see why.');
   }
   const root = loaded.kind === 'loaded' ? loaded.config.factory?.root : undefined;
-  return { dir: path.resolve(project, root ?? defaultRoot), base: project, explicit: false };
+  // A named root must exist, so a missing folder cannot turn the check into a notice.
+  return {
+    dir: path.resolve(project, root ?? defaultRoot),
+    base: project,
+    explicit: root !== undefined,
+  };
 }
 
 function display(base: string, file: string) {

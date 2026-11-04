@@ -127,7 +127,9 @@ It exits with the check's own code.
 `clutch factory --check [--root DIR] [--json]` checks the project's factory
 tree: its agents, automations, runners, scorers and models. Each problem names
 the file, the key and the reason, and the command exits 1. A project with no
-tree passes with a notice. `validate` runs it as `check-factory`.
+tree at the default `factory/` passes with a notice. A root that `--root` or
+`factory.root` names must be a folder, or the check fails. `validate` runs it
+as `check-factory`.
 
 ```sh
 mise exec -- bun run clutch factory --check
