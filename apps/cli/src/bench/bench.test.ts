@@ -229,8 +229,9 @@ afterEach(() => {
   process.env.PATH = savedPath;
 });
 
-async function runOne(body: string, setup = ['touch .setup-ran']) {
-  const { repo, commit } = await project();
+async function runOne(body: string, setup = ['touch .setup-ran'], pin?: string) {
+  const { repo, commit: first } = await project();
+  const commit = pin ?? first;
   const fake = await fakeClaude(body);
   process.env.PATH = `${fake.dir}:${savedPath}`;
   const suite: Suite = {
@@ -256,13 +257,16 @@ test('a timeout stops the agent and each process it started, and removes the clo
   expect(await exists(calls[0].cwd)).toBe(false);
 });
 
-test('a failed agent and a failed setup are exits, and both remove the clone', async () => {
+test('a failed agent, a failed setup and a failed clone are exits, and each removes the clone', async () => {
   const failed = await runOne('echo broken >&2; exit 3');
   expect(failed.result).toMatchObject({ exit: 'error', pass: true, lines: 0 });
   expect(await exists(failed.calls[0].cwd)).toBe(false);
   const setup = await runOne(`echo '${summary}'`, ['false']);
   expect(setup.result).toMatchObject({ exit: 'setup', pass: false, seconds: 0 });
   expect(setup.calls).toEqual([]);
+  const missing = await runOne(`echo '${summary}'`, [], 'f'.repeat(40));
+  expect(missing.result).toMatchObject({ exit: 'setup', pass: false });
+  expect(missing.calls).toEqual([]);
 });
 
 test('the summary line gives the exit and the turns', () => {

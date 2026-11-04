@@ -91,17 +91,26 @@ function benchPrompt(agentPrompt: string, task: BenchTask, issue: string) {
   ].join('\n\n');
 }
 
-/** Clones `commit` alone from `repo` into a new folder, so the run sees no later history and no remote. */
-async function scratchClone(repo: string, commit: string) {
-  const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'clutch-bench-')));
-  liveCheckouts.add(dir);
-  await gitOrThrow(dir, 'init', '--quiet', '--initial-branch=bench');
-  await gitOrThrow(dir, 'config', 'user.name', 'clutch bench');
-  await gitOrThrow(dir, 'config', 'user.email', 'bench@clutch.invalid');
-  await gitOrThrow(dir, 'config', 'commit.gpgsign', 'false');
-  await gitOrThrow(dir, 'fetch', '--quiet', '--depth', '1', repo, commit);
-  await gitOrThrow(dir, 'checkout', '--quiet', '--detach', 'FETCH_HEAD');
-  return dir;
+/**
+ * Clones `commit` alone from `repo` into the empty folder `dir`, so the run
+ * sees no later history and no remote. Returns git's message when a step fails.
+ */
+async function cloneInto(dir: string, repo: string, commit: string) {
+  const steps = [
+    ['init', '--quiet', '--initial-branch=bench'],
+    ['config', 'user.name', 'clutch bench'],
+    ['config', 'user.email', 'bench@clutch.invalid'],
+    ['config', 'commit.gpgsign', 'false'],
+    ['fetch', '--quiet', '--depth', '1', repo, commit],
+    ['checkout', '--quiet', '--detach', 'FETCH_HEAD'],
+  ];
+  for (const step of steps) {
+    const result = await git(dir, ...step);
+    if (!result.ok) {
+      return `git ${step.join(' ')} failed: ${result.err}\n`;
+    }
+  }
+  return '';
 }
 
 /** The lines and files that differ from `commit`, with new files. */
@@ -133,12 +142,16 @@ export async function runPair(
   const log = createWriteStream(logFile);
   const env = agentEnv(process.env);
   const base = { task: task.name, config: config.name, model: config.model };
-  let dir: string | undefined;
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'clutch-bench-')));
+  liveCheckouts.add(dir);
   try {
-    dir = await scratchClone(repo, task.commit);
-    const issue = await readFile(path.join(dir, task.issue), 'utf-8').catch(() => null);
+    const cloneError = await cloneInto(dir, repo, task.commit);
+    log.write(cloneError);
+    const issue = cloneError
+      ? null
+      : await readFile(path.join(dir, task.issue), 'utf-8').catch(() => null);
     let setupOk = issue !== null;
-    log.write(setupOk ? '' : `No ${task.issue} at ${task.commit}.\n`);
+    log.write(setupOk || cloneError ? '' : `No ${task.issue} at ${task.commit}.\n`);
     for (const step of setupOk ? suite.setup : []) {
       log.write(`$ ${step}\n`);
       const result = await exec(shell(step), { cwd: dir, env, minutes: limits.checkMinutes }, log);
@@ -169,9 +182,7 @@ export async function runPair(
     await new Promise((resolve) => {
       log.end(resolve);
     });
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-      liveCheckouts.delete(dir);
-    }
+    await rm(dir, { recursive: true, force: true });
+    liveCheckouts.delete(dir);
   }
 }
