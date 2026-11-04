@@ -63,6 +63,7 @@ export async function scorePull(
       reason: verdict.reason,
       seconds: verdict.seconds,
       calls: verdict.calls,
+      outputTokens: verdict.outputTokens,
       cuts,
     },
   };

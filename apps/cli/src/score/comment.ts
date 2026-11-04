@@ -16,6 +16,8 @@ export type Score = {
   reason: string;
   seconds: number;
   calls: number;
+  /** The output tokens of each call, with the reasoning, when the server reports them. */
+  outputTokens: number;
   cuts: Array<Cut>;
 };
 

@@ -84,7 +84,15 @@ function fakeServer(replies: Array<string>) {
       }
       bodies.push((await request.json()) as Record<string, unknown>);
       const content = replies[Math.min(bodies.length - 1, replies.length - 1)];
-      return Response.json({ choices: [{ message: { role: 'assistant', content } }] });
+      // Stream the content 3 characters to an event, with a reasoning event and a usage event.
+      const pieces = content.match(/[\s\S]{1,3}/gu) ?? [];
+      const events = [
+        { choices: [{ delta: { reasoning: 'Think.' } }] },
+        ...pieces.map((piece) => ({ choices: [{ delta: { content: piece } }] })),
+        { choices: [], usage: { completion_tokens: 40 } },
+      ];
+      const text = `${events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
+      return new Response(text, { headers: { 'content-type': 'text/event-stream' } });
     },
   });
   return {
@@ -218,6 +226,7 @@ test('scorePull sends the PR to the judge, and asks again after a bad reply', as
       passed: false,
       reason: 'Half.',
       calls: 2,
+      outputTokens: 80,
       cuts: [],
     },
   });
@@ -227,6 +236,7 @@ test('scorePull sends the PR to the judge, and asks again after a bad reply', as
     model: 'qwen',
     temperature: 0,
     response_format: { type: 'json_object' },
+    stream: true,
   });
   const user = (first.messages as Array<{ content: string }>)[1].content;
   expect(user).toContain('<work-item file=".clutch/issues/CL-426.md">');
@@ -279,6 +289,7 @@ const score: Score = {
   reason: 'Half.',
   seconds: 12.3,
   calls: 1,
+  outputTokens: 40,
   cuts: [{ part: 'diff', kept: 40, total: 90 }],
 };
 
