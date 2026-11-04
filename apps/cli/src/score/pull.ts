@@ -1,7 +1,7 @@
 import type { Gh } from '@/doctor/remote';
 
 /** One changed file of a pull request. `patch` is missing for a binary or a very large file. */
-export type PullFile = {
+type PullFile = {
   filename: string;
   status: string;
   additions: number;
@@ -10,7 +10,7 @@ export type PullFile = {
 };
 
 /** The work item of a pull request: its `.clutch/issues` file at the head commit. */
-export type WorkItem = { id: string; file: string; text: string };
+type WorkItem = { id: string; file: string; text: string };
 
 /** What a judge reads about one pull request. */
 export type Pull = {
