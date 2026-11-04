@@ -61,7 +61,7 @@ test('several web apps and no journeys.webApp fail before any server starts', as
       const { sink, lines } = capture({});
       expect(await main(root, '--all', sink)).toBe(1);
       expect(lines).toEqual([
-        'Several apps under apps/ have a web entry: apps/web, apps/admin. Name the app that the web journeys drive in clutch.yaml with `journeys: { webApp: apps/<name> }`.',
+        'Several apps under apps/ have a web entry: apps/admin, apps/web. Name the app that the web journeys drive in clutch.yaml with `journeys: { webApp: apps/<name> }`.',
       ]);
     },
   );

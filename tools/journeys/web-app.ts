@@ -52,6 +52,10 @@ export function webAppOf(root: string): DevApp | string {
   if (candidates.length === 0) {
     return 'No app under apps/ has a web entry, which is an Nx `dev` target that is not tagged platform:server or platform:native. A web journey needs one. Add the dev target, or name the app in clutch.yaml with `journeys: { webApp: apps/<name> }`.';
   }
-  const folders = candidates.map((app) => app.folder).join(', ');
+  // Sorted, since the order of a directory read depends on the file system.
+  const folders = candidates
+    .map((app) => app.folder)
+    .toSorted()
+    .join(', ');
   return `Several apps under apps/ have a web entry: ${folders}. Name the app that the web journeys drive in clutch.yaml with \`journeys: { webApp: apps/<name> }\`.`;
 }
