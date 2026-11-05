@@ -1,0 +1,308 @@
+# Factory tree
+
+A project's factory is a tree of files. The path of a file is its name. The
+frontmatter holds the settings, and the body holds the prompt.
+`clutch factory --check` reads the tree. It rejects an unknown key, a bad
+value, an empty prompt and a name that points at no file. `validate` runs it
+as `check-factory`, so `pre-push` and CI run it too.
+
+## Paths
+
+| Path                               | Holds                                          | Body             |
+| ---------------------------------- | ---------------------------------------------- | ---------------- |
+| `agents/<name>/agent.md`           | One agent: its role, harness, model and runner | The prompt       |
+| `automations/<name>/automation.md` | What starts an agent without a person          | The start prompt |
+| `runners/<name>.yaml`              | A machine that runs agents                     | None             |
+| `scorers/<name>/scorer.md`         | A judge that grades the runs of some agents    | The judge prompt |
+| `models.yaml`                      | Each model that an agent or a scorer may name  | None             |
+| `benchmarks/<name>/benchmark.md`   | A suite that compares models on pinned tasks   | What it measures |
+
+- The paths start at the tree root. The tree root is `factory/` at the project
+  root. Set `factory.root` in `clutch.yaml` to move it. `root: .` puts the
+  tree at the project root. `--root DIR` checks a tree at `DIR` for one run.
+- A name is lowercase kebab case, such as `task-compliance`.
+- A `README.md` can sit at the tree root and in each kind's folder. A file in
+  a kind's folder that is not an item of that kind is a problem. An item
+  folder can hold other files beside its main file.
+- Skills live in `.agents/skills/`, so the tree has no `skills/` folder.
+- A benchmark folder can hold a `results/` folder beside its `benchmark.md`.
+- A project with no tree at the default `factory/` passes with a notice. A
+  root that `--root` or `factory.root` names must be a folder, or the check
+  fails. `apps/cli/src/factory-command.test.ts` tests both cases.
+
+## agent.md
+
+```markdown
+---
+role: implement
+description: Builds one issue and opens its pull request.
+harness: claude
+model: claude-opus-5-5
+runner: spark
+reads:
+  - AGENTS.md
+  - .agents/skills/deliver/SKILL.md
+---
+
+Read [`AGENTS.md`](../../../AGENTS.md). Follow the deliver skill,
+[`.agents/skills/deliver/SKILL.md`](../../../.agents/skills/deliver/SKILL.md),
+for the issue you get.
+```
+
+| Key           | Required | Value                                                                  |
+| ------------- | -------- | ---------------------------------------------------------------------- |
+| `role`        | Yes      | `foreman`, `triage`, `spec`, `implement`, `review`, `verify`, `custom` |
+| `description` | Yes      | One line that says when to use the agent                               |
+| `harness`     | Yes      | `claude`, `codex` or `qwen`                                            |
+| `model`       | Yes      | An `id` in `models.yaml`                                               |
+| `runner`      | Yes      | The name of a file in `runners/`                                       |
+| `reads`       | No       | The docs that the agent must read. See below                           |
+
+`reads` is a list of paths from the project root, which is the repository
+root, not the tree root. A path can name a file or a folder. It cannot start
+with `/`, and it cannot hold a `.` or a `..` part. The check fails when a path
+does not exist, or when the prompt has no Markdown link to it. A link resolves
+from the folder of `agent.md`, as GitHub shows it, so a link from
+`factory/agents/<name>/agent.md` starts with `../../../`. A link that starts
+with `/` resolves from the project root. A link in a fenced code block does
+not count. The problem names the agent file, the key, such as `reads[1]`, and
+the path.
+
+Give each agent the smallest set of docs that its stage needs. The docs follow
+Clutch's layout, which the
+[factory as code capability](../capabilities/factory-as-code.md#docs-that-agents-read)
+names. `reads` is a Clutch addition to the format in C-Suite's `stack.md`. A
+tree without it passes.
+
+## automation.md
+
+```markdown
+---
+description: Sorts the new issues each weekday night.
+agent: triage
+trigger:
+  type: schedule
+  time: '22:00'
+  weekdays: [1, 2, 3, 4, 5]
+enabled: true
+---
+
+Sort each issue that arrived today.
+```
+
+| Key           | Required | Value                                                       |
+| ------------- | -------- | ----------------------------------------------------------- |
+| `description` | No       | One line that says what the automation does                 |
+| `agent`       | Yes      | The name of a folder in `agents/`                           |
+| `trigger`     | Yes      | A map. Its `type` sets the other keys of the map. See below |
+| `enabled`     | No       | `false` stops the automation. The default is `true`         |
+
+| `trigger.type` | Other keys                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `schedule`     | `time` (required): the runner's local time as `HH:MM`. `weekdays`: 0 to 6, and 0 is Sunday. Without it, the automation runs each day |
+| `github`       | `event` (required): an event in snake case, such as `issue_labeled`. `label`: only an issue or a PR with this label                  |
+| `linear`       | `label`: only an issue with this label                                                                                               |
+| `webhook`      | None                                                                                                                                 |
+
+## runners/\<name\>.yaml
+
+```yaml
+description: The DGX Spark, where each lane runs.
+machine: spark
+t3_environment: a3789960-af7f-4761-ae81-b7f6fc8968d2
+ssh: agent-dgx
+workspace: worktree
+```
+
+| Key              | Required | Value                                                                                                            |
+| ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `description`    | Yes      | One line that says what the machine is for                                                                       |
+| `machine`        | Yes      | The host name of the machine                                                                                     |
+| `t3_environment` | Yes      | The T3 environment id of the machine, or `local`                                                                 |
+| `workspace`      | Yes      | `worktree`: each lane gets its own git worktree. `main_checkout`: one agent at a time works in the main checkout |
+| `ssh`            | No       | The SSH host alias that reaches the machine                                                                      |
+| `setup`          | No       | A list of shell commands that the machine needs before the project's own setup, in order                         |
+
+Each command has one source. The project states its setup and its check in
+the `worktree` block of `clutch.yaml`: `worktree.setup` and `worktree.check`.
+A runner's `setup` holds only what its machine needs first, such as a tool
+that the project's setup calls. A runner has no `check` key, because no
+machine needs a different check yet.
+
+`clutch worktree new <slug> --runner <name> --check --json` launches a lane
+from the runner file. It refuses a runner whose `workspace` is
+`main_checkout`. It runs the runner's `setup`, then `worktree.setup`, then
+`worktree.check`, and prints the result as one JSON line. See
+[the CLI](../../../apps/cli/README.md#worktree).
+
+## scorer.md
+
+```markdown
+---
+description: Grades each implement run against its issue.
+agents: [implement]
+judge: qwen3.8-27b
+labels:
+  - value: complete
+    score: 1
+    description: The pull request does what the issue asks, and nothing more.
+  - value: partial
+    score: 0.5
+    description: The pull request does part of what the issue asks.
+  - value: off_task
+    score: 0
+    description: The pull request does not do what the issue asks.
+passingScore: 1
+samplingRate: 25
+---
+
+Compare the pull request with its issue. Return one label and one sentence that says why.
+```
+
+| Key            | Required | Value                                                                                                        |
+| -------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| `description`  | No       | One line that says what the scorer grades                                                                    |
+| `agents`       | Yes      | The names of the agents whose runs the scorer grades                                                         |
+| `judge`        | Yes      | An `id` in `models.yaml`, or the name of the person who grades                                               |
+| `labels`       | Yes      | 1 to 20 maps of `value`, `score` (0 to 1) and `description`. Lowercase values, with `-` or `_` between words |
+| `passingScore` | Yes      | 0 to 1. A run passes when its label scores this or more                                                      |
+| `samplingRate` | Yes      | A whole number from 0 to 100: the percent of runs that the scorer grades                                     |
+
+`clutch score <scorer> --pr <number>` runs a scorer on one pull request. See
+the [CLI reference](https://github.com/eggdev/clutch/blob/main/apps/cli/README.md#score).
+A score comment starts with the marker
+`<!-- clutch-score:<scorer>:<label>:<score>:<head sha> -->`.
+
+## benchmark.md
+
+```markdown
+---
+description: Compares Opus and Sonnet on the implement agent.
+agent: implement
+configs:
+  - name: opus
+    model: claude-opus-5-5
+  - name: sonnet
+    model: claude-sonnet-5-5
+tasks:
+  - name: cl-116-release-changeset
+    commit: 25076894f5bbd0853aecf252d88d422aeef18352
+    issue: .clutch/issues/CL-116.md
+    check: mise exec -- bun test tools/check-changeset.test.ts
+---
+
+The suite measures how well each model builds a small issue.
+```
+
+| Key           | Required | Value                                                                  |
+| ------------- | -------- | ---------------------------------------------------------------------- |
+| `description` | Yes      | One line that says what the suite compares                             |
+| `agent`       | Yes      | The name of a folder in `agents/`. Each run sends its prompt           |
+| `configs`     | Yes      | 2 to 6 maps of `name` and `model`. `model` is an `id` in `models.yaml` |
+| `tasks`       | Yes      | 1 to 20 maps of `name`, `commit`, `issue` and `check`. See below       |
+
+| Task key | Value                                                                                     |
+| -------- | ----------------------------------------------------------------------------------------- |
+| `name`   | The name that the results and `--task` use                                                |
+| `commit` | The full SHA of the commit that the task starts from                                      |
+| `issue`  | The path of the issue file at `commit`, from the repository root. The agent gets its text |
+| `check`  | The shell command that grades the result in the clone. Exit 0 passes                      |
+
+`models.yaml` gives the harness of each config. `clutch bench <name>` runs the
+suite and writes its results to `results/` in the suite folder. See the
+[CLI reference](https://github.com/eggdev/clutch/blob/main/apps/cli/README.md#bench).
+
+## models.yaml
+
+```yaml
+models:
+  - id: claude-opus-5-5
+    harness: claude
+    where: Anthropic, through Claude Code
+  - id: qwen3.8-27b
+    harness: qwen
+    where: The Spark, llama-swap at 127.0.0.1:8092
+    base_url: http://127.0.0.1:8092/v1
+```
+
+| Key        | Required | Value                                                                                          |
+| ---------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `id`       | Yes      | The model id that the harness or the server takes                                              |
+| `harness`  | Yes      | `claude`, `codex` or `qwen`                                                                    |
+| `where`    | No       | Where the model runs and how to reach it                                                       |
+| `base_url` | No       | The base URL of an OpenAI-compatible server for the model, such as `http://localhost:11434/v1` |
+
+`clutch score` sends a scorer's prompt to `base_url` with the `id` as the
+model. Ollama takes `qwen3.6` for `qwen3.6:latest`.
+
+## Rules across files
+
+The JSON Schema files cannot read a second file, so only the check applies
+these rules:
+
+- An agent's `runner` names a file in `runners/`.
+- An agent's `model` is an `id` in `models.yaml`, and that model has the same
+  `harness` as the agent.
+- An automation's `agent` and each item of a scorer's `agents` name a folder
+  in `agents/`.
+- A scorer's `judge` is an `id` in `models.yaml`, or a lowercase kebab-case
+  name of a person.
+- A scorer whose `judge` has the harness `qwen` needs the `base_url` of that
+  model.
+- A tree has at most 1 `foreman`.
+- Each path in an agent's `reads` exists from the project root, and the
+  agent's prompt links it.
+- A scorer has at least 1 label that passes and 1 label that fails. No 2
+  labels have the same `value`.
+- No 2 items in `models.yaml` have the same `id`.
+- A benchmark's `agent` names a folder in `agents/`, and each config's `model`
+  is an `id` in `models.yaml`. No 2 configs have the same `name` or `model`,
+  and no 2 tasks have the same `name`.
+
+## Ready for the factory
+
+`clutch factory --check` also reads the project's intake: the labels and the
+tracker states that mark work as ready for the factory. `factory.intake` in
+`clutch.yaml` names them, and a "Ready for the factory" section in
+`.clutch/README.md` names the same values. The check fails when the two
+disagree. It runs when the section exists or when `clutch.yaml` sets
+`factory.intake`, and `--root` skips it. The
+[factory as code capability](../capabilities/factory-as-code.md#ready-for-the-factory)
+gives the keys and the format of the section.
+
+## JSON Schema files
+
+Each kind has a JSON Schema (draft 2020-12) file. With these files, a
+repository without Clutch can check the same keys:
+[agent](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/agent.schema.json),
+[automation](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/automation.schema.json),
+[runner](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/runner.schema.json),
+[scorer](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/scorer.schema.json),
+[benchmark](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/benchmark.schema.json)
+and
+[models](https://github.com/eggdev/clutch/blob/main/apps/cli/schemas/factory/models.schema.json).
+A Markdown kind's schema checks the YAML between the `---` lines.
+
+The schemas in code are the source.
+`apps/cli/src/factory/schema-files.test.ts` fails when a JSON Schema file
+differs from them.
+
+## Add a key or a kind
+
+1. Change the kind's file in `apps/cli/src/factory/`, such as `runner.ts`.
+   A schema uses only the keywords in `json-schema.ts`. For a new kind, add a
+   file, and add the kind to `kinds.ts` and `tree.ts`.
+2. Add a rule across files to `references.ts`, when the key names another
+   file.
+3. Add a fixture or a test case to `check.test.ts`.
+4. Write the JSON Schema files:
+   `mise exec -- bun run clutch factory --write-schemas apps/cli/schemas/factory`.
+5. Change this page.
+
+## What to read when changing it
+
+- `apps/cli/src/factory/`: one file for each kind, the loader and the rules
+  across files. `reads.ts` checks each agent's `reads`.
+- `apps/cli/src/factory-command.ts`: the command and where it finds the tree.
+- [CLI reference](https://github.com/eggdev/clutch/blob/main/apps/cli/README.md#factory):
+  the command's flags.

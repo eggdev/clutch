@@ -52,6 +52,9 @@ print compact JSON naming retained command transcripts and receipts outside the
 repository. DELIVERY_EVIDENCE_ROOT selects a durable output directory. A passed
 flow proves its named assertions; the gate is not native or deployed-app proof.
 
+To post screenshots of a driven screen on a PR, see the verify agent in
+[`factory/agents/verify/agent.md`](../../../factory/agents/verify/agent.md).
+
 ## Cleanup and limits
 
 The runner checks process identity and cleans its command groups. The tests own

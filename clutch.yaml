@@ -9,8 +9,9 @@ template:
 # that adopts it is done. clutch doctor --check enforces both.
 capabilities:
   root_agents_md: adopted
-  nested_agent_rules: { status: waived, reason: Lands in CL-307., issue: CL-307 }
+  nested_agent_rules: adopted
   skills_dir: adopted
+  factory_as_code: adopted
   friction_log: adopted
   codeowners: adopted
   pr_template: adopted
@@ -76,10 +77,12 @@ pr_size:
 # check. See docs/contributing/review.md.
 agentReview:
   missingCredential: fail
+# clutch worktree new --check runs check in the new checkout after the setup.
 worktree:
   root: ../clutch.worktrees
   copy: [.env.local]
   setup: ['mise trust --quiet', 'mise exec -- bun install']
+  check: mise exec -- bun run validate
 # The repositories that .github/workflows/weekly-digest.yml reads each Monday. The release
 # bot reads each one, so it must be installed on it. See
 # docs/contributing/capabilities/factory-observability.md#weekly-digest.
@@ -91,3 +94,13 @@ fleet:
   # epic/refactor until CL-705 moves Bar Savvy to main.
   - repo: blockmen-group/bar-savvy-web
     ref: epic/refactor
+# The work that is ready for the factory. C-Suite's GitHub intake starts a lane for an
+# issue with a label in github. tracker names the .clutch/issues states that are ready,
+# for an issue with owner: agent outside later. clutch issues next reads it.
+# .clutch/README.md#ready-for-the-factory names the same values, and
+# clutch factory --check fails when the two disagree.
+factory:
+  intake:
+    github: [factory]
+    linear: []
+    tracker: [todo]

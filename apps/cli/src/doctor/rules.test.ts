@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import path from 'node:path';
 
 import { trackedFiles } from '@/doctor/detect';
 import type { Rule } from '@/doctor/registry';
@@ -111,4 +112,62 @@ test('yaml does not count an empty value', async () => {
     'fail',
     [],
   ]);
+});
+
+/** The files of a factory fixture, under `prefix` in a repository. */
+async function factoryFixture(name: string, prefix: string) {
+  const dir = path.join(import.meta.dir, '../factory/fixtures', name);
+  const files: Record<string, string> = {};
+  for (const file of new Bun.Glob('**/*').scanSync({ cwd: dir })) {
+    files[path.posix.join(prefix, file)] = await Bun.file(path.join(dir, file)).text();
+  }
+  return files;
+}
+
+async function factory(files: Record<string, string>) {
+  await using repo = await gitRepo(files);
+  const ctx = context(repo.root, await trackedFiles(repo.root));
+  // Await here: the repository is removed when the function returns.
+  return await Promise.all([
+    evaluate({ factory: 'agents' }, ctx),
+    evaluate({ factory: 'check' }, ctx),
+  ]);
+}
+
+test('factory finds the agent files and runs the check on the tree', async () => {
+  const [agents, passes] = await factory(await factoryFixture('good', 'factory'));
+  expect(agents).toEqual({
+    outcome: 'pass',
+    evidence: [
+      'factory/agents/implement/agent.md',
+      'factory/agents/review/agent.md',
+      'factory/agents/triage/agent.md',
+    ],
+  });
+  expect(passes).toEqual({ outcome: 'pass', evidence: ['clutch factory --check passes'] });
+
+  const broken = await factory(await factoryFixture('missing-runner', 'factory'));
+  expect(broken.map((result) => result.outcome)).toEqual(['pass', 'fail']);
+  expect(broken[1].evidence).toEqual(['clutch factory --check finds 1 problem']);
+
+  expect(await factory({ 'AGENTS.md': '# Agents\n' })).toEqual([
+    { outcome: 'fail', evidence: [] },
+    { outcome: 'fail', evidence: [] },
+  ]);
+});
+
+test('factory reads the tree root from clutch.yaml', async () => {
+  const config = [
+    'schemaVersion: 1',
+    'project: shop',
+    'template: { repo: eggdev/clutch, mode: sync }',
+    'capabilities: {}',
+    'factory: { root: . }',
+  ].join('\n');
+  const results = await factory({ 'clutch.yaml': config, ...(await factoryFixture('good', '')) });
+  expect(results.map((result) => result.outcome)).toEqual(['pass', 'pass']);
+  expect(results[0].evidence).toContain('agents/implement/agent.md');
+
+  const invalid = await factory({ 'clutch.yaml': 'schemaVersion: 2\n' });
+  expect(invalid[0]).toEqual({ outcome: 'unknown', evidence: ['clutch.yaml is not valid'] });
 });

@@ -65,7 +65,7 @@ test('template.grace_days takes a whole number of days', () => {
   }
 });
 
-test('worktree is optional, and copy and setup default to empty lists', () => {
+test('worktree is optional, copy and setup default to empty lists, and check is optional', () => {
   const { worktree: _, ...noWorktree } = valid;
   expect(validateClutchConfig(noWorktree).config?.worktree).toBeUndefined();
   expect(validateClutchConfig({ ...valid, worktree: { root: '../w' } }).config?.worktree).toEqual({
@@ -73,6 +73,10 @@ test('worktree is optional, and copy and setup default to empty lists', () => {
     copy: [],
     setup: [],
   });
+  expect(
+    validateClutchConfig({ ...valid, worktree: { root: '../w', check: 'bun test' } }).config
+      ?.worktree,
+  ).toEqual({ root: '../w', copy: [], setup: [], check: 'bun test' });
 });
 
 const paths = (data: unknown) => validateClutchConfig(data).errors.map((error) => error.path);
@@ -128,11 +132,17 @@ test('each capability problem names its YAML path', () => {
 });
 
 test('each worktree problem names its YAML path', () => {
-  expect(paths({ ...valid, worktree: { copy: '.env', setup: [1], extra: true } })).toEqual([
+  expect(
+    paths({ ...valid, worktree: { copy: '.env', setup: [1], check: ' ', extra: true } }),
+  ).toEqual([
     'worktree.extra',
     'worktree.root',
     'worktree.copy',
     'worktree.setup',
+    'worktree.check',
+  ]);
+  expect(paths({ ...valid, worktree: { root: '../w', check: ['bun test'] } })).toEqual([
+    'worktree.check',
   ]);
 });
 
@@ -243,4 +253,45 @@ test('journeys is optional and takes the folder of the web app under apps/', () 
     'journeys.browser',
   ]);
   expect(paths({ ...valid, journeys: 'apps/app' })).toEqual(['journeys']);
+});
+
+test('factory is optional and takes a root folder inside the project', () => {
+  expect(validateClutchConfig(valid).config?.factory).toBeUndefined();
+  expect(validateClutchConfig({ ...valid, factory: { root: '.' } }).config?.factory).toEqual({
+    root: '.',
+  });
+  expect(paths({ ...valid, factory: { root: '../c-suite' } })).toEqual(['factory.root']);
+  expect(paths({ ...valid, factory: { root: '/srv/tree' } })).toEqual(['factory.root']);
+  expect(paths({ ...valid, factory: { root: 'factory', intake: [] } })).toEqual(['factory.intake']);
+  expect(paths({ ...valid, factory: 'factory' })).toEqual(['factory']);
+});
+
+test('factory.intake takes labels and tracker states, with a default for each key', () => {
+  const read = (factory: unknown) => validateClutchConfig({ ...valid, factory }).config?.factory;
+  expect(read({ intake: {} })).toEqual({
+    intake: { github: ['factory'], linear: [], tracker: ['todo'] },
+  });
+  expect(read({ root: '.', intake: { linear: ['Agent'], tracker: ['todo', 'blocked'] } })).toEqual({
+    root: '.',
+    intake: { github: ['factory'], linear: ['Agent'], tracker: ['todo', 'blocked'] },
+  });
+  expect(read({ intake: { github: [] } })?.intake?.github).toEqual([]);
+  expect(paths({ ...valid, factory: { intake: { github: [''] } } })).toEqual([
+    'factory.intake.github',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { github: ['factory', 'factory'] } } })).toEqual([
+    'factory.intake.github',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { linear: 'Agent' } } })).toEqual([
+    'factory.intake.linear',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { tracker: [] } } })).toEqual([
+    'factory.intake.tracker',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { tracker: ['ready'] } } })).toEqual([
+    'factory.intake.tracker',
+  ]);
+  expect(paths({ ...valid, factory: { intake: { jira: ['x'] } } })).toEqual([
+    'factory.intake.jira',
+  ]);
 });

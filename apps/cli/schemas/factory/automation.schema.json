@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "automation.md frontmatter",
+  "description": "What starts an agent without a person. The folder name is the automation name. The body of the file is the starting prompt. This schema checks the YAML frontmatter of automations/<name>/automation.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent", "trigger"],
+  "properties": {
+    "description": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "One line that says what the automation does."
+    },
+    "agent": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "The name of a folder in agents/. A lowercase kebab-case name."
+    },
+    "trigger": {
+      "description": "What starts the agent. The type decides the other keys.",
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Runs at a time of day.",
+          "additionalProperties": false,
+          "required": ["type", "time"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "schedule"
+            },
+            "time": {
+              "type": "string",
+              "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$",
+              "description": "The runner's local time, as HH:MM."
+            },
+            "weekdays": {
+              "type": "array",
+              "description": "The days to run, 0 is Sunday. Leave it out for every day.",
+              "minItems": 1,
+              "maxItems": 7,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Runs on a GitHub event in a repository.",
+          "additionalProperties": false,
+          "required": ["type", "event"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "github"
+            },
+            "event": {
+              "type": "string",
+              "pattern": "^[a-z][a-z_]*$",
+              "description": "The event, such as issue_labeled. Snake case."
+            },
+            "label": {
+              "type": "string",
+              "pattern": "\\S",
+              "description": "Only an issue or a PR with this label."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Runs on a Linear issue.",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "linear"
+            },
+            "label": {
+              "type": "string",
+              "pattern": "\\S",
+              "description": "Only an issue with this label."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Runs on a call to a webhook.",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "webhook"
+            }
+          }
+        }
+      ]
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "false stops the automation and keeps the file."
+    }
+  }
+}

@@ -4,7 +4,7 @@ import path from 'node:path';
 export async function listDocs(root: string): Promise<Array<string>> {
   const files = new Set<string>();
   for (const pattern of [
-    'AGENTS.md',
+    '**/AGENTS.md',
     'KICKOFF.md',
     'README.md',
     'apps/*/README.md',

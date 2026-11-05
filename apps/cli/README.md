@@ -97,7 +97,8 @@ mise exec -- bun run clutch issues --check
 ```
 
 - `next` prints the first `todo` issue for an agent whose dependencies are
-  done. With `--stack`, a dependency in review also counts, up to 3 stacked
+  done. `factory.intake.tracker` in `clutch.yaml` can name other ready
+  states. With `--stack`, a dependency in review also counts, up to 3 stacked
   PRs. A `later` issue never comes next.
 - `set` changes the frontmatter of one issue. It leaves `.clutch/TRACKER.md`
   alone: the release workflow regenerates it on the default branch, so a pull
@@ -122,6 +123,188 @@ projects, and the root checks. See
 [only what changed](../../docs/contributing/setup/checks.md#only-what-changed).
 It exits with the check's own code.
 
+## Factory
+
+`clutch factory --check [--root DIR] [--json]` checks the project's factory
+tree: its agents, automations, runners, scorers and models. Each problem names
+the file, the key and the reason, and the command exits 1. A project with no
+tree at the default `factory/` passes with a notice. A root that `--root` or
+`factory.root` names must be a folder, or the check fails. `validate` runs it
+as `check-factory`.
+
+```sh
+mise exec -- bun run clutch factory --check
+mise exec -- bun run clutch factory --check --root ../c-suite --json
+mise exec -- bun run clutch factory --write-schemas apps/cli/schemas/factory
+```
+
+- The tree root is `factory.root` in `clutch.yaml`, or `factory/` without it.
+  `--root DIR` checks the tree at `DIR`, from the current folder.
+- Without `--root`, the check also compares the "Ready for the factory"
+  section of `.clutch/README.md` with `factory.intake` in `clutch.yaml`. See
+  [factory as code](../../docs/contributing/capabilities/factory-as-code.md#ready-for-the-factory).
+- An agent's `reads` paths start at the project root: the git repository that
+  holds the current folder. Each one must exist, and the prompt must link it.
+- `--json` prints the root, the count of each kind and the problems.
+- `--write-schemas DIR` writes a JSON Schema file for each kind into `DIR`.
+- The [factory tree](../../docs/contributing/architecture/factory-tree.md)
+  page names each path and each key.
+
+## Bench
+
+`clutch bench <name>` runs the suite in `benchmarks/<name>/benchmark.md` of
+the factory tree. It runs each task with each config, one pair at a time, and
+prints pass or fail, time, changed lines and turns for each pair. Then it
+prints the passes, time and lines of each config.
+
+```sh
+mise exec -- bun run clutch bench implement-models
+mise exec -- bun run clutch bench implement-models --task cl-116-release-changeset --config sonnet
+mise exec -- bun run clutch bench implement-models --json
+```
+
+For each pair, the command does these steps:
+
+1. It clones the task's `commit` alone into a new folder in the temp folder.
+   The clone has no remote and no later history, so the agent cannot push or
+   read the answer.
+2. It runs the `setup` commands of the agent's runner in the clone, then the
+   `worktree.setup` commands from the clone's own `clutch.yaml`.
+3. It runs the agent's model with the agent's prompt, the rules of a
+   benchmark run and the text of the task's `issue`. The run stops after 20
+   minutes or 80 turns.
+4. It counts the lines that differ from `commit`, then runs the task's
+   `check` in the clone. Exit 0 passes. `$CLUTCH_BENCH_REPO` holds the path of
+   the repository, so a check can fetch test files that the agent never saw.
+5. It removes the clone, also after a failure, a timeout or Ctrl-C.
+
+- A run of the whole suite writes
+  `benchmarks/<name>/results/<date>-<short sha>.json`, from the commit that
+  ran it. Commit that file. `--task NAME` and `--config NAME` pick some pairs,
+  and such a run writes no file. Each flag can repeat.
+- `--json` prints the result as JSON, and the progress goes to stderr.
+- The exit of each pair is `done`, `turns` (the turn limit), `timeout`,
+  `error` (the agent failed) or `setup` (the clone or the setup failed). The
+  check alone decides pass or fail.
+- The log of each pair stays in a `clutch-bench-<name>-logs-*` folder in the
+  temp folder. The command prints its path.
+- Only `claude` models run today. A run uses `claude --print` on the plan that
+  the CLI is signed in to. The command removes `ANTHROPIC_API_KEY` from the
+  agent's environment, so a run never bills per token. The agent may edit
+  files, run `bun` and `mise exec -- bun`, read files with `git`, and run
+  `git add` and `git commit`. It may not run `gh`, `git push` or
+  `bun run pr`, and the clone has no remote to push to.
+- The [factory tree](../../docs/contributing/architecture/factory-tree.md#benchmarkmd)
+  page names the keys of `benchmark.md`.
+
+## Score
+
+`clutch score <scorer> --pr <number>` judges one pull request with a scorer
+of the factory tree. The scorer's `judge` is a model in `models.yaml`. The
+command sends the judge prompt, the labels and the pull request to the model's
+`base_url`, an OpenAI-compatible server. The model returns 1 label and 1
+reason. The score is the label's score. The pull request passes when its score
+is the `passingScore` or more.
+
+```sh
+mise exec -- bun run clutch score acceptance-criteria --pr 203
+mise exec -- bun run clutch score acceptance-criteria --pr 203 --json --post
+mise exec -- bun run clutch score task-compliance --pr 203 --root ../c-suite
+```
+
+- The prompt holds the title, the description, the list of changed files and
+  the diff. It also holds the `.clutch/issues` file at the head commit, when
+  the title or the branch names an issue id, such as `CL-426`. A part that is
+  too long is cut, and the prompt says so. The budget fits a model with a
+  32,768-token context.
+- The command reads the pull request with `gh api` GET requests. `--repo
+  OWNER/NAME` reads another repository. The default is the `origin` remote.
+- The tree root is `factory.root` in `clutch.yaml`, or `factory/`. `--root DIR`
+  reads the tree at `DIR`, so a project can run a scorer of another tree. The
+  whole tree must pass `clutch factory --check`.
+- A person's judge, or a model without `base_url`, cannot score. The command
+  sends no API key, so it calls only a server that needs no key.
+- When a reply has no valid label, the command asks the model 1 more time.
+- `--post` adds the score as a PR comment, which starts with the marker
+  `<!-- clutch-score:<scorer>:<label>:<score>:<head sha> -->`. A second run on
+  the same head edits that comment.
+- `--sample` scores the pull request only when it falls in the scorer's
+  `samplingRate`. A hash of the scorer, the repository and the number makes
+  the choice, so each sweep picks the same pull requests.
+- `--json` prints the score, the reason, the seconds of the call and each cut.
+- The command exits 0 with a score, also with a score that fails, and 0 when
+  `--sample` skips the pull request. It exits 1 when it cannot score.
+
+## Verify
+
+`clutch verify post --pr <number> <png>...` shows the screenshots of a verify
+run on a pull request. The `verify` agent in
+[`factory/agents/verify/agent.md`](../../factory/agents/verify/agent.md)
+drives the app, then calls it.
+
+```sh
+mise exec -- bun run clutch verify post --pr 212 /tmp/verify-212/mobile.png /tmp/verify-212/desktop.png
+mise exec -- bun run clutch verify post --pr 212 --head <sha> --note "The home screen loads." --json /tmp/verify-212/mobile.png
+```
+
+- GitHub has no API that attaches an image to a comment. So the command
+  commits each PNG to the orphan branch `verify-shots`, at
+  `<pr>/<head sha>/<name>.png`, and links it by its
+  `https://github.com/<owner>/<repo>/blob/<commit>/<path>?raw=true` URL. The
+  default branch never holds a screenshot. The name is the file name without
+  `.png`.
+- It commits with the Git data API through `gh api`. It does not touch the
+  local checkout, so no Git hook runs. When another run moves the branch
+  first, it commits again on the new tip, up to 3 times.
+- A PR has one verify comment. It starts with the marker
+  `<!-- clutch-verify:<head sha> -->` and names the head commit. A second run
+  edits that comment, and the marker then names the new head.
+- `--head SHA` is the commit that verify drove. When the PR head is another
+  commit, the command posts nothing and exits 1.
+- `--note TEXT` adds what verify drove and saw. `--repo OWNER/NAME` posts on
+  another repository. The default is the `origin` remote.
+- Each file must be a PNG of at most 10 MB. In a private repository, only a
+  reader with access sees the screenshots.
+- The command exits 0 when the comment is up, and 1 on any failure.
+
+## Agent
+
+`clutch agent` runs the 5 stage agents of a lane run: `triage`, `spec`,
+`implement`, `review` and `verify`. Each one is
+`factory/agents/<name>/agent.md` in the factory tree.
+[Stage agents](../../docs/contributing/stage-agents.md) is the hand-off
+contract between them.
+
+```sh
+mise exec -- bun run clutch agent prompt implement --issue CL-314
+mise exec -- bun run clutch agent run review --issue CL-314 --pr 214
+mise exec -- bun run clutch agent mark spec --issue CL-314 --note "Verdict: ready."
+mise exec -- bun run clutch agent mark review --pr 214 --note-file /tmp/review-214.md
+```
+
+- `prompt` prints the agent's body, then the issue file of `--issue` and the
+  title, URL, branches, head and body of `--pr`. It reads the PR with one
+  `gh api` call.
+- `run` sends the same prompt on stdin to the agent's harness, with the
+  agent's model: `claude -p --model <id> --permission-mode auto`, or
+  `codex exec -m <id> --sandbox workspace-write` with network access and the
+  Git common folder writable. It runs in the project root and exits with the
+  harness's code. A `qwen` agent fails with a clear message: print its prompt
+  and run it by hand.
+- Both refuse an agent whose file or `models.yaml` breaks the factory check.
+- `mark <stage>` posts one PR comment that starts with
+  `<!-- clutch-stage:<stage>:<head sha> -->`, then the note of `--note` or
+  `--note-file`. A second mark with the same stage and head edits that
+  comment. `--head` defaults to the PR's head.
+- `mark` with `--issue` and no `--pr` saves the marker in
+  `<git common folder>/clutch-stages/<id>.json`, for a stage that runs before
+  the PR exists. It replaces a saved marker of the same stage. The first mark
+  with both `--pr` and `--issue` posts the saved
+  markers first, then its own, and deletes the file.
+- `--root DIR` names the factory tree. The default is `factory.root` in
+  `clutch.yaml`, else `factory`. `--repo OWNER/NAME` reads another
+  repository. The default is the `origin` remote.
+
 ## Worktree
 
 `clutch worktree` makes a separate checkout for one task, so several agents or
@@ -131,6 +314,7 @@ PGlite database, and its own dev server names.
 
 ```sh
 mise exec -- bun run clutch worktree new cart-total --issue CL-201
+mise exec -- bun run clutch worktree new smoke --runner spark --check --json
 mise exec -- bun run clutch worktree list
 mise exec -- bun run clutch worktree rm cart-total
 mise exec -- bun run clutch worktree prune --dry-run
@@ -144,15 +328,30 @@ mise exec -- bun run clutch worktree prune --dry-run
 - It copies each `worktree.copy` file that exists, such as `.env.local`, from
   the main checkout. Then it runs each `worktree.setup` command in the new
   checkout. With `--issue`, it sets the issue to `in_progress` there.
+- The setup and the check come from the `clutch.yaml` of the new checkout, so
+  they match its code. The root and the copied files come from the main
+  checkout, because the command needs them before it makes the new checkout.
+- `--runner <name>` reads `runners/<name>.yaml` in the new checkout's factory
+  tree. It runs the runner's `setup` before `worktree.setup`. A runner that is
+  missing, breaks its schema, or has `workspace: main_checkout` stops the
+  command, and the new checkout is removed, because nothing ran in it.
+- `--check` runs `worktree.check` after the setup, and exits with its exit
+  code. A failed check keeps the checkout, so a person can look.
 - It prints the path, the branch, and the dev server names from
   `bun run dev --check` when the project has a `dev` script.
+- `--json` prints one line on stdout:
+  `{"path":…,"branch":…,"runner":…,"check":{"command":…,"exitCode":…,"passed":…}}`.
+  `runner` and `check` are null without their flags. The log and the output of
+  each command go to stderr. When the setup fails, the command exits 1 and
+  prints no JSON line.
 - `list [--json]` shows each checkout with its branch, its dirty state, the
   issue in its branch name, and its PR when `gh` is signed in.
-- The `worktree` block of `clutch.yaml` sets `root`, `copy` and `setup`.
-  Without it, the checkouts go in `../<repo>.worktrees`, nothing is copied,
-  and the setup is `mise trust --quiet` then `mise exec -- bun install`. mise
-  refuses a config file in a new folder until it is trusted, and the install
-  also installs the git hooks.
+- The `worktree` block of `clutch.yaml` sets `root`, `copy`, `setup` and
+  `check`. Without it, the checkouts go in `../<repo>.worktrees`, nothing is
+  copied, and the setup is `mise trust --quiet` then
+  `mise exec -- bun install`. mise refuses a config file in a new folder until
+  it is trusted, and the install also installs the git hooks. The check is
+  `mise exec -- bun run validate` when `check` is not set.
 - `rm <slug> [--force] [--base REF]` refuses a checkout with uncommitted
   changes, or with commits that neither the base nor a remote branch holds.
   `--force` removes it anyway. It first stops that checkout's dev servers with
@@ -328,6 +527,8 @@ pr_size: # optional
   exclude: [] # globs whose lines do not count, such as generated code
 agentReview: # optional
   missingCredential: notice # notice (the default) or fail
+factory: # optional
+  root: factory # the default: the folder of the factory tree. . is the project root
 journeys: # optional
   webApp: apps/app # the app that web journeys drive. Without it, the one app under apps/ with a web entry
 fleet: # optional: the repositories the weekly digest reads
@@ -395,8 +596,8 @@ mise exec -- bun run clutch init --root ../bar-savvy-web --mode doctor --yes
   `vX.Y.Z` tag in the clone.
 - In `sync` mode, init also writes the seeds that the managed tooling reads:
   `.clutch/risk.yaml` for the Labels workflow and `clutch risk`, and
-  `.changeset/README.md`. Install writes every seed, and sync never writes
-  one, so init fills the gap. It keeps a copy that the project already has.
+  `.changeset/README.md`. Install writes every seed, and sync adds only a new
+  `add_on_sync` seed, so init fills the gap. It keeps a copy that the project already has.
 - Init refuses a repository that already has `clutch.yaml`.
 
 ### Start a new project from Clutch
@@ -422,6 +623,13 @@ names the files and gives each one a rule. The longest matching path decides.
 | `managed` | Replaces the file. A file that the project edited needs a decision.  |
 | `merge`   | Merges the project's copy with Clutch's copy.                        |
 | `seed`    | Nothing. Install writes it once, and the project owns it after that. |
+
+`add_on_sync: true` on a `seed` entry makes sync add each file under it that
+the project does not have, once. The project owns the file after that.
+`seeded` in `.clutch/lineage.json` lists each such file that install or sync
+wrote or found, so sync does not add a file again that the project deleted.
+The factory tree at `factory/` uses it. Put `add_on_sync` only on a new entry.
+On an older entry, sync adds back each file that a project deleted before.
 
 ```sh
 mise exec -- bun run clutch sync --root ../shop --check
@@ -602,7 +810,8 @@ mise exec -- bun run clutch ruleset --apply
 ## Metrics
 
 `clutch metrics` reports how pull requests flow through a repository over a
-window: merges per day, the share merged with no human action, the hours from
+window. It prints the factory numbers first: autonomy, cycle time and reverts,
+with Warp's definitions. Then it prints merges per day, the share merged with no human action, the hours from
 open to merge, main-red minutes, reverts, the agent share from
 `Co-authored-by` trailers and agent branches, PR size, the merges with no
 human action by auto-merge step, CI run times, the issues done and the
@@ -617,6 +826,11 @@ mise exec -- bun run clutch metrics --verdicts
 ```
 
 - `--since` takes a number of days, such as `14d`, the default.
+- `--json` puts the factory numbers in the top-level `factory` object, with
+  a count of PRs for each and one row for each PR. `factory.definitions` names
+  the version of the rules, so a reader such as C-Suite can pin what each
+  number means. `clutch metrics --repo eggdev/neighborhood --json | jq .factory`
+  reads them for one project.
 - A revert PR labelled `drill` is a rehearsal. It is counted as a drill, not a
   revert, in the reverts and the revert rate. `--json` has `reverts.drills`.
 - `--json` prints the report for a digest. A section that GitHub does not
@@ -641,6 +855,7 @@ for what each number counts.
 repository can adopt, and the rules that detect it. `clutch doctor` reads it.
 
 Each rule checks the files that git tracks. An untracked file never counts.
+`factory: check` is the one exception: it runs the check on the working tree.
 
 | Rule                                  | Passes when                                                               |
 | ------------------------------------- | ------------------------------------------------------------------------- |
@@ -651,6 +866,8 @@ Each rule checks the files that git tracks. An untracked file never counts.
 | `workflow: { on, uses, run, pinned }` | One workflow file matches every given field.                              |
 | `yaml: { file, path }`                | The dotted path holds a value in the YAML or JSON file that is not empty. |
 | `remote: <probe>`                     | The GitHub setting holds. It is unknown without `--remote`.               |
+| `factory: agents`                     | Git tracks an `agents/*/agent.md` in the [factory tree](#factory) root.   |
+| `factory: check`                      | The factory tree has an agent and passes `clutch factory --check`.        |
 | `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.              |
 
 A capability is present when every `detect` rule passes. It is partial when

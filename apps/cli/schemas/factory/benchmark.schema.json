@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "benchmark.md frontmatter",
+  "description": "A suite that runs one agent with 2 to 6 models on tasks pinned to commits. The folder name is the suite name. The body of the file says what the suite measures. This schema checks the YAML frontmatter of benchmarks/<name>/benchmark.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["description", "agent", "configs", "tasks"],
+  "properties": {
+    "description": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "One line that says what the suite compares."
+    },
+    "agent": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "The name of a folder in agents/. Each run sends its prompt. A lowercase kebab-case name."
+    },
+    "configs": {
+      "type": "array",
+      "description": "The setups to compare. Each one runs the agent with its own model, and models.yaml gives the harness.",
+      "minItems": 2,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "model"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "The name that the results and --config use. A lowercase kebab-case name."
+          },
+          "model": {
+            "type": "string",
+            "pattern": "\\S",
+            "description": "An id in models.yaml."
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "description": "The work that each config does. Each task starts from its own commit.",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "commit", "issue", "check"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "The name that the results and --task use. A lowercase kebab-case name."
+          },
+          "commit": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$",
+            "description": "The full SHA of the commit that the task starts from."
+          },
+          "issue": {
+            "type": "string",
+            "pattern": "^[\\w.-]+(?:/[\\w.-]+)*$",
+            "description": "The path of the issue file at the commit, from the repository root. The agent gets its text."
+          },
+          "check": {
+            "type": "string",
+            "pattern": "\\S",
+            "description": "The shell command that grades the result in the checkout. Exit 0 passes. $CLUTCH_BENCH_REPO is the repository that runs the suite."
+          }
+        }
+      }
+    }
+  }
+}

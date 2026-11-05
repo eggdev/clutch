@@ -55,6 +55,7 @@ A remote rule reads the repository settings on GitHub. Doctor checks it only wit
 | [Root AGENTS.md](./root-agents-md.md)                                                        | Agent context     | core  |
 | [Nested / scoped agent rules](./nested-agent-rules.md)                                       | Agent context     | core  |
 | [Agent skills directory](./skills-dir.md)                                                    | Agent context     | core  |
+| [Factory as code (agents, runners and models in a checked tree)](./factory-as-code.md)       | Agent context     | extra |
 | [Git hooks (pre-commit / lefthook / husky / prek)](./git-hooks.md)                           | Verification      | core  |
 | [Single canonical check command](./canonical-check.md)                                       | Verification      | core  |
 | [One-command local setup](./dev-bootstrap.md)                                                | Verification      | core  |

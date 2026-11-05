@@ -95,6 +95,9 @@ Verify the actual destination, not only submission or a build job. In T3,
 register relevant PRs and use supported watchers; delegated children return
 their result to the parent rather than watching independently.
 
+When a lane runs the work as stage agents, follow the hand-off contract in
+[stage agents](../../../docs/contributing/stage-agents.md).
+
 For a Linear issue, deliver-linear owns intake, status and its configured review
 gates; this skill owns implementation. A Todo transition grants a PR; the merge
 follows the repository's auto-merge rules.

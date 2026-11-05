@@ -1,0 +1,10 @@
+models:
+  - id: claude-opus-5-5
+    harness: claude
+    where: Anthropic, through Claude Code
+  - id: gpt-5.5-codex
+    harness: codex
+  - id: qwen3.8-27b
+    harness: qwen
+    where: The Spark, llama-swap at 127.0.0.1:8092
+    base_url: http://127.0.0.1:8092/v1

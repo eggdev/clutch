@@ -1,0 +1,7 @@
+description: The DGX Spark, where each lane runs.
+machine: spark
+t3_environment: a3789960-af7f-4761-ae81-b7f6fc8968d2
+ssh: agent-dgx
+workspace: worktree
+setup:
+  - mise trust --quiet

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { gitOrThrow } from '@/git';
@@ -12,7 +12,7 @@ import { branchName, issueOf } from '@/worktree/names';
 import { newWorktree } from '@/worktree/new';
 import type { NewWorktreeSteps } from '@/worktree/new';
 import { removeWorktree } from '@/worktree/remove';
-import { defaultSetup, worktreeSettings } from '@/worktree/settings';
+import { defaultCheck, defaultSetup, worktreeSettings } from '@/worktree/settings';
 
 const config = [
   'schemaVersion: 1',
@@ -106,6 +106,7 @@ test('without a worktree block, checkouts go beside the repository and the setup
     root: path.join(repo.parent, 'shop.worktrees'),
     copy: [],
     setup: defaultSetup,
+    check: defaultCheck,
   });
 });
 
@@ -152,11 +153,14 @@ test('the commands work on any backend, so they do not call git themselves', asy
   ];
   const calls: Array<string> = [];
   const fake: WorktreeBackend = {
-    create: ({ branch, path: where }) => {
+    create: async ({ branch, path: where }) => {
       calls.push(`create ${branch} ${where}`);
+      // The setup comes from the new checkout's clutch.yaml, so the fake checkout holds one.
+      await mkdir(where, { recursive: true });
+      await writeFile(path.join(where, 'clutch.yaml'), config.replace('touch setup-ran', 'true'));
       const record = { path: where, branch, head: 'b'.repeat(40), dirty: false };
       records.push(record);
-      return Promise.resolve(record);
+      return record;
     },
     list: () => Promise.resolve(records),
     remove: () => Promise.resolve(),
@@ -171,7 +175,7 @@ test('the commands work on any backend, so they do not call git themselves', asy
       slug: 'fake',
       issue: 'CL-300',
       base: 'origin/main',
-      settings: { root: path.join(folder.parent, 'wt'), copy: [], setup: [] },
+      settings: { root: path.join(folder.parent, 'wt'), copy: [] },
     },
     value,
   );

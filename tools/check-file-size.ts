@@ -2,15 +2,19 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * Line limits. AGENTS.md has a fixed budget, because agents load it on every
- * task (docs/principles/lean-agent-context.md). Source and test files have one
+ * Line limits. Each AGENTS.md file, at the root or in a folder, has a fixed
+ * budget, because agents load it on every task in its scope
+ * (docs/principles/lean-agent-context.md). Source and test files have one
  * limit. A file can pass it only with an entry in tools/file-size-budgets.json
  * that gives a line budget and the reason the file stays deep.
  */
-export const fixed: Record<string, number> = { 'AGENTS.md': 20 };
+export const agentsFiles = { pattern: '**/AGENTS.md', budget: 20 };
 const sources = '{apps,features,packages,tools}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}';
 
-type Budgets = { limit: number; files: Record<string, { lines: number; reason: string }> };
+type Budgets = {
+  limit: number;
+  files: Record<string, { lines: number; reason: string }>;
+};
 
 async function countLines(file: string) {
   const text = await Bun.file(file).text();
@@ -58,20 +62,30 @@ function sizeProblems(
 
 export async function checkFileSize(root: string): Promise<Array<string>> {
   const errors: Array<string> = [];
-  for (const [file, budget] of Object.entries(fixed)) {
-    if (!existsSync(path.join(root, file))) {
+  const agents: Array<string> = [];
+  for await (const file of new Bun.Glob(agentsFiles.pattern).scan({
+    cwd: root,
+    dot: true,
+  })) {
+    if (!file.split('/').includes('node_modules')) {
+      agents.push(file);
+    }
+  }
+  const ignoredAgents = ignoredByGit(root, agents);
+  for (const file of agents) {
+    if (ignoredAgents.has(file)) {
       continue;
     }
     const lines = await countLines(path.join(root, file));
-    if (lines > budget) {
+    if (lines > agentsFiles.budget) {
       errors.push(
-        `${file}: ${lines} lines, budget ${budget}. Move detail to the page that owns it.`,
+        `${file}: ${lines} lines, budget ${agentsFiles.budget}. Move detail to the page that owns it.`,
       );
     }
   }
   const budgetsFile = path.join(root, 'tools/file-size-budgets.json');
   if (!existsSync(budgetsFile)) {
-    return errors;
+    return errors.toSorted();
   }
   const { limit, files }: Budgets = await Bun.file(budgetsFile).json();
   const seen = new Set<string>();

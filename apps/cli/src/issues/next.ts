@@ -9,12 +9,17 @@ function order(issue: Issue) {
 }
 
 /**
- * The next issue an agent may start: `todo`, owned by `agent`, with every
+ * The next issue an agent may start: in a `ready` state (`todo` by default,
+ * from `factory.intake.tracker` in clutch.yaml), owned by `agent`, with every
  * dependency `done`. Issues come in phase order, then id order. A `later`
  * issue is backlog and never comes next. With `stack`, a dependency in
  * `review` also counts, while the chain of PRs stays within `maxStackDepth`.
  */
-export function nextIssue(issues: Array<Issue>, options: { stack?: boolean } = {}) {
+export function nextIssue(
+  issues: Array<Issue>,
+  options: { stack?: boolean; ready?: ReadonlyArray<string> } = {},
+) {
+  const states = options.ready ?? ['todo'];
   const byId = new Map(issues.map((issue) => [issue.id, issue]));
   /** How many PRs in `review` this issue's branch would sit on. */
   const depth = (issue: Issue, seen = new Set<string>()): number => {
@@ -42,7 +47,8 @@ export function nextIssue(issues: Array<Issue>, options: { stack?: boolean } = {
   };
   return issues
     .filter(
-      (issue) => issue.phase !== 'later' && issue.status === 'todo' && issue.owner === 'agent',
+      (issue) =>
+        issue.phase !== 'later' && states.includes(issue.status) && issue.owner === 'agent',
     )
     .toSorted((a, b) => order(a) - order(b) || a.id.localeCompare(b.id))
     .find(ready);

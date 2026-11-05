@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "agent.md frontmatter",
+  "description": "The settings of one agent in a factory tree. The folder name is the agent name. The body of the file is the prompt. This schema checks the YAML frontmatter of agents/<name>/agent.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["role", "description", "harness", "model", "runner"],
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": ["foreman", "triage", "spec", "implement", "review", "verify", "custom"],
+      "description": "The stage that the agent runs. At most 1 agent in a tree is the foreman."
+    },
+    "description": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "One line that says when to use this agent."
+    },
+    "harness": {
+      "type": "string",
+      "enum": ["claude", "codex", "qwen"],
+      "description": "The agent CLI that runs the agent."
+    },
+    "model": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "An id in models.yaml."
+    },
+    "runner": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "The name of a file in runners/, without .yaml. A lowercase kebab-case name."
+    },
+    "reads": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "The docs that the agent must read. Each path must exist, and the prompt must link it as a Markdown link.",
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?!(?:.*/)?\\.\\.?(?:/|$))\\S+$",
+        "description": "A file or a folder, from the project root (the repository root, not the tree root)."
+      }
+    }
+  }
+}

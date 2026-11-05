@@ -10,17 +10,21 @@ import { loadClutchConfig } from '@/clutch-config/load';
  */
 export const defaultSetup = ['mise trust --quiet', 'mise exec -- bun install'];
 
+/** The command that `clutch worktree new --check` runs when `worktree.check` is not set. */
+export const defaultCheck = 'mise exec -- bun run validate';
+
 export type WorktreeSettings = {
   /** The absolute folder that holds the task checkouts. */
   readonly root: string;
   readonly copy: ReadonlyArray<string>;
   readonly setup: ReadonlyArray<string>;
+  readonly check: string;
 };
 
 /**
  * The `worktree` block of `clutch.yaml` at `repoRoot`, with its paths resolved.
  * Without a block, the checkouts go in `../<repo>.worktrees`, nothing is
- * copied, and the setup installs the dependencies.
+ * copied, the setup installs the dependencies, and the check is `validate`.
  */
 export async function worktreeSettings(repoRoot: string): Promise<WorktreeSettings> {
   const loaded = await loadClutchConfig(repoRoot);
@@ -35,7 +39,13 @@ export async function worktreeSettings(repoRoot: string): Promise<WorktreeSettin
       root: path.resolve(repoRoot, '..', `${path.basename(repoRoot)}.worktrees`),
       copy: [],
       setup: defaultSetup,
+      check: defaultCheck,
     };
   }
-  return { root: path.resolve(repoRoot, block.root), copy: block.copy, setup: block.setup };
+  return {
+    root: path.resolve(repoRoot, block.root),
+    copy: block.copy,
+    setup: block.setup,
+    check: block.check ?? defaultCheck,
+  };
 }

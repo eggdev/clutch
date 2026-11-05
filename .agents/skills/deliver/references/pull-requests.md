@@ -290,7 +290,9 @@ The bot rule:
   `clutch sync` writes: the managed files that its `.clutch/lineage.json`
   lists, the lineage, its changeset, `clutch.yaml`, the merged files such as
   `package.json`, the TypeScript configs and the lockfile. The lockfile rule is
-  the same as Renovate's. The `clutch / doctor` check, which the project's CI
+  the same as Renovate's. Sync also adds a new seed file under an
+  `add_on_sync` entry, such as the factory tree. The bot rule does not accept
+  that file yet (CL-518), so a person merges that PR. The `clutch / doctor` check, which the project's CI
   runs and no ruleset requires, proves that the managed files match the release.
   When it succeeds on the head, its `owner` findings are approved upstream and
   hold nothing, as [decision 0003](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md)

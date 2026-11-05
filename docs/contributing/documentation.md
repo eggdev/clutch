@@ -3,7 +3,7 @@
 This repository writes for two audiences:
 
 - **Contributors**, people and agents who develop the project: `docs/`,
-  package `README.md` files, `AGENTS.md` and `.agents/skills/`.
+  package `README.md` files, `AGENTS.md` files and `.agents/skills/`.
 - **Users**: copy in the product, emails and exports. See
   [project intent](./project-intent.md#who-this-is-for) for who they are and
   which languages each screen needs.
@@ -52,15 +52,15 @@ one meaning and lists the writing rules.
 
 ## Checks
 
-| Check                  | Rejects                                                        |
-| ---------------------- | -------------------------------------------------------------- |
-| Docs file references   | A link or inline path to a repository file that does not exist |
-| Docs temporal language | Changelog phrases in durable docs                              |
-| Decision numbers       | Duplicate record numbers, or an index that does not match      |
-| File size              | `AGENTS.md` over 20 lines, or a source file over its limit     |
-| Kickoff slots          | A kickoff slot left in a doc after kickoff ends                |
-| Glossary terms         | A word from the glossary's rejected words table, or an em dash |
-| Enforcement claims     | A claim that a check enforces a rule, with no real check named |
+| Check                  | Rejects                                                            |
+| ---------------------- | ------------------------------------------------------------------ |
+| Docs file references   | A link or inline path to a repository file that does not exist     |
+| Docs temporal language | Changelog phrases in durable docs                                  |
+| Decision numbers       | Duplicate record numbers, or an index that does not match          |
+| File size              | An `AGENTS.md` file over 20 lines, or a source file over its limit |
+| Kickoff slots          | A kickoff slot left in a doc after kickoff ends                    |
+| Glossary terms         | A word from the glossary's rejected words table, or an em dash     |
+| Enforcement claims     | A claim that a check enforces a rule, with no real check named     |
 
 ## Related
 

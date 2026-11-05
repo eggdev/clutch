@@ -9,6 +9,8 @@ import {
   isRevert,
   mainRedMinutes,
 } from '@/metrics/compute';
+import { factoryMetrics, withAgentReview } from '@/metrics/factory';
+import type { FactoryMetrics } from '@/metrics/factory';
 import { agentBranchShare, byStep, prSize } from '@/metrics/pulls';
 
 /**
@@ -78,6 +80,20 @@ export async function metricsReport(options: Options) {
   const read = await reader.mergedPulls(numbers);
   const pulls = read.filter((pull) => pull.mergedAt >= since);
   const flow = flowMetrics(pulls, days);
+  const branchPrefix = options.branchPrefix ?? 'clutch/cl-';
+  let reviewRuns = new Map<string, string>();
+  const [firstOpened] = pulls.map((pull) => pull.createdAt).toSorted();
+  if (firstOpened) {
+    try {
+      reviewRuns = await reader.agentReviewRuns(firstOpened.slice(0, 10));
+    } catch (error) {
+      unavailable.agentReview = reason(error);
+    }
+  }
+  const factory = factoryMetrics(
+    pulls.map((pull) => withAgentReview(pull, reviewRuns)),
+    { repo, branchPrefix },
+  );
 
   let mainRed: { branch: string; requiredChecks: Array<string>; minutes: number } | null = null;
   let revertCommits: number | null = null;
@@ -144,7 +160,7 @@ export async function metricsReport(options: Options) {
     noHumanAction: { ...rest.noHumanAction, byStep: byStep(pulls) },
     agents: {
       ...rest.agents,
-      branch: agentBranchShare(pulls, options.branchPrefix ?? 'clutch/cl-'),
+      branch: agentBranchShare(pulls, branchPrefix),
     },
   };
   return {
@@ -153,6 +169,7 @@ export async function metricsReport(options: Options) {
     since,
     until,
     days,
+    factory,
     pulls: pullsOut,
     reverts: {
       pulls: revertPulls,
@@ -178,6 +195,25 @@ const percent = (share: number | null) =>
   share === null ? 'n/a' : `${Math.round(share * 1000) / 10}%`;
 const spread = (value: { p50: number | null; p90: number | null; count: number }, unit: string) =>
   `p50 ${show(value.p50, unit)}, p90 ${show(value.p90, unit)} (${value.count})`;
+
+/** The factory numbers, with Warp's definitions, as the first rows of the table. */
+function factoryRows(factory: FactoryMetrics): Array<[string, string]> {
+  const { autonomy, cycleTimeHours: cycle, reverts } = factory;
+  return [
+    [
+      'Autonomy',
+      `${percent(autonomy.share)} (${autonomy.autonomous} of ${autonomy.merged} PRs with no human code push)`,
+    ],
+    ['Lane start to PR', spread(cycle.toPr, ' h')],
+    ['Lane start to first review', spread(cycle.toFirstReview, ' h')],
+    ['Lane start to merge', spread(cycle.toMerge, ' h')],
+    [
+      'Reverted PRs',
+      `${percent(reverts.rate)} (${reverts.reverted} of ${reverts.merged}${reverts.pulls.length > 0 ? `: ${reverts.pulls.map((number) => `#${number}`).join(' ')}` : ''}), brake ${percent(reverts.brake)}`,
+    ],
+    ['Definitions', factory.definitions],
+  ];
+}
 
 /** One line: each P2 target that misses, main-red minutes and the open tighten issues. */
 function watchLine(watch: MetricsReport['watch']) {
@@ -213,6 +249,7 @@ export function renderMetrics(report: MetricsReport) {
       'Window',
       `${report.since.slice(0, 10)} to ${report.until.slice(0, 10)} (${report.days} days)`,
     ],
+    ...factoryRows(report.factory),
     ['Merged PRs', `${pulls.merged} (${pulls.mergedPerDay} a day)`],
     [
       'Merged with no human action',

@@ -10,6 +10,9 @@ agent session in its own git worktree. It delivers its issues one PR at a time
 and merges them itself. The coordinator steers the lanes and relays the owner's
 decisions. It writes no product code of its own.
 
+A lane can also run one issue through the 5 stage agents. The hand-off
+contract is in [stage agents](../../../docs/contributing/stage-agents.md).
+
 Lanes run in any host that gives each agent a worktree and lets the coordinator
 send it messages. T3 Code threads are one way: one thread for each lane, with a
 worktree for each thread. Separate terminal sessions in separate worktrees work

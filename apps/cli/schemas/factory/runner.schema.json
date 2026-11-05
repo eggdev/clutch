@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "runners/<name>.yaml",
+  "description": "A machine that runs agents. The file name, without .yaml, is the runner name.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["description", "machine", "t3_environment", "workspace"],
+  "properties": {
+    "description": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "One line that says what the machine is for."
+    },
+    "machine": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "The host name of the machine."
+    },
+    "t3_environment": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "The T3 environment id of the machine, or local."
+    },
+    "workspace": {
+      "type": "string",
+      "enum": ["worktree", "main_checkout"],
+      "description": "worktree: each lane gets its own git worktree. main_checkout: agents work in the main checkout, one at a time."
+    },
+    "ssh": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "The SSH host alias that reaches the machine."
+    },
+    "setup": {
+      "type": "array",
+      "description": "Shell commands that the machine needs before the project's own setup, in order. The project's setup and check commands are worktree.setup and worktree.check in clutch.yaml.",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "\\S",
+        "description": "A shell command."
+      }
+    }
+  }
+}

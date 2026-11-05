@@ -1,6 +1,7 @@
 import { isObject, isStringList, unknownKeys } from '@/clutch-config/checks';
 import type { Errors } from '@/clutch-config/checks';
-import { readAutoRevert, readJourneys } from '@/clutch-config/optional-keys';
+import type { Intake } from '@/clutch-config/intake';
+import { readAutoRevert, readFactory, readJourneys } from '@/clutch-config/optional-keys';
 
 const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
 const modes = ['sync', 'doctor'] as const;
@@ -31,7 +32,8 @@ export type ClutchConfig = {
    */
   template: { repo: string; mode: (typeof modes)[number]; grace_days?: number };
   capabilities: Record<string, Capability>;
-  worktree?: { root: string; copy: Array<string>; setup: Array<string> };
+  /** `check` is the command that tells whether a new checkout works. The default is in `worktree/settings.ts`. */
+  worktree?: { root: string; copy: Array<string>; setup: Array<string>; check?: string };
   /** What the Auto-merge workflow does with a low-risk agent PR. */
   /** `step` is how far auto-merge reaches. `owner` is the login whose reactions grade the dry-run verdicts. */
   automerge?: {
@@ -59,6 +61,12 @@ export type ClutchConfig = {
   agentReview?: { missingCredential: (typeof missingCredentials)[number] };
   /** The app that a web journey drives. Without it, the runner finds the one web app under apps/. */
   journeys?: { webApp: string };
+  /**
+   * `root`: the folder of the factory tree, from the project root. `factory` by
+   * default. `intake`: the labels and the tracker states that are ready for the
+   * factory. See `clutch-config/intake.ts`.
+   */
+  factory?: { root?: string; intake?: Intake };
 };
 
 /** A problem in `clutch.yaml`, at a dotted YAML path such as `template.mode`. */
@@ -78,6 +86,7 @@ const topKeys = [
   'pr_size',
   'agentReview',
   'journeys',
+  'factory',
 ];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
 const capabilityId = /^[a-z][a-z0-9_]*$/u;
@@ -194,8 +203,8 @@ function readWorktree(value: unknown, errors: Errors) {
     errors.push({ path: 'worktree', message: 'Expected a map with root, copy and setup.' });
     return;
   }
-  unknownKeys(value, ['root', 'copy', 'setup'], 'worktree', errors);
-  const { root, copy = [], setup = [] } = value;
+  unknownKeys(value, ['root', 'copy', 'setup', 'check'], 'worktree', errors);
+  const { root, copy = [], setup = [], check } = value;
   const before = errors.length;
   if (typeof root !== 'string' || !root) {
     errors.push({ path: 'worktree.root', message: 'Expected a folder path.' });
@@ -208,9 +217,18 @@ function readWorktree(value: unknown, errors: Errors) {
       errors.push({ path: `worktree.${key}`, message: 'Expected a list of strings.' });
     }
   }
-  return errors.length === before
-    ? { root: root as string, copy: copy as Array<string>, setup: setup as Array<string> }
-    : undefined;
+  if (check !== undefined && (typeof check !== 'string' || !check.trim())) {
+    errors.push({ path: 'worktree.check', message: 'Expected a shell command.' });
+  }
+  if (errors.length !== before) {
+    return;
+  }
+  const block = {
+    root: root as string,
+    copy: copy as Array<string>,
+    setup: setup as Array<string>,
+  };
+  return check === undefined ? block : { ...block, check: check as string };
 }
 
 function readAutomerge(value: unknown, errors: Errors) {
@@ -325,6 +343,7 @@ const optionalSections: Record<string, (value: unknown, errors: Errors) => unkno
   agentReview: readAgentReview,
   pr_size: readPrSize,
   journeys: readJourneys,
+  factory: readFactory,
 };
 
 /** Checks parsed `clutch.yaml` data. Returns the typed config only when there is no error. */

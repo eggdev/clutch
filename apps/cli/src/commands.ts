@@ -1,5 +1,8 @@
+import { agentCommand } from '@/agent-command';
+import { benchCommand } from '@/bench-command';
 import { checksCommand } from '@/checks-command';
 import { doctorCommand } from '@/doctor-command';
+import { factoryCommand } from '@/factory-command';
 import { frictionCommand } from '@/friction-command';
 import { initCommand } from '@/init-command';
 import { installCommand } from '@/install-command';
@@ -9,7 +12,9 @@ import { metricsCommand } from '@/metrics-command';
 import { ratchetCommand } from '@/ratchet-command';
 import { riskCommand } from '@/risk-command';
 import { rulesetCommand } from '@/ruleset-command';
+import { scoreCommand } from '@/score-command';
 import { syncCommand } from '@/sync-command';
+import { verifyCommand } from '@/verify-command';
 import { worktreeCommand } from '@/worktree-command';
 
 type Command = {
@@ -39,6 +44,39 @@ export const commands: Record<string, Command> = {
       'clutch doctor [--root DIR] [--json] [--remote [--repo OWNER/NAME]] [--category C] [--phase P]\nclutch doctor --check\nclutch doctor --write-baseline [--allow-downgrade]',
     summary: 'Report which capabilities a repository has, next to what its clutch.yaml declares.',
     run: doctorCommand,
+  },
+  factory: {
+    usage: 'clutch factory --check [--root DIR] [--json]\nclutch factory --write-schemas DIR',
+    summary:
+      'Check the factory tree: its agents, automations, runners, scorers and models. Exits 1 on a problem.',
+    run: factoryCommand,
+  },
+  bench: {
+    usage: 'clutch bench <name> [--config NAME] [--task NAME] [--json]',
+    summary:
+      'Run each task of a benchmark suite with each of its models, in scratch clones, and print pass, time and lines. A whole run writes its result file.',
+    run: benchCommand,
+  },
+  score: {
+    usage:
+      'clutch score <scorer> --pr <number> [--root DIR] [--repo OWNER/NAME] [--json] [--post] [--sample]',
+    summary:
+      "Judge one pull request with a scorer of the factory tree, on the model in the scorer's judge. --post adds the score as a PR comment.",
+    run: (args, cwd) => scoreCommand(args, cwd),
+  },
+  agent: {
+    usage:
+      'clutch agent prompt <name> [--issue CL-NNN] [--pr <number>] [--root DIR] [--repo OWNER/NAME]\nclutch agent run <name> [--issue CL-NNN] [--pr <number>] [--root DIR] [--repo OWNER/NAME]\nclutch agent mark <stage> [--pr <number>] [--issue CL-NNN] [--head SHA] [--note TEXT | --note-file PATH] [--json]',
+    summary:
+      "Print the prompt of a stage agent with its issue or PR, run it with the agent's harness and model, or mark on the PR that a stage ran.",
+    run: (args, cwd) => agentCommand(args, cwd),
+  },
+  verify: {
+    usage:
+      'clutch verify post --pr <number> [--repo OWNER/NAME] [--head SHA] [--note TEXT] [--json] <png>...',
+    summary:
+      'Commit the screenshots of a verify run to the verify-shots branch, and post or edit the one verify comment on the PR.',
+    run: (args, cwd) => verifyCommand(args, cwd),
   },
   init: {
     usage: 'clutch init [--root DIR] [--mode sync|doctor] [--adopt] [--yes]',
@@ -93,9 +131,9 @@ export const commands: Record<string, Command> = {
   },
   worktree: {
     usage:
-      'clutch worktree new <slug> [--issue CL-NNN] [--base REF]\nclutch worktree list [--json]\nclutch worktree rm <slug> [--force] [--base REF]',
+      'clutch worktree new <slug> [--issue CL-NNN] [--base REF] [--runner NAME] [--check] [--json]\nclutch worktree list [--json]\nclutch worktree rm <slug> [--force] [--base REF]',
     summary:
-      'Make a separate checkout for one task, with its own branch, copied files and setup. List the checkouts, or remove one.',
+      'Make a separate checkout for one task, with its own branch, copied files and setup, and run its check. List the checkouts, or remove one.',
     run: worktreeCommand,
   },
   ruleset: {

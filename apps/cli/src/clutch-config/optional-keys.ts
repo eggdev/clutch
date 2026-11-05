@@ -1,5 +1,6 @@
 import { isObject, isStringList, unknownKeys } from '@/clutch-config/checks';
 import type { Errors } from '@/clutch-config/checks';
+import { readIntake } from '@/clutch-config/intake';
 
 /** Readers for the newest optional top-level keys of `clutch.yaml`, which schema.ts calls. */
 
@@ -37,4 +38,39 @@ export function readJourneys(value: unknown, errors: Errors) {
     return;
   }
   return { webApp: value.webApp };
+}
+
+/**
+ * `factory.root` is the folder of the factory tree, from the project root.
+ * It stays inside the project, so `.` is allowed and `..` is not.
+ * `factory.intake` names the work that is ready for the factory.
+ */
+export function readFactory(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'factory', message: 'Expected a map with root or intake.' });
+    return;
+  }
+  unknownKeys(value, ['root', 'intake'], 'factory', errors);
+  const before = errors.length;
+  const { root } = value;
+  if (
+    root !== undefined &&
+    (typeof root !== 'string' ||
+      !root.trim() ||
+      root.startsWith('/') ||
+      root.split(/[\\/]/u).includes('..'))
+  ) {
+    errors.push({
+      path: 'factory.root',
+      message: 'Expected a folder inside the project, such as factory or .',
+    });
+  }
+  const intake = value.intake === undefined ? undefined : readIntake(value.intake, errors);
+  if (errors.length > before) {
+    return;
+  }
+  return {
+    ...(root === undefined ? {} : { root: root as string }),
+    ...(intake === undefined ? {} : { intake }),
+  };
 }
