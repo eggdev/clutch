@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.55.1 (2026-11-05)
+
+### Fixes and maintenance
+
+- chore(clutch): file the gaps that the Neighborhood sync found
+
 ## 0.55.0 (2026-11-05)
 
 ### Features
