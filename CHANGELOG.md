@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.55.0 (2026-11-05)
+
+### Features
+
+- feat(metrics): report Warp's autonomy, cycle time and reverts (CL-141)
+- feat(tools): cap every AGENTS.md at 20 lines, and add nested agent rules for tools (CL-307)
+- feat(cli): run the project check in a new worktree (CL-312)
+- feat(cli): add clutch verify post and the verify agent (CL-313)
+- feat(cli): add clutch agent and 5 stage agent prompts (CL-314)
+- feat(cli): run a factory scorer on a Qwen judge (CL-426)
+- feat(cli): add clutch bench to compare models on pinned tasks (CL-427)
+- feat(cli): add the factory tree schema and its check (CL-514)
+- feat(doctor): add factory_as_code and a starter tree with sync (CL-515)
+- feat(cli): link each agent file to the docs it must read (CL-516)
+- feat(cli): name the factory intake labels and states (CL-517)
+
+### Fixes and maintenance
+
+- chore(clutch): file the factory stack test week issues
+
 ## 0.54.1 (2026-11-04)
 
 ### Fixes and maintenance
