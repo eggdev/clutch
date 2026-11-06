@@ -135,6 +135,9 @@ jobs:
           # Each PR carries a changeset, as tools/github/pr.ts writes it.
           printf -- '---\n"%s": patch\n---\n\n%s\n' "$(jq -r .name package.json)" "$title" \
             > ".changeset/clutch-sync.md"
+          # In the project's own style: a project's oxfmt config may want single
+          # quotes, and its format check would fail the sync.
+          bun x oxfmt .changeset/clutch-sync.md
           {
             echo "Moves the project from Clutch ${CURRENT:-an unrecorded release} to [$RELEASE](https://github.com/$REPO/releases/tag/$RELEASE), as \`clutch sync --to $RELEASE\` writes it, then refreshes \`bun.lock\` and the TypeScript references."
             echo
