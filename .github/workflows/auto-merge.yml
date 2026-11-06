@@ -79,6 +79,8 @@ jobs:
       checks: read
       # The verdict comments.
       pull-requests: write
+      # An approval's run hands its merge to a run from the default branch.
+      actions: write
     # The merge job takes over when a PR may merge at the step.
     outputs:
       merge: ${{ steps.decide.outputs.merge }}
@@ -151,6 +153,16 @@ jobs:
         run: |
           set -o pipefail
           bun tools/github/auto-merge.ts --pr "$PR" --head "$HEAD_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+      # An approval's run belongs to the PR, so the merge job, which needs the
+      # release environment of the default branch, cannot run in it. A
+      # dispatch from the default branch decides again and merges.
+      - name: Hand an approved merge to the default branch
+        if: github.event_name == 'pull_request_review' && steps.decide.outputs.merge == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.pr.outputs.number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: gh workflow run auto-merge.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH" -f pr="$PR"
 
   # Enables GitHub's auto-merge, `gh pr merge --auto --merge`, with the release
   # bot's token. A merge made with the default token starts no workflow, so the

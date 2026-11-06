@@ -96,7 +96,10 @@ approves the head commit, an `on` run of Auto-merge queues an agent PR at any
 tier, and drops agent review's `owner` findings. The bot rule still holds a bot
 PR, and a PR that a person opened is still refused. The required checks, a
 draft, the base branch and a red `main` still hold any PR. Approval runs the
-Auto-merge workflow, so the merge queues once the checks pass. A later push
+Auto-merge workflow. Its run belongs to the PR, so when it decides to merge,
+it dispatches a run from the default branch, which holds the release bot and
+merges. A PR in a GitHub stack merges through the asynchronous merge API,
+because GitHub queues no auto-merge for a stack. A later push
 needs a new approval, and a later "Request changes" from the owner cancels it.
 
 ## Follow a pull request to green
