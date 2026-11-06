@@ -33,7 +33,8 @@ import type { Run } from '@tools/github/stack';
  * check is red on the default branch, except for a revert. `dry-run` and `on`
  * comment a verdict once for each head commit of an agent PR, so the owner can
  * grade it: at the step for `dry-run`, and at the next step for `on`. `off` only
- * prints. The Auto-merge workflow runs it from the base branch, so a pull request
+ * prints. The approval of `automerge.owner` on the head lifts the tier and the
+ * owner findings, so a PR that waits for the owner merges once they approve. The Auto-merge workflow runs it from the base branch, so a pull request
  * cannot change the rules that judge it. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 const usage = [
@@ -65,7 +66,7 @@ export async function readConfig(): Promise<Config> {
   const config = (await file.exists())
     ? (Bun.YAML.parse(await file.text()) as Record<string, unknown>)
     : {};
-  const automerge = (config.automerge ?? {}) as { mode?: unknown; step?: unknown };
+  const automerge = (config.automerge ?? {}) as { mode?: unknown; step?: unknown; owner?: unknown };
   const mode = automerge.mode ?? 'off';
   const step = automerge.step ?? 'bots';
   if (!(modes as ReadonlyArray<unknown>).includes(mode)) {
@@ -74,7 +75,9 @@ export async function readConfig(): Promise<Config> {
   if (!(steps as ReadonlyArray<unknown>).includes(step)) {
     throw new Error(`clutch.yaml: automerge.step must be one of ${steps.join(', ')}.`);
   }
-  return { mode: mode as Mode, step: step as Step };
+  const owner =
+    typeof automerge.owner === 'string' && automerge.owner ? automerge.owner : undefined;
+  return { mode: mode as Mode, step: step as Step, owner };
 }
 
 /** The required status checks of the default branch, plus agent review. */
@@ -87,6 +90,33 @@ async function requiredChecks(run: Run, repo: string, branch: string) {
     '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]',
   );
   return [...new Set([...(JSON.parse(out) as Array<string>), agentReview])];
+}
+
+/**
+ * Whether `owner` approved `sha`: their latest review that approves or asks
+ * for changes approves, and names that commit. A review on an older head, or
+ * a later request for changes, does not count.
+ */
+export async function ownerApproved(
+  run: Run,
+  repo: string,
+  pr: string,
+  sha: string,
+  owner?: string,
+) {
+  if (!owner) {
+    return false;
+  }
+  const out = await gh(
+    run,
+    'api',
+    '--paginate',
+    `repos/${repo}/pulls/${pr}/reviews`,
+    '--jq',
+    `.[] | select(.user.login == "${owner}" and (.state == "APPROVED" or .state == "CHANGES_REQUESTED")) | [.state, .commit_id] | @tsv`,
+  );
+  const last = out.split('\n').findLast(Boolean)?.split('\t');
+  return last?.[0] === 'APPROVED' && last[1] === sha;
 }
 
 /** The title of the annotation that agent review writes for an `owner` finding. */
@@ -274,6 +304,7 @@ export async function runAutoMerge(
     ownerFindings: await ownerFindings(run, repo, pr.headRefOid),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
+    ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),
   };
   const { effective, reasons, verdict } = await judgeAtStep(run, facts, step, log);
   if (mode === 'on' && reasons.length === 0) {

@@ -85,7 +85,10 @@ async function judgedStep(run: Run, step: Step, log: (line: string) => void) {
 export async function judgeAtStep(run: Run, facts: Facts, step: Step, log: (line: string) => void) {
   const { effective, note } = await judgedStep(run, step, log);
   const reasons = blockers(facts, effective);
-  const verdict = [note, verdictText(reasons, effective, upstreamFindings(facts))]
+  const verdict = [
+    note,
+    verdictText(reasons, effective, upstreamFindings(facts), facts.ownerApproved),
+  ]
     .filter(Boolean)
     .join('\n');
   return { effective, reasons, verdict };
