@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.3 (2026-11-06)
+
+### Fixes and maintenance
+
+- fix(auto-merge): merge after an approval and merge stacked PRs
+
 ## 0.56.2 (2026-11-06)
 
 ### Fixes and maintenance
