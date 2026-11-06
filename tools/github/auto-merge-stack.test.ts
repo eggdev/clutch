@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { enableAutoMerge } from '@tools/github/auto-merge';
+import { enableAutoMerge } from '@tools/github/auto-merge-enable';
 import { fake, head } from '@tools/github/auto-merge-fake';
 
 const stacked =
