@@ -71,3 +71,11 @@ test('on queues a one-way-door PR once the owner approved its head, and not befo
     'select(.user.login == "eggdev"',
   );
 });
+
+test("the owner's approval never lifts the bot rule", () => {
+  const renovate = facts(
+    { ownerApproved: true, botProblems: ['tools/x.ts is not a dependency file.'] },
+    { headRefName: 'renovate/all-minor', author: { login: 'app/renovate', is_bot: true } },
+  );
+  expect(blockers(renovate, 'medium')).toEqual(['tools/x.ts is not a dependency file.']);
+});

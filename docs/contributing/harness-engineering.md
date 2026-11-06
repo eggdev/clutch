@@ -126,6 +126,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A test file that a change may delete or thin                                      | `tools/test-integrity-allow.json`                                                                                   |
 | A dependency override                                                             | `tools/dependency-overrides.yaml`                                                                                   |
 | Agent review of a PR that a bot opened                                            | `agent-review.yml`, `allowed_bots`                                                                                  |
+| The owner's approval, which lifts an agent PR's risk tier and `owner` findings    | `clutch.yaml`, `automerge.owner`, read in `tools/github/auto-merge-rules.ts` (`ownerLifts`)                         |
 | A bypass of the main ruleset                                                      | `.github/rulesets/main.json`, `bypass_actors`: only the release bot's app                                           |
 | Files a Clutch sync PR may change past the lineage                                | `tools/github/bot-rule.ts`, `syncExtras`                                                                            |
 | Days a project may stay behind a Clutch release                                   | `clutch.yaml`, `template.grace_days`                                                                                |

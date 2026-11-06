@@ -92,9 +92,10 @@ Two kinds of PR wait for the owner without a GitHub approval rule:
 Do not merge either kind with `pr merge` until the owner says so. `pr status` counts the `owner` findings and reports such a PR as not ready. `pr merge` refuses it until the owner approves it.
 
 The owner's approval is the last step. When `automerge.owner` in `clutch.yaml`
-approves the head commit, an `on` run of Auto-merge queues the merge at any
-tier, and drops agent review's `owner` findings. The required checks, a draft,
-the base branch and a red `main` still hold the PR. Approval runs the
+approves the head commit, an `on` run of Auto-merge queues an agent PR at any
+tier, and drops agent review's `owner` findings. The bot rule still holds a bot
+PR, and a PR that a person opened is still refused. The required checks, a
+draft, the base branch and a red `main` still hold any PR. Approval runs the
 Auto-merge workflow, so the merge queues once the checks pass. A later push
 needs a new approval, and a later "Request changes" from the owner cancels it.
 
