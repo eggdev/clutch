@@ -27,10 +27,8 @@ rules:
       - .clutch/risk.yaml
       - tools/guardrail-files.json
       - tools/codeowners.ts
-      - tools/github/auto-merge.ts
-      - tools/github/auto-merge-checks.ts
-      - tools/github/auto-merge-rules.ts
-      - tools/github/auto-merge-brake.ts
+      # Every auto-merge file, so code that moves between them stays held.
+      - 'tools/github/auto-merge*.ts'
       - tools/github/bot-rule.ts
       - .github/workflows/auto-merge.yml
       - .github/workflows/agent-review.yml
