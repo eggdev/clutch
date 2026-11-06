@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.1 (2026-11-06)
+
+### Fixes and maintenance
+
+- fix(sync): format the sync changeset in the project's style
+
 ## 0.56.0 (2026-11-06)
 
 ### Features
