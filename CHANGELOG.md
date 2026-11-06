@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.2 (2026-11-06)
+
+### Fixes and maintenance
+
+- fix(auto-merge): let owner approval lift only the tier and findings
+
 ## 0.56.1 (2026-11-06)
 
 ### Fixes and maintenance
