@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.5 (2026-11-06)
+
+### Fixes and maintenance
+
+- chore(risk): hold every auto-merge file for the owner
+
 ## 0.56.4 (2026-11-06)
 
 ### Fixes and maintenance
