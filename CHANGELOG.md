@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.0 (2026-11-06)
+
+### Features
+
+- feat(auto-merge): merge a PR that the owner approved
+
 ## 0.55.1 (2026-11-05)
 
 ### Fixes and maintenance
