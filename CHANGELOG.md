@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.4 (2026-11-06)
+
+### Fixes and maintenance
+
+- chore(automerge): name the owner whose approval merges
+
 ## 0.56.3 (2026-11-06)
 
 ### Fixes and maintenance
