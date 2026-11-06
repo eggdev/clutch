@@ -44,7 +44,8 @@ export const nextStep = (step: Step): Step => steps[Math.min(steps.indexOf(step)
 /** Whether an `on` run is at the last step, which has no next step to calibrate, so it posts no dry-run comment. */
 export const lastStepOn = (mode: Mode, step: Step) => mode === 'on' && nextStep(step) === step;
 
-export type Config = { mode: Mode; step: Step };
+/** `owner` is the login whose approval of a head lets it merge at any tier. */
+export type Config = { mode: Mode; step: Step; owner?: string };
 
 export type Pr = {
   state: string;
@@ -74,6 +75,13 @@ export type Facts = {
   botProblems: Array<string>;
   /** Each required check that failed on the default branch's latest commit. */
   mainRed: Array<string>;
+  /**
+   * Whether `automerge.owner` approved the head commit, and gave no later
+   * review that asks for changes. The owner's approval is the review that a
+   * one-way-door PR waits for, so it lifts the tier and the owner findings.
+   * The checks, a draft, the base and a red main still hold the PR.
+   */
+  ownerApproved: boolean;
 };
 
 /**
@@ -101,6 +109,9 @@ export function kindProblem(pr: Pr) {
 /** Why the PR's kind and tier are not in reach at `step`. */
 function stepProblems(facts: Facts, step: Step): Array<string> {
   const { pr, tier, botProblems } = facts;
+  if (facts.ownerApproved) {
+    return [];
+  }
   if (!isAgentPr(pr)) {
     return botProblems;
   }
@@ -180,7 +191,7 @@ export function blockers(facts: Facts, step: Step): Array<string> {
       reasons.push(`The required check ${name} is ${conclusion}.`);
     }
   }
-  if (!approvedUpstream(facts)) {
+  if (!approvedUpstream(facts) && !facts.ownerApproved) {
     for (const finding of facts.ownerFindings) {
       reasons.push(`Agent review asks the owner: ${finding}`);
     }
@@ -201,11 +212,17 @@ export function blockers(facts: Facts, step: Step): Array<string> {
  * reasons when it would not, and the owner findings that a pure sync takes as
  * approved upstream, so that they stay visible.
  */
-export function verdictText(reasons: Array<string>, step: Step, upstream: Array<string>) {
+export function verdictText(
+  reasons: Array<string>,
+  step: Step,
+  upstream: Array<string>,
+  ownerApproved = false,
+) {
+  const approved = ownerApproved ? ' The owner approved this head.' : '';
   const verdict =
     reasons.length > 0
       ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
-      : `Would auto-merge at the step ${step}.`;
+      : `Would auto-merge at the step ${step}.${approved}`;
   return upstream.length > 0
     ? `${verdict}\nOwner findings, approved upstream in Clutch:\n${upstream.map((finding) => `- ${finding}`).join('\n')}`
     : verdict;

@@ -27,6 +27,7 @@ export const facts = (fields: Partial<Facts> = {}, pr: Partial<Facts['pr']> = {}
   ownerFindings: [],
   botProblems: [],
   mainRed: [],
+  ownerApproved: false,
   ...fields,
 });
 
@@ -54,6 +55,7 @@ export function fake(
     ['gh api repos/eggdev/clutch/commits/main --jq .sha', { out: 'mainsha\n' }],
     ['gh api --paginate repos/eggdev/clutch/commits/', { out: runs('success') }],
     ['gh pr list --state merged', { out: '[]' }],
+    ['gh api --paginate repos/eggdev/clutch/pulls/7/reviews', { out: '' }],
     ['bun tools/clutch.ts risk', { out: '{"tier":"low"}' }],
     ['gh api --paginate repos/eggdev/clutch/issues/7/comments', { out: 'LGTM\n' }],
     [

@@ -29,6 +29,10 @@ run-name: "Auto-merge${{ inputs.pr && format(' #{0}', inputs.pr) || '' }}"
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  # The owner's approval of a head lets a PR that waits for them merge. An
+  # approval runs the decide job again, so the merge queues once checks pass.
+  pull_request_review:
+    types: [submitted]
   # workflow_run runs with this repository's token, so the decide job admits
   # only runs from branches of this repository, never a fork, and it runs the
   # default branch's code. No other trigger sees a completed Actions check.
@@ -55,6 +59,8 @@ jobs:
     # Find step refuses for a dispatch. A run that finds no PR judges nothing.
     if: >-
       (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' &&
       github.event.pull_request.head.repo.full_name == github.repository) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository) ||
