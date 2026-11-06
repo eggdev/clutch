@@ -216,8 +216,42 @@ async function redOn(run: Run, repo: string, branch: string, names: Array<string
  * so once in a comment with the step. `--match-head-commit` makes GitHub
  * refuse when the head moved since the decision.
  */
+/** What GitHub answers when a PR is in a stack, which only the asynchronous merge API merges. */
+const stackRefusal = /part of a stack/u;
+
+/**
+ * Enables GitHub's auto-merge on `sha`. GitHub refuses that for a PR in a
+ * stack, and merges a stack only through the asynchronous merge API, which
+ * merges at once. The verdict already found every required check green, so
+ * the stacked PR merges through that API, still only at `sha`.
+ */
 export async function enableAutoMerge(run: Run, repo: string, pr: string, sha: string, step: Step) {
-  await gh(run, 'pr', 'merge', pr, '--auto', '--merge', '--match-head-commit', sha);
+  const queued = await run([
+    'gh',
+    'pr',
+    'merge',
+    pr,
+    '--auto',
+    '--merge',
+    '--match-head-commit',
+    sha,
+  ]);
+  if (!queued.ok) {
+    if (!stackRefusal.test(queued.err || queued.out)) {
+      throw new Error(`gh pr merge ${pr} failed: ${queued.err || queued.out}`);
+    }
+    await gh(
+      run,
+      'api',
+      '--method',
+      'PUT',
+      `repos/${repo}/pulls/${pr}/merge-async`,
+      '-f',
+      'merge_method=merge',
+      '-f',
+      `sha=${sha}`,
+    );
+  }
   if (!(await hasMarker(run, repo, pr, enabledMarker(step, sha)))) {
     const body = `${enabledMarker(step, sha)}\n**Auto-merge:** queued at ${sha.slice(0, 7)}, at the step \`${step}\`. GitHub merges it with a merge commit once the required checks pass. To stop it, run \`gh pr merge --disable-auto ${pr}\`.`;
     await gh(run, 'pr', 'comment', pr, '--body', body);
