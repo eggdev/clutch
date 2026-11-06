@@ -106,22 +106,6 @@ export function kindProblem(pr: Pr) {
     : 'A person opened this pull request. Open it with `bun run pr open`, so the release bot opens it.';
 }
 
-/** Why the PR's kind and tier are not in reach at `step`. */
-function stepProblems(facts: Facts, step: Step): Array<string> {
-  const { pr, tier, botProblems } = facts;
-  if (facts.ownerApproved) {
-    return [];
-  }
-  if (!isAgentPr(pr)) {
-    return botProblems;
-  }
-  if (step === 'bots') {
-    return ['Agent PRs auto-merge from the step low. The step is bots.'];
-  }
-  const reach = step === 'low' ? ['low'] : ['low', 'medium'];
-  return reach.includes(tier) ? [] : [`The risk tier is ${tier}, not ${reach.join(' or ')}.`];
-}
-
 /**
  * Why a revert PR may not merge without a person. It may when auto-merge merged
  * the PR it reverts, and its own risk tier is low or medium. `wasAutoMerged`
@@ -167,6 +151,33 @@ export function upstreamFindings(facts: Facts) {
   return approvedUpstream(facts) ? facts.ownerFindings : [];
 }
 
+/**
+ * The holds that the owner's approval of the head lifts, decided in one place:
+ * the step and risk tier of an agent PR, and agent review's `owner` findings.
+ * The kind of PR, the bot rule, the checks, a draft, the base and a red main
+ * still hold it. A pure Clutch sync also takes its findings as approved
+ * upstream, see `approvedUpstream`.
+ */
+function ownerLifts(facts: Facts) {
+  return { reach: facts.ownerApproved, findings: facts.ownerApproved || approvedUpstream(facts) };
+}
+
+/** Why the PR's kind and tier are not in reach at `step`. */
+function stepProblems(facts: Facts, step: Step): Array<string> {
+  const { pr, tier, botProblems } = facts;
+  if (!isAgentPr(pr)) {
+    return botProblems;
+  }
+  if (ownerLifts(facts).reach) {
+    return [];
+  }
+  if (step === 'bots') {
+    return ['Agent PRs auto-merge from the step low. The step is bots.'];
+  }
+  const reach = step === 'low' ? ['low'] : ['low', 'medium'];
+  return reach.includes(tier) ? [] : [`The risk tier is ${tier}, not ${reach.join(' or ')}.`];
+}
+
 /** The reasons the pull request may not merge without a person at `step`. None means it may. */
 export function blockers(facts: Facts, step: Step): Array<string> {
   const { pr, defaultBranch, checks, mainRed } = facts;
@@ -191,7 +202,7 @@ export function blockers(facts: Facts, step: Step): Array<string> {
       reasons.push(`The required check ${name} is ${conclusion}.`);
     }
   }
-  if (!approvedUpstream(facts) && !facts.ownerApproved) {
+  if (!ownerLifts(facts).findings) {
     for (const finding of facts.ownerFindings) {
       reasons.push(`Agent review asks the owner: ${finding}`);
     }
