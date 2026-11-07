@@ -180,3 +180,27 @@ test('merge passes without release.yml, and fails when it cannot read the releas
   const offline = releaseLookup('error connecting to api.github.com');
   expect(await runPr(['merge', '12', '--owner'], offline.run, noWrite, fakeClock())).toBe(1);
 });
+
+test('merge of a PR that the owner approval already merged goes on to the release and main', async () => {
+  const gh = fake([
+    trunk,
+    [
+      'gh pr view 17',
+      {
+        out: JSON.stringify({
+          state: 'MERGED',
+          mergeCommit: { oid: 'm3rge' },
+          baseRefName: 'main',
+          headRefName: 'cl-027',
+          headRefOid: 'h3ad',
+        }),
+      },
+    ],
+    ['gh run list --workflow release.yml', succeeded],
+    mainGreen,
+    ['git show origin/main:package.json', { out: '{"version":"1.2.3"}' }],
+  ]);
+  expect(await runPr(['merge', '17'], gh.run, noWrite, fakeClock())).toBe(0);
+  expect(gh.calls.some((call) => call.startsWith('gh workflow run auto-merge.yml'))).toBe(false);
+  expect(gh.calls.some((call) => call.startsWith('gh run list --workflow ci.yml'))).toBe(true);
+});

@@ -14,8 +14,7 @@ const decided = (conclusion: string) => ({
       displayTitle: 'Auto-merge #21',
       status: 'completed',
       conclusion,
-      // Later than any dispatch time, so the run counts as this dispatch's.
-      createdAt: '2999-01-01T00:00:00Z',
+      createdAt: '2026-11-06T10:00:00Z',
       url: 'https://github.com/acme/shop/actions/runs/8',
     },
   ]),
@@ -31,7 +30,8 @@ const prState = (state: string, queued: boolean, oid?: string) => ({
 
 test('a dispatch that the judge passes waits for GitHub to merge, and returns the merge commit', async () => {
   const gh = fake([
-    ['gh run list --workflow auto-merge.yml', [{ out: '[]' }, decided('success')]],
+    // Before the dispatch, then one poll before the run shows.
+    ['gh run list --workflow auto-merge.yml', [{ out: '[]' }, { out: '[]' }, decided('success')]],
     [
       'gh pr view 21 --json state,autoMergeRequest,mergeCommit',
       [prState('OPEN', true), prState('MERGED', false, 'm3rge')],
@@ -42,7 +42,7 @@ test('a dispatch that the judge passes waits for GitHub to merge, and returns th
     merged: true,
     sha: 'm3rge',
   });
-  expect(gh.calls[0]).toBe('gh workflow run auto-merge.yml --ref main -f pr=21');
+  expect(gh.calls[1]).toBe('gh workflow run auto-merge.yml --ref main -f pr=21');
   expect(clock.slept).toBe(30_000);
 });
 
@@ -59,7 +59,7 @@ test('a PR that the judge holds returns the verdict that the decide job printed'
     'decide\tUNKNOWN STEP\t2026-11-06T10:00:03.1000000Z [command]/usr/bin/git version',
   ].join('\n');
   const gh = fake([
-    ['gh run list --workflow auto-merge.yml', decided('success')],
+    ['gh run list --workflow auto-merge.yml', [{ out: '[]' }, decided('success')]],
     ['gh pr view 21 --json state,autoMergeRequest,mergeCommit', prState('OPEN', false)],
     ['gh run view 8 --log', { out: log }],
   ]);
@@ -74,7 +74,7 @@ test('a PR that the judge holds returns the verdict that the decide job printed'
 });
 
 test('a failed Auto-merge run fails the merge and names the run', async () => {
-  const gh = fake([['gh run list --workflow auto-merge.yml', decided('failure')]]);
+  const gh = fake([['gh run list --workflow auto-merge.yml', [{ out: '[]' }, decided('failure')]]]);
   await expect(autoMerge(gh.run, '21', 'main', { clock: fakeClock(), ...timing })).rejects.toThrow(
     'The Auto-merge run for #21 ended failure',
   );
@@ -218,4 +218,27 @@ test('a repository without ci.yml has no main to watch', async () => {
     ],
   ]);
   expect(await watch(gh)).toBe(0);
+});
+
+test('an older Auto-merge run for the same PR is never taken for this dispatch', async () => {
+  const gh = fake([
+    [
+      'gh run list --workflow auto-merge.yml',
+      [
+        decided('failure'),
+        decided('failure'),
+        {
+          out: JSON.stringify([
+            ...JSON.parse(decided('failure').out),
+            { ...JSON.parse(decided('success').out)[0], databaseId: 9 },
+          ]),
+        },
+      ],
+    ],
+    ['gh pr view 21 --json state,autoMergeRequest,mergeCommit', prState('MERGED', false, 'm3rge')],
+  ]);
+  expect(await autoMerge(gh.run, '21', 'main', { clock: fakeClock(), ...timing })).toEqual({
+    merged: true,
+    sha: 'm3rge',
+  });
 });

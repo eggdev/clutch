@@ -64,26 +64,35 @@ export function verdictOf(log: string) {
     .trim();
 }
 
-/** The workflow run that `gh workflow run` started, found by its run name and start time. */
-async function findRun(run: Run, number: string, since: string, timing: Timing) {
+/** The recent dispatched Auto-merge runs for PR `number`. */
+async function dispatched(run: Run, number: string) {
+  const out = await must(run, [
+    'gh',
+    'run',
+    'list',
+    '--workflow',
+    'auto-merge.yml',
+    '--event',
+    'workflow_dispatch',
+    '--limit',
+    '20',
+    '--json',
+    'databaseId,displayTitle,status,conclusion,createdAt,url',
+  ]);
+  return (JSON.parse(out || '[]') as Array<WorkflowRun>).filter(
+    (item) => item.displayTitle === `Auto-merge #${number}`,
+  );
+}
+
+/**
+ * The workflow run that `gh workflow run` started: the first run for PR
+ * `number` that is not in `before`. Run ids do not depend on any clock.
+ */
+async function findRun(run: Run, number: string, before: Set<number>, timing: Timing) {
   const end = timing.clock.now() + timing.timeout;
   for (;;) {
-    const out = await must(run, [
-      'gh',
-      'run',
-      'list',
-      '--workflow',
-      'auto-merge.yml',
-      '--event',
-      'workflow_dispatch',
-      '--limit',
-      '20',
-      '--json',
-      'databaseId,displayTitle,status,conclusion,createdAt,url',
-    ]);
-    const found = (JSON.parse(out || '[]') as Array<WorkflowRun>).find(
-      (item) => item.displayTitle === `Auto-merge #${number}` && item.createdAt >= since,
-    );
+    const runs = await dispatched(run, number);
+    const found = runs.find((item) => !before.has(item.databaseId));
     if (found?.status === 'completed') {
       return found;
     }
@@ -110,8 +119,8 @@ export async function autoMerge(
   trunk: string,
   timing: Timing,
 ): Promise<Merged> {
-  // gh prints times in UTC with whole seconds. A run created in the same second still counts.
-  const since = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString().replace('.000', '');
+  const earlier = await dispatched(run, number);
+  const before = new Set(earlier.map((item) => item.databaseId));
   await must(run, [
     'gh',
     'workflow',
@@ -123,7 +132,7 @@ export async function autoMerge(
     `pr=${number}`,
   ]);
   console.log(`Dispatched Auto-merge for #${number}. Waiting for its decision.`);
-  const decided = await findRun(run, number, since, timing);
+  const decided = await findRun(run, number, before, timing);
   if (decided.conclusion !== 'success') {
     throw new Error(
       `The Auto-merge run for #${number} ended ${decided.conclusion}: ${decided.url}. Read it with: gh run view --log-failed ${decided.databaseId}`,

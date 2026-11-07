@@ -222,7 +222,9 @@ the PR with the default branch's rules, under `automerge.mode` and
 The bot's merge starts the release and CI on `main`, and the session's own
 token would start neither. When the judge holds the PR, `merge` prints the
 verdict and exits 3. The PR then waits for the owner: ask them to approve the
-head, and run `merge` again after the approval.
+head. The approval starts the judge again, so the PR merges even when the
+session has ended. A session that still runs sees the merge, and goes on to
+watch `main`.
 
 Add `--owner` only when the owner told this session to merge this PR. `merge`
 then merges with the session's own token, and skips the judge. A PR in a stack
@@ -277,8 +279,11 @@ merge, set its task back to `todo` in the next branch.
 ## Auto-merge
 
 The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges one pull
-request of this repository, never a fork's, each time `pr merge` dispatches it.
-No event or schedule starts it. An agent PR is one that the release
+request of this repository, never a fork's. No schedule starts it. It runs
+when `pr merge` dispatches it, when the owner approves a head, and when CI or
+agent review completes on a PR that no session owns: a `revert/` PR or a bot's
+`renovate/`, `gardening/` or `clutch-sync/` PR. An agent's `clutch/` PR merges
+only when its session runs `pr merge`, or when the owner approves it. An agent PR is one that the release
 bot opens, so its author is a bot. The workflow also judges a PR on a
 `clutch/cl-NNN-<slug>` branch, which an agent makes, as a fallback for a project
 whose release bot is not set up. A bot PR's branch starts with `renovate/`,

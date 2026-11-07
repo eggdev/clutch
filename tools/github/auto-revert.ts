@@ -56,6 +56,29 @@ export async function autoMerged(run: Run, repo: string, pr: string) {
   return out.length > 0;
 }
 
+/**
+ * Whether `pr` is an agent's PR: the release bot opened it from a
+ * `clutch/` branch. Its session may have merged it with `pr merge --owner`,
+ * on the owner's word, so it carries no enabled marker. A person's own PR is
+ * never one.
+ */
+async function agentPr(run: Run, repo: string, pr: string) {
+  const out = await must(run, [
+    'gh',
+    'api',
+    `repos/${repo}/pulls/${pr}`,
+    '--jq',
+    '.user.type + " " + .head.ref',
+  ]);
+  const [type, ref = ''] = out.trim().split(' ');
+  return type === 'Bot' && ref.startsWith('clutch/');
+}
+
+/** Whether the net may revert `pr`: auto-merge merged it, or it is an agent's PR. */
+async function revertable(run: Run, repo: string, pr: string) {
+  return (await autoMerged(run, repo, pr)) || agentPr(run, repo, pr);
+}
+
 type CiRun = { headSha: string; conclusion: string; status: string };
 
 /**
@@ -328,7 +351,7 @@ export async function runAutoRevert(
     log(`${merge.slice(0, 7)} is not the merge of a pull request. No revert.`);
     return 0;
   }
-  if (!(await autoMerged(run, repo, pr))) {
+  if (!(await revertable(run, repo, pr))) {
     log(
       `A person merged #${pr}, so it gets no automatic revert. Fix forward or add the revert label.`,
     );

@@ -281,9 +281,10 @@ warns. Size never fails a PR. See
 
 <!-- kickoff: The globs of the project's deploy config, infrastructure code and secret handling, as the paths of the infra, deploy and secrets rule in .clutch/risk.yaml. Leave the list empty when the project has none. -->
 
-The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs only
-when `bun run pr merge <number>` dispatches it, from the session that built the
-PR. No event or schedule starts it. It judges a pull request of this repository,
+The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
+`bun run pr merge <number>` dispatches it from the session that built the PR.
+It also runs when the owner approves a head, and when CI completes on a
+`revert/` or bot PR, which no session owns. No schedule starts it. It judges a pull request of this repository,
 never a fork's, and logs a person's as not judged.
 An agent's PR is one that a bot opens. A bot's PR is on a `renovate/`,
 `gardening/`, `clutch-sync/` or `revert/` branch. It acts on `automerge.mode`

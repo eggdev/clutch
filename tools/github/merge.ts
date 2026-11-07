@@ -150,40 +150,20 @@ async function mergeAsOwner(
   ]);
 }
 
+type OpenPr = Review & { baseRefName: string; headRefName: string; headRefOid: string };
+
 /**
- * Merges a PR with a merge commit, in the session that built it. By default
- * it dispatches the Auto-merge workflow, which judges the PR with the default
- * branch's rules and merges it with the release bot's token. When the judge
- * holds the PR, it prints the verdict and returns `heldCode`. With `owner`,
- * because the owner told the session to merge, it merges itself: a PR in a
- * stack with `gh stack merge`, bottom up, and any other with a plain merge.
- * GitHub can still count a PR as stacked after the PRs below it merged, so a
- * plain merge that GitHub refuses for its stack retries through the stack.
- * Then it waits for the release and for CI on the default branch at the merge
- * commit, and starts the revert when that CI fails twice. It refuses while
- * GitHub reports that the PR needs a review, and while agent review's owner
- * findings wait for the owner's approval.
+ * The checks before the merge of an open PR, then the merge. Returns the merge
+ * commit, or `heldCode` when the judge holds the PR.
  */
-export async function merge(
+async function mergeOpen(
   run: Run,
   number: string,
+  pr: OpenPr,
   clock: Clock,
   timing: { timeout: number; interval: number },
-  options: { owner?: boolean } = {},
-) {
-  const out = await must(run, [
-    'gh',
-    'pr',
-    'view',
-    number,
-    '--json',
-    'baseRefName,headRefName,headRefOid,reviewDecision,mergeStateStatus,reviewRequests,latestReviews',
-  ]);
-  const pr = JSON.parse(out) as Review & {
-    baseRefName: string;
-    headRefName: string;
-    headRefOid: string;
-  };
+  options: { owner?: boolean },
+): Promise<string | typeof heldCode> {
   const { baseRefName, headRefName } = pr;
   const problem = reviewProblem(number, {
     // gh prints an empty reviewDecision as an empty string.
@@ -225,20 +205,64 @@ export async function merge(
       `#${number} has ${status.counts.fail} failed check(s). Babysit it to green first: bun run pr failures ${number}`,
     );
   }
-  let sha: string;
   if (options.owner) {
-    sha = await mergeAsOwner(run, number, { baseRefName, headRefName, trunk });
-  } else {
-    const result = await autoMerge(run, number, trunk, { clock, ...timing });
-    if (!result.merged) {
-      console.log(result.message);
-      console.log(
-        `#${number} waits for the owner. Ask them to approve the head, then run \`bun run pr merge ${number}\` again.`,
-      );
-      return heldCode;
-    }
-    ({ sha } = result);
+    return mergeAsOwner(run, number, { baseRefName, headRefName, trunk });
   }
+  const result = await autoMerge(run, number, trunk, { clock, ...timing });
+  if (!result.merged) {
+    console.log(result.message);
+    console.log(
+      `#${number} waits for the owner. Ask them to approve the head. The approval merges it, then run \`bun run pr merge ${number}\` again to watch main.`,
+    );
+    return heldCode;
+  }
+  return result.sha;
+}
+
+/**
+ * Merges a PR with a merge commit, in the session that built it. By default
+ * it dispatches the Auto-merge workflow, which judges the PR with the default
+ * branch's rules and merges it with the release bot's token. When the judge
+ * holds the PR, it prints the verdict and returns `heldCode`. With `owner`,
+ * because the owner told the session to merge, it merges itself: a PR in a
+ * stack with `gh stack merge`, bottom up, and any other with a plain merge.
+ * GitHub can still count a PR as stacked after the PRs below it merged, so a
+ * plain merge that GitHub refuses for its stack retries through the stack.
+ * Then it waits for the release and for CI on the default branch at the merge
+ * commit, and starts the revert when that CI fails twice. It refuses while
+ * GitHub reports that the PR needs a review, and while agent review's owner
+ * findings wait for the owner's approval.
+ */
+export async function merge(
+  run: Run,
+  number: string,
+  clock: Clock,
+  timing: { timeout: number; interval: number },
+  options: { owner?: boolean } = {},
+) {
+  const out = await must(run, [
+    'gh',
+    'pr',
+    'view',
+    number,
+    '--json',
+    'baseRefName,headRefName,headRefOid,reviewDecision,mergeStateStatus,reviewRequests,latestReviews,state,mergeCommit',
+  ]);
+  const pr = JSON.parse(out) as OpenPr & {
+    state?: string;
+    mergeCommit?: { oid: string } | null;
+  };
+  // The owner's approval can merge the PR after `merge` exited 3. Run again,
+  // `merge` goes on to the release and the watch on main.
+  const merged = pr.state === 'MERGED' && pr.mergeCommit ? pr.mergeCommit.oid : undefined;
+  if (merged) {
+    console.log(`#${number} is already merged.`);
+  }
+  const sha = merged ?? (await mergeOpen(run, number, pr, clock, timing, options));
+  if (sha === heldCode) {
+    return heldCode;
+  }
+  const trunk = await defaultBranch(run);
   await must(run, ['git', 'fetch', '--prune', 'origin']);
   console.log(`Merged #${number} as ${sha.slice(0, 7)}. Waiting for the release.`);
   const release = await awaitRelease(run, { sha, trunk, clock, ...timing });
