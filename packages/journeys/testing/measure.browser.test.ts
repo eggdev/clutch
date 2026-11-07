@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 
 import { chromium } from '@playwright/test';
-import type { Browser, BrowserContextOptions, Page, TestInfo } from '@playwright/test';
+import type { Browser, BrowserContextOptions, Page } from '@playwright/test';
 import { startMeasure } from '@repo/journeys/testing/measure';
+import type { MeasureInfo } from '@repo/journeys/testing/measure';
 
 /**
  * The page script of the journey test in a real Chromium, since only a browser
@@ -36,7 +37,7 @@ const page = `
 /** A measured page with the controls above, on a desktop or a touch phone. */
 async function measured(options: BrowserContextOptions = {}) {
   const context = await browser.newContext(options);
-  const info = { file: import.meta.path, project: { name: 'Desktop' }, retry: 0 } as TestInfo;
+  const info: MeasureInfo = { file: import.meta.path, project: { name: 'Desktop' }, retry: 0 };
   const measure = await startMeasure(context, info);
   // A real document load, so the init script runs before the page, as in a journey.
   await context.route('https://app.test/', (route) =>
