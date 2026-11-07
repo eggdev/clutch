@@ -15,6 +15,9 @@ const app = (features: Array<string>, tags: Array<string> = []) =>
 const header = (id: string) =>
   `/**\n * ${id}: A member pays an invoice.\n * Contract: docs/a.md\n * Entry: the home page\n * Isolation and cleanup: a unique invoice\n */\n`;
 
+/** The import that every web journey has: `test` from the journey kit. */
+const kit = "import { test } from '@repo/journeys/testing/test';\n";
+
 const flow = (id: string, platform = 'web') => ({
   platform,
   commands: [['mise', 'exec', '--', 'bun', 'run', 'journey', id]],
@@ -27,7 +30,7 @@ test('a shipped feature with a registered journey for each platform passes', asy
         'apps/web/package.json': app(['billing']),
         'apps/mobile/package.json': app(['billing'], ['platform:native']),
         'features/billing/screens/billing-screen.tsx': '',
-        'features/billing/journeys/pay-invoice.pw.ts': header('pay-invoice'),
+        'features/billing/journeys/pay-invoice.pw.ts': `${header('pay-invoice')}${kit}`,
         'features/billing/journeys/pay-on-phone.maestro.yaml':
           '# pay-on-phone: A member pays an invoice.\n# Contract: docs/a.md\n# Entry: the app icon\n# Isolation and cleanup: a unique invoice\nappId: com.example\n',
         // A feature with no screen has nothing to drive yet.
@@ -60,11 +63,59 @@ test('a shipped feature with no journey, a bare journey, and an unregistered or 
     `${verificationFile}: the flow \`old-journey\` runs the journey \`old-journey\`, which does not exist. Remove the flow, or restore the journey file.`,
     'features/billing: the web app ships it, but it has no web journey. Add features/billing/journeys/<id>.pw.ts with the spec header from .agents/skills/setup-verification/references/journey-specification.md.',
     `features/notes/journeys/notes-sync.pw.ts: ${verificationFile} does not register it. Add the flow \`notes-sync\` with \`"platform": "web"\` and \`"commands": [["mise","exec","--","bun","run","journey","notes-sync"]]\`.`,
+    'features/notes/journeys/notes-sync.pw.ts: it takes `test` from @playwright/test. Take `test` from @repo/journeys/testing/test, so the run is measured against its budgets. See docs/contributing/end-to-end-testing.md#measures.',
     'features/notes/journeys/notes-sync.pw.ts: the header has no `Contract:` line. Add it.',
     'features/notes/journeys/notes-sync.pw.ts: the header has no `Entry:` line. Add it.',
     'features/notes/journeys/notes-sync.pw.ts: the header has no `Isolation and cleanup:` line. Add it.',
     'features/notes/journeys/notes-sync.pw.ts: the header starts with `notes-sync: <user goal>`. Write the goal on the first header line.',
   ]);
+});
+
+test('a web journey that takes test from @playwright/test in any form, or not from the kit, fails', async () => {
+  const measured = [
+    "import { expect } from '@playwright/test';",
+    "import type { Page } from '@playwright/test';",
+    "import type * as types from '@playwright/test';",
+    "import { test } from '@repo/journeys/testing/test';",
+  ].join('\n');
+  const journeys = {
+    'pay-invoice': measured,
+    renamed: "import { test as journey } from '@repo/journeys/testing/test';",
+    named: "import { expect, test as base } from '@playwright/test';",
+    'default-import': "import test from '@playwright/test';",
+    'default-and-kit': `import pw from '@playwright/test';\n${kit}`,
+    namespace: "import * as pw from '@playwright/test';",
+    'no-kit': "import { expect } from '@playwright/test';",
+    'type-only-kit': "import type { test } from '@repo/journeys/testing/test';",
+  };
+  const files = {
+    ...Object.fromEntries(
+      Object.entries(journeys).map(([id, body]) => [
+        `features/billing/journeys/${id}.pw.ts`,
+        `${header(id)}${body}\n`,
+      ]),
+    ),
+    [verificationFile]: JSON.stringify({
+      flows: Object.fromEntries(Object.keys(journeys).map((id) => [id, flow(id)])),
+    }),
+  };
+  const fix =
+    'Take `test` from @repo/journeys/testing/test, so the run is measured against its budgets. See docs/contributing/end-to-end-testing.md#measures.';
+  const at = (id: string, why: string) => `features/billing/journeys/${id}.pw.ts: ${why} ${fix}`;
+  const problems = await inRepo(files, checkJourneys);
+  expect(problems.toSorted()).toEqual(
+    [
+      at('named', 'it takes `test` from @playwright/test.'),
+      at('default-import', 'it takes the default export of @playwright/test, which is its `test`.'),
+      at(
+        'default-and-kit',
+        'it takes the default export of @playwright/test, which is its `test`.',
+      ),
+      at('namespace', 'it takes all of @playwright/test as a namespace, which holds its `test`.'),
+      at('no-kit', 'it does not take `test` from @repo/journeys/testing/test.'),
+      at('type-only-kit', 'it does not take `test` from @repo/journeys/testing/test.'),
+    ].toSorted(),
+  );
 });
 
 test('the core journey list matches the headings of the catalog', () => {

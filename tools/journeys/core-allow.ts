@@ -26,9 +26,11 @@ export type Names = { has: (name: string) => boolean };
  * The only modules a core journey may import, by exact path, so `..` in a
  * path cannot leave the journey kit, and the one name each gives: `test`,
  * `outcomes`, `accessible` and `snap`, never renamed and never type-only.
+ * `test` comes from the kit, not from `@playwright/test`, so each run is
+ * measured against its budgets.
  */
 const moduleNames = new Map([
-  ['@playwright/test', ['test']],
+  ['@repo/journeys/testing/test', ['test']],
   ['@repo/journeys/testing/outcome', ['outcomes']],
   ['@repo/journeys/testing/a11y', ['accessible']],
   ['@repo/journeys/testing/visual', ['snap']],

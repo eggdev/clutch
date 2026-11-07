@@ -60,6 +60,17 @@ export function requiredOutcomes(name: (typeof coreJourneys)[number]): Array<str
   return [...new Set(['signed-up', ...coreOutcomes[name]])];
 }
 
+/**
+ * The devices that each web journey runs on, on every PR: the three widths of
+ * docs/principles/mobile-first.md#three-widths. `width` names the screenshot
+ * baselines of each one. See docs/contributing/end-to-end-testing.md#devices.
+ */
+export const webDevices = [
+  { name: 'Phone', width: 'mobile', viewport: { width: 390, height: 844 } },
+  { name: 'Tablet', width: 'tablet', viewport: { width: 820, height: 1180 } },
+  { name: 'Desktop', width: 'desktop', viewport: { width: 1440, height: 900 } },
+] as const;
+
 /** The verify config that registers each journey as a flow. */
 export const verificationFile = '.agents/skills/verify/verification.json';
 

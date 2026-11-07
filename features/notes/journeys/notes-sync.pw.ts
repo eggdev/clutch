@@ -2,7 +2,7 @@
  * notes-sync: A note that one device adds or renames shows on another device without a reload, also after the first device was offline.
  * State: retained
  * Contract: docs/contributing/architecture/local-first-sync.md
- * Actor and platform: the dev actor, web, two browser contexts as two devices
+ * Actor and platform: the dev actor, web on each journey device, two browser contexts as two devices
  * Entry: the home page, then the Open notes button, which opens the notes gate
  * Prerequisites: the dev servers, from `mise exec -- bun run dev`
  * Isolation and cleanup: each run adds one note with a unique title to the general space of the dev database. Delete `.data/` to reset it.
@@ -10,7 +10,7 @@
  *
  * | User action | Expected observation | Proof |
  * | --- | --- | --- |
- * | Open notes on two devices | Each shows the General space, and axe finds no serious violation on the home or notes page | heading assertion, axe check, `notes-open` screenshots |
+ * | Open notes on two devices | Each shows the General space, and axe finds no violation on the home or notes page | heading assertion, axe check, `notes-open` screenshots |
  * | Add a note on the first device | The second device shows it, with no reload | value assertion |
  * | Rename the note on the first device | The second device shows the new title | value assertion |
  * | Rename it again while the first device is offline | The first device shows it at once, the second does not | value assertions |
@@ -21,10 +21,21 @@
  * Evidence: the Playwright list output, the screenshots in `test-results/visual/`, and a trace and the axe report in `test-results/journeys/` on failure
  * Limits: one actor and one space. It does not prove sign-out, access rules or a server restore.
  */
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { accessible } from '@repo/journeys/testing/a11y';
+import { test } from '@repo/journeys/testing/test';
 import { snap } from '@repo/journeys/testing/visual';
+
+/**
+ * Hides what the notes of earlier runs change: the note list, the empty line
+ * and the note count. Each device and each retry adds a note to the same dev
+ * database, so only the first try sees no note.
+ */
+const earlierNotes = `
+  main > ul, main > form + p { display: none !important; }
+  main > header > p { visibility: hidden !important; }
+`;
 
 /** The title field of the note that has this saved title. */
 function note(page: Page, title: string) {
@@ -46,16 +57,17 @@ async function rename(page: Page, from: string, to: string) {
   await field.press('Enter');
 }
 
-test('a note syncs to another device, also after an offline rename', async ({ browser }) => {
-  const first = await browser.newContext();
+test('a note syncs to another device, also after an offline rename', async ({ page, browser }) => {
+  // The first device is the measured page. The second is a context of its own.
+  const writer = page;
+  const first = page.context();
   const second = await browser.newContext();
-  const writer = await first.newPage();
   const reader = await second.newPage();
   await writer.goto('/');
   await expect(writer.getByRole('button', { name: 'Open notes' })).toBeVisible();
   await snap(writer, 'home');
   await openNotes(writer);
-  await snap(writer, 'notes-open');
+  await snap(writer, 'notes-open', { style: earlierNotes });
   await openNotes(reader);
 
   const run = Date.now().toString(36);
@@ -81,6 +93,5 @@ test('a note syncs to another device, also after an offline rename', async ({ br
   await expect(note(reader, offline)).toBeVisible({ timeout: 20_000 });
   await expect(note(reader, renamed)).toHaveCount(0);
 
-  await first.close();
   await second.close();
 });
