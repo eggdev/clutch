@@ -58,9 +58,8 @@
       // The accessibility helper that a web journey imports. A project with no
       // web journey has no caller for it yet, so this entry keeps knip from
       // flagging it. The journey generator's template imports it. The same
-      // holds for `snap` in testing/visual.ts until a journey snaps a screen,
-      // and for `outcomes` in testing/outcome.ts until a core journey exists.
-      "entry": ["testing/a11y.ts", "testing/visual.ts", "testing/outcome.ts"],
+      // holds for `snap` in testing/visual.ts until a journey snaps a screen.
+      "entry": ["testing/a11y.ts", "testing/visual.ts"],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },
     "{apps,features,packages}/*": {

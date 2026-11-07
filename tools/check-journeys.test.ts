@@ -1,9 +1,7 @@
 import { expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 
 import { checkJourneys } from '@tools/check-journeys';
-import { coreJourneys, verificationFile } from '@tools/journeys/journeys';
+import { verificationFile } from '@tools/journeys/journeys';
 import { inRepo } from '@tools/testing/in-repo';
 
 const app = (features: Array<string>, tags: Array<string> = []) =>
@@ -65,13 +63,4 @@ test('a shipped feature with no journey, a bare journey, and an unregistered or 
     'features/notes/journeys/notes-sync.pw.ts: the header has no `Isolation and cleanup:` line. Add it.',
     'features/notes/journeys/notes-sync.pw.ts: the header starts with `notes-sync: <user goal>`. Write the goal on the first header line.',
   ]);
-});
-
-test('the core journey list matches the headings of the catalog', () => {
-  const catalog = readFileSync(
-    path.join(import.meta.dir, '../docs/contributing/journeys/core.md'),
-    'utf-8',
-  );
-  const names = [...catalog.matchAll(/^## .+ \(`([a-z-]+)`\)$/gmu)].map((match) => match[1]);
-  expect(names).toEqual([...coreJourneys]);
 });

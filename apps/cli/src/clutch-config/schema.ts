@@ -1,7 +1,5 @@
 import { isObject, isStringList, unknownKeys } from '@/clutch-config/checks';
 import type { Errors } from '@/clutch-config/checks';
-import { readBudgets, readCoreJourneys } from '@/clutch-config/core-journeys';
-import type { Budgets, CoreDecision, CoreJourney } from '@/clutch-config/core-journeys';
 import type { Intake } from '@/clutch-config/intake';
 import { readAutoRevert, readFactory, readJourneys } from '@/clutch-config/optional-keys';
 
@@ -61,10 +59,6 @@ export type ClutchConfig = {
    * notice (the default), or fail, once agent review is a required check.
    */
   agentReview?: { missingCredential: (typeof missingCredentials)[number] };
-  /** Whether the project has each core journey. See docs/contributing/journeys/core.md. */
-  coreJourneys?: Record<CoreJourney, CoreDecision>;
-  /** The quality budgets of the core journeys, which kickoff fills. */
-  budgets?: Budgets;
   /** The app that a web journey drives. Without it, the runner finds the one web app under apps/. */
   journeys?: { webApp: string };
   /**
@@ -92,8 +86,6 @@ const topKeys = [
   'pr_size',
   'agentReview',
   'journeys',
-  'coreJourneys',
-  'budgets',
   'factory',
 ];
 const repoPattern = /^[\w.-]+\/[\w.-]+$/u;
@@ -351,8 +343,6 @@ const optionalSections: Record<string, (value: unknown, errors: Errors) => unkno
   agentReview: readAgentReview,
   pr_size: readPrSize,
   journeys: readJourneys,
-  coreJourneys: readCoreJourneys,
-  budgets: readBudgets,
   factory: readFactory,
 };
 

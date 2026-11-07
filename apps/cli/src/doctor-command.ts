@@ -4,7 +4,6 @@ import { parseArgs } from 'node:util';
 import { capabilityRegistry } from '@/clutch-checkout';
 import { loadClutchConfig } from '@/clutch-config/load';
 import { baselineFile, nextBaseline, readBaseline, writeBaseline } from '@/doctor/baseline';
-import { coreJourneyFindings } from '@/doctor/core-journeys';
 import { detect } from '@/doctor/detect';
 import { gate } from '@/doctor/gate';
 import { originRepo, remoteProber, runGh } from '@/doctor/remote';
@@ -129,12 +128,9 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
       today: new Date().toISOString().slice(0, 10),
       baseline: await readBaseline(root),
     });
-    const findings = [
-      ...(rulesets ? rulesetFindings(rulesets) : []),
-      ...(await coreJourneyFindings(root, config)),
-    ];
-    if (findings.length > 0) {
-      result.failures.push(...findings);
+    const drift = rulesets ? rulesetFindings(rulesets) : [];
+    if (drift.length > 0) {
+      result.failures.push(...drift);
       result.code = 1;
     }
     if (sast.problem) {

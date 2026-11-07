@@ -123,30 +123,12 @@ not for, later not now, room to keep, hard invariants, what not to assume.
 ### 2. Journeys
 
 Output: one page in `docs/contributing/architecture/` for each journey, the
-"End-to-end journeys" list in project intent, `coreJourneys:` and `budgets:`
-in `clutch.yaml`, and the slots in `docs/users/`.
+"End-to-end journeys" list in project intent, and the slots in `docs/users/`.
 
 Walk each user from the first touch to their goal, one screen at a time: how
 they arrive, what they see, what they do, what each empty, error and offline
 state shows, and what message or email each step sends. The walk shows which
 capabilities the product needs. Collect them for phase 3.
-
-Then record the core journeys. Read the
-[core journey catalog](../../../docs/contributing/journeys/core.md), and draft
-`coreJourneys:` in `clutch.yaml`. Set `adopted` for each one that the product
-has. Give each one that it leaves out `status: n/a` and its reason, such as
-"the product has no paid plan". Show the draft, and ask the owner what is
-wrong with it.
-
-Fill `budgets:` in `clutch.yaml` from the walk:
-
-- `layoutShift`: 0.01, the template default.
-- `clicks`: the clicks or taps that each adopted core journey takes in the
-  walk. Sign-up takes 3 or fewer.
-- `timeToValue`: the activation event from project intent, and the seconds
-  from the first screen to it.
-
-A budget looser than a template default is an owner decision.
 
 Then fill two user pages from the walk. `docs/users/intro.md` says what the
 product is and is not. `docs/users/getting-started.md` takes a new user to one

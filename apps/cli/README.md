@@ -531,16 +531,6 @@ factory: # optional
   root: factory # the default: the folder of the factory tree. . is the project root
 journeys: # optional
   webApp: apps/app # the app that web journeys drive. Without it, the one app under apps/ with a web entry
-coreJourneys: # optional: kickoff records one decision for each core journey
-  sign-up: adopted
-  billing-and-checkout:
-    status: n/a # adopted or n/a
-    reason: The product has no paid plan. # required for n/a
-  # ... and sign-in, onboarding, profile-management, roles-and-access, account-security, contact-support
-budgets: # optional: kickoff fills it
-  layoutShift: 0.01 # the cumulative layout shift limit of a journey
-  clicks: { sign-up: 3 } # the clicks or taps to finish each core journey
-  timeToValue: { event: first-note-added, seconds: 120 } # first screen to the activation event
 fleet: # optional: the repositories the weekly digest reads
   - repo: eggdev/neighborhood # owner/name
     ref: main # the branch to read
@@ -565,12 +555,6 @@ it when a repository has more than one app with a web entry, which is an Nx
 `dev` target that is not tagged `platform:server` or `platform:native`. Without
 it, the runner uses the one such app, and fails when there are several. See
 [journeys](../../docs/contributing/setup/verification.md#journeys).
-
-`coreJourneys` records whether the project has each core journey in the
-[core journey catalog](../../docs/contributing/journeys/core.md). It lists all
-8 of them, and each one it leaves out has a reason. Kickoff writes it.
-`budgets` holds the quality budgets of the core journeys. The template
-defaults are `layoutShift: 0.01` and 3 clicks for sign-up.
 
 `fleet` lists the repositories that `.github/workflows/weekly-digest.yml`
 reads each Monday, as the release bot. See
@@ -792,13 +776,6 @@ mise exec -- bun run clutch doctor --phase P1
   Code Security, so `sast.yml` fails.
 - With `--remote`, a ruleset on GitHub differs from its file in
   `.github/rulesets/`, or does not exist. See [Ruleset](#ruleset).
-- `coreJourneys` adopts a core journey, and no journey in
-  `features/*/journeys/` has its `Core:` line.
-- `coreJourneys` adopts core journeys, and `budgets` lacks `layoutShift`,
-  `timeToValue`, or `clicks` for an adopted one: `budget missing`.
-- Kickoff is done (no `KICKOFF.md`), a feature has screens
-  (`features/*/screens`), and `clutch.yaml` has no `coreJourneys`:
-  `core journeys unrecorded`.
 
 A remote rule that is unknown never fails the gate. When a capability's files
 pass and only its remote rules are left, it is unknown without `--remote`, so

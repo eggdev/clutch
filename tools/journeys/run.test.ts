@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import path from 'node:path';
 
-import { main, unprovenCore } from '@tools/journeys/run';
+import { main } from '@tools/journeys/run';
 import type { Sink } from '@tools/journeys/run';
 import { inRepo } from '@tools/testing/in-repo';
 
@@ -63,43 +63,6 @@ test('several web apps and no journeys.webApp fail before any server starts', as
       expect(lines).toEqual([
         'Several apps under apps/ have a web entry: apps/admin, apps/web. Name the app that the web journeys drive in clutch.yaml with `journeys: { webApp: apps/<name> }`.',
       ]);
-    },
-  );
-});
-
-test('a passed core journey run that did not record each catalog outcome, signed-up first, is unproven', async () => {
-  const signIn = '/**\n * sign-in: A visitor signs in.\n * Core: sign-in\n */\nexport {};\n';
-  await inRepo(
-    {
-      'features/account/journeys/sign-in.pw.ts': signIn,
-      'outcomes/sign-in.jsonl': ['signed-in', 'signed-up', 'signed-out']
-        .map((name) => JSON.stringify({ name, expected: { url: '/home' } }))
-        .join('\n'),
-      'proven/sign-in.jsonl': [
-        'signed-up',
-        'signed-out',
-        'wrong-password-refused',
-        'signed-in',
-        'session-kept',
-      ]
-        .map((name) => JSON.stringify({ name, expected: { url: '/home' } }))
-        .join('\n'),
-    },
-    (root) => {
-      const ran = [
-        {
-          id: 'sign-in',
-          feature: 'account',
-          file: 'features/account/journeys/sign-in.pw.ts',
-          platform: 'web' as const,
-        },
-      ];
-      expect(unprovenCore(root, ran, path.join(root, 'outcomes'))).toEqual([
-        'features/account/journeys/sign-in.pw.ts: the run did not record `signed-up` first, so it did not prove a new account. See docs/contributing/journeys/core.md.',
-        'features/account/journeys/sign-in.pw.ts: the run passed, but recorded no `session-kept`, `wrong-password-refused`. Each catalog outcome must hold in the run. See docs/contributing/journeys/core.md.',
-      ]);
-      expect(unprovenCore(root, ran, path.join(root, 'proven'))).toEqual([]);
-      expect(unprovenCore(root, ran, path.join(root, 'none'))).toHaveLength(2);
     },
   );
 });
