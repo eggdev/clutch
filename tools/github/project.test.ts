@@ -227,7 +227,7 @@ test('the pr commands run in a project made by clutch init', async () => {
     expect(pr('status', '7').out).toContain('Ready to merge: yes');
     expect(pr('wait', '7', '--timeout', '1m')).toMatchObject({ code: 0 });
     expect(pr('failures', '7').out).toContain('No check failed.');
-    const merge = pr('merge', '7');
+    const merge = pr('merge', '7', '--owner');
     expect(merge).toMatchObject({ code: 0 });
     expect(merge.out).toContain('Released v0.1.0');
     const log = await readFile(env.FAKE_GH_LOG, 'utf-8');

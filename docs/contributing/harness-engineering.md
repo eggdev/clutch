@@ -126,6 +126,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A dependency override                                                             | `tools/dependency-overrides.yaml`                                                                                   |
 | Agent review of a PR that a bot opened                                            | `agent-review.yml`, `allowed_bots`                                                                                  |
 | The owner's approval, which lifts an agent PR's risk tier and `owner` findings    | `clutch.yaml`, `automerge.owner`, read in `tools/github/auto-merge-rules.ts` (`ownerLifts`)                         |
+| A merge on the owner's word, which skips the auto-merge judge but not the checks  | `tools/github/merge.ts`, `pr merge --owner`                                                                         |
 | A bypass of the main ruleset                                                      | `.github/rulesets/main.json`, `bypass_actors`: only the release bot's app                                           |
 | Files a Clutch sync PR may change past the lineage                                | `tools/github/bot-rule.ts`, `syncExtras`                                                                            |
 | Days a project may stay behind a Clutch release                                   | `clutch.yaml`, `template.grace_days`                                                                                |
@@ -188,9 +189,8 @@ never the only record of a leftover. Report a bug with the
 
 ## Weekly gardening
 
-Once a week, `.github/workflows/gardening.yml` runs two jobs. The `gardening`
-job runs an agent for one short pass, and the `calibration` job updates the
-auto-merge calibration issue, described below. The agent edits files only. The workflow commits the edits to a
+Once a week, `.github/workflows/gardening.yml` runs an agent for one short
+pass. The agent edits files only. The workflow commits the edits to a
 `gardening/<date>` branch and opens one pull request. It never pushes to the
 default branch, and it skips the week while a gardening PR is open. A person
 reviews the PR. The PR opens with the release bot's token when the
@@ -199,9 +199,8 @@ CI or agent review. See [the release bot](./setup/releases.md#the-release-bot).
 The agent runs on the model that the `CLUTCH_AGENT_MODEL` repository variable
 names, or on `claude-haiku-5-5` when it is unset. The workflow adds a
 changeset from the PR title, and agent review reviews the PR like any other.
-The `calibration` job needs no credential. It opens or updates the
-issue "Auto-merge calibration: week of <date>", which lists each auto-merge
-dry-run verdict the owner has not graded. See
+`clutch metrics --verdicts` lists each auto-merge dry-run verdict that the
+owner has not graded. See
 [grade the verdicts](../../.agents/skills/deliver/references/pull-requests.md#grade-the-verdicts).
 The pass:
 

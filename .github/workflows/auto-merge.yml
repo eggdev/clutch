@@ -4,45 +4,45 @@ name: Auto-merge
 # acts on automerge in clutch.yaml. automerge.step sets the reach: bots, low or
 # medium. on runs `gh pr merge --auto --merge` with the release bot token, so
 # the release and CI run after the merge, and never while main is red. dry-run
-# and on comment a verdict on each agent PR for the owner to grade.
+# and on comment a verdict on each agent PR, which the owner grades with a
+# reaction.
 # tools/github/auto-merge.ts holds the rules. See
 # .agents/skills/deliver/references/pull-requests.md#auto-merge.
 #
-# A check suite that GitHub Actions creates starts no check_suite workflow, so
-# this runs when CI or agent review completes. The run that sees every required
-# check finished decides. It reads no label, because a label set with
-# GITHUB_TOKEN starts no workflow. It runs the base branch's code, so a pull
-# request cannot change the rules that judge it.
+# Three things start it, and no schedule does:
 #
-# The sweep (auto-merge-sweep.yml) dispatches this workflow. Hourly, it decides a
-# green PR once on its final check state, and again only when its head changes
-# or its last decide job fails. After a push that changes a rule, it decides
-# every eligible PR again. A dispatch runs only from the default branch and
-# judges the head the PR has then. The decide job finds the PR and its head.
-# It queues on the PR, and merge on the head, so a dispatch and an event run
-# for the same PR never decide at once. One job finds and decides, since each job bills
-# at least a minute in a private repository. The scripts retry a gh read on a transient GitHub error, and
-# never a write (tools/github/command.ts).
+# - `bun run pr merge <number>`, in the session that built the PR, dispatches
+#   it once the PR is ready, then waits for the merge, the release and CI on
+#   main.
+# - The owner's approval of a head. The session may have ended by then, so the
+#   approval hands the PR to a dispatch from the default branch.
+# - A completed CI or Agent review run on a PR that no session owns: a
+#   `revert/` PR that the Auto-revert net opened, or a bot's `renovate/`,
+#   `gardening/` or `clutch-sync/` PR. An agent's `clutch/` PR merges from
+#   this event only after the owner approved it, so it otherwise merges only
+#   when its session asks. When CI turns green on the default branch, each
+#   approved agent PR is judged again, since a red main may have held it.
+#
+# Each run uses the default branch's code, so a pull request cannot change the
+# rules that judge it. The decide job judges the head that the PR has then, and
+# the merge job pins the merge to that head. The scripts retry a gh read on a
+# transient GitHub error, and never a write (tools/github/command.ts).
 
 run-name: "Auto-merge${{ inputs.pr && format(' #{0}', inputs.pr) || '' }}"
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  # The owner's approval of a head lets a PR that waits for them merge. An
-  # approval runs the decide job again, so the merge queues once checks pass.
   pull_request_review:
     types: [submitted]
   # workflow_run runs with this repository's token, so the decide job admits
   # only runs from branches of this repository, never a fork, and it runs the
-  # default branch's code. No other trigger sees a completed Actions check.
+  # default branch's code.
   workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [CI, Agent review]
     types: [completed]
   workflow_dispatch:
     inputs:
       pr:
-        description: The pull request number to judge again.
+        description: The pull request number to judge.
         required: true
         type: number
 
@@ -52,25 +52,24 @@ permissions:
 
 jobs:
   decide:
-    # Every pull request from this repository, never a fork. The script judges
-    # each one by its author and branch, so a person's PR gets only a refusal. A
-    # push to main also completes CI, and is no pull request. A dispatch from
-    # any branch but the default one is refused, and so is a fork's PR, which the
-    # Find step refuses for a dispatch. A run that finds no PR judges nothing.
+    # The script judges each PR by its author and branch, so a person's PR gets
+    # only a refusal. The Find step refuses a fork's PR on a dispatch.
     if: >-
-      (github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository) ||
       (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' &&
       github.event.pull_request.head.repo.full_name == github.repository) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.head_repository.full_name == github.repository) ||
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (startsWith(github.event.workflow_run.head_branch, 'revert/') ||
+      startsWith(github.event.workflow_run.head_branch, 'renovate/') ||
+      startsWith(github.event.workflow_run.head_branch, 'gardening/') ||
+      startsWith(github.event.workflow_run.head_branch, 'clutch-sync/') ||
+      startsWith(github.event.workflow_run.head_branch, 'clutch/'))) ||
       (github.event_name == 'workflow_dispatch' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     # One decision at a time for each pull request, so two runs cannot both
-    # comment. A dispatch and an event run on the same PR queue here. A
-    # workflow_run that names no PR falls back to its head commit.
+    # comment. A workflow_run that names no PR falls back to its head commit.
     concurrency:
       group: auto-merge-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr || github.event.workflow_run.head_sha }}
       cancel-in-progress: false
@@ -98,10 +97,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             # A dispatch judges the head that the PR has now. A fork's PR is
-            # refused, as the workflow_run path refuses it: the run judges nothing.
+            # refused: the run judges nothing.
             pr_view="$(gh pr view "$PR" --json headRefOid,isCrossRepository --jq '.headRefOid + " " + (.isCrossRepository | tostring)')"
             read -r HEAD_SHA cross <<< "$pr_view"
             if [ "$cross" != false ]; then
@@ -112,6 +112,18 @@ jobs:
             PR="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")][0].number // empty')"
             if [ -z "$PR" ]; then
               echo "::notice title=Auto-merge skipped::No open pull request has head $HEAD_SHA."
+            fi
+          fi
+          # An agent's clutch/ PR merges from a CI event only after the owner
+          # approved it: the approval's own run may have met a pending check.
+          # Its session merges it otherwise.
+          # A ruleset's code owner review leaves reviewDecision empty, so read the
+          # approvals on the head commit. The judge then checks that the owner gave one.
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ] && [ -n "$PR" ] && [[ "$HEAD_BRANCH" == clutch/* ]]; then
+            approved="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/reviews" --jq ".[] | select(.state == \"APPROVED\" and .user.type != \"Bot\" and .commit_id == \"$HEAD_SHA\") | .id")"
+            if [ -z "$approved" ]; then
+              echo "::notice title=Auto-merge skipped::Agent PR $PR has no approval, so its session merges it."
+              PR=""
             fi
           fi
           echo "number=$PR" >> "$GITHUB_OUTPUT"
@@ -164,14 +176,45 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: gh workflow run auto-merge.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH" -f pr="$PR"
 
+  # When CI turns green on the default branch, judge again each open agent PR
+  # that the owner approved. Its approval's run may have met a red main, and
+  # no later event of its own comes.
+  rejudge:
+    if: >-
+      github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+      actions: write
+    steps:
+      - name: Dispatch Auto-merge for each approved agent PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          # A ruleset's code owner review leaves reviewDecision empty, so read the
+          # approvals on each head commit. The judge checks that the owner gave one.
+          gh pr list --state open --limit 100 --json number,headRefName,headRefOid,isCrossRepository \
+            --jq '.[] | select((.headRefName | startswith("clutch/")) and (.isCrossRepository | not)) | "\(.number) \(.headRefOid)"' |
+            while read -r pr head; do
+              approved="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/reviews" --jq ".[] | select(.state == \"APPROVED\" and .user.type != \"Bot\" and .commit_id == \"$head\") | .id")"
+              if [ -n "$approved" ]; then
+                gh workflow run auto-merge.yml --ref "$DEFAULT_BRANCH" -f pr="$pr"
+              fi
+            done
+
   # Enables GitHub's auto-merge, `gh pr merge --auto --merge`, with the release
   # bot's token. A merge made with the default token starts no workflow, so the
   # release and CI on main would not run after it. The bot's key lives in the
-  # release environment, which only the default branch may use, so only a
-  # workflow_run run or a dispatch from the default branch merges. A
-  # pull_request run waits for the next one.
+  # release environment, which only the default branch may use.
   merge:
     needs: decide
+    # The release environment takes only the default branch: a workflow_run or a
+    # dispatch. An approval's run handed its merge to a dispatch above.
     if: >-
       (github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch') &&
       needs.decide.outputs.merge == 'true'

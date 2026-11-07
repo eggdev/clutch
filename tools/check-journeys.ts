@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { coreProblems } from '@tools/journeys/core-rules';
 import {
   fieldOf,
   headerOf,
@@ -21,6 +22,8 @@ import type { Journey } from '@tools/journeys/journeys';
  *   `Entry:` and `Isolation and cleanup:`.
  * - A journey that the verify config does not register as a flow, and a flow
  *   that runs a journey that does not exist.
+ * - A journey with `Core: <name>` that breaks the core journey catalog: see
+ *   `journeys/core-rules.ts`.
  *
  * See docs/contributing/setup/verification.md#journeys.
  */
@@ -83,7 +86,8 @@ function missingJourneys(root: string, all: ReadonlyArray<Journey>): Array<strin
 }
 
 function headerProblems(root: string, journey: Journey): Array<string> {
-  const header = headerOf(readFileSync(path.join(root, journey.file), 'utf-8'));
+  const source = readFileSync(path.join(root, journey.file), 'utf-8');
+  const header = headerOf(source);
   const problems: Array<string> = [];
   if (!header[0]?.startsWith(`${journey.id}: `)) {
     problems.push(
@@ -93,7 +97,7 @@ function headerProblems(root: string, journey: Journey): Array<string> {
   for (const name of requiredFields.filter((field) => fieldOf(header, field) === undefined)) {
     problems.push(`${journey.file}: the header has no \`${name}:\` line. Add it.`);
   }
-  return problems;
+  return [...problems, ...coreProblems(journey, source)];
 }
 
 function registrationProblems(root: string, all: ReadonlyArray<Journey>): Array<string> {

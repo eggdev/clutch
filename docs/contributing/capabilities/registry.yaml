@@ -524,13 +524,12 @@ capabilities:
       adoption_top: 0.37
     doc: docs/contributing/capabilities/ci-failure-explainer.md
     detect:
-      # Auto-merge also runs on workflow_run, so the trigger alone is no explainer.
-      - workflow:
-          'on': workflow_run
-          run: log-failed|conclusion
+      # The session that owns a PR reads its failed jobs with `pr failures`,
+      # inside each babysit round. No workflow waits on CI to explain it.
+      - file: tools/github/failures.ts
       - grep:
-          files: .github/workflows/*.y*ml
-          pattern: log-failed|conclusion == .failure.
+          files: .agents/skills/babysit-pr/SKILL.md
+          pattern: pr failures
   - id: flaky_quarantine
     name: Flaky-test quarantine / registry
     category: Verification

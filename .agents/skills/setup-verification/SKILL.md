@@ -17,6 +17,8 @@ another verify-<app> directory.
    not permission to redefine expected results.
 2. Existing verify covers the request: hand execution to it. Do not regenerate.
 3. Missing behavior: follow [journey authoring](./references/journey-authoring.md).
+   For a core journey, start from its template in
+   [core-journeys/](./references/core-journeys/).
 4. Existing verify is stale: follow [maintenance](./references/maintenance.md).
 5. No verify exists: discover the real surface and generate it below. If an older
    project-specific verification skill exists, migrate its working flows into
@@ -38,6 +40,23 @@ Prefer established project commands. Record occupied ports or foreign resources
 as conflicts, never silently adopt or kill them. Check native binary, bundle and
 API identity independently. A local lock is not a host-wide simulator lease;
 native driving needs the enforced shared lease, not merely a preflight check.
+
+## Copy what users do
+
+When the project has PostHog, read its recordings of the flow before you write
+the journey steps. Without PostHog, skip this step.
+
+1. List the recent recordings that pass through the flow's first screen:
+   `GET /api/projects/<project id>/session_recordings` on the PostHog API, with
+   the personal API key from the project's secrets.
+2. Pick 5 to 10 of them across devices. Read the events of each one in order:
+   `POST /api/projects/<project id>/query` with a HogQL query on its
+   `$session_id`.
+3. Add what users do as journey steps: the real order of screens, the devices,
+   and the detours, such as the back button or a second try.
+
+Keep the recordings and their user data out of the repository. Put only the
+steps into the journey.
 
 ## Generate one executor
 

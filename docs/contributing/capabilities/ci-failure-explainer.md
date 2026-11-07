@@ -8,20 +8,17 @@ Rank 63 of the researched practices. More than one third of the leading reposito
 
 ## Detection
 
-`clutch doctor` reports this capability as present when two rules pass. A workflow triggers on `workflow_run` and a step of it reads the failed log or the conclusion. A workflow file mentions `log-failed`, or tests whether a conclusion is `failure`. It is partial when only one rule passes. See the `ci_failure_explainer` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when two rules pass. `tools/github/failures.ts` exists, and the babysit-pr skill runs `pr failures`. It is partial when only one rule passes. See the `ci_failure_explainer` entry in [the registry](./registry.yaml).
 
 ## Adopt
 
-1. Add a workflow file `ci-explain.yml` in `.github/workflows/`.
-2. Trigger it on `workflow_run` of the CI workflow, with the type `completed`. Run the job only for a failed run from a pull request in this repository.
-3. Grant `contents: read` at the top level. Grant `pull-requests: write` and `actions: read` to the job.
-4. Download the failed logs with `gh run view --log-failed`, and trim them.
-5. Pass the logs to `anthropics/claude-code-action` with a prompt that asks for a short answer.
-6. When no API secret exists, pass with a notice, like the agent review workflow.
-   On a pull request, keep one comment and edit it. On the default branch, keep
-   one tracking issue and comment on it, so a red branch cannot open an issue
-   for every run.
-7. Set `ci_failure_explainer` to `adopted` in `clutch.yaml`.
+The session that built a pull request explains its own failures. No workflow waits for CI to finish and comments later.
+
+1. Keep `tools/github/failures.ts` and the `failures` command in `tools/github/pr.ts`. `bun run pr failures <number>` prints the failed step of each failed job, and the output of each failed Nx task.
+2. Keep the step in [babysit-pr](../../../.agents/skills/babysit-pr/SKILL.md) that reads each red check with `pr failures` before it decides.
+3. Set `ci_failure_explainer` to `adopted` in `clutch.yaml`.
+
+A red default branch after a merge belongs to the session that merged: `pr merge` watches CI on the merge commit. See [rollback](../operations/rollback.md#auto-revert).
 
 ## Waive
 

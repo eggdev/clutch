@@ -54,6 +54,8 @@
     ".cursor/BUGBOT.md",
     "tools/journeys/**",
     "packages/journeys/**",
+    "docs/contributing/journeys/core.md",
+    "apps/cli/src/clutch-config/core-journeys.ts",
     ".agents/skills/verify/verification.json",
     "clutch.yaml",
     ".clutch/risk.yaml",

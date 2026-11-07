@@ -1,5 +1,7 @@
 import { expect, test } from 'bun:test';
+import path from 'node:path';
 
+import { coreJourneys } from '@/clutch-config/core-journeys';
 import { validateClutchConfig } from '@/clutch-config/schema';
 
 const valid = {
@@ -294,4 +296,84 @@ test('factory.intake takes labels and tracker states, with a default for each ke
   expect(paths({ ...valid, factory: { intake: { jira: ['x'] } } })).toEqual([
     'factory.intake.jira',
   ]);
+});
+
+const allCore = {
+  'sign-up': 'adopted',
+  'sign-in': 'adopted',
+  onboarding: 'adopted',
+  'profile-management': 'adopted',
+  'billing-and-checkout': { status: 'n/a', reason: 'The product has no paid plan.' },
+  'roles-and-access': { status: 'n/a', reason: 'Each account has one user.' },
+  'account-security': 'adopted',
+  'contact-support': 'adopted',
+};
+
+test('coreJourneys is optional and takes a decision for each core journey', () => {
+  expect(validateClutchConfig({ ...valid, coreJourneys: allCore }).config?.coreJourneys).toEqual({
+    'sign-up': { status: 'adopted' },
+    'sign-in': { status: 'adopted' },
+    onboarding: { status: 'adopted' },
+    'profile-management': { status: 'adopted' },
+    'billing-and-checkout': { status: 'n/a', reason: 'The product has no paid plan.' },
+    'roles-and-access': { status: 'n/a', reason: 'Each account has one user.' },
+    'account-security': { status: 'adopted' },
+    'contact-support': { status: 'adopted' },
+  });
+  const { 'contact-support': _left, ...missing } = allCore;
+  expect(
+    paths({
+      ...valid,
+      coreJourneys: {
+        ...missing,
+        onboarding: 'waived',
+        'roles-and-access': { status: 'n/a' },
+        'billing-and-checkout': { status: 'n/a', reason: 'No plan.', issue: 'CL-1' },
+        search: 'adopted',
+      },
+    }),
+  ).toEqual([
+    'coreJourneys.search',
+    'coreJourneys.onboarding',
+    'coreJourneys.billing-and-checkout.issue',
+    'coreJourneys.roles-and-access.reason',
+    'coreJourneys.contact-support',
+  ]);
+  expect(paths({ ...valid, coreJourneys: ['sign-up'] })).toEqual(['coreJourneys']);
+});
+
+test('budgets is optional and takes the layout shift, the clicks of each core journey and the time to value', () => {
+  const budgets = {
+    layoutShift: 0.01,
+    clicks: { 'sign-up': 3, 'sign-in': 2 },
+    timeToValue: { event: 'first-note-added', seconds: 120 },
+  };
+  expect(validateClutchConfig({ ...valid, budgets }).config?.budgets).toEqual(budgets);
+  expect(validateClutchConfig({ ...valid, budgets: {} }).config?.budgets).toEqual({});
+  expect(
+    paths({
+      ...valid,
+      budgets: {
+        layoutShift: 1.5,
+        clicks: { 'sign-up': 0, search: 2 },
+        timeToValue: { event: '', seconds: 2.5 },
+        speed: 1,
+      },
+    }),
+  ).toEqual([
+    'budgets.speed',
+    'budgets.layoutShift',
+    'budgets.clicks.sign-up',
+    'budgets.clicks.search',
+    'budgets.timeToValue.event',
+    'budgets.timeToValue.seconds',
+  ]);
+});
+
+test('the core journey list matches the headings of the catalog', async () => {
+  const catalog = await Bun.file(
+    path.join(import.meta.dir, '../../../../docs/contributing/journeys/core.md'),
+  ).text();
+  const names = [...catalog.matchAll(/^## .+ \(`([a-z-]+)`\)$/gmu)].map((match) => match[1]);
+  expect(names).toEqual([...coreJourneys]);
 });
