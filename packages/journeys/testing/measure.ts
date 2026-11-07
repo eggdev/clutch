@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { stripVTControlCharacters as plain } from 'node:util';
 
 import type { BrowserContext, Page, TestInfo } from '@playwright/test';
 
@@ -231,16 +232,17 @@ function count(measure: Measure, event: PageEvent) {
 
 /** Keeps the first failure of the try, so the measures file names what failed. */
 export function markFailure(measure: Measure, kind: FailureKind, message: string) {
-  measure.failure ??= { kind, message };
+  measure.failure ??= { kind, message: plain(message) };
 }
 
 /** The kind of a try that failed with no measured budget: a timeout, a failed `expect`, or a crash. */
 export function kindOf(info: Pick<TestInfo, 'status' | 'error'>): FailureKind {
-  const message = info.error?.message ?? '';
+  const message = plain(info.error?.message ?? '');
   if (info.status === 'timedOut' || /TimeoutError|Timeout \d+ms exceeded/u.test(message)) {
     return 'timeout';
   }
-  return /expect(?:\.\w+)*\(/u.test(message) ? 'assertion' : 'crash';
+  // A missing screenshot baseline is a failed snapshot assertion too.
+  return /expect(?:\.\w+)*\(|A snapshot doesn't exist/u.test(message) ? 'assertion' : 'crash';
 }
 
 /** The core journey that the `Core:` line of the journey header names, or null. */

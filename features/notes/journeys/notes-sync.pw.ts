@@ -27,6 +27,16 @@ import { accessible } from '@repo/journeys/testing/a11y';
 import { test } from '@repo/journeys/testing/test';
 import { snap } from '@repo/journeys/testing/visual';
 
+/**
+ * Hides what the notes of earlier runs change: the note list, the empty line
+ * and the note count. Each device and each retry adds a note to the same dev
+ * database, so only the first try sees no note.
+ */
+const earlierNotes = `
+  main > ul, main > form + p { display: none !important; }
+  main > header > p { visibility: hidden !important; }
+`;
+
 /** The title field of the note that has this saved title. */
 function note(page: Page, title: string) {
   return page.getByRole('textbox', { name: 'Note title' }).and(page.locator(`[value="${title}"]`));
@@ -57,7 +67,7 @@ test('a note syncs to another device, also after an offline rename', async ({ pa
   await expect(writer.getByRole('button', { name: 'Open notes' })).toBeVisible();
   await snap(writer, 'home');
   await openNotes(writer);
-  await snap(writer, 'notes-open');
+  await snap(writer, 'notes-open', { style: earlierNotes });
   await openNotes(reader);
 
   const run = Date.now().toString(36);

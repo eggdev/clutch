@@ -102,7 +102,11 @@ page it left.
 Each shot is deterministic. Animations are off, the caret is hidden, fonts are
 loaded, and `snap` takes shots until two in a row match. The locale is `en-US`
 and the time zone UTC. Pass `mask` for a region that changes on each run, such
-as a generated name. A screen that shows the time sets the clock first with
+as a generated name. Pass `style` with CSS that hides a region whose size
+changes on each run. An example is a list that grows with the data of earlier
+runs.
+The CSS applies only to the shot. A layout shift that the snap makes does not
+count toward the budget. A screen that shows the time sets the clock first with
 `page.clock.setFixedTime`.
 
 The baselines are committed PNG files:

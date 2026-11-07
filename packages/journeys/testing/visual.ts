@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
+import { flush, measureOf } from '@repo/journeys/testing/measure';
 
 /**
  * The screenshot check of web journeys. A journey calls `snap(page, 'name')` at
@@ -69,6 +70,12 @@ type SnapOptions = {
   readonly mask?: ReadonlyArray<Locator>;
   /** The whole page, not only the viewport. */
   readonly fullPage?: boolean;
+  /**
+   * CSS that applies only while the shot is taken. Use it to hide a region
+   * whose size changes on each run, such as a list that grows with the data
+   * of earlier runs. `mask` keeps the size of a region, so it cannot cover that.
+   */
+  readonly style?: string;
 };
 
 /** Takes shots until two in a row match, as `toHaveScreenshot` does, at most 5. */
@@ -80,6 +87,7 @@ async function stableShot(page: Page, options: SnapOptions) {
       scale: 'css',
       fullPage: options.fullPage ?? false,
       mask: [...(options.mask ?? [])],
+      ...(options.style === undefined ? {} : { style: options.style }),
     });
   let previous = await take();
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -114,11 +122,7 @@ function widthOf(info: ReturnType<typeof test.info>): Width {
   return found;
 }
 
-/**
- * Captures the page on the run's device in each scheme, then puts the scheme
- * back, so the journey goes on as before.
- */
-export async function snap(page: Page, name: string, options: SnapOptions = {}) {
+async function shoot(page: Page, name: string, options: SnapOptions) {
   const info = test.info();
   const width = widthOf(info);
   const quarantine = quarantinedSnaps(
@@ -172,5 +176,27 @@ export async function snap(page: Page, name: string, options: SnapOptions = {}) 
     }
   } finally {
     await setScheme(page, wasDark ? 'dark' : 'light');
+  }
+}
+
+/**
+ * Captures the page on the run's device in each scheme, then puts the scheme
+ * back, so the journey goes on as before. A layout shift during the snap does
+ * not count toward the budget, because the snap makes it, not the app.
+ */
+export async function snap(page: Page, name: string, options: SnapOptions = {}) {
+  const measure = measureOf(page);
+  await flush(page);
+  const shiftsBefore = measure?.shifts.length ?? 0;
+  try {
+    await shoot(page, name, options);
+  } finally {
+    // The scheme and the `style` of a shot can move the page. The user never
+    // sees that, so the layout shift budget drops each shift from the snap.
+    await page.evaluate(
+      'new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))',
+    );
+    await flush(page);
+    measure?.shifts.splice(shiftsBefore);
   }
 }

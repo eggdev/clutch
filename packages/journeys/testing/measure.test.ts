@@ -155,6 +155,13 @@ test('a try that fails with no measured budget is a timeout, an assertion or a c
   expect(kindOf({ status: 'failed', error: { message: 'TypeError: x is undefined' } })).toBe(
     'crash',
   );
+  // As CI wrote them for a changed and a missing screenshot baseline.
+  const changed =
+    'Error: a.png differs from its baseline.\n\n\u001B[2mexpect(\u001B[22m\u001B[31mBuffer\u001B[39m\u001B[2m).\u001B[22mtoMatchSnapshot';
+  const missing =
+    "Error: a.png differs from its baseline.\n\nA snapshot doesn't exist at /repo/__screenshots__/a.png.";
+  expect(kindOf({ status: 'failed', error: { message: changed } })).toBe('assertion');
+  expect(kindOf({ status: 'failed', error: { message: missing } })).toBe('assertion');
 });
 
 test('the first failure of a try is the one it keeps', () => {
@@ -162,4 +169,7 @@ test('the first failure of a try is the one it keeps', () => {
   markFailure(run, 'axe', 'axe found violations');
   markFailure(run, 'crash', 'later');
   expect(run.failure).toEqual({ kind: 'axe', message: 'axe found violations' });
+  const colored = measure(null, []);
+  markFailure(colored, 'assertion', '\u001B[2mexpect(\u001B[22mBuffer)');
+  expect(colored.failure?.message).toBe('expect(Buffer)');
 });
