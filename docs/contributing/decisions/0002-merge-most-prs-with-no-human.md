@@ -34,7 +34,7 @@ check scripts, lint config and other workflows. Two guards make it safe:
 
 - Agent review gives an `owner` finding to a change that weakens a check, a
   lint rule, a budget or a test, whatever its path. Auto-merge leaves that PR
-  for Brendan. The test-integrity check stays as it is.
+  for Brendan. It is the one guard for a weaker or deleted test.
 - When `main` turns red after an auto-merged PR, the Auto-revert workflow opens
   its revert PR. Each revert of an auto-merged PR files a `risk-tighten` issue
   that proposes to tighten its path. `clutch metrics` watches the share with

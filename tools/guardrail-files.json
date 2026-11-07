@@ -49,7 +49,6 @@
     "tools/validate.ts",
     "tools/dev.ts",
     "tools/native/**",
-    "tools/test-integrity-allow.json",
     "packages/sync/service/transaction-safe.ts",
     "docs/contributing/review.md",
     ".cursor/BUGBOT.md",

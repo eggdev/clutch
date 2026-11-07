@@ -1,6 +1,0 @@
-{
-  "description": "Test files that a change may delete, or whose test or expect count may drop, with the reason. check-test-integrity reads it. An entry covers a file only in the change that adds it or changes its reason, and only when the change touches that file. An entry from an earlier change covers nothing. See docs/contributing/testing.md#test-integrity.",
-  "files": {
-    "tools/docs-checks.test.ts": "CL-307 moves the 2 file-size tests and their assertions to tools/check-file-size.test.ts, unchanged."
-  }
-}
