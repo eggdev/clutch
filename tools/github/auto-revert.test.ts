@@ -236,7 +236,18 @@ test('a red release commit blames the merge before it', async () => {
 });
 
 test('a PR that a person merged, or a commit with no PR, is not reverted', async () => {
-  const person = main([['gh api --paginate repos/acme/shop/issues/42/comments', { out: '' }]]);
+  const person = main([
+    ['gh api --paginate repos/acme/shop/issues/42/comments', { out: '' }],
+    [
+      'gh api repos/acme/shop/pulls/42',
+      {
+        out: JSON.stringify({
+          headRefName: 'fix/typo',
+          author: { login: 'eggdev', is_bot: false },
+        }),
+      },
+    ],
+  ]);
   const merged = await autoRevert(person);
   expect(merged.lines[0]).toContain('A person merged #42');
   const direct = main([['gh api repos/acme/shop/commits/red1234/pulls', { out: '' }]]);
@@ -300,7 +311,15 @@ test("an agent's PR that its session merged on the owner's word is reverted", as
   // `pr merge --owner` merges with the session's token, so no enabled marker exists.
   const gh = main([
     ['gh api --paginate repos/acme/shop/issues/42/comments', { out: '' }],
-    ['gh api repos/acme/shop/pulls/42', { out: 'clutch/cl-042-fix-sign-in\n' }],
+    [
+      'gh api repos/acme/shop/pulls/42',
+      {
+        out: JSON.stringify({
+          headRefName: 'clutch/cl-042-fix-sign-in',
+          author: { login: 'eggdev', is_bot: false },
+        }),
+      },
+    ],
   ]);
   await autoRevert(gh);
   expect(gh.calls).toContain('gh workflow run revert.yml --repo acme/shop --ref main -f pr=42');

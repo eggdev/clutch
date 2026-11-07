@@ -63,10 +63,6 @@ export function isAgentPr(state: Pick<PrState, 'author' | 'authorIsBot' | 'headR
   return (
     !state.fork &&
     agentRule({
-      state: 'OPEN',
-      isDraft: false,
-      baseRefName: '',
-      headRefOid: '',
       headRefName: state.headRef,
       author: { login: state.author, is_bot: state.authorIsBot },
     })

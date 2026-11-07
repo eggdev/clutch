@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { isAgentPr } from '@tools/github/auto-merge-rules';
+import type { Pr } from '@tools/github/auto-merge-rules';
 import { isRed, latestChecks, requiredChecks } from '@tools/github/main-checks';
 import type { CheckRun } from '@tools/github/main-checks';
 import type { Run } from '@tools/github/stack';
@@ -63,8 +65,15 @@ export async function autoMerged(run: Run, repo: string, pr: string) {
  * `pr merge --owner`, on the owner's word, so it carries no enabled marker.
  */
 async function agentPr(run: Run, repo: string, pr: string) {
-  const out = await must(run, ['gh', 'api', `repos/${repo}/pulls/${pr}`, '--jq', '.head.ref']);
-  return /^clutch\/cl-\d+/u.test(out.trim());
+  const out = await must(run, [
+    'gh',
+    'api',
+    `repos/${repo}/pulls/${pr}`,
+    '--jq',
+    '{headRefName: .head.ref, author: {login: .user.login, is_bot: (.user.type == "Bot")}}',
+  ]);
+  // The judge's own rule, so the two cannot disagree on who is an agent.
+  return isAgentPr(JSON.parse(out) as Pick<Pr, 'headRefName' | 'author'>);
 }
 
 /** Whether the net may revert `pr`: auto-merge merged it, or it is an agent's PR. */

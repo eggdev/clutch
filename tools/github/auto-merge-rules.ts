@@ -89,7 +89,7 @@ export type Facts = {
  * bot opened it. The release bot opens each agent PR, so the author is a bot.
  * A PR on a known bot's branch is never an agent's.
  */
-export function isAgentPr(pr: Pr) {
+export function isAgentPr(pr: Pick<Pr, 'headRefName' | 'author'>) {
   return (
     botKind(pr.headRefName) === null && (pr.headRefName.startsWith(agentBranch) || pr.author.is_bot)
   );
