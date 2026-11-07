@@ -139,6 +139,9 @@ test('the babysit-pr skill keeps its contract, its decisions, its caps and its p
     'at most 8 rounds',
     '## Babysit log',
     'No workflow or\nschedule babysits',
+    'Sync by merge',
+    '--sync merge',
+    'resolves each thread',
   ]) {
     expect(text).toContain(word);
   }

@@ -286,5 +286,12 @@ test('a rerun that another actor started first is not an error', async () => {
   const { code, lines } = await autoRevert(gh, '1');
   expect(code).toBe(0);
   expect(reran(gh)).toBe(true);
-  expect(lines.at(-1)).toContain('The rerun did not start, likely because it already runs');
+  expect(lines.at(-1)).toContain('The rerun did not start, because it already runs');
+});
+
+test('a rerun that fails for another reason fails the job', async () => {
+  const gh = main([
+    ['gh run rerun', { ok: false, err: 'HTTP 403: Resource not accessible by integration' }],
+  ]);
+  await expect(autoRevert(gh, '1')).rejects.toThrow('gh run rerun 77 failed: HTTP 403');
 });

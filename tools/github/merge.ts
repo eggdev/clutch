@@ -210,24 +210,25 @@ export async function merge(
     );
   }
   const trunk = await defaultBranch(run);
+  if (!options.owner && baseRefName !== trunk) {
+    throw new Error(
+      `#${number} is stacked on ${baseRefName}. Merge the PR below it first, or merge the stack with --owner once the owner tells you to.`,
+    );
+  }
+  // The owner's word skips the judge, never the checks.
+  const { status, code } = await waitForChecks(run, number, clock, timing);
+  if (code === 2) {
+    throw new Error(`#${number} still has pending checks after the timeout.`);
+  }
+  if (status.counts.fail > 0) {
+    throw new Error(
+      `#${number} has ${status.counts.fail} failed check(s). Babysit it to green first: bun run pr failures ${number}`,
+    );
+  }
   let sha: string;
   if (options.owner) {
     sha = await mergeAsOwner(run, number, { baseRefName, headRefName, trunk });
   } else {
-    if (baseRefName !== trunk) {
-      throw new Error(
-        `#${number} is stacked on ${baseRefName}. Merge the PR below it first, or merge the stack with --owner once the owner tells you to.`,
-      );
-    }
-    const { status, code } = await waitForChecks(run, number, clock, timing);
-    if (code === 2) {
-      throw new Error(`#${number} still has pending checks after the timeout.`);
-    }
-    if (status.counts.fail > 0) {
-      throw new Error(
-        `#${number} has ${status.counts.fail} failed check(s). Babysit it to green first: bun run pr failures ${number}`,
-      );
-    }
     const result = await autoMerge(run, number, trunk, { clock, ...timing });
     if (!result.merged) {
       console.log(result.message);

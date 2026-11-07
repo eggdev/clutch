@@ -130,10 +130,15 @@ async function rerunOnce(
 ) {
   const { repo, runId, at, log, reran } = options;
   const rerun = await run(['gh', 'run', 'rerun', runId, '--failed', '--repo', repo]);
+  const why = (rerun.err || rerun.out).trim();
+  // The session and the Auto-revert workflow can both rerun. Only that race is not an error.
+  if (!rerun.ok && !/already running|is not completed|in progress/iu.test(why)) {
+    throw new Error(`gh run rerun ${runId} failed: ${why}`);
+  }
   log(
     rerun.ok
       ? `CI failed on ${at}. Reran the failed jobs once, in case a test is flaky.`
-      : `CI failed on ${at}. The rerun did not start, likely because it already runs: ${(rerun.err || rerun.out).trim()}`,
+      : `CI failed on ${at}. The rerun did not start, because it already runs: ${why}`,
   );
   reran?.();
 }
