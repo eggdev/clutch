@@ -24,7 +24,8 @@ export type Names = { has: (name: string) => boolean };
 
 /**
  * The only modules a core journey may import, by exact path, so `..` in a
- * path cannot leave the journey kit. `test` must come from @playwright/test.
+ * path cannot leave the journey kit, and the one name each gives: `test`,
+ * `outcomes`, `accessible` and `snap`, never renamed and never type-only.
  */
 const moduleNames = new Map([
   ['@playwright/test', ['test']],
@@ -252,12 +253,19 @@ function importAllowed(statement: ts.ImportDeclaration, kit: Set<string>) {
   const names = moduleNames.get(from);
   const clause = statement.importClause;
   const bindings = clause?.namedBindings;
-  if (!names || !clause || clause.name || !bindings || !ts.isNamedImports(bindings)) {
+  if (
+    !names ||
+    !clause ||
+    clause.name ||
+    clause.isTypeOnly ||
+    !bindings ||
+    !ts.isNamedImports(bindings)
+  ) {
     return false;
   }
   // No `as`: each name keeps the meaning that its module gives it.
   const plainNames = bindings.elements.every(
-    (item) => item.propertyName === undefined && names.includes(item.name.text),
+    (item) => !item.isTypeOnly && item.propertyName === undefined && names.includes(item.name.text),
   );
   if (!plainNames) {
     return false;

@@ -142,3 +142,13 @@ test('a renamed kit import that stands in for outcome fails', async () => {
   const problems = await coreRepo({ [file]: core('sign-up', 'sign-up', body) });
   expect(problems.find((item) => item.includes('not steps'))).toContain('lines 2, 7, ');
 });
+
+test('a type-only kit import fails', async () => {
+  const file = 'features/account/journeys/sign-up.pw.ts';
+  const body = signUp.replace(
+    "import { outcomes } from '@repo/journeys/testing/outcome';",
+    "import { type outcomes } from '@repo/journeys/testing/outcome';",
+  );
+  const problems = await coreRepo({ [file]: core('sign-up', 'sign-up', body) });
+  expect(problems.some((item) => item.includes(': line 2 is not a step'))).toBe(true);
+});
