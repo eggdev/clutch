@@ -64,9 +64,9 @@ sensitive path. A sensitive path reaches every platform.
 
 The judge reads its rules from the default branch, and the journeys run from
 the default branch too. When a PR changes a journey, its own copy must pass,
-and a check compares the two copies. A renamed button or a moved field passes
-that check. A removed assertion, budget, entry or platform is a weaker
-journey, and it goes to the owner. So a PR cannot weaken the proof or the gate
+and a check compares the named outcomes of the two copies. A renamed button
+or a moved field passes that check. A removed or changed outcome, or a looser
+budget, entry or platform, is a weaker journey, and it goes to the owner. So a PR cannot weaken the proof or the gate
 that judges it. A path stays held for the owner until its journeys exist and
 pass.
 
