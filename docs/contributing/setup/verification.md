@@ -51,11 +51,14 @@ mise exec -- bun run journey --all
 
 The runner uses the dev servers that already run. When a server is down, it
 starts the missing ones through `tools/dev.ts`. It stops only the servers that
-it started. A journey that runs past its budget fails. A `Core:` journey also
-fails when its run passed but did not record `signed-up` first, then every
-outcome that its catalog section names. `outcome()` writes each outcome that
-held to a folder for that run, under `test-results/journeys/outcomes/`. See
-[core journeys](../journeys/core.md#outcomes).
+it started. Each web journey runs on a Pixel 7 and on Desktop Chrome. A
+journey that runs past its budget fails. A failed journey runs once more, and
+a pass on the retry files a `flake` friction entry. A `Core:` journey also
+fails when its run on a device passed but did not record each outcome. That
+is `signed-up` first, then every outcome that its catalog section names. Each journey writes its
+[measures](../end-to-end-testing.md#measures) to
+`test-results/journeys/measures/`. See [core journeys](../journeys/core.md#outcomes)
+and [devices](../end-to-end-testing.md#devices).
 
 Each journey is also a verify flow, so `verify.py` runs it and keeps the
 evidence:
@@ -89,9 +92,11 @@ a `serious` or `critical` axe violation. See
 A web journey calls `snap(page, 'name')` from `@repo/journeys/testing/visual`
 at a stable point, the same way it calls `accessible`. A gallery or component
 page is a journey that opens each group and snaps it. `snap` captures the page
-4 times, at 390 px and 1280 px wide, in the light and dark schemes. It changes
-the viewport and the `dark` class on `<html>` in place. Then it puts them back,
-so the journey's next step sees the page it left.
+on the device of the run, in the light and dark schemes. So each journey keeps
+a baseline for each device: `mobile` from the Pixel 7, 412 px wide, and
+`desktop` from Desktop Chrome, 1280 px wide. It changes the `dark` class on
+`<html>` in place. Then it puts it back, so the journey's next step sees the
+page it left.
 
 Each shot is deterministic. Animations are off, the caret is hidden, fonts are
 loaded, and `snap` takes shots until two in a row match. The locale is `en-US`
@@ -152,8 +157,10 @@ project before its first journey can merge, but it tests nothing.
 A web journey shares the dev database. It writes records with unique names, so
 runs do not collide. Delete `.data/` to reset the dev database.
 
-A native journey runs only through the device host. The runner refuses a
-`.maestro.yaml` file, and `verify.py` refuses a native flow.
+A native journey runs only through the device host, with
+`mise exec -- bun run journey --native <ios|android>`. See
+[native journeys](../end-to-end-testing.md#native-journeys). `verify.py`
+refuses a native flow.
 
 ## Proof and limits
 

@@ -29,8 +29,12 @@ A host has no call that creates, clones, boots or erases a device. When no
 device is booted, the host stops and tells the agent to ask the owner.
 
 The `DEVICE_HOST` environment variable names the host. It is a machine
-setting, so it is not in the repository. The template ships one host, `none`.
-It refuses each call and points to this page.
+setting, so it is not in the repository. The template ships two hosts:
+
+- `none` refuses each call and points to this page.
+- `ci` drives the one device that a CI job booted on its own runner. It runs
+  Maestro on it, and it builds nothing. See
+  [native journeys](../end-to-end-testing.md#native-journeys).
 
 <!-- kickoff: The device host of this project: the machine that runs the simulators, how an agent session reaches it, and the DEVICE_HOST name. Add the adapter to `hosts` in tools/native/device-host.ts, with tests that use a fake. -->
 
@@ -134,6 +138,8 @@ owner.
 
 ## CI
 
-CI runs no native build today, because the template has no native app. A CI
-job that builds a native app calls `mise exec -- bun run native:build`, with
-the same fingerprint rule. It never calls `eas build` directly.
+The `native-ios` and `native-android` jobs in `.github/workflows/ci.yml` run
+each native journey on a simulator and an emulator. They run only when the
+repository has a native app. Each project fills their build step at kickoff.
+A CI job never calls `eas build` directly. See
+[native journeys](../end-to-end-testing.md#native-journeys).
