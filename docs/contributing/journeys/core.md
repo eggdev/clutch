@@ -33,6 +33,18 @@ when the screens change, so a check can compare two copies of a journey.
 
 A `Core:` journey asserts only through outcomes. On web it has no `expect`.
 The names on this page are fixed. The path and the text come from the project.
+The text must match the whole visible text, so `Pro` does not hold on
+`Upgrade to Pro`.
+
+A journey asserts every outcome and failure state that its section names,
+`signed-up` first, each name as a literal string. `check-journeys` reads the
+source for them. The run is the proof: `outcome()` records each outcome that
+held, and `bun run journey` fails a core journey whose run did not record
+each one. A call in a comment, or one that never runs, proves nothing.
+
+A web `Core:` journey imports only `@playwright/test` and
+`@repo/journeys/testing`. A native one keeps every step in its own flow, with
+no `runFlow`. So each step is in the file that the checks read.
 
 ### User
 
@@ -45,7 +57,7 @@ real users have.
 ### Entry
 
 The entry is the first screen that a new user sees: `page.goto('/')` on web,
-and `launchApp` on native. The journey opens no other URL or link. It reaches
+and `launchApp: { clearState: true }` as the first step on native. The journey opens no other URL or link. It reaches
 each screen through the buttons that a user taps. A direct route does not
 count, because it hides a screen that no button leads to.
 
@@ -67,9 +79,7 @@ A journey uses the test mode of each vendor that it touches, never a stand-in:
 
 - The email inbox: the local mail catcher, or the email vendor's test inbox.
   The journey reads the email and opens its link.
-- The payment provider: its test cards and its test clocks. On production,
-  the journey uses live mode with a $0 plan or a full discount, and cancels the
-  subscription after.
+- The payment provider: its test cards and its test clocks.
 
 ## Sign up (`sign-up`)
 

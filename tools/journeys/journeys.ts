@@ -38,6 +38,28 @@ export const coreJourneys = [
   'contact-support',
 ] as const;
 
+/**
+ * The outcomes that each core journey proves, its failure states included, as
+ * docs/contributing/journeys/core.md names them. A `Core:` journey asserts
+ * each one, after `signed-up`. A test compares this list with the catalog.
+ */
+export const coreOutcomes: Readonly<Record<(typeof coreJourneys)[number], ReadonlyArray<string>>> =
+  {
+    'sign-up': ['signed-up', 'email-verified', 'email-taken-refused', 'weak-password-refused'],
+    'sign-in': ['signed-out', 'signed-in', 'session-kept', 'wrong-password-refused'],
+    onboarding: ['onboarded', 'onboarding-resumed', 'required-field-refused'],
+    'profile-management': ['profile-saved', 'email-changed', 'invalid-field-refused'],
+    'billing-and-checkout': ['plan-upgraded', 'plan-cancelled', 'card-declined', 'renewal-failed'],
+    'roles-and-access': ['member-invited', 'member-joined', 'role-refused'],
+    'account-security': ['password-changed', 'password-reset', 'wrong-password-refused'],
+    'contact-support': ['support-request-sent', 'empty-request-refused'],
+  };
+
+/** The outcomes that a `Core: <name>` journey must record: `signed-up` first, then the catalog's. */
+export function requiredOutcomes(name: (typeof coreJourneys)[number]): Array<string> {
+  return [...new Set(['signed-up', ...coreOutcomes[name]])];
+}
+
 /** The verify config that registers each journey as a flow. */
 export const verificationFile = '.agents/skills/verify/verification.json';
 

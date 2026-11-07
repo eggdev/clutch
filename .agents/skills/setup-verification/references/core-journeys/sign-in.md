@@ -45,16 +45,22 @@ test('a member signs out, and signs in again with their new account', async ({ p
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('<a strong test password>');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await outcome('signed-up', { text: 'Welcome' });
+  await outcome('signed-up', { url: '<the first screen after sign-up>', text: '<its heading>' });
   await accessible(page, 'signed up');
 
   // The steps of this journey, from the first screen after sign-up.
   await page.getByRole('button', { name: 'Sign out' }).click();
   await outcome('signed-out', { url: '/', text: 'Sign in' });
   // Sign in with a wrong password, then with the right one.
-  await outcome('wrong-password-refused', { text: 'Wrong email or password' });
-  await outcome('signed-in', { text: 'Welcome' });
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill('<a wrong password>');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await outcome('wrong-password-refused', { text: '<the refusal, such as Wrong email or password.>' });
+  await page.getByLabel('Password').fill('<a strong test password>');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await outcome('signed-in', { url: '<the first screen after sign-in>', text: '<its heading>' });
   await page.reload();
-  await outcome('session-kept', { text: 'Welcome' });
+  await outcome('session-kept', { url: '<the first screen after sign-in>', text: '<its heading>' });
 });
 ```

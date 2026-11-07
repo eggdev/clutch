@@ -146,7 +146,7 @@ export function readBudgets(value: unknown, errors: Errors) {
   ) {
     errors.push({
       path: 'budgets.layoutShift',
-      message: 'Expected a number from 0 up to 1, such as 0.01.',
+      message: 'Expected a number of at least 0 and below 1, such as 0.01.',
     });
   }
   const clicks = value.clicks === undefined ? undefined : readClicks(value.clicks, errors);

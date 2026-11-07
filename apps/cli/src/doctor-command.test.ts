@@ -127,6 +127,10 @@ const coreConfig = [
   '  roles-and-access: { status: n/a, reason: Each account has one user. }',
   '  account-security: { status: n/a, reason: Kickoff has not run. }',
   '  contact-support: { status: n/a, reason: Kickoff has not run. }',
+  'budgets:',
+  '  layoutShift: 0.01',
+  '  clicks: { sign-up: 3, sign-in: 3 }',
+  '  timeToValue: { event: first-note, seconds: 60 }',
 ].join('\n');
 
 const signUpJourney = '/**\n * sign-up: A visitor makes an account.\n * Core: sign-up\n */\n';
@@ -153,4 +157,35 @@ test('--check passes the core journeys when each adopted one has a journey', asy
   });
   const result = await doctor('--root', repo.root, '--check');
   expect(result.stdout).not.toContain('core journey missing');
+  expect(result.stdout).not.toContain('budget missing');
+});
+
+test('--check fails after kickoff when screens ship and clutch.yaml records no core journeys', async () => {
+  await using repo = await gitRepo({ 'clutch.yaml': config });
+  const empty = await doctor('--root', repo.root, '--check');
+  expect(empty.stdout).not.toContain('core journeys unrecorded');
+  await repo.write({ 'features/account/screens/home.tsx': 'export {};\n' });
+  const done = await doctor('--root', repo.root, '--check');
+  expect(done.code).toBe(1);
+  expect(done.stdout).toContain(
+    'core journeys unrecorded: kickoff is done and features have screens, but clutch.yaml has no `coreJourneys`',
+  );
+  await repo.write({ 'KICKOFF.md': '# Kickoff\n' });
+  const before = await doctor('--root', repo.root, '--check');
+  expect(before.stdout).not.toContain('core journeys unrecorded');
+});
+
+test('--check fails for a budget that the adopted core journeys need', async () => {
+  await using repo = await gitRepo({
+    'clutch.yaml': coreConfig.replace(
+      '  clicks: { sign-up: 3, sign-in: 3 }\n',
+      '  clicks: { sign-up: 3 }\n',
+    ),
+    'features/account/journeys/sign-up.pw.ts': signUpJourney,
+  });
+  const result = await doctor('--root', repo.root, '--check');
+  expect(result.code).toBe(1);
+  expect(result.stdout.split('\n').filter((line) => line.startsWith('budget missing'))).toEqual([
+    'budget missing: budgets.clicks.sign-in is not set in clutch.yaml, and the adopted core journeys need it. See docs/contributing/journeys/core.md.',
+  ]);
 });

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { checkJourneys } from '@tools/check-journeys';
-import { coreJourneys, verificationFile } from '@tools/journeys/journeys';
+import { coreJourneys, coreOutcomes, verificationFile } from '@tools/journeys/journeys';
 import { inRepo } from '@tools/testing/in-repo';
 
 const app = (features: Array<string>, tags: Array<string> = []) =>
@@ -78,6 +78,9 @@ const signUp = [
   "  await page.goto('/');",
   "  await page.getByRole('button', { name: 'Sign up' }).click();",
   "  await outcome('signed-up', { url: '/home', text: 'Welcome' });",
+  "  await outcome('email-verified', { text: 'Email verified' });",
+  "  await outcome('email-taken-refused', { text: 'That email has an account' });",
+  "  await outcome('weak-password-refused', { text: 'Use a longer password' });",
   '});',
 ].join('\n');
 
@@ -87,6 +90,9 @@ const nativeSignUp = [
   '- launchApp: { clearState: true }',
   '- tapOn: Sign up',
   "- assertVisible: { text: Welcome, label: 'outcome signed-up' }",
+  "- assertVisible: { text: Email verified, label: 'outcome email-verified' }",
+  "- assertVisible: { text: That email has an account, label: 'outcome email-taken-refused' }",
+  "- assertVisible: { text: Use a longer password, label: 'outcome weak-password-refused' }",
   '',
 ].join('\n');
 
@@ -106,7 +112,9 @@ const coreRepo = (files: Record<string, string>) =>
     checkJourneys,
   );
 
-test('a core journey that opens the entry, signs up and asserts through outcomes passes', async () => {
+const see = 'See docs/contributing/journeys/core.md.';
+
+test('a core journey that opens the entry, signs up first and asserts each catalog outcome passes', async () => {
   expect(
     await coreRepo({
       'features/account/journeys/sign-up.pw.ts': core('sign-up', 'sign-up', signUp),
@@ -122,34 +130,59 @@ test('a core journey that opens the entry, signs up and asserts through outcomes
   ).toEqual([]);
 });
 
-test('a core journey that opens a second URL, uses a seeded account, skips sign-up or asserts with expect fails', async () => {
-  const file = 'features/account/journeys/sign-in.pw.ts';
+test('a core journey that gets around the rules through a fixture, an API login, a URL change, a renamed expect or a comment fails', async () => {
+  const file = 'features/account/journeys/billing.pw.ts';
+  // A bypass that the first version of these rules let through.
   const body = [
-    "import { expect, test } from '@playwright/test';",
-    "import { seededMember } from '../testing/seed';",
-    "test('a member signs in', async ({ page }) => {",
+    "import { test } from './fixtures';",
+    "import { expect as check } from '@playwright/test';",
+    "test('a member upgrades', async ({ page }) => {",
+    "  await page.request.post('/api/test/login-pro');",
     "  await page.goto('/');",
-    "  await page.goto('/sign-in');",
-    '  await page.goto(url);',
-    "  await expect(page.getByText('Welcome')).toBeVisible();",
+    "  await page.evaluate(() => location.assign('/billing'));",
+    "  // outcome('signed-up', {})",
+    "  await check(page.getByText('Pro')).toBeVisible();",
     '});',
   ].join('\n');
-  expect(
-    await coreRepo({
-      [file]: core('sign-in', 'sign-in', body),
-      'features/account/journeys/search.pw.ts': core('search', 'search', signUp),
-    }),
-  ).toEqual([
-    'features/account/journeys/search.pw.ts: `Core: search` names no core journey. Use one of sign-up, sign-in, onboarding, profile-management, billing-and-checkout, roles-and-access, account-security, contact-support.',
-    `${file}: it asserts with \`expect\`. A core journey asserts only through \`outcome(name, expected)\` from @repo/journeys/testing/outcome. See docs/contributing/journeys/core.md.`,
-    `${file}: it does not create its account through the sign-up screens. Walk sign-up from the entry, and assert \`outcome('signed-up', …)\`. See docs/contributing/journeys/core.md.`,
-    `${file}: it loads a seed fixture or a saved session. A core journey makes a new account through the sign-up screens. See docs/contributing/journeys/core.md.`,
-    `${file}: it opens '/sign-in'. A core journey opens only the entry, \`/\`, and reaches each screen through the app. See docs/contributing/journeys/core.md.`,
-    `${file}: it opens url. A core journey opens only the entry, \`/\`, and reaches each screen through the app. See docs/contributing/journeys/core.md.`,
+  expect(await coreRepo({ [file]: core('billing', 'billing-and-checkout', body) })).toEqual([
+    `${file}: it asserts with \`expect\`. A core journey asserts only through \`outcome(name, expected)\` from @repo/journeys/testing/outcome. ${see}`,
+    `${file}: it changes the URL without a tap. A core journey reaches each screen through the buttons that a user taps. ${see}`,
+    `${file}: it does not assert \`signed-up\`, \`plan-upgraded\`, \`plan-cancelled\`, \`card-declined\`, \`renewal-failed\`, which the catalog names for billing-and-checkout. ${see}`,
+    `${file}: it does not create its account through the sign-up screens first. Walk sign-up from the entry, and assert the \`signed-up\` outcome before any other. ${see}`,
+    `${file}: it imports ./fixtures. A core journey imports only @playwright/test and @repo/journeys/testing, so every step is in the journey. ${see}`,
+    `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. ${see}`,
   ]);
 });
 
-test('a native core journey that opens a link, uses a seed or asserts with no outcome label fails', async () => {
+test('a core journey that opens a second URL, names an outcome with a variable or skips catalog outcomes fails', async () => {
+  const file = 'features/account/journeys/sign-in.pw.ts';
+  const body = [
+    "import { test } from '@playwright/test';",
+    "import { outcomes } from '@repo/journeys/testing/outcome';",
+    "test('a member signs in', async ({ page }) => {",
+    '  const outcome = outcomes(page);',
+    "  await page.goto('/');",
+    "  await page.goto('/sign-in');",
+    "  await outcome('signed-up', { url: '/home' });",
+    "  await outcome(name, { url: '/home' });",
+    "  await outcome('signed-in', { url: '/home' });",
+    '});',
+  ].join('\n');
+  expect(await coreRepo({ [file]: core('sign-in', 'sign-in', body) })).toEqual([
+    `${file}: an outcome name is not a literal string. Write each name as a string, such as \`outcome('signed-in', …)\`, so a check can read it. ${see}`,
+    `${file}: it does not assert \`signed-out\`, \`session-kept\`, \`wrong-password-refused\`, which the catalog names for sign-in. ${see}`,
+    `${file}: it opens '/sign-in'. A core journey opens only the entry, \`/\`, and reaches each screen through the app. ${see}`,
+  ]);
+});
+
+test('a plan named Seedling is not a seed', async () => {
+  const body = signUp.replace("text: 'Welcome'", "text: 'Seedling plan'");
+  expect(
+    await coreRepo({ 'features/account/journeys/sign-up.pw.ts': core('sign-up', 'sign-up', body) }),
+  ).toEqual([]);
+});
+
+test('a native core journey that keeps its state, runs another flow, opens a link or skips outcomes fails', async () => {
   const file = 'features/account/journeys/phone-sign-in.maestro.yaml';
   expect(
     await coreRepo({
@@ -161,19 +194,42 @@ test('a native core journey that opens a link, uses a seed or asserts with no ou
         '# Core: sign-in',
         'appId: com.example',
         '---',
+        '- launchApp: { clearState: false }',
+        '- runFlow: login-as-pro.yaml',
         '- runScript: seed-member.js',
         '- openLink: example://sign-in',
+        "- assertVisible: { text: Welcome, label: 'outcome signed-up' }",
         '- assertVisible: Welcome',
         '',
       ].join('\n'),
     }),
   ).toEqual([
-    `${file}: it does not create its account through the sign-up screens. Walk sign-up from the entry, and assert an outcome with \`label: outcome signed-up\`. See docs/contributing/journeys/core.md.`,
-    `${file}: it has an assertion with no \`label: outcome <name>\`. A core journey asserts only through outcomes. See docs/contributing/journeys/core.md.`,
-    `${file}: it loads a seed fixture or a saved session. A core journey makes a new account through the sign-up screens. See docs/contributing/journeys/core.md.`,
-    `${file}: it never opens the entry. Start with \`launchApp\`.`,
-    `${file}: it opens a link. A core journey starts with \`launchApp\`, and reaches each screen through the app. See docs/contributing/journeys/core.md.`,
+    `${file}: it does not assert \`signed-out\`, \`signed-in\`, \`session-kept\`, \`wrong-password-refused\`, which the catalog names for sign-in. ${see}`,
+    `${file}: it does not start with a clean launch. Start with \`launchApp: { clearState: true }\`, so the app holds no account. ${see}`,
+    `${file}: it has an assertion with no \`label: outcome <name>\`. A core journey asserts only through outcomes. ${see}`,
+    `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. ${see}`,
+    `${file}: it opens a link. A core journey starts with \`launchApp\`, and reaches each screen through the app. ${see}`,
+    `${file}: it runs another flow. A core journey keeps every step in its own file, so a check can read it. ${see}`,
   ]);
+});
+
+test('the core outcomes match the outcomes and failure states of the catalog', () => {
+  const text = readFileSync(
+    path.join(import.meta.dir, '../docs/contributing/journeys/core.md'),
+    'utf-8',
+  );
+  const named: Record<string, ReadonlyArray<string>> = {};
+  for (const section of text.split('\n## ')) {
+    const name = /^[^\n]*\(`([a-z-]+)`\)/u.exec(section)?.[1];
+    if (name === undefined) {
+      continue;
+    }
+    const bullets = [...section.matchAll(/\n- (?:Outcomes|Failure states):([\s\S]*?)(?=\n- |$)/gu)];
+    named[name] = bullets.flatMap((bullet) =>
+      [...(bullet[1] ?? '').matchAll(/`([a-z][a-z0-9-]+)`/gu)].map((match) => match[1] ?? ''),
+    );
+  }
+  expect(named).toEqual(coreOutcomes);
 });
 
 test('the core journey list matches the headings of the catalog', () => {

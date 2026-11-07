@@ -44,7 +44,7 @@ test('a member changes their password, and resets a forgotten one', async ({ pag
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('<a strong test password>');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await outcome('signed-up', { text: 'Welcome' });
+  await outcome('signed-up', { url: '<the first screen after sign-up>', text: '<its heading>' });
   await accessible(page, 'signed up');
 
   // The steps of this journey, from the first screen after sign-up.

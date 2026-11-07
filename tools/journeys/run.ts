@@ -1,9 +1,16 @@
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 import { devApps, isUp, urlOf } from '@tools/dev';
 import type { DevApp } from '@tools/dev';
-import { budgetOf, journeys } from '@tools/journeys/journeys';
+import {
+  budgetOf,
+  coreJourneys,
+  fieldOf,
+  headerOf,
+  journeys,
+  requiredOutcomes,
+} from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
 import { webAppOf } from '@tools/journeys/web-app';
 
@@ -100,12 +107,16 @@ async function stopServers(dev: Bun.Subprocess) {
   }
 }
 
+/** Where `outcome()` records the outcomes of a run. */
+const outcomesDir = (root: string) => path.join(root, 'test-results/journeys/outcomes');
+
 async function runPlaywright(
   root: string,
   files: ReadonlyArray<string>,
   baseUrl: string,
   budgetSeconds: number,
 ) {
+  rmSync(outcomesDir(root), { recursive: true, force: true });
   const run = Bun.spawn(
     [
       path.join(root, 'node_modules/.bin/playwright'),
@@ -120,6 +131,7 @@ async function runPlaywright(
         ...process.env,
         JOURNEY_BASE_URL: baseUrl,
         JOURNEY_BUDGET_MS: String(budgetSeconds * 1000),
+        JOURNEY_OUTCOMES_DIR: outcomesDir(root),
       },
       stdout: 'inherit',
       stderr: 'inherit',
@@ -135,6 +147,46 @@ async function runPlaywright(
     return 1;
   }
   return code;
+}
+
+/**
+ * The core journeys of a passed run that did not record each outcome that the
+ * catalog names, `signed-up` first. The source checks read the code. This
+ * reads what held in the browser, so a call that never ran proves nothing.
+ */
+export function unprovenCore(
+  root: string,
+  ran: ReadonlyArray<Journey>,
+  dir: string,
+): Array<string> {
+  return ran.flatMap((journey) => {
+    const name = fieldOf(headerOf(readFileSync(path.join(root, journey.file), 'utf-8')), 'Core');
+    if (name === undefined || !(coreJourneys as ReadonlyArray<string>).includes(name)) {
+      return [];
+    }
+    const file = path.join(dir, `${journey.id}.jsonl`);
+    const seen = existsSync(file)
+      ? readFileSync(file, 'utf-8')
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => (JSON.parse(line) as { name: string }).name)
+      : [];
+    const missing = requiredOutcomes(name as (typeof coreJourneys)[number]).filter(
+      (outcome) => !seen.includes(outcome),
+    );
+    const problems: Array<string> = [];
+    if (seen[0] !== 'signed-up') {
+      problems.push(
+        `${journey.file}: the run did not record \`signed-up\` first, so it did not prove a new account. See docs/contributing/journeys/core.md.`,
+      );
+    }
+    if (missing.length > 0) {
+      problems.push(
+        `${journey.file}: the run passed, but recorded no ${missing.map((item) => `\`${item}\``).join(', ')}. Each catalog outcome must hold in the run. See docs/contributing/journeys/core.md.`,
+      );
+    }
+    return problems;
+  });
 }
 
 /** The journeys that `id` selects: one by its ID, or each web journey for `--all`. */
@@ -178,12 +230,20 @@ export async function main(
   const started = (await allUp(apps, urls)) ? null : await startServers(root, apps, urls);
   try {
     const budget = selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
-    return await runPlaywright(
+    const code = await runPlaywright(
       root,
       selected.map((journey) => journey.file),
       urls.get(web.name) ?? '',
       budget,
     );
+    if (code !== 0) {
+      return code;
+    }
+    const unproven = unprovenCore(root, selected, outcomesDir(root));
+    for (const problem of unproven) {
+      sink.error(problem);
+    }
+    return unproven.length > 0 ? 1 : 0;
   } finally {
     if (started) {
       await stopServers(started);

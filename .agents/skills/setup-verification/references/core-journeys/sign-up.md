@@ -45,13 +45,13 @@ test('a visitor makes an account on the free plan from the first screen', async 
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('<a strong test password>');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await outcome('signed-up', { text: 'Welcome' });
+  await outcome('signed-up', { url: '<the first screen after sign-up>', text: '<its heading>' });
   await accessible(page, 'signed up');
 
   // The steps of this journey, from the first screen after sign-up.
   await outcome('email-verified', { text: 'Email verified' });
   // Failure states: sign up again with the same address, then with a weak password.
-  await outcome('email-taken-refused', { text: 'already has an account' });
+  await outcome('email-taken-refused', { text: '<the whole refusal, such as That email already has an account.>' });
   await outcome('weak-password-refused', { text: 'Use a longer password' });
 });
 ```
