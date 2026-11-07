@@ -10,20 +10,36 @@ import {
   headerOf,
   journeys,
   requiredOutcomes,
+  webDevices,
 } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
+import {
+  budgetsOf,
+  deviceRuns,
+  frictionFlake,
+  reportFlakes,
+  webAttempts,
+  writeMeasures,
+} from '@tools/journeys/measures';
+import type { DeviceRun, FileFlake } from '@tools/journeys/measures';
+import { nativeMain } from '@tools/journeys/native';
 import { webAppOf } from '@tools/journeys/web-app';
+import type { Platform } from '@tools/native/device-host';
 
 /**
  * Runs one journey: `mise exec -- bun run journey <id>`. `--all` runs every
  * web journey in one browser run, as CI and the pre-push hook do. A web journey runs
  * in Playwright against the web app, which `journeys.webApp` in clutch.yaml
- * names, or the one app under apps/ with a web entry. Running servers are used again. When
+ * names, or the one app under apps/ with a web entry, on each device in
+ * `webDevices`. Running servers are used again. When
  * a server is down, the runner starts the missing ones through `tools/dev.ts`,
  * then stops only what it started. A journey that runs past its budget fails.
+ * A failed journey runs once more. A pass on the retry passes, and files a
+ * `flake` friction entry. Each journey writes its measures file.
  * With no web journey, `--all` passes and says so: a warning annotation and a
- * line in the step summary. A native journey runs only through the device host.
- * See docs/contributing/setup/verification.md#journeys.
+ * line in the step summary. `--native <ios|android>` runs each native journey
+ * on the booted device of the device host.
+ * See docs/contributing/end-to-end-testing.md#devices.
  */
 
 /** Time for Playwright to start and to stop the browser, on top of the journey budget. */
@@ -107,15 +123,15 @@ async function stopServers(dev: Bun.Subprocess) {
   }
 }
 
-/** The folder that holds the outcome records of each run. */
-const outcomesRoot = (root: string) => path.join(root, 'test-results/journeys/outcomes');
+/** The folder that holds the tries that the journey test writes in each run. */
+const runsRoot = (root: string) => path.join(root, 'test-results/journeys/runs');
 
 /**
- * Where `outcome()` records the outcomes of this run. Each run has its own
- * folder, so two runs do not mix. A folder older than a day is deleted.
+ * Where the journey test writes the measures of each try in this run. Each
+ * run has its own folder, so two runs do not mix. A folder older than a day is deleted.
  */
-function outcomesDir(root: string) {
-  const parent = outcomesRoot(root);
+function runsDir(root: string) {
+  const parent = runsRoot(root);
   const now = Date.now();
   if (existsSync(parent)) {
     for (const entry of readdirSync(parent)) {
@@ -135,7 +151,7 @@ async function runPlaywright(
   files: ReadonlyArray<string>,
   baseUrl: string,
   budgetSeconds: number,
-  outcomes: string,
+  env: Record<string, string>,
 ) {
   const run = Bun.spawn(
     [
@@ -149,15 +165,17 @@ async function runPlaywright(
       cwd: root,
       env: {
         ...process.env,
+        ...env,
         JOURNEY_BASE_URL: baseUrl,
         JOURNEY_BUDGET_MS: String(budgetSeconds * 1000),
-        JOURNEY_OUTCOMES_DIR: outcomes,
       },
       stdout: 'inherit',
       stderr: 'inherit',
     },
   );
-  const late = setTimeout(() => run.kill('SIGKILL'), budgetSeconds * 1000 + overheadMs);
+  // Each journey may run on each device twice: once, and once more on a failure.
+  const tries = webDevices.length * 2;
+  const late = setTimeout(() => run.kill('SIGKILL'), budgetSeconds * 1000 * tries + overheadMs);
   const code = await run.exited;
   clearTimeout(late);
   if (run.signalCode === 'SIGKILL') {
@@ -171,42 +189,60 @@ async function runPlaywright(
 
 /**
  * The core journeys of a passed run that did not record each outcome that the
- * catalog names, `signed-up` first. The source checks read the code. This
- * reads what held in the browser, so a call that never ran proves nothing.
+ * catalog names, `signed-up` first, on each device. The source checks read the
+ * code. This reads what held in the browser, so a call that never ran proves
+ * nothing. The last try of each device is the one that passed.
  */
 export function unprovenCore(
   root: string,
   ran: ReadonlyArray<Journey>,
-  dir: string,
+  runsOf: (journey: Journey) => ReadonlyArray<DeviceRun>,
 ): Array<string> {
   return ran.flatMap((journey) => {
     const name = fieldOf(headerOf(readFileSync(path.join(root, journey.file), 'utf-8')), 'Core');
     if (name === undefined || !(coreJourneys as ReadonlyArray<string>).includes(name)) {
       return [];
     }
-    const file = path.join(dir, `${journey.id}.jsonl`);
-    const seen = existsSync(file)
-      ? readFileSync(file, 'utf-8')
-          .split('\n')
-          .filter(Boolean)
-          .map((line) => (JSON.parse(line) as { name: string }).name)
-      : [];
-    const missing = requiredOutcomes(name as (typeof coreJourneys)[number]).filter(
-      (outcome) => !seen.includes(outcome),
-    );
-    const problems: Array<string> = [];
-    if (seen[0] !== 'signed-up') {
-      problems.push(
-        `${journey.file}: the run did not record \`signed-up\` first, so it did not prove a new account. See docs/contributing/journeys/core.md.`,
+    const runs = runsOf(journey);
+    return webDevices.flatMap((device) => {
+      const at = `${journey.file} on ${device.name}`;
+      const last = runs.find((run) => run.device === device.name)?.attempts.at(-1);
+      const seen = (last?.outcomes ?? []).map((outcome) => outcome.name);
+      const missing = requiredOutcomes(name as (typeof coreJourneys)[number]).filter(
+        (outcome) => !seen.includes(outcome),
       );
-    }
-    if (missing.length > 0) {
-      problems.push(
-        `${journey.file}: the run passed, but recorded no ${missing.map((item) => `\`${item}\``).join(', ')}. Each catalog outcome must hold in the run. See docs/contributing/journeys/core.md.`,
-      );
-    }
-    return problems;
+      const problems: Array<string> = [];
+      if (seen[0] !== 'signed-up') {
+        problems.push(
+          `${at}: the run did not record \`signed-up\` first, so it did not prove a new account. See docs/contributing/journeys/core.md.`,
+        );
+      }
+      if (missing.length > 0) {
+        problems.push(
+          `${at}: the run passed, but recorded no ${missing.map((item) => `\`${item}\``).join(', ')}. Each catalog outcome must hold in the run. See docs/contributing/journeys/core.md.`,
+        );
+      }
+      return problems;
+    });
   });
+}
+
+/** Writes the measures file of each journey that ran, and reports each flake. */
+async function collect(
+  root: string,
+  selected: ReadonlyArray<Journey>,
+  dir: string,
+  sink: Sink,
+  fileFlake: FileFlake,
+) {
+  const runs = new Map<string, Array<DeviceRun>>();
+  for (const journey of selected) {
+    const list = deviceRuns('web', webAttempts(dir, journey));
+    runs.set(journey.id, list);
+    const where = writeMeasures(root, journey, list);
+    await reportFlakes(journey, list, where, fileFlake, sink.log);
+  }
+  return (journey: Journey) => runs.get(journey.id) ?? [];
 }
 
 /** The journeys that `id` selects: one by its ID, or each web journey for `--all`. */
@@ -220,7 +256,7 @@ function select(all: ReadonlyArray<Journey>, id: string | undefined): Array<Jour
     return `${id ? `No journey has the ID \`${id}\`.` : 'Name a journey.'} Run \`mise exec -- bun run journey <id>\`. Known journeys: ${known}.`;
   }
   if (journey.platform === 'native') {
-    return 'Native journeys run through the device host. See docs/contributing/setup/native.md.';
+    return 'Native journeys run on the device host: `mise exec -- bun run journey --native <ios|android>`. See docs/contributing/end-to-end-testing.md#native-journeys.';
   }
   return [journey];
 }
@@ -230,10 +266,16 @@ export async function main(
   root: string,
   id: string | undefined,
   sink: Sink = consoleSink,
+  fileFlake: FileFlake = frictionFlake(root),
 ): Promise<number> {
   const selected = select(journeys(root), id);
   if (typeof selected === 'string') {
     sink.error(selected);
+    return 1;
+  }
+  const budgets = budgetsOf(root);
+  if (typeof budgets === 'string') {
+    sink.error(budgets);
     return 1;
   }
   if (selected.length === 0) {
@@ -250,18 +292,19 @@ export async function main(
   const started = (await allUp(apps, urls)) ? null : await startServers(root, apps, urls);
   try {
     const budget = selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
-    const outcomes = outcomesDir(root);
+    const dir = runsDir(root);
     const code = await runPlaywright(
       root,
       selected.map((journey) => journey.file),
       urls.get(web.name) ?? '',
       budget,
-      outcomes,
+      { JOURNEY_MEASURES_DIR: dir, JOURNEY_BUDGETS: JSON.stringify(budgets) },
     );
+    const runsOf = await collect(root, selected, dir, sink, fileFlake);
     if (code !== 0) {
       return code;
     }
-    const unproven = unprovenCore(root, selected, outcomes);
+    const unproven = unprovenCore(root, selected, runsOf);
     for (const problem of unproven) {
       sink.error(problem);
     }
@@ -275,7 +318,11 @@ export async function main(
 
 if (import.meta.main) {
   try {
-    process.exitCode = await main(process.cwd(), process.argv[2]);
+    const [first, platform] = process.argv.slice(2);
+    process.exitCode =
+      first === '--native'
+        ? await nativeMain(process.cwd(), platform as Platform)
+        : await main(process.cwd(), first);
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;

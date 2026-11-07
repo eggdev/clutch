@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import path from 'node:path';
 
+import type { DeviceRun } from '@tools/journeys/measures';
 import { main, unprovenCore } from '@tools/journeys/run';
 import type { Sink } from '@tools/journeys/run';
 import { inRepo } from '@tools/testing/in-repo';
@@ -67,39 +68,55 @@ test('several web apps and no journeys.webApp fail before any server starts', as
   );
 });
 
-test('a passed core journey run that did not record each catalog outcome, signed-up first, is unproven', async () => {
+const signInJourney = {
+  id: 'sign-in',
+  feature: 'account',
+  file: 'features/account/journeys/sign-in.pw.ts',
+  platform: 'web' as const,
+};
+
+/** A passed run on `device`, with one try for each list of outcome names. */
+const run = (device: string, ...tries: Array<Array<string>>): DeviceRun => ({
+  platform: 'web',
+  device,
+  result: 'passed',
+  attempts: tries.map((names, retry) => ({
+    device,
+    retry,
+    status: 'passed',
+    durationMs: 1000,
+    outcomes: names.map((name) => ({ name })),
+  })),
+});
+
+test('a passed core journey run that did not record each catalog outcome, signed-up first, on each device, is unproven', async () => {
   const signIn = '/**\n * sign-in: A visitor signs in.\n * Core: sign-in\n */\nexport {};\n';
-  await inRepo(
-    {
-      'features/account/journeys/sign-in.pw.ts': signIn,
-      'outcomes/sign-in.jsonl': ['signed-in', 'signed-up', 'signed-out']
-        .map((name) => JSON.stringify({ name, expected: { url: '/home' } }))
-        .join('\n'),
-      'proven/sign-in.jsonl': [
-        'signed-up',
-        'signed-out',
-        'wrong-password-refused',
-        'signed-in',
-        'session-kept',
-      ]
-        .map((name) => JSON.stringify({ name, expected: { url: '/home' } }))
-        .join('\n'),
-    },
-    (root) => {
-      const ran = [
-        {
-          id: 'sign-in',
-          feature: 'account',
-          file: 'features/account/journeys/sign-in.pw.ts',
-          platform: 'web' as const,
-        },
-      ];
-      expect(unprovenCore(root, ran, path.join(root, 'outcomes'))).toEqual([
-        'features/account/journeys/sign-in.pw.ts: the run did not record `signed-up` first, so it did not prove a new account. See docs/contributing/journeys/core.md.',
-        'features/account/journeys/sign-in.pw.ts: the run passed, but recorded no `session-kept`, `wrong-password-refused`. Each catalog outcome must hold in the run. See docs/contributing/journeys/core.md.',
-      ]);
-      expect(unprovenCore(root, ran, path.join(root, 'proven'))).toEqual([]);
-      expect(unprovenCore(root, ran, path.join(root, 'none'))).toHaveLength(2);
-    },
-  );
+  await inRepo({ 'features/account/journeys/sign-in.pw.ts': signIn }, (root) => {
+    const proven = [
+      'signed-up',
+      'signed-out',
+      'wrong-password-refused',
+      'signed-in',
+      'session-kept',
+    ];
+    const at = 'features/account/journeys/sign-in.pw.ts on Desktop Chrome';
+    // The phone proves each outcome on its retry. The laptop never records signed-up first.
+    expect(
+      unprovenCore(root, [signInJourney], () => [
+        run('Pixel 7', ['signed-up'], proven),
+        run('Desktop Chrome', ['signed-in', 'signed-up', 'signed-out']),
+      ]),
+    ).toEqual([
+      `${at}: the run did not record \`signed-up\` first, so it did not prove a new account. See docs/contributing/journeys/core.md.`,
+      `${at}: the run passed, but recorded no \`session-kept\`, \`wrong-password-refused\`. Each catalog outcome must hold in the run. See docs/contributing/journeys/core.md.`,
+    ]);
+    expect(
+      unprovenCore(root, [signInJourney], () => [
+        run('Pixel 7', proven),
+        run('Desktop Chrome', proven),
+      ]),
+    ).toEqual([]);
+    // A device with no run proves nothing.
+    expect(unprovenCore(root, [signInJourney], () => [run('Pixel 7', proven)])).toHaveLength(2);
+  });
 });

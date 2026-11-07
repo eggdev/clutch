@@ -15,8 +15,9 @@
  * Driver: `mise exec -- bun run journey <%= fileName %>-open`
  * Limits: it proves only that the screen renders.
  */
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { accessible } from '@repo/journeys/testing/a11y';
+import { test } from '@repo/journeys/testing/test';
 
 test('the <%= title %> screen opens', async ({ page }) => {
   await page.goto('/<%= fileName %>');

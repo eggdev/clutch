@@ -101,7 +101,7 @@ export function prompt(
   return `# Visual review
 
 A pull request changes the screenshot baselines below. Each baseline is a
-screen at one width (\`mobile\` is 390 px, \`desktop\` is 1280 px) and in one
+screen on one device (\`mobile\` is a Pixel 7, 412 px wide, and \`desktop\` is 1280 px) and in one
 scheme (\`light\` or \`dark\`). Read each before and after image with the Read
 tool, then judge each pair. Do not read any other file except the rule pages
 named below, and only if you need them.

@@ -97,8 +97,9 @@ jobs:
           fi
 
   # Journeys drive the web app in a browser against the dev servers, so they
-  # run in their own job and not in validate. See
-  # docs/contributing/setup/verification.md#journeys.
+  # run in their own job and not in validate. Each web journey runs on a Pixel 7
+  # and on Desktop Chrome at 1280 px, on every PR. See
+  # docs/contributing/end-to-end-testing.md#devices.
   journeys:
     runs-on: ubuntu-26.04
     steps:
@@ -130,6 +131,17 @@ jobs:
           name: journey-traces
           path: test-results/journeys
           if-no-files-found: ignore
+      # One JSON file for each journey: layout shift, clicks and keys, axe
+      # results and timings on each device. See
+      # docs/contributing/end-to-end-testing.md#measures.
+      - name: Keep the measures
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journey-measures-web
+          path: test-results/journeys/measures
+          if-no-files-found: ignore
+          retention-days: 14
       # Each screenshot that `snap` took, at its baseline path. `bun run visual
       # pull <pr>` copies the changed ones into the baselines. See
       # docs/contributing/setup/verification.md#screenshots.
@@ -139,5 +151,115 @@ jobs:
         with:
           name: visual-screenshots
           path: test-results/visual
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Which platforms the change reaches, by the reach rule in
+  # tools/journeys/reach.ts. Native journeys run on a PR that touches a native
+  # app, shared runtime code or a sensitive path, and on each push to main,
+  # when the repository has a native app. See
+  # docs/contributing/end-to-end-testing.md#native-journeys.
+  reach:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      native: ${{ steps.reach.outputs.native }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile
+      - name: Compute the reach
+        id: reach
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            bun tools/journeys/reach.ts --base "origin/$BASE_REF" --head "$HEAD_SHA"
+          else
+            bun tools/journeys/reach.ts --main
+          fi
+
+  # Each native journey on an iPhone 16 simulator. CI boots the device on its
+  # own runner. The ci device host finds it and runs Maestro on it.
+  native-ios:
+    needs: reach
+    if: needs.reach.outputs.native == 'true'
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      DEVICE_HOST: ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile
+      - name: Install Maestro
+        run: mise install maestro@cli-2.12.1
+      - name: Boot the iPhone 16 simulator
+        run: xcrun simctl boot "iPhone 16" && xcrun simctl bootstatus "iPhone 16"
+      # Each project fills this step at kickoff, so it builds the app for the
+      # simulator and installs it. Until then a project with a native app fails
+      # here, so no native lane passes with nothing tested.
+      - name: Build the app and install it on the simulator
+        run: |
+          echo "::error title=No native build::Fill the build step of the native-ios job in .github/workflows/ci.yml. See docs/contributing/end-to-end-testing.md#native-journeys."
+          exit 1
+      - name: Run the native journeys
+        run: mise exec maestro@cli-2.12.1 -- bun run journey --native ios
+      - name: Keep the measures
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journey-measures-ios
+          path: test-results/journeys/measures
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Each native journey on a Pixel 7 emulator with API 35. KVM makes the
+  # emulator fast enough to run inside the time limit.
+  native-android:
+    needs: reach
+    if: needs.reach.outputs.native == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    env:
+      DEVICE_HOST: ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile
+      - name: Turn on KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install Maestro
+        run: mise install maestro@cli-2.12.1
+      - name: Run the native journeys on the emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_7
+          avd-name: pixel-7-api-35
+          # Each project fills the build line at kickoff, so it builds the app
+          # and installs it on the emulator. Until then a project with a native
+          # app fails here, so no native lane passes with nothing tested.
+          script: |
+            echo "::error title=No native build::Fill the build line of the native-android job in .github/workflows/ci.yml. See docs/contributing/end-to-end-testing.md#native-journeys." && exit 1
+            mise exec maestro@cli-2.12.1 -- bun run journey --native android
+      - name: Keep the measures
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journey-measures-android
+          path: test-results/journeys/measures
           if-no-files-found: ignore
           retention-days: 14

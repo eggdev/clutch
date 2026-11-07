@@ -60,6 +60,16 @@ export function requiredOutcomes(name: (typeof coreJourneys)[number]): Array<str
   return [...new Set(['signed-up', ...coreOutcomes[name]])];
 }
 
+/**
+ * The devices that each web journey runs on, on every PR: a mid-range phone and
+ * a laptop. `width` names the screenshot baselines of each one. See
+ * docs/contributing/end-to-end-testing.md#devices.
+ */
+export const webDevices = [
+  { name: 'Pixel 7', width: 'mobile' },
+  { name: 'Desktop Chrome', width: 'desktop' },
+] as const;
+
 /** The verify config that registers each journey as a flow. */
 export const verificationFile = '.agents/skills/verify/verification.json';
 

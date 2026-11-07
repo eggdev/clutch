@@ -10,6 +10,7 @@ import {
   verificationFile,
 } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
+import ts from 'typescript';
 
 /**
  * Journeys are the main behavioral tests, so each feature that ships has one.
@@ -24,6 +25,9 @@ import type { Journey } from '@tools/journeys/journeys';
  *   that runs a journey that does not exist.
  * - A journey with `Core: <name>` that breaks the core journey catalog: see
  *   `journeys/core-rules.ts`.
+ * - A web journey that takes `test` from `@playwright/test`. It takes `test`
+ *   from `@repo/journeys/testing/test`, so each run is measured against its
+ *   budgets.
  *
  * See docs/contributing/setup/verification.md#journeys.
  */
@@ -85,6 +89,28 @@ function missingJourneys(root: string, all: ReadonlyArray<Journey>): Array<strin
     );
 }
 
+/** Whether a web journey takes `test` from `@playwright/test`, which measures nothing. */
+function takesPlainTest(source: string) {
+  const file = ts.createSourceFile('journey.ts', source, ts.ScriptTarget.Latest, true);
+  return file.statements.some((statement) => {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== '@playwright/test' ||
+      statement.importClause?.isTypeOnly
+    ) {
+      return false;
+    }
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings && ts.isNamespaceImport(bindings)) {
+      return true;
+    }
+    return (bindings?.elements ?? []).some(
+      (item) => !item.isTypeOnly && (item.propertyName ?? item.name).text === 'test',
+    );
+  });
+}
+
 function headerProblems(root: string, journey: Journey): Array<string> {
   const source = readFileSync(path.join(root, journey.file), 'utf-8');
   const header = headerOf(source);
@@ -96,6 +122,16 @@ function headerProblems(root: string, journey: Journey): Array<string> {
   }
   for (const name of requiredFields.filter((field) => fieldOf(header, field) === undefined)) {
     problems.push(`${journey.file}: the header has no \`${name}:\` line. Add it.`);
+  }
+  // A core journey's own rules name this problem.
+  if (
+    journey.platform === 'web' &&
+    fieldOf(header, 'Core') === undefined &&
+    takesPlainTest(source)
+  ) {
+    problems.push(
+      `${journey.file}: it takes \`test\` from @playwright/test. Take it from @repo/journeys/testing/test, so the run is measured against its budgets. See docs/contributing/end-to-end-testing.md#measures.`,
+    );
   }
   return [...problems, ...coreProblems(journey, source)];
 }

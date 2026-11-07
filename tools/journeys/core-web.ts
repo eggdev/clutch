@@ -113,8 +113,10 @@ function testBodies(file: ts.SourceFile) {
 type Found = { problems: Set<string>; seen: Array<string>; idle: Array<string> };
 
 const message = {
+  playwright: (file: string) =>
+    `${file}: it imports @playwright/test. A core journey takes \`test\` from @repo/journeys/testing/test, so each run is measured against its budgets. See ${catalog}.`,
   imports: (file: string, from: string) =>
-    `${file}: it imports ${from}. A core journey imports only @playwright/test and @repo/journeys/testing, so every step is in the journey. See ${catalog}.`,
+    `${file}: it imports ${from}. A core journey imports only @repo/journeys/testing, so every step is in the journey. See ${catalog}.`,
   escapes: (file: string) =>
     `${file}: it reaches past the page, through a dynamic import, \`require\`, the environment or the file system. See ${catalog}.`,
   brackets: (file: string) =>
@@ -169,6 +171,9 @@ function boundAsOutcome(node: ts.Node) {
 function nodeProblems(file: string, node: ts.Node): Array<string> {
   if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
     const from = node.moduleSpecifier.text;
+    if (from === '@playwright/test') {
+      return [message.playwright(file)];
+    }
     return allowedModules.has(from) ? [] : [message.imports(file, from)];
   }
   if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
