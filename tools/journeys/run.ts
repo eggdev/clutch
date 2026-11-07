@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 import { devApps, isUp, urlOf } from '@tools/dev';
@@ -107,9 +107,26 @@ async function stopServers(dev: Bun.Subprocess) {
   }
 }
 
-/** Where `outcome()` records the outcomes of this run. Each run has its own folder, so two runs do not mix. */
-const outcomesDir = (root: string) =>
-  path.join(root, 'test-results/journeys/outcomes', `${process.pid}-${Date.now()}`);
+/** The folder that holds the outcome records of each run. */
+const outcomesRoot = (root: string) => path.join(root, 'test-results/journeys/outcomes');
+
+/**
+ * Where `outcome()` records the outcomes of this run. Each run has its own
+ * folder, so two runs do not mix. A folder older than a day is deleted.
+ */
+function outcomesDir(root: string) {
+  const parent = outcomesRoot(root);
+  const now = Date.now();
+  if (existsSync(parent)) {
+    for (const entry of readdirSync(parent)) {
+      const folder = path.join(parent, entry);
+      if (now - statSync(folder).mtimeMs > 86_400_000) {
+        rmSync(folder, { recursive: true, force: true });
+      }
+    }
+  }
+  return path.join(parent, `${process.pid}-${now}`);
+}
 
 async function runPlaywright(
   root: string,

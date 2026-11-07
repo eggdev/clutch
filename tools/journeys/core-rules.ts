@@ -1,3 +1,4 @@
+import { webFindings } from '@tools/journeys/core-web';
 import {
   bodyOf,
   coreJourneys,
@@ -6,7 +7,6 @@ import {
   requiredOutcomes,
 } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
-import ts from 'typescript';
 import { parseAllDocuments } from 'yaml';
 
 /**
@@ -32,57 +32,6 @@ import { parseAllDocuments } from 'yaml';
 
 const catalog = 'docs/contributing/journeys/core.md';
 
-/** A seed, a saved session, a token in storage, a login through the API, or a mocked backend. */
-const seeded =
-  /\bseed(?:ed|s|ing)?\b|\bseed[A-Z_]|storageState|addCookies|addInitScript|localStorage|sessionStorage|\.request\b|\brequest\.(?:get|post|put|fetch)\b|\btest\.extend\b|\bfetch\s*\(|\.route\s*\(|\.routeFromHAR\b/u;
-
-/**
- * A way to change the URL, or to run code in the page, that is not a tap:
- * `location`, `history`, `window.open`, `evaluate`, or `goto` by another name.
- */
-const navigates =
-  /\blocation\s*(?:\.\s*(?:assign|replace|href)|=)|\bhistory\s*\.|\bwindow\.open\b|\[\s*['"`]goto['"`]\s*\]|\bgoto\b(?!\s*\()|\.evaluate(?:Handle)?\s*\(|\.\$eval\s*\(|\.\$\$eval\s*\(/u;
-
-/** Code that reaches past the page: a dynamic import, `require`, the environment or the file system. */
-const escapes = /\bimport\s*\(|\brequire\s*\(|\bprocess\s*\.|\bBun\s*\.|\bDeno\s*\./u;
-
-/** A step that a user takes. Each outcome follows at least one, so an outcome cannot hold on the page it started on. */
-const action =
-  /\.(?:click|dblclick|tap|fill|press|pressSequentially|type|check|uncheck|selectOption|setInputFiles|dragTo|reload|goBack|goForward)\s*\(/u;
-
-/**
- * Two views of the source, from the TypeScript scanner: `code` has no
- * comments, and `bare` also has the text of each string blanked. So a
- * commented-out call proves nothing, and a page text such as `Seed your
- * garden` trips no rule.
- */
-function views(body: string) {
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    false,
-    ts.LanguageVariant.Standard,
-    body,
-  );
-  let code = '';
-  let bare = '';
-  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
-    const text = scanner.getTokenText();
-    if (
-      kind === ts.SyntaxKind.SingleLineCommentTrivia ||
-      kind === ts.SyntaxKind.MultiLineCommentTrivia
-    ) {
-      continue;
-    }
-    code += text;
-    const quoted =
-      kind === ts.SyntaxKind.StringLiteral ||
-      kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral ||
-      kind === ts.SyntaxKind.TemplateHead;
-    bare += quoted ? `${text[0]}${text.at(-1) === '{' ? '${' : text[0]}` : text;
-  }
-  return { code, bare };
-}
-
 const seedProblem = (file: string) =>
   `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. See ${catalog}.`;
 
@@ -102,76 +51,8 @@ function outcomeProblems(file: string, name: (typeof coreJourneys)[number], seen
   return problems;
 }
 
-/** The name of an outcome call: the text of its string, or the code that is not one. */
-const nameOf = (argument: string | undefined) => {
-  const text = argument?.trim() ?? '';
-  return /^(['"`])[a-z0-9-]+\1$/u.test(text) ? text.slice(1, -1) : text;
-};
-
 function webProblems(file: string, name: (typeof coreJourneys)[number], body: string) {
-  const { code, bare } = views(body);
-  const problems: Array<string> = [];
-  const opened = [...code.matchAll(/\.goto\(\s*([^,)]*)/gu)].map((match) => match[1]?.trim());
-  if (opened.length === 0) {
-    problems.push(`${file}: it never opens the entry. Start with \`page.goto('/')\`.`);
-  }
-  for (const url of new Set(opened.filter((item) => !/^(['"`])\/\1$/u.test(item ?? '')))) {
-    problems.push(
-      `${file}: it opens ${url}. A core journey opens only the entry, \`/\`, and reaches each screen through the app. See ${catalog}.`,
-    );
-  }
-  if (navigates.test(bare)) {
-    problems.push(
-      `${file}: it changes the URL or runs code in the page without a tap. A core journey reaches each screen through the buttons that a user taps. See ${catalog}.`,
-    );
-  }
-  if (seeded.test(bare)) {
-    problems.push(seedProblem(file));
-  }
-  if (escapes.test(bare)) {
-    problems.push(
-      `${file}: it reaches past the page, through a dynamic import, \`require\`, the environment or the file system. See ${catalog}.`,
-    );
-  }
-  const imports = [...code.matchAll(/\bfrom\s+(['"`])([^'"`]+)\1/gu)].map((match) => match[2]);
-  for (const from of imports.filter(
-    (item) => item !== '@playwright/test' && !item?.startsWith('@repo/journeys/testing/'),
-  )) {
-    problems.push(
-      `${file}: it imports ${from}. A core journey imports only @playwright/test and @repo/journeys/testing, so every step is in the journey. See ${catalog}.`,
-    );
-  }
-  if (/\bexpect\b/u.test(bare)) {
-    problems.push(
-      `${file}: it asserts with \`expect\`. A core journey asserts only through \`outcome(name, expected)\` from @repo/journeys/testing/outcome. See ${catalog}.`,
-    );
-  }
-  const bound = [...bare.matchAll(/\boutcomes\s*\(/gu)].length;
-  const named = [...bare.matchAll(/\bconst\s+outcome\s*=\s*outcomes\s*\(\s*page\s*\)/gu)].length;
-  if (bound !== named) {
-    problems.push(
-      `${file}: it binds \`outcomes(page)\` to a name other than \`outcome\`. Write \`const outcome = outcomes(page)\`, so a check can read each outcome. See ${catalog}.`,
-    );
-  }
-  const calls = [...code.matchAll(/\boutcome\(\s*([^,)]*)/gu)];
-  if (calls.some((match) => !/^(['"`])[a-z0-9-]+\1$/u.test(match[1]?.trim() ?? ''))) {
-    problems.push(
-      `${file}: an outcome name is not a literal string. Write each name as a string, such as \`outcome('signed-in', …)\`, so a check can read it. See ${catalog}.`,
-    );
-  }
-  const entry = code.search(/\.goto\(/u);
-  const idle = calls
-    .map((match, index) => {
-      const from = index === 0 ? Math.max(entry, 0) : (calls[index - 1]?.index ?? 0);
-      return action.test(code.slice(from, match.index)) ? undefined : nameOf(match[1]);
-    })
-    .filter((item) => item !== undefined);
-  if (idle.length > 0) {
-    problems.push(
-      `${file}: no user step comes before ${idle.map((item) => `\`${item}\``).join(', ')}. Each outcome comes after a tap, a fill or a reload, so it cannot hold on the screen before. See ${catalog}.`,
-    );
-  }
-  const seen = calls.map((match) => nameOf(match[1]));
+  const { problems, seen } = webFindings(file, body);
   return [...problems, ...outcomeProblems(file, name, seen)];
 }
 
@@ -248,8 +129,13 @@ function nativeProblems(
       `${file}: it runs another flow. A core journey keeps every step in its own file, so a check can read it. See ${catalog}.`,
     );
   }
-  if (seeded.test(body)) {
+  if (/\bseed(?:ed|s|ing)?\b|\bseed[A-Z_]|storageState|addCookies/u.test(body)) {
     problems.push(seedProblem(file));
+  }
+  if (steps.some((step) => step.command === 'runScript' || step.command === 'evalScript')) {
+    problems.push(
+      `${file}: it runs a script. A script can log in or seed, so a core journey takes only the steps that a user takes. See ${catalog}.`,
+    );
   }
   const asserts = steps.filter((step) => step.command.startsWith('assert'));
   if (
