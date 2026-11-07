@@ -89,8 +89,9 @@ are how a weaker check reaches the owner.
 ## Hard invariants
 
 Read [project intent](./project-intent.md#hard-invariants). Flag a change that
-touches a hard invariant and has no `one-way-door` label. That finding is
-`blocking`. See [two-way and one-way doors](../principles/two-way-doors.md).
+touches a hard invariant when its PR shows no passing run of that invariant's
+journey. That finding is `blocking`. A change to what an invariant says is an
+`owner` finding. See [proof gates code](../principles/proof-gates-code.md).
 
 ## One door for each decision
 

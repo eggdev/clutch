@@ -17,16 +17,22 @@ A change is one-way when a copy outlives the deploy. Examples are:
 A change that touches a [hard invariant](../contributing/project-intent.md#hard-invariants)
 is one-way by definition.
 
-## One-way changes need the owner
+## One-way changes need proof
 
 Before a one-way change merges:
 
-1. Add the `one-way-door` label to the PR, and wait for the
-   [owner](../contributing/project-intent.md#owner) to approve it. No CI job
-   reads the label, so the approval is a review step.
+1. Prove it with the journeys that its paths name. Add a step to a journey
+   that exists before you write a new one. See
+   [proof gates code](./proof-gates-code.md).
+   A path in the `one-way-door` tier of `.clutch/risk.yaml` still needs the
+   owner's approval until its journeys exist and pass. A migration also needs
+   its rehearsal, as the [rules for stored shapes](#rules-for-stored-shapes)
+   say.
 2. Add a PR section that lists each copy that outlives the deploy and its
    recovery path.
-3. Tag the owner on the issue.
+3. Ask the [owner](../contributing/project-intent.md#owner) in a T3 thread
+   only when the change alters what the product does, such as data that users
+   lose.
 
 ## Rules for stored shapes
 
@@ -34,9 +40,10 @@ Before a one-way change merges:
 - Migrations only move forward.
 - Add optional fields before you change a shape.
 - Give readers a recovery path for a version they cannot read.
-- Rehearse a one-way migration before it merges. Run it on a preview with seed
-  data, and attach the difference before and after to the PR. Each difference
-  is one that you expect.
+- Rehearse a one-way migration before it merges. Run it on a branch of the
+  production database, and attach the difference before and after to the PR.
+  Each difference is one that you expect. Seed data hides the rows that real
+  users have.
 - Record the no in [decision records](../contributing/decisions/index.md) when
   the next agent would otherwise propose it again.
 

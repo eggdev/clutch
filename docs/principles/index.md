@@ -36,6 +36,7 @@ Each surface starts on a phone and takes every visual value from a token.
 
 | Principle                                                                   | When to open it                                                                               |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [Proof gates code](./proof-gates-code.md)                                   | Asking the owner, changing a sensitive path, or adding a journey or a gate                    |
 | [Generic platform](./generic-platform.md)                                   | Importing a vendor, adding a module, or deciding which module owns a vendor                   |
 | [Normalized source of truth](./normalized-source-of-truth.md)               | Adding a cache, index or second store for a fact that already has a record                    |
 | [Delete what is off the common path](./delete-off-the-common-path.md)       | A migration left an old lane, or a branch, field, flag or doc serves a path the product skips |
