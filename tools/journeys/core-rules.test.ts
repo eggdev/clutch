@@ -109,6 +109,7 @@ test('a core journey that gets around the rules through a fixture, an API login,
     `${file}: it does not create its account through the sign-up screens first. Walk sign-up from the entry, and assert the \`signed-up\` outcome before any other. ${see}`,
     `${file}: it imports ./fixtures. A core journey imports only @playwright/test and @repo/journeys/testing, so every step is in the journey. ${see}`,
     `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. ${see}`,
+    `${file}: lines 4, 6, 8 are not steps that a core journey takes. A test holds only page steps from \`page\`, outcomes, journey kit calls and consts of plain values. ${see}`,
   ]);
 });
 
@@ -133,6 +134,7 @@ test('a core journey that opens a second URL, names an outcome with a variable o
     `${file}: an outcome name is not a literal string. Write each name as a string, such as \`outcome('signed-in', …)\`, so a check can read it. ${see}`,
     `${file}: it does not assert \`signed-out\`, \`session-kept\`, \`wrong-password-refused\`, which the catalog names for sign-in. ${see}`,
     `${file}: it opens '/sign-in'. A core journey opens only the entry, \`/\`, and reaches each screen through the app. ${see}`,
+    `${file}: line 10 is not a step that a core journey takes. A test holds only page steps from \`page\`, outcomes, journey kit calls and consts of plain values. ${see}`,
   ]);
 });
 
@@ -202,6 +204,7 @@ test('outcomes that hold on the entry screen, a mocked backend, page scripts and
     `${file}: it changes the URL or runs code in the page without a tap. A core journey reaches each screen through the buttons that a user taps. ${see}`,
     `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. ${see}`,
     `${file}: it reaches past the page, through a dynamic import, \`require\`, the environment or the file system. ${see}`,
+    `${file}: lines 5, 6, 7, 8, 9, 10 are not steps that a core journey takes. A test holds only page steps from \`page\`, outcomes, journey kit calls and consts of plain values. ${see}`,
     `${file}: no user step comes before \`signed-up\`, \`email-verified\`, \`email-taken-refused\`, \`weak-password-refused\`. Each outcome comes after a tap, a fill or a reload, so it cannot hold on the screen before. ${see}`,
   ]);
 });
@@ -297,7 +300,41 @@ test('bracket access, a template that hides code, a fake step and a branch fail'
     `${file}: it does not assert \`weak-password-refused\`, which the catalog names for sign-up. ${see}`,
     `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. ${see}`,
     `${file}: it reaches a member through brackets. Write each call by name, such as \`page.goto('/')\`, so a check can read it. ${see}`,
+    `${file}: lines 3, 7, 8, 10, 16, 18 are not steps that a core journey takes. A test holds only page steps from \`page\`, outcomes, journey kit calls and consts of plain values. ${see}`,
     `${file}: no user step comes before \`email-verified\`, \`email-taken-refused\`. Each outcome comes after a tap, a fill or a reload, so it cannot hold on the screen before. ${see}`,
+  ]);
+});
+
+test('reflection, a constructor, page scripts, a fake screen, a destructured goto, a stand-in click and a hook fail', async () => {
+  const file = 'features/account/journeys/sign-up.pw.ts';
+  // The probes of the fourth review.
+  const body = [
+    "import { test } from '@playwright/test';",
+    "import { outcomes } from '@repo/journeys/testing/outcome';",
+    "test.beforeEach(async ({ page }) => { await page.getByRole('button').click(); });",
+    "test('a visitor signs up', async ({ page }) => {",
+    '  const outcome = outcomes(page);',
+    "  await page.goto('/');",
+    "  await Reflect.get(page, 'evaluate').call(page, 'x');",
+    "  await (async () => {}).constructor('return 1')();",
+    "  await page.waitForFunction('true');",
+    "  await page.addScriptTag({ content: 'x' });",
+    "  await page.setContent('<h1>Welcome</h1>');",
+    '  const { goto: open } = page;',
+    '  const user = { click: async () => {} };',
+    "  await page.getByRole('button', { name: 'Sign up' }).click();",
+    "  await outcome('signed-up', { url: '/home' });",
+    '  await user.click();',
+    "  await outcome('email-verified', { text: 'Welcome' });",
+    "  await page.getByRole('link', { name: 'Again' }).click();",
+    "  await outcome('email-taken-refused', { text: 'Taken' });",
+    "  await page.getByLabel('Password').fill('short');",
+    "  await outcome('weak-password-refused', { text: 'Weak' });",
+    '});',
+  ].join('\n');
+  expect(await coreRepo({ [file]: core('sign-up', 'sign-up', body) })).toEqual([
+    `${file}: lines 3, 7, 8, 9, 10, 11, 12, 13, 16 are not steps that a core journey takes. A test holds only page steps from \`page\`, outcomes, journey kit calls and consts of plain values. ${see}`,
+    `${file}: no user step comes before \`email-verified\`. Each outcome comes after a tap, a fill or a reload, so it cannot hold on the screen before. ${see}`,
   ]);
 });
 

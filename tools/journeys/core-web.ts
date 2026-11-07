@@ -1,3 +1,5 @@
+import { allowProblems, pageStep } from '@tools/journeys/core-allow';
+import type { Names } from '@tools/journeys/core-allow';
 import ts from 'typescript';
 
 /**
@@ -215,6 +217,9 @@ function countOutcomeCalls(source: ts.SourceFile) {
   return count;
 }
 
+/** Any name, so a step's own arguments do not decide whether it counts as a step. The allow list checks them. */
+const everyName: Names = { has: () => true };
+
 /** Each outcome is an awaited statement of the test body, in order, after a user step. */
 function steps(file: string, body: ts.Block, found: Found) {
   let entered = false;
@@ -234,7 +239,12 @@ function steps(file: string, body: ts.Block, found: Found) {
       stepped = false;
       continue;
     }
-    const member = ts.isExpressionStatement(statement) ? memberCalled(statement.expression) : null;
+    const call =
+      ts.isExpressionStatement(statement) && ts.isAwaitExpression(statement.expression)
+        ? statement.expression.expression
+        : null;
+    // Only a step that starts at `page` counts, so a stand-in `{ click }` object does not.
+    const member = call ? pageStep(call, everyName) : null;
     if (member === 'goto') {
       entered = true;
     } else if (member !== null && actions.has(member)) {
@@ -248,6 +258,9 @@ export function webFindings(file: string, body: string) {
   const source = ts.createSourceFile('journey.ts', body, ts.ScriptTarget.Latest, true);
   const found: Found = { problems: new Set(), seen: [], idle: [] };
   scan(file, source, found);
+  for (const problem of allowProblems(file, source)) {
+    found.problems.add(problem);
+  }
   const bodies = testBodies(source);
   for (const block of bodies) {
     steps(file, block, found);

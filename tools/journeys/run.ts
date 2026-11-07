@@ -120,7 +120,9 @@ function outcomesDir(root: string) {
   if (existsSync(parent)) {
     for (const entry of readdirSync(parent)) {
       const folder = path.join(parent, entry);
-      if (now - statSync(folder).mtimeMs > 86_400_000) {
+      // Another run may delete the folder first.
+      const changed = statSync(folder, { throwIfNoEntry: false })?.mtimeMs ?? now;
+      if (now - changed > 86_400_000) {
         rmSync(folder, { recursive: true, force: true });
       }
     }
