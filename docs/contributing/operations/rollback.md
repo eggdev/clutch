@@ -66,10 +66,10 @@ deploy an old SHA by hand.
 
 ### Revert a merged pull request
 
-Add the `revert` label to a merged PR. The
-[Revert workflow](../../../.github/workflows/revert.yml) starts a run of
-itself on the default branch, because only that branch may use the release
-bot's key. That run:
+Run `bun run pr revert <number>`, or add the `revert` label to the merged PR.
+Either one starts the [Revert workflow](../../../.github/workflows/revert.yml)
+on the default branch, because only that branch may use the release bot's key.
+`pr revert` then waits for the revert PR and names it. That run:
 
 1. Reverts its merge commit on a `revert/<number>` branch, with `-m 1` for a
    merge commit.
@@ -79,19 +79,26 @@ bot's key. That run:
    runs on it. The PR links the original.
 4. Comments on the original PR, and asks for the reason for the revert.
 
-When auto-merge merged the original PR, and the revert is low or medium risk,
-auto-merge takes the revert PR once its checks pass. It may merge while `main`
-is red, because it is the fix. Otherwise a person merges it. When a later change
+The session that started the revert drives the revert PR like its own: it
+babysits it, then runs `bun run pr merge` on it. When auto-merge merged the
+original PR, and the revert is low or medium risk, the judge passes the revert
+PR once its checks pass. It may merge while `main` is red, because it is the
+fix. Otherwise the owner approves it first. When a later change
 touches the same lines, the revert conflicts. The workflow then comments on the
 original PR and opens nothing, so revert it by hand or fix forward. Without the
 release bot, the default token opens the PR, and CI does not start on it.
 
 ### Auto-revert
 
-The [Auto-revert workflow](../../../.github/workflows/auto-revert.yml) acts
-when CI fails on a push to the default branch. It judges main the same way
-auto-merge and the red-main metric do: by the required checks of the default
-branch. Main is red when a required check fails, and green when every required
+The session that merged a PR owns `main` after it. `bun run pr merge` waits for
+the release, then for CI's push run on the merge commit, and applies the rules
+below to it. The
+[Auto-revert workflow](../../../.github/workflows/auto-revert.yml) applies the
+same rules when CI fails on a push to the default branch. It is the net for a
+session that stopped before CI finished. Both may act on the same failure: a
+rerun or a revert that already started is left alone. The rules judge main the
+same way auto-merge and the red-main metric do: by the required checks of the
+default branch. Main is red when a required check fails, and green when every required
 check that ran passed. A check that is not required, such as a deploy job, does
 not make main red here.
 
@@ -115,8 +122,10 @@ auto-revert only, so a failed health check reverts the PR that broke it. Neither
 auto-merge nor the red-main metric reads the list. See
 [clutch.yaml](../../../apps/cli/README.md#clutchyaml).
 
-The revert PR merges as the revert section above says: auto-merge takes it when
-it may, and a person merges it otherwise.
+The revert PR merges as the revert section above says. When `pr merge` reports
+a red `main` after a merge, the session drives the revert PR to the merge before
+it reports the task. After a merge that the owner made, it tells the owner and
+offers `pr revert` or a forward fix.
 
 ### Tighten after a revert
 

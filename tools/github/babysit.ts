@@ -1,19 +1,12 @@
-import { parseArgs } from 'node:util';
-
 import { isAgentPr as agentRule } from '@tools/github/auto-merge-rules';
 import { roundsToday } from '@tools/github/babysit-log';
-import { isBlocking, readPr } from '@tools/github/babysit-read';
+import { isBlocking } from '@tools/github/babysit-read';
 import type { Comment, FailedCheck, PrState, Thread } from '@tools/github/babysit-read';
-import { retrying } from '@tools/github/command';
-import { must } from '@tools/github/github';
-import type { Run } from '@tools/github/stack';
-import { ownerLogin } from '@tools/github/status';
 
 /**
  * The babysitter's view of one agent PR: what still needs a round, and
- * whether the caps allow one. The Babysit workflow runs `plan` before each
- * round, and `sweep` on each event to dispatch the PRs that need one. See
- * .agents/skills/babysit-pr/SKILL.md.
+ * whether the caps allow one. The session that built the PR runs `bun run pr
+ * babysit <number>` for each round. See .agents/skills/babysit-pr/SKILL.md.
  */
 
 /** Each babysitter reply ends with this, so it never answers itself. */
@@ -22,14 +15,12 @@ export const replyMarker = '<!-- clutch-babysit -->';
 /** The label that holds a PR out of the sweep until a person or a new head clears it. */
 export const stuckLabel = 'babysit:stuck';
 /** The label that turns the babysitter off for one PR. */
-export const offLabel = 'babysit:off';
+const offLabel = 'babysit:off';
 
 /** At most this many rounds on one head for the same work. A third would repeat the second. */
 export const roundsPerTrigger = 2;
 /** At most this many rounds for one PR in a UTC day. */
 export const roundsPerDay = 8;
-/** At most this many PRs dispatched by one sweep. */
-export const sweepCap = 10;
 /** A branch this many commits behind its base gets a merge sync, even with no conflict. */
 export const behindLimit = 20;
 
@@ -42,7 +33,7 @@ const machine = [
   /^Opened by the release bot/u,
 ];
 
-export type Trigger =
+type Trigger =
   | 'conflict'
   | 'behind'
   | 'red-check'
@@ -163,100 +154,4 @@ export function plan(state: PrState, now: string): Plan {
     return skip(`${roundsPerDay} rounds today already`, true);
   }
   return { ...base, skip: null, stuck: false };
-}
-
-/** The open agent PRs, one `gh` call. */
-async function openPrs(run: Run, repo: string) {
-  const out = await must(run, [
-    'gh',
-    'pr',
-    'list',
-    '--repo',
-    repo,
-    '--state',
-    'open',
-    '--limit',
-    '50',
-    '--json',
-    'number,isDraft,isCrossRepository,headRefName,author',
-  ]);
-  return (
-    JSON.parse(out) as Array<{
-      number: number;
-      isDraft: boolean;
-      isCrossRepository: boolean;
-      headRefName: string;
-      author: { login: string; is_bot: boolean };
-    }>
-  )
-    .filter((p) => !p.isDraft)
-    .filter((p) =>
-      isAgentPr({
-        author: p.author.login,
-        authorIsBot: p.author.is_bot,
-        headRef: p.headRefName,
-        fork: p.isCrossRepository,
-      }),
-    )
-    .map((p) => p.number);
-}
-
-/**
- * Dispatches a round for each PR that needs one, up to `sweepCap`. An event
- * that names a PR plans only that PR. A push to main or the schedule plans
- * every open agent PR.
- */
-export async function sweep(
-  run: Run,
-  repo: string,
-  owner: string,
-  only: number | null,
-  now: string,
-  log = console.log,
-) {
-  const numbers = only ? [only] : await openPrs(run, repo);
-  const dispatched: Array<number> = [];
-  for (const number of numbers) {
-    if (dispatched.length >= sweepCap) {
-      break;
-    }
-    const state = await readPr(run, repo, number, owner);
-    const next = plan(state, now);
-    // A round that the caps stop still runs once, to log it and mark the PR stuck.
-    if (next.skip && !next.stuck) {
-      log(`#${number}: ${next.skip}.`);
-      continue;
-    }
-    await must(run, ['gh', 'workflow', 'run', 'babysit.yml', '--repo', repo, '-f', `pr=${number}`]);
-    dispatched.push(number);
-    log(`#${number}: dispatched for ${next.stuck ? 'the stuck log' : next.triggers.join(', ')}.`);
-  }
-  return dispatched;
-}
-
-if (import.meta.main) {
-  const { values, positionals } = parseArgs({
-    args: process.argv.slice(2),
-    allowPositionals: true,
-    options: { repo: { type: 'string' }, pr: { type: 'string' }, owner: { type: 'string' } },
-  });
-  try {
-    const repo = values.repo ?? process.env.GITHUB_REPOSITORY ?? '';
-    const owner = values.owner ?? (await ownerLogin()) ?? '';
-    const now = new Date().toISOString();
-    const number = values.pr ? Number(values.pr) : null;
-    if (positionals[0] === 'sweep') {
-      await sweep(retrying, repo, owner, number, now);
-    } else if (positionals[0] === 'plan' && number) {
-      console.log(JSON.stringify(plan(await readPr(retrying, repo, number, owner), now), null, 1));
-    } else {
-      console.error(
-        'Usage: bun tools/github/babysit.ts sweep|plan --repo <owner/name> --owner <login> [--pr <n>]',
-      );
-      process.exit(2);
-    }
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
 }

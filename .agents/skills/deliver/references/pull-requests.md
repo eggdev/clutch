@@ -92,25 +92,24 @@ Two kinds of PR wait for the owner without a GitHub approval rule:
 Do not merge either kind with `pr merge` until the owner says so. `pr status` counts the `owner` findings and reports such a PR as not ready. `pr merge` refuses it until the owner approves it.
 
 The owner's approval is the last step. When `automerge.owner` in `clutch.yaml`
-approves the head commit, an `on` run of Auto-merge queues an agent PR at any
+approves the head commit, an `on` run of Auto-merge passes an agent PR at any
 tier, and drops agent review's `owner` findings. The bot rule still holds a bot
 PR, and a PR that a person opened is still refused. The required checks, a
-draft, the base branch and a red `main` still hold any PR. Approval runs the
-Auto-merge workflow. Its run belongs to the PR, so when it decides to merge,
-it dispatches a run from the default branch, which holds the release bot and
-merges. A PR in a GitHub stack merges through the asynchronous merge API,
-because GitHub queues no auto-merge for a stack. A later push
-needs a new approval, and a later "Request changes" from the owner cancels it.
+draft, the base branch and a red `main` still hold any PR. The session that
+watches the PR sees the approval and runs `bun run pr merge` again. A later
+push needs a new approval, and a later "Request changes" from the owner
+cancels it.
 
 ## Follow a pull request to green
 
-Between open and merge, the [Babysit workflow](../../../../.github/workflows/babysit.yml)
-runs the [babysit-pr](../../babysit-pr/SKILL.md) skill on every agent PR. It
-syncs the PR with its base by merge, answers every review thread and comment,
-fixes what needs a fix, resolves each answered thread and keeps a
-`## Babysit log` comment. The main ruleset requires each review thread to be
-resolved before a merge. A session that follows its own PR runs the same
-skill with the commands below.
+Between open and merge, the session that opened the PR stays with it and runs
+the [babysit-pr](../../babysit-pr/SKILL.md) skill. Each round syncs the PR with
+its base by merge, answers every review thread and comment, fixes what needs a
+fix, resolves each answered thread and keeps a `## Babysit log` comment. The
+main ruleset requires each review thread to be resolved before a merge. No
+workflow or schedule does this for the session. In T3, the session watches the
+PR, and each change to its checks or reviews starts the next round. Elsewhere,
+`pr wait` blocks until the checks finish.
 
 | Command                                 | When to use it                                                                                                              |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -118,6 +117,8 @@ skill with the commands below.
 | `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending and GitHub shows the commit that the checkout has, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
 | `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. A job with no log, such as one that never started, gets its check run's annotations instead. |
 | `bun run pr findings <number> [--check]` | After the checks finish, and after each new review. It lists every agent review finding from every head, and which ones the `## Review disposition` comment answers. See [answer each finding](#answer-each-finding). |
+| `bun run pr babysit <number>`           | At the start of each babysit round. It prints the round's plan: each open thread, each unanswered comment, each failed check, and the sync that the branch needs. It keeps the plan in the git directory. |
+| `bun run pr babysit <number> --answers <file> [--pushed <sha>] [--sync merge]` | After you decide, fix, validate and push. It replies in each thread, resolves the answered ones, reruns each flaky check once, writes the disposition and the `## Babysit log`, and asks for the owner's review only when nothing else is left. `--stuck "<why>"` logs a round that a cap or a conflict stopped. |
 | `bun run pr sync <number, branch or id>` | When GitHub reports the PR as conflicting. It rebases on the PR's base, takes the base's copy of `.clutch/TRACKER.md` if an older branch still committed it, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits, even when another clone rewrote the base. On a PR in the middle of a stack, it keeps the PRs above it linked. After a rebase that you finished by hand, it rebases as usual. |
 | `bun run pr ready <id> <number>`        | Optional, once the PR exists. It adds the PR link to the issue's `done` record, commits only the issue file as `chore(tracker): mark <id> done`, and pushes. It makes no commit when the issue already says `done` with that link. The release regenerates `.clutch/TRACKER.md` on `main`. |
 
@@ -196,8 +197,8 @@ stale reviews. So the owner approves a batch once:
    with `open --base`, so `gh stack` links them bottom to top. Each PR is green,
    with 0 blocking findings and its head already marks the issue `done`.
 2. Ask the owner to approve every PR in the stack in one sitting.
-3. Run `bun run pr merge <top>`. It merges the whole stack, bottom up, in one
-   step.
+3. Run `bun run pr merge <top> --owner`. It merges the whole stack, bottom
+   up, in one step.
 4. After the approval, push only a sync with the base or a blocking fix.
    GitHub dismisses the approval only when a push changes the PR's diff. A
    sync that merges or rebases a moved base, with no conflict, keeps it, as
@@ -208,14 +209,25 @@ stale reviews. So the owner approves a batch once:
 
 ## Merge
 
-Merge only when the owner says so. The one exception is a PR that the Auto-merge
-workflow queues under `automerge.mode: on` in `clutch.yaml`, within the reach of
-`automerge.step`. At `bots`, only Renovate, gardening, Clutch sync and revert PRs merge this way. See
-[Auto-merge](#auto-merge).
+The session that built the PR merges it, as soon as it is ready:
 
 ```sh
 mise exec -- bun run pr merge <number>
 ```
+
+`merge` waits for the checks, then dispatches the
+[Auto-merge workflow](#auto-merge) from the default branch. The workflow judges
+the PR with the default branch's rules, under `automerge.mode` and
+`automerge.step` in `clutch.yaml`, and merges it with the release bot's token.
+The bot's merge starts the release and CI on `main`, and the session's own
+token would start neither. When the judge holds the PR, `merge` prints the
+verdict and exits 3. The PR then waits for the owner: ask them to approve the
+head, and run `merge` again after the approval.
+
+Add `--owner` only when the owner told this session to merge this PR. `merge`
+then merges with the session's own token, and skips the judge. A PR in a stack
+needs `--owner`, since the judge takes only a PR whose base is the default
+branch.
 
 `merge` refuses while GitHub reports that the PR needs a review
 (`REVIEW_REQUIRED`) or has changes requested, and it names the reviewer. A
@@ -233,16 +245,29 @@ owner findings. The owner is `automerge.owner` in `clutch.yaml`, else the
 default owner in `.github/CODEOWNERS`. A dismissed approval, or one on an older
 commit, does not count, and neither does another login's approval.
 
-For a PR in a stack, `merge` merges every PR from the bottom up to that one,
-with merge commits. When one merge fails, none of them merge. For a PR that is
-not in a stack, it merges that PR with a merge commit. GitHub can still count a
-PR as stacked after the PRs below it merged. When GitHub refuses the plain
-merge for that reason, `merge` merges through the stack.
+With `--owner`, for a PR in a stack, `merge` merges every PR from the bottom up
+to that one, with merge commits. When one merge fails, none of them merge. For
+a PR that is not in a stack, it merges that PR with a merge commit. GitHub can
+still count a PR as stacked after the PRs below it merged. When GitHub refuses
+the plain merge for that reason, `merge` merges through the stack.
 
 Each merge to the default branch is a release. `merge` then waits for the run of
-`release.yml` on the merge commit, up to `--timeout` (15 minutes by default). It
-prints the released version, or the failed run, and exits 1 when the release
-fails.
+`release.yml` on the merge commit, and prints the released version or the
+failed run. Then it waits for CI's push run on the merge commit, under the
+[auto-revert](../../../../docs/contributing/operations/rollback.md#auto-revert)
+rules: a red run reruns its failed jobs once, and a second red run starts the
+revert of an auto-merged PR. Each wait lasts up to `--timeout`, 30 minutes by
+default. `merge` exits 0 only when `main` is green at the merge. When it exits
+1 after a revert started, drive the revert PR to the merge before you report
+the task.
+
+The exit code of `merge` says what comes next:
+
+| Exit | Meaning                                 | Next                                                                            |
+| ---- | --------------------------------------- | ------------------------------------------------------------------------------- |
+| 0    | Merged, released, and `main` is green.  | Report the task done.                                                           |
+| 1    | The release failed, or `main` went red. | Read the output. When a revert started, babysit the revert PR and merge it.     |
+| 3    | The judge holds the PR for the owner.   | Ask the owner to approve the head. Keep watching, and merge after the approval. |
 
 The default branch takes no direct pushes, so a task cannot become `done`
 after its merge. The PR head makes it so: `open` commits the task as `done`
@@ -251,8 +276,9 @@ merge, set its task back to `todo` in the next branch.
 
 ## Auto-merge
 
-The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges the pull
-requests of this repository, never a fork's. An agent PR is one that the release
+The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges one pull
+request of this repository, never a fork's, each time `pr merge` dispatches it.
+No event or schedule starts it. An agent PR is one that the release
 bot opens, so its author is a bot. The workflow also judges a PR on a
 `clutch/cl-NNN-<slug>` branch, which an agent makes, as a fallback for a project
 whose release bot is not set up. A bot PR's branch starts with `renovate/`,
@@ -325,9 +351,10 @@ At each step, the PR also needs all of these:
   [owner findings](../../../../docs/contributing/review.md#owner-findings). The
   owner merges such a PR.
 
-The workflow runs when CI or agent review completes, and it runs the default
-branch's rules. It skips a run whose branch lives in a fork, because that run
-gets this repository's token. `automerge.mode` decides what it does:
+The workflow runs only from the default branch, with the default branch's
+rules, so a PR cannot change the rules that judge it. It refuses a fork's PR,
+because the run gets this repository's token. `automerge.mode` decides what it
+does:
 
 - `off` prints the verdict in the job summary.
 - `dry-run` comments its verdict at the step, once for each head commit of an
@@ -335,50 +362,28 @@ gets this repository's token. `automerge.mode` decides what it does:
   reasons. It waits until every required check has finished. The comment asks
   the owner to react 👍 when they agree and 👎 when they do not. `clutch
   metrics` counts those reactions as `dryRunAgreement`.
-- `on` runs `gh pr merge --auto --merge` with the release bot token, for each
+- `on` runs `gh pr merge --auto --merge` with the release bot token, for a
   PR that may merge at the step, and comments that the merge is queued. A
   separate `merge` job does that in the `release` environment, which holds the
-  bot's key and admits only the default branch. So only a run that CI or agent
-  review completes, or a sweep dispatch from the default branch, merges, and the
-  merge is pinned to the judged head commit. GitHub
-  merges it with a merge commit once the required checks pass. A merge made with
+  bot's key and admits only the default branch. The merge is pinned to the
+  judged head commit. GitHub merges it with a merge commit once the required
+  checks pass, and `pr merge` waits for that. A merge made with
   the default token starts no workflow, so the bot's token keeps the release
   and CI running on `main`. Each agent PR also gets the dry-run verdict for the
   next step, so the owner can grade it before that step turns on. At the last
   step, `medium`, there is no next step, so `on` posts no verdict.
-
-The sweep (`.github/workflows/auto-merge-sweep.yml`) dispatches the Auto-merge
-workflow for up to 20 PRs a run, least recently decided first. Hourly, it
-decides a green PR once, on its final check state. It decides that PR again only
-when its head changes, or when its last decide job fails. A decide job that was
-skipped did not decide, and neither did one whose Decide step was skipped:
-it found no PR to judge, or the default branch has no auto-merge rules. A PR held at the last step, which posts no verdict, is
-therefore left alone. A push to `main` that changes an auto-merge rule file
-decides every eligible PR again, since each last decision used the old rules.
 
 The `gh` reads of these scripts are retried on a transient GitHub error (a 5xx,
 a timeout or a reset connection), up to 3 tries. A write is never retried,
 because a 5xx on a write may have taken effect.
 
 To stop one queued merge, run `gh pr merge --disable-auto <number>`. To stop
-all of them, set `automerge.mode` to `dry-run`.
+every merge that the judge would make, set `automerge.mode` to `dry-run`.
 
 ### Grade the verdicts
 
-The owner grades verdicts after the fact, in one place. Each week the gardening
-workflow opens or updates the issue "Auto-merge calibration: week of <date>".
-`gh workflow run grade-verdicts.yml` opens or updates it now.
-It lists each verdict that the owner has not graded, with its reasons and a
-link. In that issue, the owner comments:
+The owner grades each dry-run verdict on its PR: 👍 when they agree and 👎 when
+they do not. `clutch metrics --verdicts` lists each verdict that the owner has
+not graded yet, with its reasons and a link. `clutch metrics` counts the owner's
+reactions as `dryRunAgreement`, and ignores anyone else's.
 
-- `agree with all` or `/agree all`: a 👍 on every listed verdict.
-- `/disagree #<pr>`: a 👎 on that PR's verdict. It stays on the list with a note.
-
-The Grade verdicts workflow (`.github/workflows/grade-verdicts.yml`) reads only
-the owner's comments. The owner is `automerge.owner` in `clutch.yaml`, else the
-default owner in CODEOWNERS. The release bot adds the reactions. The workflow
-then replies "Graded on the owner's instruction" and names the bot's login,
-which it reads from the app token. `clutch metrics` counts the owner's
-reactions, and those of each bot that a bot's reply names. It ignores anyone
-else's. `clutch metrics --verdicts` lists the ungraded verdicts
-and the agreement streak.

@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { babysit } from '@tools/github/babysit-session';
 import { openAsBot } from '@tools/github/bot-open';
 import { markBranchDone, ready, recordForkPoint, sync } from '@tools/github/branch';
 import { failures, renderFailures } from '@tools/github/failures';
@@ -16,6 +17,7 @@ import {
 } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import { merge } from '@tools/github/merge';
+import { revert } from '@tools/github/revert-start';
 import {
   ghStack,
   ghVersion,
@@ -43,9 +45,11 @@ export const usage = [
   '       bun run pr wait <number> [--timeout 30m] [--json]',
   '       bun run pr failures <number>',
   '       bun run pr findings <number> [--check]',
+  '       bun run pr babysit <number> [--answers FILE [--pushed SHA] [--sync merge] | --stuck TEXT]',
   '       bun run pr sync <number | branch | CL-id>',
   '       bun run pr ready <CL-id> <number>',
-  '       bun run pr merge <number> [--timeout 15m]',
+  '       bun run pr merge <number> [--owner] [--timeout 30m]',
+  '       bun run pr revert <number> [--timeout 15m]',
 ].join('\n');
 
 const root = path.resolve(import.meta.dir, '../..');
@@ -283,6 +287,11 @@ export async function runPr(
       timeout: { type: 'string' },
       help: { type: 'boolean' },
       check: { type: 'boolean' },
+      owner: { type: 'boolean' },
+      answers: { type: 'string' },
+      pushed: { type: 'string' },
+      sync: { type: 'string' },
+      stuck: { type: 'string' },
     },
   });
   if (values.help) {
@@ -290,6 +299,7 @@ export async function runPr(
     return 0;
   }
   const timeout = (fallback: string) => duration(values.timeout ?? fallback);
+  const waits = (fallback: string) => ({ timeout: timeout(fallback), interval: 15_000 });
   const print = (status: object) =>
     console.log(values.json ? JSON.stringify(status) : renderStatus(status as PrStatus));
   /** Each command, with the count of arguments it takes. */
@@ -346,12 +356,11 @@ export async function runPr(
         return values.check === true && unanswered(found).length > 0 ? 1 : 0;
       },
     ],
+    babysit: [1, ([n]) => babysit(run, n, { ...values, now: new Date(clock.now()).toISOString() })],
     sync: [1, ([target]) => sync(run, root, target, (options) => open(run, options, write, clock))],
     ready: [2, ([id, number]) => ready(run, root, id, number)],
-    merge: [
-      1,
-      ([number]) => merge(run, number, clock, { timeout: timeout('15m'), interval: 15_000 }),
-    ],
+    merge: [1, ([n]) => merge(run, n, clock, waits('30m'), { owner: values.owner === true })],
+    revert: [1, ([n]) => revert(run, n, clock, waits('15m'))],
   };
   const [command = '', ...rest] = positionals;
   const entry = Object.hasOwn(commands, command) ? commands[command] : undefined;

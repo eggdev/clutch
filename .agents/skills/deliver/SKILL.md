@@ -91,16 +91,32 @@ never a hand-rolled `gh` or `git` sequence.
 Open, stack and merge PRs with the commands in
 [pull requests](./references/pull-requests.md): ready for review, never a draft,
 and in one linear stack when a PR builds on another open PR.
-Verify the actual destination, not only submission or a build job. In T3,
-register relevant PRs and use supported watchers; delegated children return
-their result to the parent rather than watching independently.
+Verify the actual destination, not only submission or a build job.
+
+A PR destination makes this session own the PR through its merge. No workflow
+or schedule finishes it later:
+
+1. `bun run pr open` opens the PR.
+2. [babysit-pr](../babysit-pr/SKILL.md) rounds take it to ready. In T3,
+   register the PR and watch it, so each change to its checks or reviews
+   starts the next round. Elsewhere, `bun run pr wait` blocks between rounds.
+3. `bun run pr merge <number>` dispatches the auto-merge judge. The judge
+   decides whether the PR merges now or waits for the owner's approval. An
+   open PR authorizes this step, because the judge applies the repository's
+   auto-merge rules. `--owner` needs the owner's word.
+4. `pr merge` waits for the release and for CI on `main`. When `main` goes
+   red, it starts the revert, and this session drives the revert PR to the
+   merge too.
+
+Delegated children return their result to the parent rather than watching
+independently.
 
 When a lane runs the work as stage agents, follow the hand-off contract in
 [stage agents](../../../docs/contributing/stage-agents.md).
 
 For a Linear issue, deliver-linear owns intake, status and its configured review
 gates; this skill owns implementation. A Todo transition grants a PR; the merge
-follows the repository's auto-merge rules.
+follows the repository's auto-merge rules, through `pr merge`.
 
 Mark done only when the destination and required proof exist. Missing proof
 stays failed/unverified with its prerequisite. Owner review is a state only

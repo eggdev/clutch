@@ -104,7 +104,7 @@ test('merge uses gh stack for a PR in a stack, and gh pr merge for a lone PR', a
     released,
     ['git show', { out: '{"version":"1.0.0"}' }],
   ]);
-  await runPr(['merge', '10'], stacked.run, noWrite, clock);
+  await runPr(['merge', '10', '--owner'], stacked.run, noWrite, clock);
   expect(stacked.calls).toContain('gh stack merge 10 --merge --yes');
 
   const lone = fake([
@@ -115,12 +115,23 @@ test('merge uses gh stack for a PR in a stack, and gh pr merge for a lone PR', a
     released,
     ['git show', { out: '{"version":"1.0.0"}' }],
   ]);
-  await runPr(['merge', '12'], lone.run, noWrite, clock);
-  // The fetch runs right after the merge, before the release wait.
+  await runPr(['merge', '12', '--owner'], lone.run, noWrite, clock);
+  // The fetch runs after the merge, before the release wait.
   const merged = lone.calls.indexOf('gh pr merge 12 --merge');
   expect(merged).not.toBe(-1);
-  expect(lone.calls[merged + 1]).toBe('git fetch --prune origin');
-  expect(lone.calls.at(-1)).toBe('git show origin/main:package.json');
+  const fetched = lone.calls.indexOf('git fetch --prune origin');
+  expect(fetched).toBeGreaterThan(merged);
+  expect(fetched).toBeLessThan(
+    lone.calls.indexOf(
+      'gh run list --workflow release.yml --branch main --limit 20 --json headSha,status,conclusion,url',
+    ),
+  );
+  // CI on main at the merge commit is watched after the release.
+  const releasedAt = lone.calls.indexOf('git show origin/main:package.json');
+  expect(releasedAt).toBeGreaterThan(merged);
+  expect(
+    lone.calls.slice(releasedAt).some((call) => call.startsWith('gh run list --workflow ci.yml')),
+  ).toBe(true);
 });
 
 test('doctor reports a gh that does not match mise.toml, and --fix installs the pinned extension', async () => {

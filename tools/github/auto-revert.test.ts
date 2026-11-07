@@ -267,3 +267,24 @@ test('a missing argument gives the usage', async () => {
   const gh = main();
   await expect(runAutoRevert(['--sha', 'x'], gh.run, { env })).rejects.toThrow('Usage');
 });
+
+test('a revert that already started is left alone, so the session and the workflow can both act', async () => {
+  const gh = main([['gh api repos/acme/shop/issues/42/labels', { out: 'risk/low\nrevert\n' }]]);
+  const { code, lines } = await autoRevert(gh);
+  expect(code).toBe(0);
+  expect(reverted(gh)).toBe(false);
+  expect(gh.calls.some((call) => call.startsWith('gh workflow run revert.yml'))).toBe(false);
+  expect(lines.at(-1)).toBe(
+    'The revert of #42 already started. Drive its revert PR, revert/42, to the merge.',
+  );
+});
+
+test('a rerun that another actor started first is not an error', async () => {
+  const gh = main([
+    ['gh run rerun', { ok: false, err: 'run 77 cannot be rerun; it is already running' }],
+  ]);
+  const { code, lines } = await autoRevert(gh, '1');
+  expect(code).toBe(0);
+  expect(reran(gh)).toBe(true);
+  expect(lines.at(-1)).toContain('The rerun did not start, likely because it already runs');
+});
