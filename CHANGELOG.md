@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.2 (2026-11-07)
+
+### Fixes and maintenance
+
+- test(access): warm PGlite before the first access test (CL-448)
+
 ## 0.60.1 (2026-11-07)
 
 ### Fixes and maintenance
