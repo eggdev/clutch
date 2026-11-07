@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { beforeAll, expect, test } from 'bun:test';
 
 import { createSpaceServer } from '@repo/access/commands/create-space.server';
 import { joinSpaceServer } from '@repo/access/commands/join-space.server';
@@ -11,6 +11,12 @@ import { Effect } from 'effect';
 const at = '2026-10-28T12:00:00.000Z';
 const owner = { userId: 'user-a', organizationId: 'org-a' };
 const other = { userId: 'user-b', organizationId: 'org-a' };
+
+// The first PGlite start in a process loads its WASM. On a busy CI runner that
+// passed the 5 s timeout of the first test, so it runs here, with its own limit.
+beforeAll(async () => {
+  await Effect.runPromise(Effect.void.pipe(Effect.provide(AccessTest())));
+}, 30_000);
 
 test('every actor loads its organization and user groups at once, and each of its spaces on request', async () => {
   const result = await Effect.runPromise(
