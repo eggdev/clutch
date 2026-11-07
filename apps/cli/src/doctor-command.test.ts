@@ -115,3 +115,42 @@ test('--phase narrows the report, and a bad clutch.yaml exits 1 with its path', 
   expect(p2ids.length).toBeGreaterThan(0);
   expect(results.map((item: { id: string }) => item.id)).toEqual(p2ids);
 });
+
+const coreConfig = [
+  config,
+  'coreJourneys:',
+  '  sign-up: adopted',
+  '  sign-in: adopted',
+  '  onboarding: { status: n/a, reason: The product has no setup step. }',
+  '  profile-management: { status: n/a, reason: Kickoff has not run. }',
+  '  billing-and-checkout: { status: n/a, reason: The product has no paid plan. }',
+  '  roles-and-access: { status: n/a, reason: Each account has one user. }',
+  '  account-security: { status: n/a, reason: Kickoff has not run. }',
+  '  contact-support: { status: n/a, reason: Kickoff has not run. }',
+].join('\n');
+
+const signUpJourney = '/**\n * sign-up: A visitor makes an account.\n * Core: sign-up\n */\n';
+
+test('--check fails for an adopted core journey that no journey proves', async () => {
+  await using repo = await gitRepo({
+    'clutch.yaml': coreConfig,
+    'features/account/journeys/sign-up.pw.ts': signUpJourney,
+  });
+  const result = await doctor('--root', repo.root, '--check');
+  expect(result.code).toBe(1);
+  const missing = result.stdout.split('\n').filter((line) => line.startsWith('core journey'));
+  expect(missing).toEqual([
+    'core journey missing: sign-in is adopted in clutch.yaml, but no journey has `Core: sign-in`. Add features/<feature>/journeys/<id>.pw.ts from .agents/skills/setup-verification/references/core-journeys/sign-in.md, or record it as n/a with a reason. See docs/contributing/journeys/core.md.',
+  ]);
+});
+
+test('--check passes the core journeys when each adopted one has a journey', async () => {
+  await using repo = await gitRepo({
+    'clutch.yaml': coreConfig,
+    'features/account/journeys/sign-up.pw.ts': signUpJourney,
+    'features/account/journeys/sign-in.maestro.yaml':
+      '# sign-in: A member signs in on a phone.\n# Core: sign-in\nappId: com.example\n',
+  });
+  const result = await doctor('--root', repo.root, '--check');
+  expect(result.stdout).not.toContain('core journey missing');
+});

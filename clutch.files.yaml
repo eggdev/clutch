@@ -129,6 +129,9 @@ files:
     rule: managed
   - path: docs/contributing/import-boundaries.md
     rule: managed
+  # The core journey catalog. check-journeys and doctor read its names.
+  - path: docs/contributing/journeys/core.md
+    rule: managed
   - path: docs/
     rule: seed
   # Files that both sides edit.

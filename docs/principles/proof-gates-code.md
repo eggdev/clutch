@@ -90,6 +90,8 @@ change is not proof that users can do it.
 
 Every product has these journeys. A project adds its own core features to the
 list in [project intent](../contributing/project-intent.md#hard-invariants).
+The [core journey catalog](../contributing/journeys/core.md) names the
+outcomes, entry, budgets and failure states of each one.
 
 - sign up
 - sign in

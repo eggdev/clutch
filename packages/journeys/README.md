@@ -13,5 +13,11 @@ quarantines for the journey warns instead of failing. A local run only writes th
 `test-results/visual/`. See
 [screenshots](https://github.com/eggdev/clutch/blob/main/docs/contributing/setup/verification.md#screenshots).
 
+A core journey imports `outcomes` from `@repo/journeys/testing/outcome`.
+`const outcome = outcomes(page)` gives `outcome(name, expected)`, which checks
+the page's path, a visible text or both, in a step named for the outcome. A
+journey with a `Core:` line asserts only through it. See the
+[core journey catalog](https://github.com/eggdev/clutch/blob/main/docs/contributing/journeys/core.md).
+
 The runner and the Playwright config live in `tools/journeys/`. A feature may
 import only packages, so the checks live here.

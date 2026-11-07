@@ -45,6 +45,7 @@ Actor and platform: <anonymous/role, web/device/CLI/runtime>
 Entry: <real route, command or gesture>
 Prerequisites: <owned instance, fixture, role and capabilities>
 Isolation and cleanup: <records/session created, who owns them, cleanup command>
+Core: <optional: the core journey it proves, such as sign-in>
 
 | User action | Expected observation | Proof |
 | --- | --- | --- |
@@ -57,6 +58,13 @@ Driver: <existing tool/test plus exact command and selection>
 Evidence: <persistent destination and action/result artifacts>
 Limits: <platforms, dependencies or outcomes this journey does not prove>
 ```
+
+Add `Core:` only to a journey that proves an entry of the
+[core journey catalog](../../../../docs/contributing/journeys/core.md). Start
+it from its template in [core-journeys/](./core-journeys/). A `Core:` journey
+opens only the first screen, makes its account through the sign-up screens,
+and asserts each outcome through `outcome(name, expected)`. `check-journeys`
+holds it to these rules.
 
 Keep a missing prerequisite explicit. Use established disposable fixtures and
 cleanup, never a person's account or live records. A fresh browser context does
