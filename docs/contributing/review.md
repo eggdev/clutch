@@ -71,10 +71,9 @@ are how a weaker check reaches the owner.
   rule that the hatch turns off, and the reason the PR gives. A new hatch is
   `owner`. A hatch with no reason is `blocking`. A new option of a new feature
   is not a hatch.
-- **A weaker or deleted test.** Flag a test that asserts less than before, a
-  deleted test whose module still exists, and a new entry in
-  `tools/test-integrity-allow.json`. Each one is `owner`. A deleted test with
-  no reason is `blocking`.
+- **A weaker or deleted test.** Flag a test that asserts less than before, and
+  a deleted test whose module still exists. Each one is `owner`. A deleted test
+  with no reason is `blocking`.
 - **Docs that did not move with behavior.** When a change alters how a module
   or flow works, the page that owns it must change in the same PR. The
   placement table is in
