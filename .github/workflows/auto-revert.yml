@@ -1,7 +1,8 @@
 # When CI fails on the default branch right after a green run, reverts the
-# auto-merged pull request that broke it. The first failure reruns the failed
-# jobs once, so a flaky test does not revert a PR. A second failure labels the
-# PR `revert` and starts the Revert workflow, which opens the revert PR. A PR
+# auto-merged or agent pull request that broke it. The first failure reruns
+# the failed jobs once, so a flaky test does not revert a PR. A second failure
+# labels the PR `revert` and starts the Revert workflow, which opens the revert
+# PR. An agent's `clutch/cl-NNN` PR counts, however it merged. Any other PR
 # that a person merged gets no automatic revert. tools/github/auto-revert.ts
 # holds the rules. See
 # https://github.com/eggdev/clutch/blob/main/docs/contributing/operations/rollback.md#auto-revert.

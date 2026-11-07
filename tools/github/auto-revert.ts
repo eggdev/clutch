@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { isAgentPr } from '@tools/github/auto-merge-rules';
+import type { Pr } from '@tools/github/auto-merge-rules';
 import { isRed, latestChecks, requiredChecks } from '@tools/github/main-checks';
 import type { CheckRun } from '@tools/github/main-checks';
 import type { Run } from '@tools/github/stack';
@@ -14,7 +16,11 @@ import type { Run } from '@tools/github/stack';
  * nothing. When auto-merge merged that PR, this labels it `revert` and starts
  * the Revert workflow, which opens the revert PR. A first failure only reruns
  * the failed jobs, so a flaky test does not revert a PR. A PR that a person
- * merged gets no automatic revert: the person who merged it owns the fix. See
+ * merged gets no automatic revert: the person who merged it owns the fix.
+ * `pr merge` runs the same rules from the session that merged, while the
+ * Auto-revert workflow stays as the net for a session that stopped. Both may
+ * act on the same failure, so a rerun that already started and a revert that
+ * already started are not errors. See
  * docs/contributing/operations/rollback.md#auto-revert.
  */
 const usage =
@@ -50,6 +56,29 @@ export async function autoMerged(run: Run, repo: string, pr: string) {
     `.[] | select(.user.type == "Bot" and (.body | contains("${enabledMarker}"))) | .id`,
   ]);
   return out.length > 0;
+}
+
+/**
+ * Whether `pr` is an agent's PR: its branch is `clutch/cl-NNN-<slug>`, which
+ * only an agent's task makes. The release bot opens it, or the user's token
+ * when the bot is not set up. Its session may have merged it with
+ * `pr merge --owner`, on the owner's word, so it carries no enabled marker.
+ */
+async function agentPr(run: Run, repo: string, pr: string) {
+  const out = await must(run, [
+    'gh',
+    'api',
+    `repos/${repo}/pulls/${pr}`,
+    '--jq',
+    '{headRefName: .head.ref, author: {login: .user.login, is_bot: (.user.type == "Bot")}}',
+  ]);
+  // The judge's own rule, so the two cannot disagree on who is an agent.
+  return isAgentPr(JSON.parse(out) as Pick<Pr, 'headRefName' | 'author'>);
+}
+
+/** Whether the net may revert `pr`: auto-merge merged it, or it is an agent's PR. */
+async function revertable(run: Run, repo: string, pr: string) {
+  return (await autoMerged(run, repo, pr)) || agentPr(run, repo, pr);
 }
 
 type CiRun = { headSha: string; conclusion: string; status: string };
@@ -109,6 +138,121 @@ export async function readWatch(file: string): Promise<Array<string>> {
   return watch.map((name: string) => name.trim());
 }
 
+/**
+ * Reruns the failed jobs of a run once, in case a test is flaky. The other
+ * actor may have rerun it first, so a refused rerun only logs: the next
+ * attempt decides either way.
+ */
+async function rerunOnce(
+  run: Run,
+  options: {
+    repo: string;
+    runId: string;
+    at: string;
+    log: (text: string) => void;
+    reran?: () => void;
+  },
+) {
+  const { repo, runId, at, log, reran } = options;
+  const rerun = await run(['gh', 'run', 'rerun', runId, '--failed', '--repo', repo]);
+  const why = (rerun.err || rerun.out).trim();
+  // The session and the Auto-revert workflow can both rerun. Only that race is not an error.
+  if (!rerun.ok && !/already running|is not completed|in progress/iu.test(why)) {
+    throw new Error(`gh run rerun ${runId} failed: ${why}`);
+  }
+  log(
+    rerun.ok
+      ? `CI failed on ${at}. Reran the failed jobs once, in case a test is flaky.`
+      : `CI failed on ${at}. The rerun did not start, because it already runs: ${why}`,
+  );
+  reran?.();
+}
+
+/** Whether `pr` already carries the `revert` label, so its revert already started. */
+async function revertStarted(run: Run, repo: string, pr: string) {
+  const labels = await must(run, [
+    'gh',
+    'api',
+    `repos/${repo}/issues/${pr}/labels`,
+    '--jq',
+    '.[].name',
+  ]);
+  return labels.split('\n').includes('revert');
+}
+
+/**
+ * Labels `pr` `revert` and starts the Revert workflow, which opens the revert
+ * PR. A revert that already started is left alone.
+ */
+async function startRevert(
+  run: Run,
+  options: {
+    repo: string;
+    pr: string;
+    branch: string;
+    sha: string;
+    runId: string;
+    log: (text: string) => void;
+  },
+) {
+  const { repo, pr, branch, sha, runId, log } = options;
+  if (await revertStarted(run, repo, pr)) {
+    log(`The revert of #${pr} already started. Drive its revert PR, revert/${pr}, to the merge.`);
+    return;
+  }
+  // The label may be missing before the Labels workflow has run. Creating it
+  // needs the Issues permission, which this job does not grant. So a failure is
+  // not fatal: the add below fails if the label still does not exist. The color
+  // and description match apps/cli/src/labels/compute.ts.
+  await run([
+    'gh',
+    'label',
+    'create',
+    'revert',
+    '--force',
+    '--repo',
+    repo,
+    '--color',
+    'e99695',
+    '--description',
+    'Revert this merged PR: the Revert workflow opens the revert PR',
+  ]);
+  // The REST issues endpoint adds a label to a PR. `gh pr edit` fails on
+  // Projects (classic), which GitHub is retiring, so it does not add labels.
+  await must(run, [
+    'gh',
+    'api',
+    '--method',
+    'POST',
+    `repos/${repo}/issues/${pr}/labels`,
+    '-f',
+    'labels[]=revert',
+  ]);
+  await must(run, [
+    'gh',
+    'workflow',
+    'run',
+    'revert.yml',
+    '--repo',
+    repo,
+    '--ref',
+    branch,
+    '-f',
+    `pr=${pr}`,
+  ]);
+  await must(run, [
+    'gh',
+    'pr',
+    'comment',
+    pr,
+    '--repo',
+    repo,
+    '--body',
+    `CI failed on \`${branch}\` at ${sha.slice(0, 7)} twice after auto-merge merged this PR, and it was green before. The Revert workflow opens the revert PR. Run: https://github.com/${repo}/actions/runs/${runId}`,
+  ]);
+  log(`Auto-merge merged #${pr}, and ${branch} went red after it. Started its revert.`);
+}
+
 /** Runs the check. Returns the exit code. */
 export async function runAutoRevert(
   args: Array<string>,
@@ -117,9 +261,11 @@ export async function runAutoRevert(
     log?: (text: string) => void;
     env?: Record<string, string | undefined>;
     watch?: Array<string>;
+    /** Called when the failed jobs rerun, so a watcher waits for the next attempt. */
+    reran?: () => void;
   } = {},
 ): Promise<number> {
-  const { log = console.log, watch = [] } = options;
+  const { log = console.log, watch = [], reran } = options;
   const env = options.env ?? process.env;
   const { values } = parseArgs({
     args,
@@ -181,10 +327,7 @@ export async function runAutoRevert(
     return 0;
   }
   if (Number(attempt) < 2) {
-    await must(run, ['gh', 'run', 'rerun', runId, '--failed', '--repo', repo]);
-    log(
-      `CI failed on ${branch} at ${sha.slice(0, 7)}. Reran the failed jobs once, in case a test is flaky.`,
-    );
+    await rerunOnce(run, { repo, runId, at: `${branch} at ${sha.slice(0, 7)}`, log, reran });
     return 0;
   }
   const commit = JSON.parse(
@@ -210,63 +353,13 @@ export async function runAutoRevert(
     log(`${merge.slice(0, 7)} is not the merge of a pull request. No revert.`);
     return 0;
   }
-  if (!(await autoMerged(run, repo, pr))) {
+  if (!(await revertable(run, repo, pr))) {
     log(
       `A person merged #${pr}, so it gets no automatic revert. Fix forward or add the revert label.`,
     );
     return 0;
   }
-  // The label may be missing before the Labels workflow has run. Creating it
-  // needs the Issues permission, which this job does not grant. So a failure is
-  // not fatal: the add below fails if the label still does not exist. The color
-  // and description match apps/cli/src/labels/compute.ts.
-  await run([
-    'gh',
-    'label',
-    'create',
-    'revert',
-    '--force',
-    '--repo',
-    repo,
-    '--color',
-    'e99695',
-    '--description',
-    'Revert this merged PR: the Revert workflow opens the revert PR',
-  ]);
-  // The REST issues endpoint adds a label to a PR. `gh pr edit` fails on
-  // Projects (classic), which GitHub is retiring, so it does not add labels.
-  await must(run, [
-    'gh',
-    'api',
-    '--method',
-    'POST',
-    `repos/${repo}/issues/${pr}/labels`,
-    '-f',
-    'labels[]=revert',
-  ]);
-  await must(run, [
-    'gh',
-    'workflow',
-    'run',
-    'revert.yml',
-    '--repo',
-    repo,
-    '--ref',
-    branch,
-    '-f',
-    `pr=${pr}`,
-  ]);
-  await must(run, [
-    'gh',
-    'pr',
-    'comment',
-    pr,
-    '--repo',
-    repo,
-    '--body',
-    `CI failed on \`${branch}\` at ${sha.slice(0, 7)} twice after auto-merge merged this PR, and it was green before. The Revert workflow opens the revert PR. Run: https://github.com/${repo}/actions/runs/${runId}`,
-  ]);
-  log(`Auto-merge merged #${pr}, and ${branch} went red after it. Started its revert.`);
+  await startRevert(run, { repo, pr, branch, sha, runId, log });
   return 0;
 }
 

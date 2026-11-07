@@ -118,7 +118,14 @@ test('the babysit-pr skill keeps its contract, its decisions, its caps and its p
   const root = path.resolve(import.meta.dir, '..');
   expect(checkSkills(root).filter((error) => error.startsWith('babysit-pr'))).toEqual([]);
   const text = readFileSync(path.join(root, '.agents/skills/babysit-pr/SKILL.md'), 'utf-8');
-  for (const command of ['pr wait', 'pr status', 'pr sync', 'pr failures', 'pr open']) {
+  for (const command of [
+    'pr wait',
+    'pr status',
+    'pr failures',
+    'pr open',
+    'pr babysit',
+    'pr merge',
+  ]) {
     expect(text).toContain(`bun run ${command}`);
   }
   for (const word of [
@@ -131,7 +138,10 @@ test('the babysit-pr skill keeps its contract, its decisions, its caps and its p
     'at most 2 times',
     'at most 8 rounds',
     '## Babysit log',
-    'resolveReviewThread',
+    'No workflow or\nschedule babysits',
+    'Sync by merge',
+    '--sync merge',
+    'resolves each thread',
   ]) {
     expect(text).toContain(word);
   }

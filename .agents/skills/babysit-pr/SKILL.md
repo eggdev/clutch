@@ -1,14 +1,16 @@
 ---
 name: babysit-pr
-description: Stay with one open pull request until it merges - sync it with its base by merge, answer every review thread and comment (agent review, people, other bots), fix what needs a fix, resolve each answered thread, rerun a flaky check once, ask the owner last, and keep a `## Babysit log`. The Babysit workflow runs it on every agent PR. Use it by hand when asked to babysit, watch or get a PR green.
+description: Stay with one open pull request until it merges - sync it with its base by merge, answer every review thread and comment (agent review, people, other bots), fix what needs a fix, resolve each answered thread, rerun a flaky check once, ask the owner last, keep a `## Babysit log`, then merge it with `pr merge`. The session that opened the PR runs it. Use it after `pr open`, and when asked to babysit, watch or get a PR green.
 ---
 
 # Babysit a pull request
 
-The Babysit workflow (`.github/workflows/babysit.yml`) runs this skill on
-every open agent PR, so no session has to remember it. Its `sweep` job reads
-the PR on each review, comment, finished CI or agent review run, push to
-`main`, and every half hour. It dispatches a round when there is work:
+The session that opened a PR stays with it until it merges. No workflow or
+schedule babysits for it. In T3, register the PR and watch it: each change to
+its checks or reviews wakes the session for the next round. Elsewhere, run
+`bun run pr wait <number>` between rounds.
+
+`bun run pr babysit <number>` plans each round. It reports these triggers:
 
 | Trigger          | When                                                                  |
 | ---------------- | --------------------------------------------------------------------- |
@@ -21,8 +23,8 @@ the PR on each review, comment, finished CI or agent review run, push to
 
 Every comment counts: agent review's inline findings, a person's review and
 comments, Bugbot and any other bot. Machine status comments do not count:
-the `## Agent review` summary, auto-merge verdicts, visual review, CI
-explain, the disposition and this log.
+the `## Agent review` summary, auto-merge verdicts, visual review, the
+disposition and this log.
 
 The main ruleset requires each review thread to be resolved before a merge.
 So a thread that no one answers holds the PR, and the babysitter is what
@@ -30,34 +32,57 @@ answers it.
 
 ## One round
 
-1. **Plan.** `bun tools/github/babysit.ts plan --repo <owner/name> --owner <login> --pr <n>`
-   prints the work and the caps.
-2. **Sync by merge.** On `conflict` or `behind`, merge the base into the
+Run every command through `mise exec --`.
+
+1. **Plan.** `bun run pr babysit <n>` prints the work and keeps the plan in
+   the git directory. When it says no round runs, wait for the next change.
+2. **Read each red check.** `bun run pr failures <n>` prints the failed step
+   of each job and the output of each failed Nx task.
+3. **Sync by merge.** On `conflict` or `behind`, merge the base into the
    branch: `git merge origin/<base>`. Never rebase and never force-push. A
    merge keeps the history, and it keeps the owner's approval while the PR's
-   own diff stays the same. Resolve a conflict only when
-   the right result is clear from both sides. Otherwise the round is stuck.
-3. **Decide** each item, as below.
-4. **Fix** each `must-fix`, and each `cheap-fix` before the owner approves.
-5. **Validate.** `mise exec -- bun run validate` must pass before a push.
-6. **Push** without force. A push that loses a race fails, and the next round
+   own diff stays the same. Resolve a conflict only when the right result is
+   clear from both sides. Otherwise the round is stuck.
+4. **Decide** each item, as below.
+5. **Fix** each `must-fix`, and each `cheap-fix` before the owner approves.
+6. **Validate.** `bun run validate` must pass before a push.
+7. **Push** with `bun run pr open --title "<title>" --body-file <file>`,
+   without `--force`. A push that loses a race fails, and the next round
    starts over.
-7. **Reply, resolve and log.** `bun tools/github/babysit-apply.ts` does it.
-   It replies in each thread, and it resolves each thread with a pushed fix
-   or a `no-change` reason. It answers the other comments in one comment,
-   reruns each flaky check once, and edits the disposition and the log.
-8. **Ask the owner last.** `bun tools/github/babysit-owner.ts` asks for the
-   owner's review only when the checks pass, agent review has no blocking
-   finding, and the branch merges cleanly. While work is left, it withdraws
-   the request, so the owner never approves a head that is about to change.
+8. **Reply, resolve and log.** Write your answers to a file, then run
+   `bun run pr babysit <n> --answers <file> --pushed <sha> --sync merge`.
+   Leave out `--pushed` when the round pushed nothing, and `--sync` when it
+   merged nothing. It replies in each thread, and it resolves each thread
+   with a pushed fix or a `no-change` reason. It answers the other comments in
+   one comment, reruns each flaky check once, and edits the disposition and
+   the log. Then it asks for the owner's review only when the checks pass,
+   agent review has no blocking finding and the branch merges cleanly. While
+   work is left, it withdraws the request, so the owner never approves a head
+   that is about to change.
+9. **Merge** when the PR is ready: `bun run pr merge <n>`. See
+   [merge](#merge).
 
-The workflow runs steps 3 and 4 as two model calls. Triage uses
-`claude-haiku-5-5` (`CLUTCH_BABYSIT_TRIAGE_MODEL`). The fix runs only when an
-item needs one, on `claude-sonnet-5-5` (`CLUTCH_BABYSIT_FIX_MODEL`). The models
-edit files and return decisions. They hold no token that can push, and they run
-no code from the PR, because they hold the API key. A later step with no key
-runs validate and makes the commit. The bot token is minted after that, and the
-push runs from a fresh repository that never ran the PR's code.
+The answers file holds one item for each thread (`ref` is its id), each
+comment (`ref` is its id as a string) and each failed check (`ref` is its
+name):
+
+```json
+{
+  "items": [
+    {
+      "kind": "thread",
+      "ref": "PRRT_kwDO...",
+      "decision": "must-fix",
+      "reason": "The docs page still names the old flag.",
+      "reply": "Fixed: the page names --owner now."
+    }
+  ]
+}
+```
+
+`kind` is `thread`, `comment` or `check`. `decision` is one of the decisions
+below. Write each reply for a person: short, plain, with no restatement of the
+comment. A fix that you could not make becomes `owner`, with its reason.
 
 ## Decide
 
@@ -83,6 +108,7 @@ not change code to hide it.
   reply instead of widening the PR.
 - **Never weaken a check to pass it.** Do not skip a test, raise a budget,
   add an exemption or delete an assertion. That needs the owner.
+- Never push with `--no-verify`.
 - A docs finding is usually a page that did not move with the behavior.
   Change the page it names.
 
@@ -97,12 +123,11 @@ fix it would make and is resolved, and the log keeps it for a later PR.
 
 - A round with the same triggers on the same head runs at most 2 times.
 - A PR gets at most 8 rounds in a UTC day.
-- When a cap stops a round, or a conflict needs a person, the round logs
-  `stuck` and labels the PR `babysit:stuck`. The sweep leaves it alone until a
-  new head or a person's new comment. The owner's daily brief lists each
-  stuck PR, so the babysitter never pings the owner on the PR.
-- Label a PR `babysit:off` to leave it alone. Set the `CLUTCH_BABYSIT`
-  repository variable to `off` to stop every round.
+- When a cap stops a round, or a conflict needs a person, log it with
+  `bun run pr babysit <n> --stuck "<why>"`. That labels the PR
+  `babysit:stuck`. Tell the owner in the session's report, and do not ping
+  them on the PR. A new head or a person's new comment clears it.
+- Label a PR `babysit:off` to leave it alone.
 
 ## The log
 
@@ -110,20 +135,15 @@ Each PR has one `## Babysit log` comment, which each round edits. A round
 records its trigger, the event, the head, the sync, each item with its
 decision, its reason, what it did and whether its thread is resolved, the
 commit it pushed, and its cost. The comment's hidden JSON is the state that
-the next round reads. Each round also uploads it as the artifact
-`babysit-<pr>-<run id>`, for metrics and the weekly digest.
+the next round reads.
 
 The babysitter also keeps a `## Review disposition` comment with a line for
 each agent review finding it answered, so `pr findings --check` and
 `pr merge` agree with the threads.
 
-## By hand
+## Merge
 
-A session that babysits its own PR runs the same round with the `bun run pr`
-commands: `bun run pr status`, `bun run pr wait`, `bun run pr failures`,
-`bun run pr findings`, `bun run pr sync` and `bun run pr open`. See [commands](../deliver/references/commands.md). Reply in each
-thread with `gh api repos/<repo>/pulls/<n>/comments/<id>/replies`, end the
-reply with `<!-- clutch-babysit -->`, and resolve it with the GraphQL
-`resolveReviewThread` call. Never push with `--no-verify`, and
-never merge from this skill. The merge follows the
-[merge rules](../deliver/references/pull-requests.md#merge).
+When `bun run pr status <n>` says the PR is ready, run `bun run pr merge <n>`
+and act on its exit code. The [merge rules](../deliver/references/pull-requests.md#merge)
+give each exit code and what comes next. Add `--owner` only when the owner told
+you to merge this PR.

@@ -1,6 +1,3 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import { parseArgs } from 'node:util';
-
 import { replyMarker, stuckLabel } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
 import {
@@ -12,13 +9,11 @@ import {
   fixes,
 } from '@tools/github/babysit-answer';
 import type { Answer, Context } from '@tools/github/babysit-answer';
-import { addRound, logHeading, renderDisposition, renderLog } from '@tools/github/babysit-log';
+import { addRound, renderDisposition, renderLog } from '@tools/github/babysit-log';
 import type { Item, Round } from '@tools/github/babysit-log';
 import { readPr } from '@tools/github/babysit-read';
-import { retrying } from '@tools/github/command';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
-import { ownerLogin } from '@tools/github/status';
 
 /**
  * The deterministic half of a round. The agent decides and edits files; this
@@ -177,76 +172,4 @@ export async function apply(
     input.plan.comments.map((c) => c.id),
   );
   return round;
-}
-
-if (import.meta.main) {
-  const { values } = parseArgs({
-    args: process.argv.slice(2),
-    options: {
-      repo: { type: 'string' },
-      owner: { type: 'string' },
-      plan: { type: 'string' },
-      answers: { type: 'string' },
-      pushed: { type: 'string' },
-      sync: { type: 'string' },
-      cost: { type: 'string' },
-      models: { type: 'string' },
-      event: { type: 'string' },
-      run: { type: 'string' },
-      out: { type: 'string' },
-      stuck: { type: 'string' },
-    },
-  });
-  try {
-    const repo = values.repo ?? process.env.GITHUB_REPOSITORY ?? '';
-    const owner = values.owner ?? (await ownerLogin()) ?? '';
-    const plan = JSON.parse(await readFile(values.plan ?? '', 'utf-8')) as Plan;
-    const now = new Date().toISOString();
-    const cost = {
-      usd: Number(values.cost ?? 0) || 0,
-      models: (values.models ?? '').split(',').filter(Boolean),
-    };
-    const common = {
-      at: now,
-      run: values.run ?? '',
-      event: values.event ?? '',
-      head: plan.head,
-      triggers: plan.triggers,
-      pushed: null,
-      cost,
-    };
-    let round: Round;
-    if (values.stuck) {
-      // The caps stopped this round before any model ran.
-      round = { ...common, sync: 'none', items: [], outcome: 'stuck', note: values.stuck };
-      await writeLog(retrying, repo, owner, plan.number, round, []);
-    } else {
-      const answers = values.answers
-        ? ((JSON.parse(await readFile(values.answers, 'utf-8')) as { items?: Array<Answer> })
-            .items ?? [])
-        : [];
-      round = await apply(retrying, {
-        repo,
-        owner,
-        plan,
-        answers,
-        pushed: values.pushed || null,
-        sync: (values.sync ?? 'none') as Round['sync'],
-        cost,
-        event: values.event ?? '',
-        runUrl: values.run ?? '',
-        now,
-      });
-    }
-    if (values.out) {
-      await writeFile(
-        values.out,
-        JSON.stringify({ repo, pr: plan.number, heading: logHeading, round }, null, 1),
-      );
-    }
-    console.log(`#${plan.number}: ${round.outcome}. ${round.note}`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
 }

@@ -40,9 +40,8 @@ its options, and so does `bun run pr --help`.
 
 See [pull requests](./pull-requests.md) for the rules behind each one. The
 [babysit-pr](../../babysit-pr/SKILL.md) skill strings them into rounds that
-take a PR to green. The Babysit workflow runs those rounds with
-`bun tools/github/babysit.ts plan|sweep`, `bun tools/github/babysit-apply.ts`
-and `bun tools/github/babysit-owner.ts`.
+take a PR to green. The session that opened the PR runs each round, and then
+the merge, itself.
 
 | Command                                                  | Use it when                                          | It replaces                                     |
 | -------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------- |
@@ -53,9 +52,12 @@ and `bun tools/github/babysit-owner.ts`.
 | `bun run pr wait <number>`                               | After a push, to wait for the checks.                | A `gh pr checks --watch` or `sleep` loop.       |
 | `bun run pr failures <number>`                           | A check failed.                                      | Digging in `gh run view --log`.                 |
 | `bun run pr findings <number> [--check]` | The checks finished. Answer each agent review finding, from every head, in one `## Review disposition` comment. | Reading only the latest review, which can drop an older finding. |
+| `bun run pr babysit <number>`                            | A babysit round starts. It prints and keeps the round's plan. | Reading every thread, comment and check by hand. |
+| `bun run pr babysit <number> --answers <file>`           | You decided, fixed, validated and pushed. It replies, resolves, reruns flaky checks, logs and asks the owner last. | Replying and resolving each thread by hand. |
 | `bun run pr sync <number>`                               | The base moved, or the tracker conflicts.            | A manual rebase, tracker fix, validate and push. |
 | `bun run pr ready <id> <number>`                         | Optional, once the PR exists: it adds the PR link to the issue. | `clutch issues set ... done`, commit and push.  |
-| `bun run pr merge <number>`                              | The merge rules hold.                                | `gh pr merge` and `gh stack merge`.             |
+| `bun run pr merge <number> [--owner]`                    | The PR is ready. It dispatches the auto-merge judge, waits for the merge, the release and CI on `main`, and starts the revert when `main` goes red. `--owner` only on the owner's word. | `gh pr merge`, `gh stack merge` and watching `main` by hand. |
+| `bun run pr revert <number>`                             | A merged PR must come out. It starts the Revert workflow and names the revert PR. | A hand-made `git revert` and PR.                |
 
 ## Measure
 
@@ -63,11 +65,8 @@ and `bun tools/github/babysit-owner.ts`.
 | --------------------------------------------- | --------------------------------------------------- | ------------------------------------ |
 | `bun run clutch metrics [--since 30d] [--json]` | You want flow numbers or the dry-run agreement streak. | Counting PRs and reactions by hand. |
 | `bun run clutch metrics --verdicts [--json]` | You want the dry-run verdicts the owner has not graded yet, with reasons and links. | Searching PR comments for verdicts. |
-| `gh workflow run grade-verdicts.yml` | You want this week's calibration issue now. The gardening workflow opens it each week. | Collecting verdicts into an issue by hand. |
-
-The owner grades every listed verdict in the calibration issue with one
-comment: `agree with all` or `/agree all`, or `/disagree #<pr>` for one PR.
-Do not add 👍 reactions for the owner by hand.
+The owner grades each verdict with a 👍 or a 👎 on its comment. Do not add
+reactions for the owner.
 
 ## Release
 
@@ -79,7 +78,7 @@ changeset from the PR title, and the release workflow does the rest. See
 | -------------------------------------- | -------------------------------------------- | ------------------------------------ |
 | `bun run clutch sync --check`          | You want to know if a project is behind.     | Comparing files with the template.   |
 | `bun run clutch sync`                  | You move a project to the latest release.    | Copying template files by hand.      |
-| The `revert` label on a merged PR      | A merged PR must come out.                   | A hand-made `git revert` and PR.     |
+| `bun run pr revert <number>`, or the `revert` label on a merged PR | A merged PR must come out. | A hand-made `git revert` and PR. |
 
 ## Do not hand-roll
 

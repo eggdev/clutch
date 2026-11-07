@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.60.0 (2026-11-07)
+
+### Features
+
+- feat(journeys): ship the core journey catalog (CL-440)
+
+## 0.59.0 (2026-11-07)
+
+### Features
+
+- feat(pr): merge, watch main and revert in the delivering session (CL-436)
+
+## 0.58.0 (2026-11-07)
+
+### Features
+
+- chore(tools): remove check-test-integrity and its allow list
+
+### Fixes and maintenance
+
+- docs(principles): proof gates code, and the owner gates the product (CL-439)
+
 ## 0.57.0 (2026-11-07)
 
 ### Features

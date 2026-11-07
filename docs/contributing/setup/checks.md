@@ -106,7 +106,6 @@ tests the workflow and dependency checks.
 | `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md)                                                                                                                                                                                                                                                                                      |
 | `check-guardrail-coverage`   | A file that a check, a lint plugin or a hook reads, with no pattern in `tools/guardrail-files.json`. See [guardrail files](../harness-engineering.md#guardrail-files)                                                                                                                                                                                                                   |
 | `check-transaction-safe`     | A service that marks itself transaction-safe when `primitives.yaml` does not list it. See [server](../architecture/server.md#services-in-a-server-change)                                                                                                                                                                                                                               |
-| `check-test-integrity`       | A deleted test file, a test renamed so it does not run, or fewer tests or assertions in a test file. See [test integrity](../testing.md#test-integrity)                                                                                                                                                                                                                                 |
 | `check-journeys`             | A shipped feature with no journey for its platform, a journey header with missing lines, or an unregistered journey. See [journeys](./verification.md#journeys)                                                                                                                                                                                                                         |
 | `check-clutch`               | A capability that `clutch.yaml` adopts but the repository lacks, a core gap with no waiver, an expired waiver, or a capability below `.clutch/doctor-baseline.json`. Run `bun run clutch doctor` to see why                                                                                                                                                                             |
 | `check-ratchets`             | A count in `.clutch/ratchets.json` that went up, or that went down while the baseline did not. Run `bun run clutch ratchet check`, then fix the new violation or run `bun run clutch ratchet update`                                                                                                                                                                                    |
@@ -282,9 +281,10 @@ warns. Size never fails a PR. See
 <!-- kickoff: The globs of the project's deploy config, infrastructure code and secret handling, as the paths of the infra, deploy and secrets rule in .clutch/risk.yaml. Leave the list empty when the project has none. -->
 
 The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
-CI or agent review completes on a branch of this repository, never a fork. The
-[sweep](../../../.github/workflows/auto-merge-sweep.yml) also dispatches it. It
-judges each pull request of this repository, and logs a person's as not judged.
+`bun run pr merge <number>` dispatches it from the session that built the PR.
+It also runs when the owner approves a head, and when CI completes on a
+`revert/` or bot PR, which no session owns. No schedule starts it. It judges a pull request of this repository,
+never a fork's, and logs a person's as not judged.
 An agent's PR is one that a bot opens. A bot's PR is on a `renovate/`,
 `gardening/`, `clutch-sync/` or `revert/` branch. It acts on `automerge.mode`
 and `automerge.step` in `clutch.yaml`. Its `merge` job enables GitHub's
@@ -325,21 +325,13 @@ auto-merge with the release bot, in the `release` environment. See
 
 ## CI failure explainer
 
-When CI fails, [`ci-explain.yml`](../../../.github/workflows/ci-explain.yml)
-explains the failure. It runs after each failed `CI` run of a branch in this
-repository, never a fork. A run that passed starts no job.
+The session that owns a pull request explains its own red checks. In each
+[babysit](../../../.agents/skills/babysit-pr/SKILL.md) round,
+`bun run pr failures <number>` prints the failed step of each failed job, and
+the output of each failed Nx task. The session reads it, classifies the
+failure and fixes it on the branch. No workflow waits for CI to comment later.
 
-- It downloads the failed job logs with `gh run view --log-failed`, and keeps
-  the last 20,000 characters.
-- An agent reads the logs and this page, and returns the failing step, the
-  likely cause and the fix command. It uses the cheapest model, unless the
-  `CLUTCH_AGENT_MODEL` repository variable names another one. It can only read
-  files, and the workflow posts its answer.
-- On a pull request, the workflow keeps one comment and edits it on each new
-  failure.
-- On the default branch, it opens one issue with the label `ci-red-main`, then
-  comments on that issue for each later failure. An issue that the job's token
-  opens starts no workflow, so the explainer cannot loop.
-- It checks out the default branch, never the failed code.
-- Without the `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` secret, it
-  passes with a notice.
+A red default branch after a merge belongs to the session that merged.
+`pr merge` watches CI on the merge commit. It reruns a failure once, and it
+starts the revert on a second one. See
+[rollback](../operations/rollback.md#auto-revert).
