@@ -79,13 +79,18 @@ that an adopted core journey needs and that `budgets:` lacks.
 - `clicks`: the clicks or taps to finish each core journey. Kickoff writes 3
   for sign-up.
 - `timeToValue`: the seconds from the first screen to the activation event.
+  No check reads it yet. Each outcome records its `elapsedMs` from the start
+  of the test, so a later tool can check it.
 
 Each journey also has no accessibility error: `accessible(page, 'where')`
-after each step that renders a page.
+after each step that renders a page. `outcome()` also runs axe after each
+outcome holds, so each state that the journey proves is checked.
 
 The journey test checks each run on each device. A layout shift at or over
 `layoutShift` fails, and names the elements that moved. A click budget counts
-each click or tap, and each press of Enter. Sign-up counts from the entry to
+each activation: a click or tap, or a key that clicks a control, such as Space
+or Enter on a button. A choice in a `<select>` also counts. A press and hold
+or a drag that activates nothing does not count. Sign-up counts from the entry to
 `signed-up`. Each other journey counts from `signed-up` to the outcome that
 its section names in its budget. A run over the budget fails at that outcome.
 See [budgets](../end-to-end-testing.md#budgets).

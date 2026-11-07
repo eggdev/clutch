@@ -51,9 +51,10 @@ mise exec -- bun run journey --all
 
 The runner uses the dev servers that already run. When a server is down, it
 starts the missing ones through `tools/dev.ts`. It stops only the servers that
-it started. Each web journey runs on a Pixel 7 and on Desktop Chrome. A
+it started. Each web journey runs on a phone, a tablet and a desktop. A
 journey that runs past its budget fails. A failed journey runs once more, and
-a pass on the retry files a `flake` friction entry. A `Core:` journey also
+a pass on the retry files a `flake` friction entry. A layout shift, click
+budget or axe failure on any try still fails the run. A `Core:` journey also
 fails when its run on a device passed but did not record each outcome. That
 is `signed-up` first, then every outcome that its catalog section names. Each journey writes its
 [measures](../end-to-end-testing.md#measures) to
@@ -84,7 +85,7 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
 
 Each web journey also calls `accessible(page, 'where')` from
 `@repo/journeys/testing/a11y` after each step that renders a page. It fails on
-a `serious` or `critical` axe violation. See
+any axe violation. See
 [accessibility checks](../capabilities/a11y-checks.md).
 
 ### Screenshots
@@ -93,8 +94,8 @@ A web journey calls `snap(page, 'name')` from `@repo/journeys/testing/visual`
 at a stable point, the same way it calls `accessible`. A gallery or component
 page is a journey that opens each group and snaps it. `snap` captures the page
 on the device of the run, in the light and dark schemes. So each journey keeps
-a baseline for each device: `mobile` from the Pixel 7, 412 px wide, and
-`desktop` from Desktop Chrome, 1280 px wide. It changes the `dark` class on
+a baseline for each device. The phone gives `mobile`, 390 px wide. The tablet
+gives `tablet`, 820 px wide, and the desktop gives `desktop`, 1440 px wide. It changes the `dark` class on
 `<html>` in place. Then it puts it back, so the journey's next step sees the
 page it left.
 
@@ -107,7 +108,7 @@ as a generated name. A screen that shows the time sets the clock first with
 The baselines are committed PNG files:
 
 ```text
-features/<name>/journeys/__screenshots__/<snap>-<mobile|desktop>-<light|dark>.png
+features/<name>/journeys/__screenshots__/<snap>-<mobile|tablet|desktop>-<light|dark>.png
 ```
 
 CI is the only renderer. Fonts and anti-aliasing differ between machines, so a
