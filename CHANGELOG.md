@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.58.0 (2026-11-07)
+
+### Features
+
+- chore(tools): remove check-test-integrity and its allow list
+
+### Fixes and maintenance
+
+- docs(principles): proof gates code, and the owner gates the product (CL-439)
+
 ## 0.57.0 (2026-11-07)
 
 ### Features
