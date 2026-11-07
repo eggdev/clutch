@@ -117,9 +117,11 @@ jobs:
           # An agent's clutch/ PR merges from a CI event only after the owner
           # approved it: the approval's own run may have met a pending check.
           # Its session merges it otherwise.
+          # A ruleset's code owner review leaves reviewDecision empty, so read the
+          # approvals on the head commit. The judge then checks that the owner gave one.
           if [ "$GITHUB_EVENT_NAME" = workflow_run ] && [ -n "$PR" ] && [[ "$HEAD_BRANCH" == clutch/* ]]; then
-            decision="$(gh pr view "$PR" --json reviewDecision --jq .reviewDecision)"
-            if [ "$decision" != APPROVED ]; then
+            approved="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/reviews" --jq ".[] | select(.state == \"APPROVED\" and .user.type != \"Bot\" and .commit_id == \"$HEAD_SHA\") | .id")"
+            if [ -z "$approved" ]; then
               echo "::notice title=Auto-merge skipped::Agent PR $PR has no approval, so its session merges it."
               PR=""
             fi
@@ -194,10 +196,15 @@ jobs:
           GH_REPO: ${{ github.repository }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          gh pr list --state open --limit 100 --json number,headRefName,reviewDecision,isCrossRepository \
-            --jq '.[] | select((.headRefName | startswith("clutch/")) and .reviewDecision == "APPROVED" and (.isCrossRepository | not)) | .number' |
-            while read -r pr; do
-              gh workflow run auto-merge.yml --ref "$DEFAULT_BRANCH" -f pr="$pr"
+          # A ruleset's code owner review leaves reviewDecision empty, so read the
+          # approvals on each head commit. The judge checks that the owner gave one.
+          gh pr list --state open --limit 100 --json number,headRefName,headRefOid,isCrossRepository \
+            --jq '.[] | select((.headRefName | startswith("clutch/")) and (.isCrossRepository | not)) | "\(.number) \(.headRefOid)"' |
+            while read -r pr head; do
+              approved="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/reviews" --jq ".[] | select(.state == \"APPROVED\" and .user.type != \"Bot\" and .commit_id == \"$head\") | .id")"
+              if [ -n "$approved" ]; then
+                gh workflow run auto-merge.yml --ref "$DEFAULT_BRANCH" -f pr="$pr"
+              fi
             done
 
   # Enables GitHub's auto-merge, `gh pr merge --auto --merge`, with the release
