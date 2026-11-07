@@ -46,26 +46,12 @@ An existence check is `toBeDefined`, `toBeTruthy`, `not.toBeNull`,
 instead. A helper that asserts has a name that starts with `expect` or
 `assert`, such as `expectErrorCode`, so the rule counts it.
 
-## Test integrity
+## Deleted tests
 
-`check-test-integrity` compares the working tree with the base commit. CI
-sets the base in `CHECK_BASE`. Locally, the base is the merge base with
-`origin/HEAD`, or with `origin/main` when the clone has no `origin/HEAD`. See
-[`tools/check-base.ts`](../../tools/check-base.ts). The check fails when a change does any of these:
-
-- It deletes a test file.
-- It renames a test file to a name that no test runner runs.
-- It lowers the number of tests or assertions in a test file.
-
-A test file may go in the same change that deletes the module it tests:
-`pool.test.ts` goes with `pool.ts`. For any other reason, list the test file
-in [`tools/test-integrity-allow.json`](../../tools/test-integrity-allow.json)
-with the reason, in the same change. Agent review gives a new entry an `owner`
-finding, so auto-merge leaves the PR for the owner.
-
-An entry counts only in the change that adds it or changes its reason. A later
-change gets no cover from it, so a stale entry is inert and the drop fails
-again. Deleting old entries is tidy, not required.
+A change may delete or thin a test when the behavior it proves is gone, or
+when another test now proves it. The PR names that test. Agent review gives a
+weaker or deleted test an `owner` finding, so auto-merge leaves the PR for the
+owner. See [review](./review.md).
 
 ## Flaky tests
 
