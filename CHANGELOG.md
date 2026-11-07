@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.0 (2026-11-07)
+
+### Features
+
+- feat(journeys): ship the core journey catalog (CL-440)
+
 ## 0.59.0 (2026-11-07)
 
 ### Features
