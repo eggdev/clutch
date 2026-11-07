@@ -20,7 +20,9 @@ A plain task request does not authorize an unattended queue.
 
 Before asking anything: reuse a settled decision; look up observable facts;
 choose reversible implementation details yourself. Ask only an unresolved product,
-access, cost or retention decision that blocks the task. Continue independent
+access, cost or retention decision that blocks the task. The owner decides the
+product and proof decides the code: see
+[proof gates code](../../../docs/principles/proof-gates-code.md). Continue independent
 work while that answer is pending. Do not ask for approval of routine next steps.
 
 For ambiguous reports, unfamiliar modules or relevant earlier work, follow
