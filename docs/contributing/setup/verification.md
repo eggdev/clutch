@@ -77,6 +77,9 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
   `Isolation and cleanup:` line.
 - A journey that `verification.json` does not register, and a flow that runs a
   journey that does not exist.
+- A web journey that does not take `test` from `@repo/journeys/testing/test`.
+  This includes one that takes the `test` of `@playwright/test` by name, as its
+  default export or through a namespace.
 - A journey with a `Core:` line that breaks the
   [core journey rules](../journeys/core.md#rules-for-every-core-journey). It
   names no core journey, or opens a URL other than `/` on web or a link on
