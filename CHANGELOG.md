@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.1 (2026-11-07)
+
+### Fixes and maintenance
+
+- test(cli): await the intake check before its repo is removed (CL-450)
+
 ## 0.60.0 (2026-11-07)
 
 ### Features
