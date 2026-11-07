@@ -49,8 +49,11 @@ test('a member changes their name and email address', async ({ page }) => {
   await accessible(page, 'signed up');
 
   // The steps of this journey, from the first screen after sign-up.
+  await page.getByRole('button', { name: '<the step that leads to invalid-field-refused>' }).click();
   await outcome('invalid-field-refused', { text: 'Enter a valid name' });
+  await page.getByRole('button', { name: '<the step that leads to profile-saved>' }).click();
   await outcome('profile-saved', { text: '<the new name>' });
+  await page.getByRole('button', { name: '<the step that leads to email-changed>' }).click();
   await outcome('email-changed', { text: '<the new address>' });
 });
 ```

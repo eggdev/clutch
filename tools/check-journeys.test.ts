@@ -77,9 +77,14 @@ const signUp = [
   '  const outcome = outcomes(page);',
   "  await page.goto('/');",
   "  await page.getByRole('button', { name: 'Sign up' }).click();",
+  "  await page.getByRole('button', { name: 'Create account' }).click();",
   "  await outcome('signed-up', { url: '/home', text: 'Welcome' });",
+  "  await page.getByRole('link', { name: 'Verify email' }).click();",
   "  await outcome('email-verified', { text: 'Email verified' });",
+  "  await page.getByRole('button', { name: 'Sign out' }).click();",
+  "  await page.getByLabel('Email').fill('taken@example.com');",
   "  await outcome('email-taken-refused', { text: 'That email has an account' });",
+  "  await page.getByLabel('Password').fill('short');",
   "  await outcome('weak-password-refused', { text: 'Use a longer password' });",
   '});',
 ].join('\n');
@@ -146,7 +151,7 @@ test('a core journey that gets around the rules through a fixture, an API login,
   ].join('\n');
   expect(await coreRepo({ [file]: core('billing', 'billing-and-checkout', body) })).toEqual([
     `${file}: it asserts with \`expect\`. A core journey asserts only through \`outcome(name, expected)\` from @repo/journeys/testing/outcome. ${see}`,
-    `${file}: it changes the URL without a tap. A core journey reaches each screen through the buttons that a user taps. ${see}`,
+    `${file}: it changes the URL or runs code in the page without a tap. A core journey reaches each screen through the buttons that a user taps. ${see}`,
     `${file}: it does not assert \`signed-up\`, \`plan-upgraded\`, \`plan-cancelled\`, \`card-declined\`, \`renewal-failed\`, which the catalog names for billing-and-checkout. ${see}`,
     `${file}: it does not create its account through the sign-up screens first. Walk sign-up from the entry, and assert the \`signed-up\` outcome before any other. ${see}`,
     `${file}: it imports ./fixtures. A core journey imports only @playwright/test and @repo/journeys/testing, so every step is in the journey. ${see}`,
@@ -163,8 +168,11 @@ test('a core journey that opens a second URL, names an outcome with a variable o
     '  const outcome = outcomes(page);',
     "  await page.goto('/');",
     "  await page.goto('/sign-in');",
+    "  await page.getByRole('button', { name: 'Sign up' }).click();",
     "  await outcome('signed-up', { url: '/home' });",
+    "  await page.getByRole('button', { name: 'Sign out' }).click();",
     "  await outcome(name, { url: '/home' });",
+    "  await page.getByRole('button', { name: 'Sign in' }).click();",
     "  await outcome('signed-in', { url: '/home' });",
     '});',
   ].join('\n');
@@ -210,6 +218,72 @@ test('a native core journey that keeps its state, runs another flow, opens a lin
     `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. ${see}`,
     `${file}: it opens a link. A core journey starts with \`launchApp\`, and reaches each screen through the app. ${see}`,
     `${file}: it runs another flow. A core journey keeps every step in its own file, so a check can read it. ${see}`,
+  ]);
+});
+
+test('outcomes that hold on the entry screen, a mocked backend, page scripts and a self-written record fail', async () => {
+  const file = 'features/account/journeys/sign-up.pw.ts';
+  // The bypasses of the second review: each outcome holds on the entry page.
+  const body = [
+    "import { test } from '@playwright/test';",
+    "import { outcomes } from '@repo/journeys/testing/outcome';",
+    "test('a visitor signs up', async ({ page }) => {",
+    '  const outcome = outcomes(page);',
+    '  const o = outcomes(page);',
+    "  await page.route('**/api/me', (route) => route.fulfill({ json: { plan: 'pro' } }));",
+    "  await page.evaluate(() => fetch('/api/login', { method: 'POST' }));",
+    "  await page.evaluate(() => history.pushState({}, '', '/billing'));",
+    '  const go = page.goto.bind(page);',
+    "  const fs = await import('node:fs');",
+    "  await page.goto('/');",
+    "  await outcome('signed-up', { url: '/' });",
+    "  await outcome('email-verified', { url: '/' });",
+    "  await outcome('email-taken-refused', { url: '/' });",
+    "  await outcome('weak-password-refused', { url: '/' });",
+    '});',
+  ].join('\n');
+  expect(await coreRepo({ [file]: core('sign-up', 'sign-up', body) })).toEqual([
+    `${file}: it binds \`outcomes(page)\` to a name other than \`outcome\`. Write \`const outcome = outcomes(page)\`, so a check can read each outcome. ${see}`,
+    `${file}: it changes the URL or runs code in the page without a tap. A core journey reaches each screen through the buttons that a user taps. ${see}`,
+    `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. ${see}`,
+    `${file}: it reaches past the page, through a dynamic import, \`require\`, the environment or the file system. ${see}`,
+    `${file}: no user step comes before \`signed-up\`, \`email-verified\`, \`email-taken-refused\`, \`weak-password-refused\`. Each outcome comes after a tap, a fill or a reload, so it cannot hold on the screen before. ${see}`,
+  ]);
+});
+
+test('page text that names a seed, storage or a slash pair trips no rule', async () => {
+  const body = signUp
+    .replace("text: 'Welcome'", "text: 'Seed your garden in localStorage'")
+    .replace("text: 'Email verified'", "text: 'a // b'");
+  expect(
+    await coreRepo({ 'features/account/journeys/sign-up.pw.ts': core('sign-up', 'sign-up', body) }),
+  ).toEqual([]);
+});
+
+test('a native assertion that may not run or checks nothing on the screen fails', async () => {
+  const file = 'features/account/journeys/phone-sign-up.maestro.yaml';
+  const steps = nativeSignUp
+    .replace(
+      "- assertVisible: { text: Email verified, label: 'outcome email-verified' }",
+      "- assertTrue: { condition: 'true', label: 'outcome email-verified' }",
+    )
+    .replace(
+      "- assertVisible: { text: Use a longer password, label: 'outcome weak-password-refused' }",
+      "- repeat: { times: 0, commands: [{ assertVisible: { text: x, optional: true, label: 'outcome weak-password-refused' } }] }",
+    );
+  expect(
+    await coreRepo({
+      [file]: [
+        '# phone-sign-up: A visitor makes an account on a phone.',
+        '# Contract: docs/contributing/journeys/core.md',
+        '# Entry: the app icon',
+        '# Isolation and cleanup: a new account',
+        '# Core: sign-up',
+        steps,
+      ].join('\n'),
+    }),
+  ).toEqual([
+    `${file}: it has an assertion that may not run or may not check the screen: inside \`repeat\` or \`retry\`, \`optional\`, or not \`assertVisible\` or \`assertNotVisible\`. ${see}`,
   ]);
 });
 

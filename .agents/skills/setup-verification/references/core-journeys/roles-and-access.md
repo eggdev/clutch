@@ -49,9 +49,12 @@ test('an owner invites a member, and the member cannot do what their role refuse
   await accessible(page, 'signed up');
 
   // The steps of this journey, from the first screen after sign-up.
+  await page.getByRole('button', { name: '<the step that leads to member-invited>' }).click();
   await outcome('member-invited', { text: 'Invitation sent' });
   // Open the invitation in a second browser context, as the invited user.
+  await page.getByRole('button', { name: '<the step that leads to member-joined>' }).click();
   await outcome('member-joined', { text: '<the team name>' });
+  await page.getByRole('button', { name: '<the step that leads to role-refused>' }).click();
   await outcome('role-refused', { text: 'You do not have access' });
 });
 ```

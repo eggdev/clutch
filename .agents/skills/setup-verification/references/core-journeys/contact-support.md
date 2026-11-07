@@ -48,7 +48,9 @@ test('a member sends a request to support, and support gets it', async ({ page }
   await accessible(page, 'signed up');
 
   // The steps of this journey, from the first screen after sign-up.
+  await page.getByRole('button', { name: '<the step that leads to empty-request-refused>' }).click();
   await outcome('empty-request-refused', { text: 'Enter a message' });
+  await page.getByRole('button', { name: '<the step that leads to support-request-sent>' }).click();
   await outcome('support-request-sent', { text: 'We got your request' });
 });
 ```

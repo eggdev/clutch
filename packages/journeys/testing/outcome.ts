@@ -47,6 +47,9 @@ export function outcomes(page: Page) {
     if (!namePattern.test(name)) {
       throw new Error(`The outcome name "${name}" is not kebab case, such as signed-in.`);
     }
+    if (!expected.url && !expected.text) {
+      throw new Error(`The outcome ${name} names no path and no text, so it would check nothing.`);
+    }
     await test.step(`outcome ${name}`, async () => {
       if (expected.url !== undefined) {
         await expect

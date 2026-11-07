@@ -42,9 +42,16 @@ source for them. The run is the proof: `outcome()` records each outcome that
 held, and `bun run journey` fails a core journey whose run did not record
 each one. A call in a comment, or one that never runs, proves nothing.
 
+Each outcome comes after a user step, such as a tap, a fill or a reload. An
+outcome cannot hold on the screen that the journey was already on.
+
 A web `Core:` journey imports only `@playwright/test` and
-`@repo/journeys/testing`. A native one keeps every step in its own flow, with
-no `runFlow`. So each step is in the file that the checks read.
+`@repo/journeys/testing`, and names the helper `const outcome =
+outcomes(page)`. It runs no script in the page, mocks no route, and reaches
+no file or environment. A native one keeps every step in its own flow, with
+no `runFlow`. Its outcomes are `assertVisible` or `assertNotVisible`, never
+`optional`, and never inside `repeat` or `retry`. So each step is in the file
+that the checks read, and each outcome checks the screen.
 
 ### User
 

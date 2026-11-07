@@ -51,10 +51,14 @@ test('a member on the free plan upgrades, then cancels', async ({ page }) => {
   await accessible(page, 'signed up');
 
   // The steps of this journey, from the first screen after sign-up.
+  await page.getByRole('button', { name: '<the step that leads to card-declined>' }).click();
   await outcome('card-declined', { text: 'Your card was declined' });
+  await page.getByRole('button', { name: '<the step that leads to plan-upgraded>' }).click();
   await outcome('plan-upgraded', { text: '<the paid plan>' });
   // Move the payment provider's test clock to the renewal date.
+  await page.getByRole('button', { name: '<the step that leads to renewal-failed>' }).click();
   await outcome('renewal-failed', { text: 'Update your card' });
+  await page.getByRole('button', { name: '<the step that leads to plan-cancelled>' }).click();
   await outcome('plan-cancelled', { text: 'Free plan' });
 });
 ```

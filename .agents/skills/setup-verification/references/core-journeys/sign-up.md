@@ -49,9 +49,12 @@ test('a visitor makes an account on the free plan from the first screen', async 
   await accessible(page, 'signed up');
 
   // The steps of this journey, from the first screen after sign-up.
+  await page.getByRole('button', { name: '<the step that leads to email-verified>' }).click();
   await outcome('email-verified', { text: 'Email verified' });
   // Failure states: sign up again with the same address, then with a weak password.
+  await page.getByRole('button', { name: '<the step that leads to email-taken-refused>' }).click();
   await outcome('email-taken-refused', { text: '<the whole refusal, such as That email already has an account.>' });
+  await page.getByRole('button', { name: '<the step that leads to weak-password-refused>' }).click();
   await outcome('weak-password-refused', { text: 'Use a longer password' });
 });
 ```

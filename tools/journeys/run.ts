@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { devApps, isUp, urlOf } from '@tools/dev';
@@ -107,16 +107,17 @@ async function stopServers(dev: Bun.Subprocess) {
   }
 }
 
-/** Where `outcome()` records the outcomes of a run. */
-const outcomesDir = (root: string) => path.join(root, 'test-results/journeys/outcomes');
+/** Where `outcome()` records the outcomes of this run. Each run has its own folder, so two runs do not mix. */
+const outcomesDir = (root: string) =>
+  path.join(root, 'test-results/journeys/outcomes', `${process.pid}-${Date.now()}`);
 
 async function runPlaywright(
   root: string,
   files: ReadonlyArray<string>,
   baseUrl: string,
   budgetSeconds: number,
+  outcomes: string,
 ) {
-  rmSync(outcomesDir(root), { recursive: true, force: true });
   const run = Bun.spawn(
     [
       path.join(root, 'node_modules/.bin/playwright'),
@@ -131,7 +132,7 @@ async function runPlaywright(
         ...process.env,
         JOURNEY_BASE_URL: baseUrl,
         JOURNEY_BUDGET_MS: String(budgetSeconds * 1000),
-        JOURNEY_OUTCOMES_DIR: outcomesDir(root),
+        JOURNEY_OUTCOMES_DIR: outcomes,
       },
       stdout: 'inherit',
       stderr: 'inherit',
@@ -230,16 +231,18 @@ export async function main(
   const started = (await allUp(apps, urls)) ? null : await startServers(root, apps, urls);
   try {
     const budget = selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
+    const outcomes = outcomesDir(root);
     const code = await runPlaywright(
       root,
       selected.map((journey) => journey.file),
       urls.get(web.name) ?? '',
       budget,
+      outcomes,
     );
     if (code !== 0) {
       return code;
     }
-    const unproven = unprovenCore(root, selected, outcomesDir(root));
+    const unproven = unprovenCore(root, selected, outcomes);
     for (const problem of unproven) {
       sink.error(problem);
     }
