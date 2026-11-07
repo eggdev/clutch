@@ -82,6 +82,12 @@ async function babysitApply(
     console.log(`#${number}: stuck. ${input.stuck}`);
     return 1;
   }
+  // The plan's caps hold the apply step too: a skipped round only logs as stuck.
+  if (kept.skip) {
+    throw new Error(
+      `No round for #${number}: ${kept.skip}. Log it with \`bun run pr babysit ${number} --stuck "<why>"\`.`,
+    );
+  }
   const answers = input.answers
     ? ((JSON.parse(await readFile(input.answers, 'utf-8')) as { items?: Array<Answer> }).items ??
       [])
