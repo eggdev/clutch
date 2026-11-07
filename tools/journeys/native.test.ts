@@ -28,8 +28,10 @@ function host(codes: Array<number>, booted = true) {
   return { fake, ran };
 }
 
-function run(codes: Array<number>, booted = true) {
-  return inRepo({ 'features/account/journeys/sign-up.maestro.yaml': flow }, async (root) => {
+const signUp: Record<string, string> = { 'features/account/journeys/sign-up.maestro.yaml': flow };
+
+function run(codes: Array<number>, booted = true, files: Record<string, string> = signUp) {
+  return inRepo(files, async (root) => {
     const { fake, ran } = host(codes, booted);
     const lines: Array<string> = [];
     const filed: Array<string> = [];
@@ -43,7 +45,7 @@ function run(codes: Array<number>, booted = true) {
       },
     });
     const file = path.join(root, 'test-results/journeys/measures/sign-up.android.json');
-    const measures = booted ? JSON.parse(readFileSync(file, 'utf-8')) : null;
+    const measures = booted && ran.length > 0 ? JSON.parse(readFileSync(file, 'utf-8')) : null;
     return { exitCode, ran, lines, filed, measures };
   });
 }
@@ -74,4 +76,12 @@ test('with no booted device, the run fails and asks for one', async () => {
   const result = await run([], false);
   expect(result.exitCode).toBe(1);
   expect(result.lines.at(-1)).toContain('No android device is booted');
+});
+
+test('with no native journey, the run fails, since the lane runs only when a native app exists', async () => {
+  const result = await run([], true, {});
+  expect([result.exitCode, result.ran]).toEqual([1, []]);
+  expect(result.lines).toEqual([
+    '::error title=No journey ran::No native journey exists, so the android run proves nothing. Add one at features/<feature>/journeys/<id>.maestro.yaml. See docs/contributing/end-to-end-testing.md#native-journeys.',
+  ]);
 });

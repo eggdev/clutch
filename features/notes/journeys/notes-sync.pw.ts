@@ -10,7 +10,7 @@
  *
  * | User action | Expected observation | Proof |
  * | --- | --- | --- |
- * | Open notes on two devices | Each shows the General space, and axe finds no serious violation on the home or notes page | heading assertion, axe check, `notes-open` screenshots |
+ * | Open notes on two devices | Each shows the General space, and axe finds no violation on the home or notes page | heading assertion, axe check, `notes-open` screenshots |
  * | Add a note on the first device | The second device shows it, with no reload | value assertion |
  * | Rename the note on the first device | The second device shows the new title | value assertion |
  * | Rename it again while the first device is offline | The first device shows it at once, the second does not | value assertions |

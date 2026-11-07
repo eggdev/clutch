@@ -8,8 +8,8 @@ import type { Locator, Page } from '@playwright/test';
 /**
  * The screenshot check of web journeys. A journey calls `snap(page, 'name')` at
  * a stable point. It captures the page on the device of the run, in each
- * scheme. Each device keeps its own baseline: the Pixel 7 project is `mobile`
- * and the Desktop Chrome project is `desktop`. In CI it compares each shot
+ * scheme. Each device keeps its own baseline: the Phone project is `mobile`,
+ * the Tablet project is `tablet` and the Desktop project is `desktop`. In CI it compares each shot
  * with its committed baseline,
  * `<journey folder>/__screenshots__/<name>-<width>-<scheme>.png`, fails on a
  * change, and writes each changed or new shot to `test-results/visual/` at its
@@ -19,7 +19,7 @@ import type { Locator, Page } from '@playwright/test';
  */
 
 /** The width names of the devices, which `metadata.width` of each project in the Playwright config sets. */
-const widths = ['mobile', 'desktop'] as const;
+const widths = ['mobile', 'tablet', 'desktop'] as const;
 
 const schemes = ['light', 'dark'] as const;
 
@@ -108,7 +108,7 @@ function widthOf(info: ReturnType<typeof test.info>): Width {
   const found = widths.find((item) => item === width);
   if (!found) {
     throw new Error(
-      `The Playwright project ${info.project.name} sets no metadata.width of mobile or desktop, so snap cannot name its baseline. Run journeys with \`mise exec -- bun run journey\`.`,
+      `The Playwright project ${info.project.name} sets no metadata.width of mobile, tablet or desktop, so snap cannot name its baseline. Run journeys with \`mise exec -- bun run journey\`.`,
     );
   }
   return found;

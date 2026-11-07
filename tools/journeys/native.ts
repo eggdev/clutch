@@ -1,5 +1,11 @@
 import { journeys } from '@tools/journeys/journeys';
-import { deviceRuns, frictionFlake, reportFlakes, writeMeasures } from '@tools/journeys/measures';
+import {
+  deviceRuns,
+  failedRuns,
+  frictionFlake,
+  reportFlakes,
+  writeMeasures,
+} from '@tools/journeys/measures';
 import type { Attempt, FileFlake } from '@tools/journeys/measures';
 import { DeviceHostError, deviceHost, lockFile, withDevice } from '@tools/native/device-host';
 import type { DeviceHost, Platform } from '@tools/native/device-host';
@@ -31,11 +37,12 @@ export async function nativeMain(
     return 1;
   }
   const flows = journeys(root).filter((journey) => journey.platform === 'native');
+  // CI starts a native lane only when a native app exists, so an app with no native journey has no proof.
   if (flows.length === 0) {
     log(
-      `::warning title=No journey ran::No native journey exists yet, so the ${platform} run tested nothing.`,
+      `::error title=No journey ran::No native journey exists, so the ${platform} run proves nothing. Add one at features/<feature>/journeys/<id>.maestro.yaml. See docs/contributing/end-to-end-testing.md#native-journeys.`,
     );
-    return 0;
+    return 1;
   }
   const host = options.host ?? deviceHost();
   try {
@@ -64,10 +71,11 @@ export async function nativeMain(
           const runs = deviceRuns(platform, attempts);
           const where = writeMeasures(root, journey, runs);
           await reportFlakes(journey, runs, where, options.fileFlake ?? frictionFlake(root), log);
-          if (runs.some((run) => run.result === 'failed')) {
-            log(`${journey.file} failed on ${device.name}, also on the retry. See ${where}.`);
-            failed += 1;
+          const lines = failedRuns(journey, runs, where);
+          for (const line of lines) {
+            log(line);
           }
+          failed += lines.length > 0 ? 1 : 0;
         }
         return failed > 0 ? 1 : 0;
       },

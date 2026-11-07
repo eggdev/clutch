@@ -10,7 +10,7 @@
  *
  * | User action | Expected observation | Proof |
  * | --- | --- | --- |
- * | Open the <%= title %> screen | The screen shows its heading, and axe finds no serious violation | heading assertion, axe check |
+ * | Open the <%= title %> screen | The screen shows its heading, and axe finds no violation | heading assertion, axe check |
  *
  * Driver: `mise exec -- bun run journey <%= fileName %>-open`
  * Limits: it proves only that the screen renders.

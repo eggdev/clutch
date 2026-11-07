@@ -16,6 +16,7 @@ import type { Journey } from '@tools/journeys/journeys';
 import {
   budgetsOf,
   deviceRuns,
+  failedRuns,
   frictionFlake,
   reportFlakes,
   webAttempts,
@@ -35,7 +36,9 @@ import type { Platform } from '@tools/native/device-host';
  * a server is down, the runner starts the missing ones through `tools/dev.ts`,
  * then stops only what it started. A journey that runs past its budget fails.
  * A failed journey runs once more. A pass on the retry passes, and files a
- * `flake` friction entry. Each journey writes its measures file.
+ * `flake` friction entry. A measured budget that fails on any try (a layout
+ * shift, a click budget or axe) fails the run, even when the retry passes.
+ * Each journey writes its measures file.
  * With no web journey, `--all` passes and says so: a warning annotation and a
  * line in the step summary. `--native <ios|android>` runs each native journey
  * on the booted device of the device host.
@@ -227,7 +230,12 @@ export function unprovenCore(
   });
 }
 
-/** Writes the measures file of each journey that ran, and reports each flake. */
+/**
+ * Writes the measures file of each journey that ran, and reports each flake.
+ * Returns the runs of each journey, and a line for each device run that
+ * failed. Playwright passes a run whose retry passed, so these lines are how a
+ * measured budget that failed on the first try still fails the run.
+ */
 async function collect(
   root: string,
   selected: ReadonlyArray<Journey>,
@@ -236,13 +244,15 @@ async function collect(
   fileFlake: FileFlake,
 ) {
   const runs = new Map<string, Array<DeviceRun>>();
+  const failed: Array<string> = [];
   for (const journey of selected) {
     const list = deviceRuns('web', webAttempts(dir, journey));
     runs.set(journey.id, list);
     const where = writeMeasures(root, journey, list);
     await reportFlakes(journey, list, where, fileFlake, sink.log);
+    failed.push(...failedRuns(journey, list, where));
   }
-  return (journey: Journey) => runs.get(journey.id) ?? [];
+  return { runsOf: (journey: Journey) => runs.get(journey.id) ?? [], failed };
 }
 
 /** The journeys that `id` selects: one by its ID, or each web journey for `--all`. */
@@ -300,9 +310,15 @@ export async function main(
       budget,
       { JOURNEY_MEASURES_DIR: dir, JOURNEY_BUDGETS: JSON.stringify(budgets) },
     );
-    const runsOf = await collect(root, selected, dir, sink, fileFlake);
+    const { runsOf, failed } = await collect(root, selected, dir, sink, fileFlake);
+    for (const line of failed) {
+      sink.error(line);
+    }
     if (code !== 0) {
       return code;
+    }
+    if (failed.length > 0) {
+      return 1;
     }
     const unproven = unprovenCore(root, selected, runsOf);
     for (const problem of unproven) {

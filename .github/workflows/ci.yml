@@ -97,9 +97,9 @@ jobs:
           fi
 
   # Journeys drive the web app in a browser against the dev servers, so they
-  # run in their own job and not in validate. Each web journey runs on a Pixel 7
-  # and on Desktop Chrome at 1280 px, on every PR. See
-  # docs/contributing/end-to-end-testing.md#devices.
+  # run in their own job and not in validate. Each web journey runs on a phone
+  # (390 x 844), a tablet (820 x 1180) and a desktop (1440 x 900), on every PR.
+  # See docs/contributing/end-to-end-testing.md#devices.
   journeys:
     runs-on: ubuntu-26.04
     steps:
@@ -123,6 +123,9 @@ jobs:
       - name: Install the Chromium system libraries
         if: steps.browsers.outputs.cache-hit == 'true'
         run: bunx playwright install-deps chromium
+      # The page script of the journey test, in a real Chromium. Validate has no browser.
+      - name: Test the journey kit in a browser
+        run: bun test ./packages/journeys/testing/measure.browser.test.ts
       - run: bun run journey --all
       - name: Keep the traces of a failed journey
         if: failure()

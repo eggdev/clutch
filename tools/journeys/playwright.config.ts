@@ -1,16 +1,40 @@
 import path from 'node:path';
 
 import { defineConfig, devices } from '@playwright/test';
+import type { Project } from '@playwright/test';
 import { webDevices } from '@tools/journeys/journeys';
 
-/** The browser settings of each device. The laptop is 1280 px wide, like its screenshots. */
-const settings: Record<(typeof webDevices)[number]['name'], (typeof devices)[string]> = {
-  'Pixel 7': devices['Pixel 7'],
-  'Desktop Chrome': {
-    ...devices['Desktop Chrome'],
-    viewport: { width: 1280, height: 800 },
+type Device = (typeof webDevices)[number];
+
+/**
+ * The browser settings of each device, at the viewport that `webDevices` names
+ * from docs/principles/mobile-first.md. The journeys run in Chromium, so the
+ * phone and the tablet send a Chrome on Android user agent: a phone that
+ * emulates touch and a 3x screen, and a tablet with touch and a 2x screen.
+ */
+const settings: Record<Device['name'], NonNullable<Project['use']>> = {
+  Phone: {
+    userAgent: devices['Pixel 7'].userAgent,
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+    defaultBrowserType: 'chromium',
   },
+  Tablet: {
+    userAgent: devices['Galaxy Tab S9'].userAgent,
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    defaultBrowserType: 'chromium',
+  },
+  Desktop: devices['Desktop Chrome'],
 };
+
+const use = (device: Device) => ({
+  ...settings[device.name],
+  viewport: { ...device.viewport },
+  screen: { ...device.viewport },
+});
 
 /**
  * The Playwright config for web journeys. Run a journey through
@@ -44,7 +68,7 @@ export default defineConfig({
   },
   projects: webDevices.map((device) => ({
     name: device.name,
-    use: settings[device.name],
+    use: use(device),
     metadata: { width: device.width },
   })),
 });

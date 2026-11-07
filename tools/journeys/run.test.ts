@@ -99,12 +99,13 @@ test('a passed core journey run that did not record each catalog outcome, signed
       'signed-in',
       'session-kept',
     ];
-    const at = 'features/account/journeys/sign-in.pw.ts on Desktop Chrome';
-    // The phone proves each outcome on its retry. The laptop never records signed-up first.
+    const at = 'features/account/journeys/sign-in.pw.ts on Desktop';
+    // The phone proves each outcome on its retry. The desktop never records signed-up first.
     expect(
       unprovenCore(root, [signInJourney], () => [
-        run('Pixel 7', ['signed-up'], proven),
-        run('Desktop Chrome', ['signed-in', 'signed-up', 'signed-out']),
+        run('Phone', ['signed-up'], proven),
+        run('Tablet', proven),
+        run('Desktop', ['signed-in', 'signed-up', 'signed-out']),
       ]),
     ).toEqual([
       `${at}: the run did not record \`signed-up\` first, so it did not prove a new account. See docs/contributing/journeys/core.md.`,
@@ -112,11 +113,12 @@ test('a passed core journey run that did not record each catalog outcome, signed
     ]);
     expect(
       unprovenCore(root, [signInJourney], () => [
-        run('Pixel 7', proven),
-        run('Desktop Chrome', proven),
+        run('Phone', proven),
+        run('Tablet', proven),
+        run('Desktop', proven),
       ]),
     ).toEqual([]);
-    // A device with no run proves nothing.
-    expect(unprovenCore(root, [signInJourney], () => [run('Pixel 7', proven)])).toHaveLength(2);
+    // A device with no run proves nothing: the tablet and the desktop each fail twice.
+    expect(unprovenCore(root, [signInJourney], () => [run('Phone', proven)])).toHaveLength(4);
   });
 });

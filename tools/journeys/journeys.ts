@@ -61,13 +61,14 @@ export function requiredOutcomes(name: (typeof coreJourneys)[number]): Array<str
 }
 
 /**
- * The devices that each web journey runs on, on every PR: a mid-range phone and
- * a laptop. `width` names the screenshot baselines of each one. See
- * docs/contributing/end-to-end-testing.md#devices.
+ * The devices that each web journey runs on, on every PR: the three widths of
+ * docs/principles/mobile-first.md#three-widths. `width` names the screenshot
+ * baselines of each one. See docs/contributing/end-to-end-testing.md#devices.
  */
 export const webDevices = [
-  { name: 'Pixel 7', width: 'mobile' },
-  { name: 'Desktop Chrome', width: 'desktop' },
+  { name: 'Phone', width: 'mobile', viewport: { width: 390, height: 844 } },
+  { name: 'Tablet', width: 'tablet', viewport: { width: 820, height: 1180 } },
+  { name: 'Desktop', width: 'desktop', viewport: { width: 1440, height: 900 } },
 ] as const;
 
 /** The verify config that registers each journey as a flow. */

@@ -47,7 +47,8 @@ export type Shift = {
 type OutcomeMark = {
   name: string;
   expected: unknown;
-  atMs: number;
+  /** Milliseconds from the start of the test, so a later tool can measure the time to value. */
+  elapsedMs: number;
   clicks: number;
   keys: number;
   steps: number;
@@ -55,9 +56,32 @@ type OutcomeMark = {
 
 type AxeMark = {
   where: string;
-  atMs: number;
+  /** Milliseconds from the start of the test. */
+  elapsedMs: number;
   violations: Array<{ id: string; impact: string | null; nodes: number }>;
 };
+
+/**
+ * What failed a try. A measured budget, `layout-shift`, `click-budget` or
+ * `axe`, fails the run even when the retry passes. The retry covers only a
+ * `crash`, a `timeout` or an `assertion` that throws.
+ */
+export type FailureKind =
+  | 'layout-shift'
+  | 'click-budget'
+  | 'axe'
+  | 'timeout'
+  | 'assertion'
+  | 'crash';
+
+/** The failures that a retry does not cover. `tools/journeys/measures.ts` keeps the same set, and its test compares the two. */
+export const budgetFailures: ReadonlySet<FailureKind> = new Set([
+  'layout-shift',
+  'click-budget',
+  'axe',
+]);
+
+type Failure = { kind: FailureKind; message: string };
 
 export type Measure = {
   journey: string;
@@ -69,14 +93,20 @@ export type Measure = {
   budgets: Budgets;
   startedAt: number;
   shifts: Array<Shift>;
-  /** Each click or tap: a primary pointer press. */
+  /**
+   * Each activation: a click that a pointer or a key such as Space or Enter
+   * fires, a choice in a `<select>`, or a form sent with Enter. A press and
+   * hold or a drag that activates nothing does not count.
+   */
   clicks: number;
   /** Each key press, typed characters included. */
   keys: number;
-  /** What a click budget counts: each click or tap, and each press of Enter. */
+  /** What a click budget counts: each activation. */
   steps: number;
   outcomes: Array<OutcomeMark>;
   axe: Array<AxeMark>;
+  /** The first thing that failed the try, or null. */
+  failure: Failure | null;
   /** The click budget, once the outcome where it ends holds. */
   clickBudget: {
     budget: number;
@@ -139,8 +169,45 @@ const pageScript = `(() => {
   const observer = new PerformanceObserver((list) => shifts(list.getEntries()));
   observer.observe({ type: 'layout-shift', buffered: true });
   window.__clutchFlush = () => Promise.all(shifts(observer.takeRecords()));
+  // An element that a press activates. A press on anything else counts only as a short, still tap.
+  const control =
+    'a[href], button, input, select, textarea, summary, label, [contenteditable=""], [contenteditable="true"], ' +
+    ['button', 'link', 'checkbox', 'radio', 'switch', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option']
+      .map((role) => '[role="' + role + '"]')
+      .join(', ');
+  // One activation in each task, so a label that clicks its field, or a click
+  // that sends a form, counts once.
+  let counted = false;
+  const activate = () => {
+    if (counted) return;
+    counted = true;
+    setTimeout(() => (counted = false), 0);
+    send({ kind: 'click' });
+  };
+  let press = null;
   addEventListener('pointerdown', (event) => {
-    if (event.isTrusted && event.isPrimary) send({ kind: 'click' });
+    if (event.isTrusted && event.isPrimary) press = { x: event.clientX, y: event.clientY, at: event.timeStamp };
+  }, true);
+  addEventListener('click', (event) => {
+    if (!event.isTrusted) return;
+    const down = press;
+    press = null;
+    // A key, such as Space or Enter on a button, fires a click with no pointer.
+    const fromKey = event.detail === 0;
+    const onControl = event.target instanceof Element && event.target.closest(control) !== null;
+    const tap =
+      down !== null &&
+      Math.hypot(event.clientX - down.x, event.clientY - down.y) < 10 &&
+      event.timeStamp - down.at < 500;
+    if (fromKey || onControl || tap) activate();
+  }, true);
+  // A choice in a <select> fires no click. A test driver fires the change itself, so it is not trusted.
+  addEventListener('change', (event) => {
+    if (event.target instanceof HTMLSelectElement) activate();
+  }, true);
+  // Enter in a form with no submit button sends it with no click.
+  addEventListener('submit', (event) => {
+    if (event.isTrusted && event.submitter === null) activate();
   }, true);
   addEventListener('keydown', (event) => {
     if (event.isTrusted && !event.repeat) send({ kind: 'key', key: event.key });
@@ -148,6 +215,33 @@ const pageScript = `(() => {
 })();`;
 
 type PageEvent = ({ kind: 'shift' } & Shift) | { kind: 'click' } | { kind: 'key'; key: string };
+
+/** Adds one event of the page script to the measure. */
+function count(measure: Measure, event: PageEvent) {
+  if (event.kind === 'shift') {
+    const { kind: _kind, ...shift } = event;
+    measure.shifts.push(shift);
+  } else if (event.kind === 'click') {
+    measure.clicks += 1;
+    measure.steps += 1;
+  } else {
+    measure.keys += 1;
+  }
+}
+
+/** Keeps the first failure of the try, so the measures file names what failed. */
+export function markFailure(measure: Measure, kind: FailureKind, message: string) {
+  measure.failure ??= { kind, message };
+}
+
+/** The kind of a try that failed with no measured budget: a timeout, a failed `expect`, or a crash. */
+export function kindOf(info: Pick<TestInfo, 'status' | 'error'>): FailureKind {
+  const message = info.error?.message ?? '';
+  if (info.status === 'timedOut' || /TimeoutError|Timeout \d+ms exceeded/u.test(message)) {
+    return 'timeout';
+  }
+  return /expect(?:\.\w+)*\(/u.test(message) ? 'assertion' : 'crash';
+}
 
 /** The core journey that the `Core:` line of the journey header names, or null. */
 export function coreOf(source: string): string | null {
@@ -181,20 +275,10 @@ export async function startMeasure(context: BrowserContext, info: TestInfo): Pro
     steps: 0,
     outcomes: [],
     axe: [],
+    failure: null,
     clickBudget: null,
   };
-  await context.exposeBinding(binding, (_source, event: PageEvent) => {
-    if (event.kind === 'shift') {
-      const { kind: _kind, ...shift } = event;
-      measure.shifts.push(shift);
-    } else if (event.kind === 'click') {
-      measure.clicks += 1;
-      measure.steps += 1;
-    } else {
-      measure.keys += 1;
-      measure.steps += event.key === 'Enter' ? 1 : 0;
-    }
-  });
+  await context.exposeBinding(binding, (_source, event: PageEvent) => count(measure, event));
   await context.addInitScript(pageScript);
   measures.set(context, measure);
   return measure;
@@ -212,6 +296,7 @@ export async function flush(page: Page) {
  * The cumulative layout shift: the largest session window of shifts in one
  * document, as Chrome reports it. A window ends after a gap of 1 s, or 5 s
  * after it starts. Returns the window, with its elements, largest share first.
+ * The value is not rounded, so the budget check compares the real sum.
  */
 export function layoutShift(shifts: ReadonlyArray<Shift>): Attempt['layoutShift'] {
   let worst: { value: number; window: Array<Shift> } = { value: 0, window: [] };
@@ -240,7 +325,7 @@ export function layoutShift(shifts: ReadonlyArray<Shift>): Attempt['layoutShift'
     }
   }
   return {
-    value: Number(worst.value.toFixed(4)),
+    value: worst.value,
     page: worst.window[0]?.page ?? null,
     elements: [...share.entries()].toSorted((a, b) => b[1] - a[1]).map(([element]) => element),
   };
@@ -263,9 +348,9 @@ export function checkClickBudget(measure: Measure, name: string) {
   const used = (mark?.steps ?? measure.steps) - (start?.steps ?? 0);
   measure.clickBudget = { budget, used, from, to: name };
   if (used > budget) {
-    throw new Error(
-      `${core} took ${used} clicks, taps or presses of Enter from ${from} to \`${name}\`, over its budget of ${budget} in \`budgets.clicks\` of clutch.yaml. Remove a step. A larger budget is the owner's decision. See docs/contributing/journeys/core.md#budgets.`,
-    );
+    const message = `${core} took ${used} clicks or taps from ${from} to \`${name}\`, over its budget of ${budget} in \`budgets.clicks\` of clutch.yaml. Remove a step. A larger budget is the owner's decision. See docs/contributing/journeys/core.md#budgets.`;
+    markFailure(measure, 'click-budget', message);
+    throw new Error(message);
   }
 }
 
@@ -276,7 +361,9 @@ export function layoutShiftProblem(measure: Measure) {
     return null;
   }
   const elements = shift.elements.slice(0, 3).join(', ') || 'no element that Chrome named';
-  return `The layout shift on ${shift.page ?? 'the page'} is ${shift.value}, at or over the budget of ${measure.budgets.layoutShift} in \`budgets.layoutShift\` of clutch.yaml. It moved ${elements}. Reserve the space of content that loads late. See docs/contributing/end-to-end-testing.md#budgets.`;
+  // Rounded only to show it. The check above compares the real sum.
+  const shown = Number(shift.value.toPrecision(3));
+  return `The layout shift on ${shift.page ?? 'the page'} is ${shown}, at or over the budget of ${measure.budgets.layoutShift} in \`budgets.layoutShift\` of clutch.yaml. It moved ${elements}. Reserve the space of content that loads late. See docs/contributing/end-to-end-testing.md#budgets.`;
 }
 
 /** Writes the run's measures to `JOURNEY_MEASURES_DIR`, when the runner sets it. */
