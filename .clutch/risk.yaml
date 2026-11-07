@@ -14,6 +14,9 @@
 #                 ruleset requires a code owner's approval.
 # Brendan, 2026-11-02: start at 80% of PRs merging with no human, and tighten
 # a path only on evidence. See docs/contributing/decisions/0002-merge-most-prs-with-no-human.md.
+# Brendan, 2026-11-06: proof gates code, and the owner gates the product. A
+# held path leaves the owner when its journeys exist and pass (CL-441). See
+# docs/principles/proof-gates-code.md.
 schemaVersion: 1
 unmatched: medium
 rules:

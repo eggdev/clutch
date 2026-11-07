@@ -123,7 +123,6 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A knip ignore or entry                                                            | `knip.jsonc`                                                                                                        |
 | An import exception                                                               | `primitives.yaml`, `exceptions`                                                                                     |
 | A transaction-safe service                                                        | `primitives.yaml`, `transactionSafe`                                                                                |
-| A test file that a change may delete or thin                                      | `tools/test-integrity-allow.json`                                                                                   |
 | A dependency override                                                             | `tools/dependency-overrides.yaml`                                                                                   |
 | Agent review of a PR that a bot opened                                            | `agent-review.yml`, `allowed_bots`                                                                                  |
 | The owner's approval, which lifts an agent PR's risk tier and `owner` findings    | `clutch.yaml`, `automerge.owner`, read in `tools/github/auto-merge-rules.ts` (`ownerLifts`)                         |

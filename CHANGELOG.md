@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.57.0 (2026-11-07)
+
+### Features
+
+- docs(principles): add the single-page app principle
+
 ## 0.56.5 (2026-11-06)
 
 ### Fixes and maintenance

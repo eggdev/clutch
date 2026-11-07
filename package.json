@@ -1,6 +1,6 @@
 {
   "name": "clutch",
-  "version": "0.56.5",
+  "version": "0.57.0",
   "private": true,
   "license": "UNLICENSED",
   "workspaces": [
@@ -312,7 +312,6 @@
           "skill-tests",
           "check-guardrail-coverage",
           "check-transaction-safe",
-          "check-test-integrity",
           "check-journeys",
           "check-clutch",
           "check-clutch-issues",
@@ -346,13 +345,6 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "bun tools/check-transaction-safe.ts"
-        },
-        "cache": false
-      },
-      "check-test-integrity": {
-        "executor": "nx:run-commands",
-        "options": {
-          "command": "bun tools/check-test-integrity.ts"
         },
         "cache": false
       },

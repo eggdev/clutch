@@ -11,7 +11,7 @@ conflict with it, this file states the intent.
 
 ## Owner
 
-<!-- kickoff: The owner's name, and how an agent reaches them: where to ask a question, and which label or tag asks for approval. -->
+<!-- kickoff: The owner's name, and the T3 project where an agent opens a thread to reach them. See docs/principles/proof-gates-code.md#reach-the-owner-in-a-t3-thread. -->
 
 <!-- kickoff: Where work that is not done lives: the issue tracker and its project link. Docs never hold status. -->
 
@@ -41,10 +41,10 @@ Do not build these yet, and do not design them out:
 
 ## Hard invariants
 
-A change that breaks one of these breaks the business. Treat each change that
-touches them as a one-way door
-([two-way and one-way doors](../principles/two-way-doors.md)) and ask the
-[owner](#owner).
+A change that breaks one of these breaks the business. The [owner](#owner)
+decides what each one says. A journey proves that each change keeps it. See
+[proof gates code](../principles/proof-gates-code.md), which also lists the
+core journeys that every product has.
 
 <!-- kickoff: A numbered list. Each invariant is one bold sentence that a test can prove, then the detail. Cover: records that never change, actions that need explicit consent, tenant isolation, who sees what, what can always be exported, and what a user never loses. -->
 
@@ -69,7 +69,7 @@ Each hard invariant has one journey that proves it. See
 - Read this file before you add a screen, field, role or flow.
 - Name the user. Each feature serves a goal from this page. If you cannot name
   one, ask the [owner](#owner) before you build.
-- Check each change against the hard invariants. If a change touches one, ask
-  the owner.
+- Check each change against the hard invariants. Prove a change that touches
+  one with its journey. Ask the owner only to change what an invariant says.
 - Use the present tense only for behavior that exists in the repository. Keep
   roadmap items in "Later, not now".

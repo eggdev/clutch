@@ -11,11 +11,12 @@ owns the fact.
 ## Speed
 
 Speed drives the design of every surface that a person uses. A user action
-never waits on the network. Open these pages first for any change to what a
+never waits on the network, and the web app renders in the browser. Open these pages first for any change to what a
 user sees or does.
 
 | Principle                                             | When to open it                                                       |
 | ----------------------------------------------------- | --------------------------------------------------------------------- |
+| [Single-page app](./single-page-app.md)               | Adding a route, a render mode, a server render or a web host          |
 | [Local first](./local-first.md)                       | Adding a screen, a read, a write, a search or a boot step             |
 | [Stay at 60 FPS](./stay-at-60-fps.md)                 | Adding a page, a guard, a data load, or work that runs on navigation  |
 | [Fast first load](./fast-first-load.md)               | Adding a dependency, a route, a font or a step before the first paint |
@@ -35,6 +36,7 @@ Each surface starts on a phone and takes every visual value from a token.
 
 | Principle                                                                   | When to open it                                                                               |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [Proof gates code](./proof-gates-code.md)                                   | Asking the owner, changing a sensitive path, or adding a journey or a gate                    |
 | [Generic platform](./generic-platform.md)                                   | Importing a vendor, adding a module, or deciding which module owns a vendor                   |
 | [Normalized source of truth](./normalized-source-of-truth.md)               | Adding a cache, index or second store for a fact that already has a record                    |
 | [Delete what is off the common path](./delete-off-the-common-path.md)       | A migration left an old lane, or a branch, field, flag or doc serves a path the product skips |
