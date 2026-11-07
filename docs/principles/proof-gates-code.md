@@ -121,8 +121,8 @@ Each journey proves its outcome as the weakest real user meets it:
 - A `journeys` check that runs no journey fails.
 - A PR that says `unverified` does not merge.
 - A skipped deploy is red.
-- The core journeys run on production after each deploy. A red run starts the
-  revert, and opens a T3 thread for the owner.
+- The core journeys run on production after each deploy. A red run marks the
+  deploy red, and opens a T3 thread for the owner that names the deploy's PRs.
 
 ## Example
 
