@@ -95,8 +95,12 @@ const nativeSignUp = [
   '- launchApp: { clearState: true }',
   '- tapOn: Sign up',
   "- assertVisible: { text: Welcome, label: 'outcome signed-up' }",
+  '- tapOn: Verify email',
   "- assertVisible: { text: Email verified, label: 'outcome email-verified' }",
+  '- tapOn: Sign out',
+  '- inputText: taken@example.com',
   "- assertVisible: { text: That email has an account, label: 'outcome email-taken-refused' }",
+  '- inputText: short',
   "- assertVisible: { text: Use a longer password, label: 'outcome weak-password-refused' }",
   '',
 ].join('\n');
@@ -218,6 +222,7 @@ test('a native core journey that keeps its state, runs another flow, opens a lin
     `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. ${see}`,
     `${file}: it opens a link. A core journey starts with \`launchApp\`, and reaches each screen through the app. ${see}`,
     `${file}: it runs another flow. A core journey keeps every step in its own file, so a check can read it. ${see}`,
+    `${file}: no user step comes before \`signed-up\`. Each outcome comes after a tap, a text entry or a relaunch, so it cannot hold on the screen before. ${see}`,
   ]);
 });
 
@@ -284,6 +289,29 @@ test('a native assertion that may not run or checks nothing on the screen fails'
     }),
   ).toEqual([
     `${file}: it has an assertion that may not run or may not check the screen: inside \`repeat\` or \`retry\`, \`optional\`, or not \`assertVisible\` or \`assertNotVisible\`. ${see}`,
+  ]);
+});
+
+test('native outcomes on one screen with no user step between them fail', async () => {
+  const file = 'features/account/journeys/phone-sign-up.maestro.yaml';
+  const yaml = [
+    '# phone-sign-up: A visitor makes an account on a phone.',
+    '# Contract: docs/contributing/journeys/core.md',
+    '# Entry: the app icon',
+    '# Isolation and cleanup: a new account',
+    '# Core: sign-up',
+    'appId: com.example',
+    '---',
+    '- launchApp: { clearState: true }',
+    "- assertVisible: { text: Welcome, label: 'outcome signed-up' }",
+    "- assertVisible: { text: Welcome, label: 'outcome email-verified' }",
+    '- tapOn: Sign out',
+    "- assertVisible: { text: Welcome, label: 'outcome email-taken-refused' }",
+    "- assertVisible: { text: Welcome, label: 'outcome weak-password-refused' }",
+    '',
+  ].join('\n');
+  expect(await coreRepo({ [file]: yaml })).toEqual([
+    `${file}: no user step comes before \`signed-up\`, \`email-verified\`, \`weak-password-refused\`. Each outcome comes after a tap, a text entry or a relaunch, so it cannot hold on the screen before. ${see}`,
   ]);
 });
 

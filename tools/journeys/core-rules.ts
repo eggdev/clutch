@@ -201,6 +201,25 @@ const argOf = (step: Step, key: string) =>
     ? (step.args as Record<string, unknown>)[key]
     : undefined;
 
+/** The Maestro commands that a user takes. Each outcome follows at least one. */
+const nativeActions = new Set([
+  'tapOn',
+  'doubleTapOn',
+  'longPressOn',
+  'inputText',
+  'inputRandomEmail',
+  'inputRandomText',
+  'inputRandomNumber',
+  'inputRandomPersonName',
+  'eraseText',
+  'pressKey',
+  'swipe',
+  'scroll',
+  'scrollUntilVisible',
+  'back',
+  'launchApp',
+]);
+
 const labelOf = (step: Step) => String(argOf(step, 'label') ?? '');
 
 function nativeProblems(
@@ -248,6 +267,23 @@ function nativeProblems(
   if (asserts.some((step) => !labelOf(step).startsWith('outcome '))) {
     problems.push(
       `${file}: it has an assertion with no \`label: outcome <name>\`. A core journey asserts only through outcomes. See ${catalog}.`,
+    );
+  }
+  const idle: Array<string> = [];
+  let stepped = false;
+  for (const step of steps.slice(1)) {
+    if (nativeActions.has(step.command)) {
+      stepped = true;
+    } else if (step.command.startsWith('assert') && labelOf(step).startsWith('outcome ')) {
+      if (!stepped) {
+        idle.push(labelOf(step).replace(/^outcome /u, ''));
+      }
+      stepped = false;
+    }
+  }
+  if (idle.length > 0) {
+    problems.push(
+      `${file}: no user step comes before ${idle.map((item) => `\`${item}\``).join(', ')}. Each outcome comes after a tap, a text entry or a relaunch, so it cannot hold on the screen before. See ${catalog}.`,
     );
   }
   const seen = asserts.map((step) => labelOf(step).replace(/^outcome /u, ''));
