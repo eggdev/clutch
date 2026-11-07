@@ -39,7 +39,8 @@ The header of each journey follows the
 [journey specification](../../../.agents/skills/setup-verification/references/journey-specification.md).
 Its first line is `<id>: <user goal>`. It also has `Contract:`, `Entry:` and
 `Isolation and cleanup:` lines. An optional `Budget: <n> s` line sets the time
-limit. The default is 60 seconds.
+limit. The default is 60 seconds. An optional `Core: <name>` line names the
+[core journey](../journeys/core.md) that the journey proves.
 
 Run one journey, or every web journey:
 
@@ -50,7 +51,11 @@ mise exec -- bun run journey --all
 
 The runner uses the dev servers that already run. When a server is down, it
 starts the missing ones through `tools/dev.ts`. It stops only the servers that
-it started. A journey that runs past its budget fails.
+it started. A journey that runs past its budget fails. A `Core:` journey also
+fails when its run passed but did not record `signed-up` first, then every
+outcome that its catalog section names. `outcome()` writes each outcome that
+held to a folder for that run, under `test-results/journeys/outcomes/`. See
+[core journeys](../journeys/core.md#outcomes).
 
 Each journey is also a verify flow, so `verify.py` runs it and keeps the
 evidence:
@@ -68,6 +73,11 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
   `Isolation and cleanup:` line.
 - A journey that `verification.json` does not register, and a flow that runs a
   journey that does not exist.
+- A journey with a `Core:` line that breaks the
+  [core journey rules](../journeys/core.md#rules-for-every-core-journey). It
+  names no core journey, or opens a URL other than `/` on web or a link on
+  native. It loads a seed fixture or a saved session, or never asserts
+  `signed-up`. Or it asserts other than through outcomes.
 
 Each web journey also calls `accessible(page, 'where')` from
 `@repo/journeys/testing/a11y` after each step that renders a page. It fails on

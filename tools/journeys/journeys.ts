@@ -22,6 +22,44 @@ const kinds = [
   ['.maestro.yaml', 'native'],
 ] as const;
 
+/**
+ * The core journeys that every product has, as `docs/contributing/journeys/core.md`
+ * names them. A journey whose header has `Core: <name>` proves one of them.
+ * The CLI keeps the same list in `apps/cli/src/clutch-config/core-journeys.ts`.
+ */
+export const coreJourneys = [
+  'sign-up',
+  'sign-in',
+  'onboarding',
+  'profile-management',
+  'billing-and-checkout',
+  'roles-and-access',
+  'account-security',
+  'contact-support',
+] as const;
+
+/**
+ * The outcomes that each core journey proves, its failure states included, as
+ * docs/contributing/journeys/core.md names them. A `Core:` journey asserts
+ * each one, after `signed-up`. A test compares this list with the catalog.
+ */
+export const coreOutcomes: Readonly<Record<(typeof coreJourneys)[number], ReadonlyArray<string>>> =
+  {
+    'sign-up': ['signed-up', 'email-verified', 'email-taken-refused', 'weak-password-refused'],
+    'sign-in': ['signed-out', 'signed-in', 'session-kept', 'wrong-password-refused'],
+    onboarding: ['onboarded', 'onboarding-resumed', 'required-field-refused'],
+    'profile-management': ['profile-saved', 'email-changed', 'invalid-field-refused'],
+    'billing-and-checkout': ['plan-upgraded', 'plan-cancelled', 'card-declined', 'renewal-failed'],
+    'roles-and-access': ['member-invited', 'member-joined', 'role-refused'],
+    'account-security': ['password-changed', 'password-reset', 'wrong-password-refused'],
+    'contact-support': ['support-request-sent', 'empty-request-refused'],
+  };
+
+/** The outcomes that a `Core: <name>` journey must record: `signed-up` first, then the catalog's. */
+export function requiredOutcomes(name: (typeof coreJourneys)[number]): Array<string> {
+  return [...new Set(['signed-up', ...coreOutcomes[name]])];
+}
+
 /** The verify config that registers each journey as a flow. */
 export const verificationFile = '.agents/skills/verify/verification.json';
 
@@ -76,6 +114,16 @@ export function headerOf(source: string): Array<string> {
   return lines
     .slice(0, comments === -1 ? lines.length : comments)
     .map((line) => line.replace(/^# ?/u, '').trimEnd());
+}
+
+/** The lines of a journey after its header: the code that runs. */
+export function bodyOf(source: string): string {
+  const lines = source.split('\n');
+  if (lines[0]?.trim() === '/**') {
+    return lines.slice(lines.findIndex((line) => line.trim() === '*/') + 1).join('\n');
+  }
+  const comments = lines.findIndex((line) => !line.startsWith('#'));
+  return comments === -1 ? '' : lines.slice(comments).join('\n');
 }
 
 /** The value of a `Name: value` line in a journey header. */
