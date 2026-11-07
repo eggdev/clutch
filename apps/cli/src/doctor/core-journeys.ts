@@ -69,6 +69,9 @@ async function shipsScreens(root: string) {
 
 /** The budgets that an adopted set of core journeys needs: layout shift, time to value, and clicks for each one. */
 function missingBudgets(config: ClutchConfig, adopted: ReadonlyArray<string>) {
+  if (adopted.length === 0) {
+    return [];
+  }
   const { budgets } = config;
   return [
     ...(budgets?.layoutShift === undefined ? ['budgets.layoutShift'] : []),

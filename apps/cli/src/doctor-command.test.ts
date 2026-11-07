@@ -175,6 +175,16 @@ test('--check fails after kickoff when screens ship and clutch.yaml records no c
   expect(before.stdout).not.toContain('core journeys unrecorded');
 });
 
+test('--check asks for no budget when no core journey is adopted', async () => {
+  const none = coreConfig
+    .replace('  sign-up: adopted', '  sign-up: { status: n/a, reason: Invite only. }')
+    .replace('  sign-in: adopted', '  sign-in: { status: n/a, reason: Invite only. }')
+    .replace(/budgets:[\s\S]*$/u, '');
+  await using repo = await gitRepo({ 'clutch.yaml': none });
+  const result = await doctor('--root', repo.root, '--check');
+  expect(result.stdout).not.toContain('budget missing');
+});
+
 test('--check fails for a budget that the adopted core journeys need', async () => {
   await using repo = await gitRepo({
     'clutch.yaml': coreConfig.replace(

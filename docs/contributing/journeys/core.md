@@ -38,9 +38,10 @@ The text must match the whole visible text, so `Pro` does not hold on
 
 A journey asserts every outcome and failure state that its section names,
 `signed-up` first, each name as a literal string. `check-journeys` reads the
-source for them. The run is the proof: `outcome()` records each outcome that
-held, and `bun run journey` fails a core journey whose run did not record
-each one. A call in a comment, or one that never runs, proves nothing.
+source for them. On web, the run is the proof. `outcome()` records each outcome that held,
+and `bun run journey` fails a core journey whose run did not record each one. A native core journey runs on the device host, which
+does not record outcomes yet. Until it does, its source rules are its only
+check. A call in a comment, or one that never runs, proves nothing.
 
 Each outcome comes after a user step, such as a tap, a fill or a reload. An
 outcome cannot hold on the screen that the journey was already on.
