@@ -35,7 +35,8 @@ async function check(readme: string | null, settings?: ClutchConfig) {
   await using repo = await gitRepo(readme === null ? {} : { '.clutch/README.md': readme }, {
     git: false,
   });
-  return checkIntakeDoc(repo.root, settings);
+  // Await before `await using` removes the repo, or the read races the removal.
+  return await checkIntakeDoc(repo.root, settings);
 }
 
 test('readIntakeSection reads each line of its own section only', () => {
