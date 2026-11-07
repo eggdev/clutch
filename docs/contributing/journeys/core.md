@@ -71,11 +71,13 @@ count, because it hides a screen that no button leads to.
 
 ### Budgets
 
-The budgets come from `budgets:` in `clutch.yaml`, which kickoff fills:
+The budgets come from `budgets:` in `clutch.yaml`, which kickoff fills. The
+loader adds no value of its own, so `clutch doctor --check` fails on a budget
+that an adopted core journey needs and that `budgets:` lacks.
 
-- `layoutShift`: the cumulative layout shift limit. The default is 0.01.
-- `clicks`: the clicks or taps to finish each core journey. The default for
-  sign-up is 3.
+- `layoutShift`: the cumulative layout shift limit. Kickoff writes 0.01.
+- `clicks`: the clicks or taps to finish each core journey. Kickoff writes 3
+  for sign-up.
 - `timeToValue`: the seconds from the first screen to the activation event.
 
 Each journey also has no accessibility error: `accessible(page, 'where')`
@@ -95,7 +97,8 @@ A journey uses the test mode of each vendor that it touches, never a stand-in:
   sign-up. `email-verified`, the link in the inbox verifies the address.
 - User: a visitor with no account.
 - Entry: the first screen, then its sign-up button.
-- Budgets: 3 clicks or taps by default, from the entry to `signed-up`.
+- Budgets: the `clicks` budget, 3 clicks or taps from kickoff, from the entry
+  to `signed-up`.
 - Vendors in test mode: the email inbox, for the verification email.
 - Failure states: `email-taken-refused` for an address that has an account,
   and `weak-password-refused`.
