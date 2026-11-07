@@ -16,7 +16,7 @@ import type { PullShape } from '@/metrics/pulls';
 /** The marker that starts each dry-run comment of `tools/github/auto-merge.ts`. */
 const dryRunMarker = '<!-- automerge-dry-run:';
 
-/** How the Grade verdicts workflow's reply starts. */
+/** How a reply of the retired Grade verdicts workflow starts. Its grades in the window still count. */
 const gradedReply = "Graded on the owner's instruction";
 
 /** The grading bot that a reply names: the login of the workflow's app token. */
@@ -272,8 +272,8 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
     /**
      * The dry-run verdicts commented on or after `since`, an ISO time. With an
      * `owner`, only the owner's reactions count as grades, and those of each
-     * grading bot. The Grade verdicts workflow names that bot, the login of its
-     * app token, in its `Graded on the owner's instruction` reply. Only a reply
+     * grading bot. The retired Grade verdicts workflow named that bot, the login
+     * of its app token, in its `Graded on the owner's instruction` reply. Only a reply
      * that a bot posted counts. Without an owner, no reaction counts.
      */
     async dryRunVerdicts(since: string, owner?: string | null): Promise<Array<DryRunVerdict>> {

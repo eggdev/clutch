@@ -6,7 +6,7 @@
  * .agents/skills/babysit-pr/SKILL.md#the-log.
  */
 
-export const logHeading = '## Babysit log';
+const logHeading = '## Babysit log';
 export const logMarker = '<!-- clutch-babysit-log';
 
 /** What the babysitter decided for one comment, thread or check. */

@@ -1,11 +1,8 @@
-import { parseArgs } from 'node:util';
-
 import { plan } from '@tools/github/babysit';
 import { readPr } from '@tools/github/babysit-read';
-import { retrying } from '@tools/github/command';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
-import { ownerLogin, prStatus } from '@tools/github/status';
+import { prStatus } from '@tools/github/status';
 import type { PrStatus } from '@tools/github/status';
 
 /**
@@ -72,23 +69,4 @@ export async function askOwnerLast(run: Run, repo: string, owner: string, number
     ]);
   }
   return step;
-}
-
-if (import.meta.main) {
-  const { values } = parseArgs({
-    args: process.argv.slice(2),
-    options: { repo: { type: 'string' }, owner: { type: 'string' }, pr: { type: 'string' } },
-  });
-  try {
-    const step = await askOwnerLast(
-      retrying,
-      values.repo ?? '',
-      values.owner ?? (await ownerLogin()) ?? '',
-      Number(values.pr),
-    );
-    console.log(`#${values.pr}: ${step} the owner's review request.`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
 }

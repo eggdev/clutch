@@ -236,7 +236,18 @@ test('a red release commit blames the merge before it', async () => {
 });
 
 test('a PR that a person merged, or a commit with no PR, is not reverted', async () => {
-  const person = main([['gh api --paginate repos/acme/shop/issues/42/comments', { out: '' }]]);
+  const person = main([
+    ['gh api --paginate repos/acme/shop/issues/42/comments', { out: '' }],
+    [
+      'gh api repos/acme/shop/pulls/42',
+      {
+        out: JSON.stringify({
+          headRefName: 'fix/typo',
+          author: { login: 'eggdev', is_bot: false },
+        }),
+      },
+    ],
+  ]);
   const merged = await autoRevert(person);
   expect(merged.lines[0]).toContain('A person merged #42');
   const direct = main([['gh api repos/acme/shop/commits/red1234/pulls', { out: '' }]]);
@@ -266,4 +277,50 @@ test('the watch list comes from autoRevert in clutch.yaml, and a bad one fails',
 test('a missing argument gives the usage', async () => {
   const gh = main();
   await expect(runAutoRevert(['--sha', 'x'], gh.run, { env })).rejects.toThrow('Usage');
+});
+
+test('a revert that already started is left alone, so the session and the workflow can both act', async () => {
+  const gh = main([['gh api repos/acme/shop/issues/42/labels', { out: 'risk/low\nrevert\n' }]]);
+  const { code, lines } = await autoRevert(gh);
+  expect(code).toBe(0);
+  expect(reverted(gh)).toBe(false);
+  expect(gh.calls.some((call) => call.startsWith('gh workflow run revert.yml'))).toBe(false);
+  expect(lines.at(-1)).toBe(
+    'The revert of #42 already started. Drive its revert PR, revert/42, to the merge.',
+  );
+});
+
+test('a rerun that another actor started first is not an error', async () => {
+  const gh = main([
+    ['gh run rerun', { ok: false, err: 'run 77 cannot be rerun; it is already running' }],
+  ]);
+  const { code, lines } = await autoRevert(gh, '1');
+  expect(code).toBe(0);
+  expect(reran(gh)).toBe(true);
+  expect(lines.at(-1)).toContain('The rerun did not start, because it already runs');
+});
+
+test('a rerun that fails for another reason fails the job', async () => {
+  const gh = main([
+    ['gh run rerun', { ok: false, err: 'HTTP 403: Resource not accessible by integration' }],
+  ]);
+  await expect(autoRevert(gh, '1')).rejects.toThrow('gh run rerun 77 failed: HTTP 403');
+});
+
+test("an agent's PR that its session merged on the owner's word is reverted", async () => {
+  // `pr merge --owner` merges with the session's token, so no enabled marker exists.
+  const gh = main([
+    ['gh api --paginate repos/acme/shop/issues/42/comments', { out: '' }],
+    [
+      'gh api repos/acme/shop/pulls/42',
+      {
+        out: JSON.stringify({
+          headRefName: 'clutch/cl-042-fix-sign-in',
+          author: { login: 'eggdev', is_bot: false },
+        }),
+      },
+    ],
+  ]);
+  await autoRevert(gh);
+  expect(gh.calls).toContain('gh workflow run revert.yml --repo acme/shop --ref main -f pr=42');
 });
