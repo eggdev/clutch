@@ -133,7 +133,8 @@ budget. It is `timeout`, `assertion` or `crash` for a failure that the retry
 covers. A device run that failed a measured budget also has `budgetFailure`,
 with the try that failed it.
 
-A native try has only its result and its time. CI keeps the files as the
+The measures read the top document only. A click or a layout shift inside an
+iframe, such as a payment or captcha frame, is not counted. A native try has only its result and its time. CI keeps the files as the
 `journey-measures-web`, `journey-measures-ios` and `journey-measures-android`
 artifacts.
 

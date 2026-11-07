@@ -210,8 +210,14 @@ const pageScript = `(() => {
   addEventListener('submit', (event) => {
     if (event.isTrusted && event.submitter === null) activate();
   }, true);
+  // A native control fires a click for Space or Enter. A WAI-ARIA widget, such
+  // as a div with role=button, handles the key itself and fires no click.
+  const native = 'a[href], button, input, select, textarea, summary, label';
   addEventListener('keydown', (event) => {
-    if (event.isTrusted && !event.repeat) send({ kind: 'key', key: event.key });
+    if (!event.isTrusted || event.repeat) return;
+    send({ kind: 'key', key: event.key });
+    const widget = event.target instanceof Element ? event.target.closest(control) : null;
+    if ((event.key === 'Enter' || event.key === ' ') && widget && !widget.matches(native)) activate();
   }, true);
 })();`;
 
