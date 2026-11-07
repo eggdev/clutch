@@ -11,11 +11,12 @@ owns the fact.
 ## Speed
 
 Speed drives the design of every surface that a person uses. A user action
-never waits on the network. Open these pages first for any change to what a
+never waits on the network, and the web app renders in the browser. Open these pages first for any change to what a
 user sees or does.
 
 | Principle                                             | When to open it                                                       |
 | ----------------------------------------------------- | --------------------------------------------------------------------- |
+| [Single-page app](./single-page-app.md)               | Adding a route, a render mode, a server render or a web host          |
 | [Local first](./local-first.md)                       | Adding a screen, a read, a write, a search or a boot step             |
 | [Stay at 60 FPS](./stay-at-60-fps.md)                 | Adding a page, a guard, a data load, or work that runs on navigation  |
 | [Fast first load](./fast-first-load.md)               | Adding a dependency, a route, a font or a step before the first paint |

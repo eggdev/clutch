@@ -23,8 +23,9 @@ network.
   the chunk names into the boot script.
 - Inline the CSS that paints the app shell. An inline script reads the last
   shell settings from device storage, such as the theme and the sidebar width.
-  It applies them before the first paint. This boot script in `index.html` is
-  the one place outside `packages/sync` that reads device storage.
+  It applies them before the first paint. This boot script in the static
+  document is the one place outside `packages/sync` that reads device storage.
+  See [single-page app](./single-page-app.md#rules).
 - The boot script marks the app start with `performance.mark('appStart')`, as
   its first line.
 - Use one variable font file for each family. Preload it with
@@ -71,5 +72,6 @@ The `<head>` paints the shell and starts every critical fetch at once:
 
 ## Related
 
+- [Single-page app](./single-page-app.md)
 - [Local first](./local-first.md)
 - [Fix the root bottleneck](./fix-the-root-bottleneck.md)
