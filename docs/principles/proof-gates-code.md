@@ -2,7 +2,9 @@
 
 Agents drive the project. The [owner](../contributing/project-intent.md#owner)
 sets the big picture and decides what the product does. Proof decides whether
-a change ships. The owner never reviews a diff, and never opens a PR.
+a change ships. The owner does not review diffs. A sensitive path waits for the
+owner's approval only until its journeys exist, as
+[proof decides the rest](#proof-decides-the-rest) says.
 
 An owner who reviews diffs becomes the slowest step, and does not catch what
 breaks users. A broken sign-in looks like a small cache change in a diff. Only a
@@ -45,15 +47,24 @@ times a day, so a question that can wait goes into the next stop.
 
 ## Proof decides the rest
 
-Each sensitive path in `.clutch/risk.yaml` names the journeys that prove it.
-Sensitive paths include auth, billing, roles and access, migrations,
+Every PR runs the core journeys, whatever its risk tier. A cache change in an
+app can break sign-in as surely as a change to auth.
+
+Each sensitive path in `.clutch/risk.yaml` also names the journeys that prove
+it. Sensitive paths include auth, billing, roles and access, migrations,
 credentials and the merge gate. A change to a sensitive path merges when:
 
 1. each journey that its paths name passes on the PR head, on every platform
 2. agent review has 0 blocking findings
 
-The judge reads its rules from the default branch, so a PR cannot loosen its
-own gate. A path stays held for the owner until its journeys exist and pass.
+The journeys run as the default branch has them, against the PR head. The
+judge also reads its rules from the default branch. So a PR cannot weaken the
+proof or the gate that judges it. A path stays held for the owner until its
+journeys exist and pass.
+
+A migration also needs its rehearsal on a copy of production data. A journey
+cannot show that a copy survives or rolls back. See
+[two-way and one-way doors](./two-way-doors.md#rules-for-stored-shapes).
 
 ## Grow the journeys you have
 
@@ -88,9 +99,12 @@ Each journey proves its outcome as the weakest real user meets it:
 - It uses a new account on the free plan. A seeded paid account hides what
   real users see.
 - It runs on mobile web, desktop web, iOS and Android.
-- It meets its budgets: no layout shift, sign-up in 3 clicks or fewer, and no
+- It meets the budgets in project intent. The template's defaults are a
+  cumulative layout shift under 0.01, sign-up in 3 clicks or taps, and no
   accessibility error.
-- A payment runs end to end in the vendor's test mode.
+- A payment runs end to end. On a PR it uses the vendor's test mode. On
+  production it uses live mode with a $0 plan or a full discount, and the
+  journey cancels the subscription after.
 - It also proves the refusals: a wrong password, a declined card, a refused
   role.
 
