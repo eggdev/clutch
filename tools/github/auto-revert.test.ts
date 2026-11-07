@@ -300,7 +300,7 @@ test("an agent's PR that its session merged on the owner's word is reverted", as
   // `pr merge --owner` merges with the session's token, so no enabled marker exists.
   const gh = main([
     ['gh api --paginate repos/acme/shop/issues/42/comments', { out: '' }],
-    ['gh api repos/acme/shop/pulls/42', { out: 'Bot clutch/cl-042-fix-sign-in\n' }],
+    ['gh api repos/acme/shop/pulls/42', { out: 'clutch/cl-042-fix-sign-in\n' }],
   ]);
   await autoRevert(gh);
   expect(gh.calls).toContain('gh workflow run revert.yml --repo acme/shop --ref main -f pr=42');

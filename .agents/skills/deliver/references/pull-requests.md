@@ -283,7 +283,10 @@ request of this repository, never a fork's. No schedule starts it. It runs
 when `pr merge` dispatches it, when the owner approves a head, and when CI or
 agent review completes on a PR that no session owns: a `revert/` PR or a bot's
 `renovate/`, `gardening/` or `clutch-sync/` PR. An agent's `clutch/` PR merges
-only when its session runs `pr merge`, or when the owner approves it. An agent PR is one that the release
+only when its session runs `pr merge`, or after the owner approves it. Its CI
+event judges it only once the owner approved it. When CI turns green on the
+default branch, each approved agent PR is judged again, since a red `main` may
+have held it. An agent PR is one that the release
 bot opens, so its author is a bot. The workflow also judges a PR on a
 `clutch/cl-NNN-<slug>` branch, which an agent makes, as a fallback for a project
 whose release bot is not set up. A bot PR's branch starts with `renovate/`,
@@ -391,4 +394,3 @@ The owner grades each dry-run verdict on its PR: 👍 when they agree and 👎 w
 they do not. `clutch metrics --verdicts` lists each verdict that the owner has
 not graded yet, with its reasons and a link. `clutch metrics` counts the owner's
 reactions as `dryRunAgreement`, and ignores anyone else's.
-

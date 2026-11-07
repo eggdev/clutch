@@ -18,8 +18,10 @@ name: Auto-merge
 #   approval hands the PR to a dispatch from the default branch.
 # - A completed CI or Agent review run on a PR that no session owns: a
 #   `revert/` PR that the Auto-revert net opened, or a bot's `renovate/`,
-#   `gardening/` or `clutch-sync/` PR. An agent's `clutch/` PR never merges
-#   from this event, so it merges only when its session asks.
+#   `gardening/` or `clutch-sync/` PR. An agent's `clutch/` PR merges from
+#   this event only after the owner approved it, so it otherwise merges only
+#   when its session asks. When CI turns green on the default branch, each
+#   approved agent PR is judged again, since a red main may have held it.
 #
 # Each run uses the default branch's code, so a pull request cannot change the
 # rules that judge it. The decide job judges the head that the PR has then, and
@@ -60,7 +62,8 @@ jobs:
       (startsWith(github.event.workflow_run.head_branch, 'revert/') ||
       startsWith(github.event.workflow_run.head_branch, 'renovate/') ||
       startsWith(github.event.workflow_run.head_branch, 'gardening/') ||
-      startsWith(github.event.workflow_run.head_branch, 'clutch-sync/'))) ||
+      startsWith(github.event.workflow_run.head_branch, 'clutch-sync/') ||
+      startsWith(github.event.workflow_run.head_branch, 'clutch/'))) ||
       (github.event_name == 'workflow_dispatch' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     runs-on: ubuntu-26.04
@@ -94,6 +97,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             # A dispatch judges the head that the PR has now. A fork's PR is
@@ -108,6 +112,16 @@ jobs:
             PR="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")][0].number // empty')"
             if [ -z "$PR" ]; then
               echo "::notice title=Auto-merge skipped::No open pull request has head $HEAD_SHA."
+            fi
+          fi
+          # An agent's clutch/ PR merges from a CI event only after the owner
+          # approved it: the approval's own run may have met a pending check.
+          # Its session merges it otherwise.
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ] && [ -n "$PR" ] && [[ "$HEAD_BRANCH" == clutch/* ]]; then
+            decision="$(gh pr view "$PR" --json reviewDecision --jq .reviewDecision)"
+            if [ "$decision" != APPROVED ]; then
+              echo "::notice title=Auto-merge skipped::Agent PR $PR has no approval, so its session merges it."
+              PR=""
             fi
           fi
           echo "number=$PR" >> "$GITHUB_OUTPUT"
@@ -159,6 +173,32 @@ jobs:
           PR: ${{ steps.pr.outputs.number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: gh workflow run auto-merge.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH" -f pr="$PR"
+
+  # When CI turns green on the default branch, judge again each open agent PR
+  # that the owner approved. Its approval's run may have met a red main, and
+  # no later event of its own comes.
+  rejudge:
+    if: >-
+      github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+      actions: write
+    steps:
+      - name: Dispatch Auto-merge for each approved agent PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          gh pr list --state open --limit 100 --json number,headRefName,reviewDecision,isCrossRepository \
+            --jq '.[] | select((.headRefName | startswith("clutch/")) and .reviewDecision == "APPROVED" and (.isCrossRepository | not)) | .number' |
+            while read -r pr; do
+              gh workflow run auto-merge.yml --ref "$DEFAULT_BRANCH" -f pr="$pr"
+            done
 
   # Enables GitHub's auto-merge, `gh pr merge --auto --merge`, with the release
   # bot's token. A merge made with the default token starts no workflow, so the

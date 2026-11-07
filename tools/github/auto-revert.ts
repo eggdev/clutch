@@ -57,21 +57,14 @@ export async function autoMerged(run: Run, repo: string, pr: string) {
 }
 
 /**
- * Whether `pr` is an agent's PR: the release bot opened it from a
- * `clutch/` branch. Its session may have merged it with `pr merge --owner`,
- * on the owner's word, so it carries no enabled marker. A person's own PR is
- * never one.
+ * Whether `pr` is an agent's PR: its branch is `clutch/cl-NNN-<slug>`, which
+ * only an agent's task makes. The release bot opens it, or the user's token
+ * when the bot is not set up. Its session may have merged it with
+ * `pr merge --owner`, on the owner's word, so it carries no enabled marker.
  */
 async function agentPr(run: Run, repo: string, pr: string) {
-  const out = await must(run, [
-    'gh',
-    'api',
-    `repos/${repo}/pulls/${pr}`,
-    '--jq',
-    '.user.type + " " + .head.ref',
-  ]);
-  const [type, ref = ''] = out.trim().split(' ');
-  return type === 'Bot' && ref.startsWith('clutch/');
+  const out = await must(run, ['gh', 'api', `repos/${repo}/pulls/${pr}`, '--jq', '.head.ref']);
+  return /^clutch\/cl-\d+/u.test(out.trim());
 }
 
 /** Whether the net may revert `pr`: auto-merge merged it, or it is an agent's PR. */
