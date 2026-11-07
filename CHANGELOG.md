@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.59.0 (2026-11-07)
+
+### Features
+
+- feat(pr): merge, watch main and revert in the delivering session (CL-436)
+
 ## 0.58.0 (2026-11-07)
 
 ### Features
