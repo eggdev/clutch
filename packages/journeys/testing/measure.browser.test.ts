@@ -28,6 +28,8 @@ const page = `
     <select aria-label="Plan"><option>Free</option><option>Pro</option></select>
     <form id="search" onsubmit="event.preventDefault()"><input aria-label="Search"></form>
     <div id="blank" style="width: 300px; height: 300px; margin-top: 20px"></div>
+    <div contenteditable="true" aria-label="Notes" style="min-height: 40px"></div>
+    <div role="link" tabindex="0" aria-label="Docs">Docs</div>
     <div role="button" tabindex="0" aria-label="Next" onkeydown="if (event.key === 'Enter' || event.key === ' ') this.dataset.done = 'yes'">Next</div>
   </main>`;
 
@@ -127,5 +129,17 @@ test('Space or Enter on a WAI-ARIA button, which fires no click, counts once eac
   // A key that activates nothing on the widget counts as a key only.
   await tab.getByRole('button', { name: 'Next' }).press('a');
   expect(await clicks()).toBe(2);
+  await context.close();
+});
+
+test('typing Space or Enter in an editor, or Space on a role=link, counts no activation', async () => {
+  const { context, tab, clicks } = await measured();
+  await tab.getByLabel('Notes').click();
+  const before = await clicks();
+  await tab.getByLabel('Notes').pressSequentially('hello world and more');
+  await tab.getByLabel('Notes').press('Enter');
+  expect(await clicks()).toBe(before);
+  await tab.getByRole('link', { name: 'Docs' }).press(' ');
+  expect(await clicks()).toBe(before);
   await context.close();
 });

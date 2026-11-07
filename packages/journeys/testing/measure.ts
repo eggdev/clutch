@@ -212,12 +212,16 @@ const pageScript = `(() => {
   }, true);
   // A native control fires a click for Space or Enter. A WAI-ARIA widget, such
   // as a div with role=button, handles the key itself and fires no click.
-  const native = 'a[href], button, input, select, textarea, summary, label';
+  // An editor takes Space and Enter as text, so neither is an activation there.
+  const native =
+    'a[href], button, input, select, textarea, summary, label, [contenteditable=""], [contenteditable="true"]';
   addEventListener('keydown', (event) => {
     if (!event.isTrusted || event.repeat) return;
     send({ kind: 'key', key: event.key });
     const widget = event.target instanceof Element ? event.target.closest(control) : null;
-    if ((event.key === 'Enter' || event.key === ' ') && widget && !widget.matches(native)) activate();
+    // Space does not follow a link, so only Enter activates role=link.
+    const key = event.key === 'Enter' || (event.key === ' ' && !(widget && widget.matches('[role="link"]')));
+    if (key && widget && !widget.matches(native)) activate();
   }, true);
 })();`;
 
