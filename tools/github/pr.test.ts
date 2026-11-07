@@ -119,13 +119,14 @@ test('merge uses gh stack for a PR in a stack, and gh pr merge for a lone PR', a
   // The fetch runs after the merge, before the release wait.
   const merged = lone.calls.indexOf('gh pr merge 12 --merge');
   expect(merged).not.toBe(-1);
-  const fetched = lone.calls.indexOf('git fetch --prune origin');
-  expect(fetched).toBeGreaterThan(merged);
-  expect(fetched).toBeLessThan(
-    lone.calls.indexOf(
-      'gh run list --workflow release.yml --branch main --limit 20 --json headSha,status,conclusion,url',
-    ),
-  );
+  // Between the merge and the fetch: only the merge commit and trunk lookups.
+  expect(lone.calls.slice(merged, merged + 5)).toEqual([
+    'gh pr merge 12 --merge',
+    'gh pr view 12 --json mergeCommit --jq .mergeCommit.oid',
+    'gh repo view --json defaultBranchRef --jq .defaultBranchRef.name',
+    'git fetch --prune origin',
+    'gh run list --workflow release.yml --branch main --limit 20 --json headSha,status,conclusion,url',
+  ]);
   // CI on main at the merge commit is watched after the release.
   const releasedAt = lone.calls.indexOf('git show origin/main:package.json');
   expect(releasedAt).toBeGreaterThan(merged);

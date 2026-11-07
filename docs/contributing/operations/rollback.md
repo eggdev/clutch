@@ -113,8 +113,10 @@ not make main red here.
    Revert workflow and comments on the PR. First it tries to create the
    `revert` label, which the Labels workflow also makes. This job may lack the
    permission to create it, so a project that has never run the Labels
-   workflow needs that workflow to run once. A PR that a person merged gets no
-   automatic revert: the person fixes forward or adds the label.
+   workflow needs that workflow to run once. An agent's PR, on a
+   `clutch/cl-NNN` branch, is reverted the same way, even when its session
+   merged it with `pr merge --owner`. Any other PR that a person merged gets
+   no automatic revert: the person fixes forward or adds the label.
 
 A project with a live deploy can add its deploy job to `autoRevert.watch` in
 `clutch.yaml`, such as `production`. Those checks count as required for
