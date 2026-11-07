@@ -26,12 +26,14 @@ export type Names = { has: (name: string) => boolean };
  * The only modules a core journey may import, by exact path, so `..` in a
  * path cannot leave the journey kit. `test` must come from @playwright/test.
  */
-export const allowedModules = new Set([
-  '@playwright/test',
-  '@repo/journeys/testing/outcome',
-  '@repo/journeys/testing/a11y',
-  '@repo/journeys/testing/visual',
+const moduleNames = new Map([
+  ['@playwright/test', ['test']],
+  ['@repo/journeys/testing/outcome', ['outcomes']],
+  ['@repo/journeys/testing/a11y', ['accessible']],
+  ['@repo/journeys/testing/visual', ['snap']],
 ]);
+
+export const allowedModules = new Set(moduleNames.keys());
 
 /** The members that a page step may chain: locators, then one action. */
 const chain = new Set([
@@ -167,15 +169,16 @@ function allowed(statement: ts.Statement, consts: Set<string>, kit: ReadonlySet<
         return false;
       }
       const { initializer } = item;
+      const isOutcome = item.name.text === 'outcome';
       const ok =
-        (item.name.text === 'outcome' &&
+        (isOutcome &&
           ts.isCallExpression(initializer) &&
           ts.isIdentifier(initializer.expression) &&
           initializer.expression.text === 'outcomes' &&
           initializer.arguments.length === 1 &&
           ts.isIdentifier(initializer.arguments[0] as ts.Expression) &&
           (initializer.arguments[0] as ts.Identifier).text === 'page') ||
-        plain(initializer, consts);
+        (!isOutcome && plain(initializer, consts));
       if (ok) {
         consts.add(item.name.text);
       }
@@ -195,7 +198,8 @@ function allowed(statement: ts.Statement, consts: Set<string>, kit: ReadonlySet<
   const callee = call.expression.text;
   const [first, ...rest] = call.arguments;
   if (callee === 'outcome') {
-    return call.arguments.every((item) => plain(item, consts));
+    // Only after `const outcome = outcomes(page)`, the one const named outcome that the list takes.
+    return consts.has('outcome') && call.arguments.every((item) => plain(item, consts));
   }
   return (
     kit.has(callee) &&
@@ -238,30 +242,28 @@ function testBody(node: ts.Statement) {
 
 /**
  * Whether an import is one that a core journey may have: named imports from
- * an allowed module by exact path, with `test` only from @playwright/test. It
- * adds each journey kit helper to `kit`. A side-effect, default or namespace
- * import runs or hides code that no rule reads.
+ * an allowed module by exact path, each under the name that its module
+ * exports: `test`, `outcomes`, `accessible` or `snap`, with no `as`. It adds
+ * each journey kit helper to `kit`. A side-effect, default or namespace import
+ * runs or hides code that no rule reads.
  */
 function importAllowed(statement: ts.ImportDeclaration, kit: Set<string>) {
   const from = ts.isStringLiteral(statement.moduleSpecifier) ? statement.moduleSpecifier.text : '';
+  const names = moduleNames.get(from);
   const clause = statement.importClause;
   const bindings = clause?.namedBindings;
-  if (
-    !allowedModules.has(from) ||
-    !clause ||
-    clause.name ||
-    !bindings ||
-    !ts.isNamedImports(bindings)
-  ) {
+  if (!names || !clause || clause.name || !bindings || !ts.isNamedImports(bindings)) {
     return false;
   }
-  if (from === '@playwright/test') {
-    return bindings.elements.every(
-      (item) => item.name.text === 'test' && (item.propertyName ?? item.name).text === 'test',
-    );
+  // No `as`: each name keeps the meaning that its module gives it.
+  const plainNames = bindings.elements.every(
+    (item) => item.propertyName === undefined && names.includes(item.name.text),
+  );
+  if (!plainNames) {
+    return false;
   }
   for (const item of bindings.elements) {
-    if (item.name.text !== 'outcomes') {
+    if (item.name.text !== 'test' && item.name.text !== 'outcomes') {
       kit.add(item.name.text);
     }
   }

@@ -129,3 +129,16 @@ test('an import that leaves the journey kit, a side-effect import or a test from
     'lines 1, 2, 3, 8 are not steps',
   );
 });
+
+test('a renamed kit import that stands in for outcome fails', async () => {
+  const file = 'features/account/journeys/sign-up.pw.ts';
+  // The probe of the sixth review: a renamed helper asserts nothing.
+  const body = signUp
+    .replace(
+      "import { outcomes } from '@repo/journeys/testing/outcome';",
+      "import { shotName as outcome } from '@repo/journeys/testing/visual';",
+    )
+    .replace('  const outcome = outcomes(page);\n', '');
+  const problems = await coreRepo({ [file]: core('sign-up', 'sign-up', body) });
+  expect(problems.find((item) => item.includes('not steps'))).toContain('lines 2, 7, ');
+});
