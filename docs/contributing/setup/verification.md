@@ -51,7 +51,11 @@ mise exec -- bun run journey --all
 
 The runner uses the dev servers that already run. When a server is down, it
 starts the missing ones through `tools/dev.ts`. It stops only the servers that
-it started. A journey that runs past its budget fails.
+it started. A journey that runs past its budget fails. A `Core:` journey also
+fails when its run passed but did not record `signed-up` first, then every
+outcome that its catalog section names. `outcome()` writes each outcome that
+held to a folder for that run, under `test-results/journeys/outcomes/`. See
+[core journeys](../journeys/core.md#outcomes).
 
 Each journey is also a verify flow, so `verify.py` runs it and keeps the
 evidence:
