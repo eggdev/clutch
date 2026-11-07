@@ -40,9 +40,10 @@ Before a one-way change merges:
 - Migrations only move forward.
 - Add optional fields before you change a shape.
 - Give readers a recovery path for a version they cannot read.
-- Rehearse a one-way migration before it merges. Run it on a preview with seed
-  data, and attach the difference before and after to the PR. Each difference
-  is one that you expect.
+- Rehearse a one-way migration before it merges. Run it on a branch of the
+  production database, and attach the difference before and after to the PR.
+  Each difference is one that you expect. Seed data hides the rows that real
+  users have.
 - Record the no in [decision records](../contributing/decisions/index.md) when
   the next agent would otherwise propose it again.
 

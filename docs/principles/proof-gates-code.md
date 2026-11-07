@@ -54,16 +54,24 @@ Each sensitive path in `.clutch/risk.yaml` also names the journeys that prove
 it. Sensitive paths include auth, billing, roles and access, migrations,
 credentials and the merge gate. A change to a sensitive path merges when:
 
-1. each journey that its paths name passes on the PR head, on every platform
+1. each journey that its paths name passes on the PR head, on each platform
+   that the change reaches
 2. agent review has 0 blocking findings
 
-The journeys run as the default branch has them, against the PR head. The
-judge also reads its rules from the default branch. So a PR cannot weaken the
-proof or the gate that judges it. A path stays held for the owner until its
-journeys exist and pass.
+A change reaches web when it touches the web app or anything it imports. It
+reaches native when it touches a native app, a shared runtime package or a
+sensitive path. A sensitive path reaches every platform.
 
-A migration also needs its rehearsal on a copy of production data. A journey
-cannot show that a copy survives or rolls back. See
+The judge reads its rules from the default branch, and the journeys run from
+the default branch too. When a PR changes a journey, its own copy must pass,
+and a check compares the two copies. A renamed button or a moved field passes
+that check. A removed assertion, budget, entry or platform is a weaker
+journey, and it goes to the owner. So a PR cannot weaken the proof or the gate
+that judges it. A path stays held for the owner until its journeys exist and
+pass.
+
+A migration also needs its rehearsal on a branch of the production database.
+A journey cannot show that a copy survives or rolls back. See
 [two-way and one-way doors](./two-way-doors.md#rules-for-stored-shapes).
 
 ## Grow the journeys you have
@@ -99,9 +107,9 @@ Each journey proves its outcome as the weakest real user meets it:
 - It uses a new account on the free plan. A seeded paid account hides what
   real users see.
 - It runs on mobile web, desktop web, iOS and Android.
-- It meets the budgets in project intent. The template's defaults are a
-  cumulative layout shift under 0.01, sign-up in 3 clicks or taps, and no
-  accessibility error.
+- It meets the budgets in `budgets:` of `clutch.yaml`, which kickoff fills.
+  The template's defaults are a cumulative layout shift under 0.01, sign-up in
+  3 clicks or taps, and no accessibility error.
 - A payment runs end to end. On a PR it uses the vendor's test mode. On
   production it uses live mode with a $0 plan or a full discount, and the
   journey cancels the subscription after.
@@ -121,7 +129,8 @@ Each journey proves its outcome as the weakest real user meets it:
 A PR changes how `packages/identity/**` caches the session token. It adds a
 token refresh step to the sign-in journey that already exists. Sign-in fails on
 iOS, so the PR holds with that failure, and no person looks at it. The fix
-makes sign-in pass on all 4 platforms, and the PR merges.
+makes sign-in pass on every platform that the change reaches, and the PR
+merges.
 
 The same PR also moves the sign-up button below the fold, and adds a click.
 The sign-up budget fails. That is a product decision, so the agent asks in its
