@@ -22,6 +22,17 @@ const catalog = 'docs/contributing/journeys/core.md';
 /** The names that a plain value may use: the consts of the test so far. */
 export type Names = { has: (name: string) => boolean };
 
+/**
+ * The only modules a core journey may import, by exact path, so `..` in a
+ * path cannot leave the journey kit. `test` must come from @playwright/test.
+ */
+export const allowedModules = new Set([
+  '@playwright/test',
+  '@repo/journeys/testing/outcome',
+  '@repo/journeys/testing/a11y',
+  '@repo/journeys/testing/visual',
+]);
+
 /** The members that a page step may chain: locators, then one action. */
 const chain = new Set([
   'getByRole',
@@ -225,6 +236,38 @@ function testBody(node: ts.Statement) {
   return onlyPage ? fn.body : null;
 }
 
+/**
+ * Whether an import is one that a core journey may have: named imports from
+ * an allowed module by exact path, with `test` only from @playwright/test. It
+ * adds each journey kit helper to `kit`. A side-effect, default or namespace
+ * import runs or hides code that no rule reads.
+ */
+function importAllowed(statement: ts.ImportDeclaration, kit: Set<string>) {
+  const from = ts.isStringLiteral(statement.moduleSpecifier) ? statement.moduleSpecifier.text : '';
+  const clause = statement.importClause;
+  const bindings = clause?.namedBindings;
+  if (
+    !allowedModules.has(from) ||
+    !clause ||
+    clause.name ||
+    !bindings ||
+    !ts.isNamedImports(bindings)
+  ) {
+    return false;
+  }
+  if (from === '@playwright/test') {
+    return bindings.elements.every(
+      (item) => item.name.text === 'test' && (item.propertyName ?? item.name).text === 'test',
+    );
+  }
+  for (const item of bindings.elements) {
+    if (item.name.text !== 'outcomes') {
+      kit.add(item.name.text);
+    }
+  }
+  return true;
+}
+
 /** The lines of a web `Core:` journey that the allow list does not take. */
 export function allowProblems(file: string, source: ts.SourceFile): Array<string> {
   const kit = new Set<string>();
@@ -233,16 +276,8 @@ export function allowProblems(file: string, source: ts.SourceFile): Array<string
     source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
   for (const statement of source.statements) {
     if (ts.isImportDeclaration(statement)) {
-      const from = ts.isStringLiteral(statement.moduleSpecifier)
-        ? statement.moduleSpecifier.text
-        : '';
-      const bindings = statement.importClause?.namedBindings;
-      if (from.startsWith('@repo/journeys/testing/') && bindings && ts.isNamedImports(bindings)) {
-        for (const item of bindings.elements) {
-          if (item.name.text !== 'outcomes') {
-            kit.add(item.name.text);
-          }
-        }
+      if (!importAllowed(statement, kit)) {
+        lines.push(line(statement));
       }
       continue;
     }

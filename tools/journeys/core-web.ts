@@ -1,4 +1,4 @@
-import { allowProblems, pageStep } from '@tools/journeys/core-allow';
+import { allowProblems, allowedModules, pageStep } from '@tools/journeys/core-allow';
 import type { Names } from '@tools/journeys/core-allow';
 import ts from 'typescript';
 
@@ -169,8 +169,7 @@ function boundAsOutcome(node: ts.Node) {
 function nodeProblems(file: string, node: ts.Node): Array<string> {
   if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
     const from = node.moduleSpecifier.text;
-    const allowed = from === '@playwright/test' || from.startsWith('@repo/journeys/testing/');
-    return allowed ? [] : [message.imports(file, from)];
+    return allowedModules.has(from) ? [] : [message.imports(file, from)];
   }
   if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
     return [message.escapes(file)];
