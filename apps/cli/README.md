@@ -794,6 +794,11 @@ mise exec -- bun run clutch doctor --phase P1
   `.github/rulesets/`, or does not exist. See [Ruleset](#ruleset).
 - `coreJourneys` adopts a core journey, and no journey in
   `features/*/journeys/` has its `Core:` line.
+- `coreJourneys` adopts core journeys, and `budgets` lacks `layoutShift`,
+  `timeToValue`, or `clicks` for an adopted one: `budget missing`.
+- Kickoff is done (no `KICKOFF.md`), a feature has screens
+  (`features/*/screens`), and `clutch.yaml` has no `coreJourneys`:
+  `core journeys unrecorded`.
 
 A remote rule that is unknown never fails the gate. When a capability's files
 pass and only its remote rules are left, it is unknown without `--remote`, so
