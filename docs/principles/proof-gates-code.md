@@ -22,7 +22,7 @@ already written down.
 The owner stops for three things only:
 
 1. **Hand testing.** A new feature or screen that the issue marks with
-   `Hand test: yes` at scoping. The owner tests it after it deploys, so the
+   `hand_test: yes` at scoping. The owner tests it after it deploys, so the
    merge does not wait.
 2. **A destructive migration.** SQL that drops, empties, deletes or retypes
    stored data, or a move to a new system that the issue names at scoping.

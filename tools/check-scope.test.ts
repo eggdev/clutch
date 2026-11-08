@@ -1,0 +1,55 @@
+import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+import { checkScope } from '@tools/check-scope';
+
+let root = '';
+
+function git(...args: Array<string>) {
+  const run = Bun.spawnSync(['git', '-C', root, ...args]);
+  if (run.exitCode !== 0) {
+    throw new Error(run.stderr.toString());
+  }
+  return run.stdout.toString().trim();
+}
+
+async function write(file: string, content: string) {
+  await mkdir(path.join(root, path.dirname(file)), { recursive: true });
+  await writeFile(path.join(root, file), content);
+}
+
+beforeEach(async () => {
+  root = await mkdtemp(path.join(tmpdir(), 'scope-'));
+  git('init', '-q', '-b', 'main');
+  git('config', 'user.email', 'test@example.com');
+  git('config', 'user.name', 'Test');
+  await write('a.txt', 'one\n');
+  git('add', '-A');
+  git('commit', '-qm', 'base');
+});
+afterEach(() => rm(root, { recursive: true, force: true }));
+
+const limits = { max: 5, exclude: ['gen/**'] };
+
+test('a change over the limit fails, and excluded files do not count', async () => {
+  await write('b.txt', 'x\n'.repeat(6));
+  await write('gen/c.txt', 'x\n'.repeat(50));
+  git('add', '-A');
+  expect(checkScope(root, 'HEAD', limits)).toEqual([
+    'The PR changes 6 lines, over the limit of 5. Split it.',
+  ]);
+  git('rm', '-q', '--cached', 'b.txt');
+  await rm(path.join(root, 'b.txt'));
+  expect(checkScope(root, 'HEAD', limits)).toEqual([]);
+});
+
+test('a new screen needs an issue that states hand_test', async () => {
+  await write('features/a/screens/x.tsx', 'x\n');
+  git('add', '-A');
+  expect(checkScope(root, 'HEAD', limits)[0]).toContain('hand_test');
+  await write('.clutch/issues/CL-1.md', '---\nhand_test: no\n---\n');
+  git('add', '-A');
+  expect(checkScope(root, 'HEAD', limits)).toEqual([]);
+});

@@ -71,9 +71,10 @@ automerge:
 # code scanning takes results and Semgrep elsewhere. This repository is public, so auto runs
 # CodeQL. Kickoff asks each project. See docs/contributing/capabilities/codeql-sast.md.
 sast: auto
-# When clutch labels warns about a large PR. Size never fails one (CL-401).
+# When clutch labels warns about a large PR, and when a PR must split (tools/check-scope.ts).
 pr_size:
   warn: 300
+  max: 1000
   exclude: []
 # clutch worktree new --check runs check in the new checkout after the setup.
 worktree:
