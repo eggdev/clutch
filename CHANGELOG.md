@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.64.0 (2026-11-08)
+
+### Features
+
+- Fail a journeys run that tests nothing when a feature ships a screen.
+
 ## 0.63.0 (2026-11-08)
 
 ### Features
