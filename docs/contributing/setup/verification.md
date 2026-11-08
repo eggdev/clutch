@@ -158,8 +158,10 @@ names it, as `apps/app`. Without the key, it is the one app under `apps/` with
 an Nx `dev` target, not tagged `platform:server` or `platform:native`. Several
 such apps without the key fail the run.
 
-When no web journey exists, `--all` exits 0 and says so: a `No journey ran`
-warning in the run, and a line in the step summary. The check passes so a
+When a feature ships a screen and no journey ran, `--all` exits 1 and names the
+feature. When no feature ships a screen and no web journey exists, `--all` exits 0 and
+says so. It gives a `No journey ran` warning in the run, and a line in the step
+summary. The check passes so a
 project before its first journey can merge, but it tests nothing.
 
 `--production <url>` runs only the core journeys, against that URL. `tools/deploy.ts`

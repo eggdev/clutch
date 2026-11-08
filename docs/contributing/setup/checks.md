@@ -103,6 +103,7 @@ tests the workflow and dependency checks.
 | `check-workflow-lint`        | actionlint errors, shellcheck findings in `run:` scripts, and zizmor findings of medium severity or higher                                                                                                                                                                                                                                                                              |
 | `check-flaky-tests`          | A quarantined test that is expired, more than 30 days out, missing from its file, or tied to a done issue                                                                                                                                                                                                                                                                               |
 | `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)                                                                                                                                                                                                                                                                                                    |
+| `check-scope`                | A PR over `pr_size.max` lines, or one that adds a screen with no stated `hand_test`.                                                                                                                                                                                                                                                                                                    |
 | `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md)                                                                                                                                                                                                                                                                                      |
 | `check-guardrail-coverage`   | A file that a check, a lint plugin or a hook reads, with no pattern in `tools/guardrail-files.json`. See [guardrail files](../harness-engineering.md#guardrail-files)                                                                                                                                                                                                                   |
 | `check-transaction-safe`     | A service that marks itself transaction-safe when `primitives.yaml` does not list it. See [server](../architecture/server.md#services-in-a-server-change)                                                                                                                                                                                                                               |
@@ -273,7 +274,7 @@ The [Labels workflow](../../../.github/workflows/labels.yml) runs `clutch labels
 on each PR. It sets `kind/<type>` from the title and `area/<part>` for each
 workspace package or top folder the PR touches. It also sets `size/S` to
 `size/XL` by the changed lines. Above `pr_size.warn` in `clutch.yaml` the run
-warns. Size never fails a PR. See
+warns. Above `pr_size.max`, `check-scope` fails the PR, so it splits. See
 [labels](../agent-review.md#labels).
 
 <!-- kickoff: The globs of the project's payment and billing code, as the paths of the billing rule in .clutch/risk.yaml. Leave the list empty when the product bills nothing. -->
@@ -282,8 +283,8 @@ warns. Size never fails a PR. See
 
 The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
 `bun run pr merge <number>` dispatches it from the session that built the PR.
-It also runs when the owner approves a head, and when CI completes on a
-`revert/` or bot PR, which no session owns. No schedule starts it. It judges a pull request of this repository,
+It also runs when the owner approves a head, and when CI completes on an agent's
+`clutch/` PR, a `revert/` PR or a bot PR. No schedule starts it. It judges a pull request of this repository,
 never a fork's, and logs a person's as not judged.
 An agent's PR is one that a bot opens. A bot's PR is on a `renovate/`,
 `gardening/`, `clutch-sync/` or `revert/` branch. It acts on `automerge.mode`
