@@ -525,8 +525,6 @@ sast: auto # optional: auto (the default), codeql or semgrep
 pr_size: # optional
   warn: 300 # the default: clutch labels warns above it, and never fails
   exclude: [] # globs whose lines do not count, such as generated code
-agentReview: # optional
-  missingCredential: notice # notice (the default) or fail
 factory: # optional
   root: factory # the default: the folder of the factory tree. . is the project root
 journeys: # optional: set webApp, inbox or both
@@ -560,10 +558,6 @@ Auto-revert workflow only. A project with a live deploy lists its deploy job, so
 a failed health check still reverts the PR that broke it. The default is an
 empty list. Auto-merge and the red-main metric judge main by the required checks
 alone. See [rollback](../../docs/contributing/operations/rollback.md#auto-revert).
-
-`agentReview.missingCredential` tells `agent-review.yml` what to do without an
-Anthropic credential: pass with a notice, or fail. Set `fail` once
-`agent-review` is a required check. See [agent review](../../docs/contributing/agent-review.md).
 
 `journeys.webApp` names the app that `bun run journey` drives in a browser. Set
 it when a repository has more than one app with a web entry, which is an Nx

@@ -29,8 +29,7 @@
           { "context": "journeys", "integration_id": 15368 },
           { "context": "secrets", "integration_id": 15368 },
           { "context": "commits", "integration_id": 15368 },
-          { "context": "sast", "integration_id": 15368 },
-          { "context": "agent-review", "integration_id": 15368 }
+          { "context": "sast", "integration_id": 15368 }
         ]
       }
     }
