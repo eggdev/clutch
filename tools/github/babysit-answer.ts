@@ -61,6 +61,9 @@ export type Context = {
   plan: Plan;
   answers: Array<Answer>;
   pushed: string | null;
+
+  /** What the owner answered in the session's thread, when this round records it. */
+  ownerSaid?: string;
 };
 
 export const unanswered = 'the agent gave no decision';
@@ -137,12 +140,15 @@ export async function answerThreads({ run, repo, plan, answers, pushed }: Contex
   return items;
 }
 
-/** Resolves each thread left for the owner, once the owner approves the head. */
-export async function closeApproved({ run, repo, plan }: Context) {
+/** Resolves each thread left for the owner, once the owner approves the head or answers. */
+export async function closeApproved({ run, repo, plan, ownerSaid }: Context) {
   const items: Array<Item> = [];
   for (const thread of plan.approvedThreads ?? []) {
     const first = thread.comments[0];
-    const body = `The owner approved \`${plan.head.slice(0, 7)}\`, which answers this.\n\n${replyMarker}`;
+    const said = ownerSaid
+      ? `The owner answered in the session's thread: ${ownerSaid}`
+      : `The owner approved \`${plan.head.slice(0, 7)}\`, which answers this.`;
+    const body = `${said}\n\n${replyMarker}`;
     await must(run, [
       'gh',
       'api',
@@ -168,8 +174,8 @@ export async function closeApproved({ run, repo, plan }: Context) {
       path: thread.path,
       finding: firstLine(first?.body),
       decision: 'owner',
-      reason: 'the owner approved the head',
-      action: 'resolved by the approval',
+      reason: ownerSaid ? 'the owner answered in the thread' : 'the owner approved the head',
+      action: ownerSaid ? 'resolved by the answer' : 'resolved by the approval',
       resolved: true,
     });
   }

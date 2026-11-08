@@ -46,7 +46,7 @@ export const usage = [
   '       bun run pr wait <number> [--timeout 30m] [--json]',
   '       bun run pr failures <number>',
   '       bun run pr findings <number> [--check]',
-  '       bun run pr babysit <number> [--answers FILE [--pushed SHA] [--sync merge] | --stuck TEXT]',
+  '       bun run pr babysit <number> [--answers FILE [--pushed SHA] [--sync merge] | --stuck TEXT | --owner-said TEXT]',
   '       bun run pr sync <number | branch | CL-id>',
   '       bun run pr ready <CL-id> <number>',
   '       bun run pr merge <number> [--owner] [--timeout 30m]',
@@ -294,6 +294,7 @@ export async function runPr(
       pushed: { type: 'string' },
       sync: { type: 'string' },
       stuck: { type: 'string' },
+      'owner-said': { type: 'string' },
     },
   });
   if (values.help) {

@@ -122,8 +122,8 @@ for users, give your pick, and invite the owner to say what to change. The answe
 thread. When no person can answer there, use `bun run pr ask`, and read the
 owner's reply on that issue.
 
-Do not ask again before the answer arrives.
-Continue other work while it waits.
+Do not ask again before the answer arrives. Finish other work before you ask,
+because the question tool holds the turn.
 
 ## Related
 

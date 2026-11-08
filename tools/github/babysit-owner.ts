@@ -60,8 +60,19 @@ export async function ownerLeft(run: Run, repo: string, owner: string, number: n
     next.threads.length > 0 ||
     next.comments.length > 0 ||
     state.log.rounds.at(-1)?.outcome === 'stuck';
-  const waitingOwner = state.log.rounds.at(-1)?.outcome === 'waiting-owner';
-  return onlyOwnerLeft(status, state.approved, workLeft, waitingOwner);
+  // A round on an older head was already asked about, so a new head does not ask again.
+  const last = state.log.rounds.at(-1);
+  const waiting =
+    last?.head === state.head
+      ? last.items.filter(
+          (item) => item.decision === 'owner' && !item.resolved && item.reason !== unanswered,
+        )
+      : [];
+  if (!onlyOwnerLeft(status, state.approved, workLeft, waiting.length > 0)) {
+    return null;
+  }
+  const held = !status.ready && status.mergeState === 'BLOCKED';
+  return { held, refs: waiting.map((item) => item.ref) };
 }
 
 /** How a round tells the session to reach the owner. */
@@ -74,16 +85,23 @@ export function ownerAsk(input: {
   number: string;
   head: string;
   stuck: boolean;
-  left: boolean;
+  left: { held: boolean; refs: Array<string> } | null;
   now: ReadonlyArray<Pick<Item, 'ref'>>;
 }) {
   if (input.stuck) {
     return { key: `${input.head} stuck`, text: `${askInThread}.` };
   }
-  if (input.left) {
+  if (input.left?.held) {
     return {
       key: input.head,
       text: `Only the owner is left. ${askInThread}, with this approve link: https://github.com/${input.repo}/pull/${input.number}/files`,
+    };
+  }
+  if (input.left) {
+    const refs = input.left.refs.join(', ');
+    return {
+      key: `${input.head} ${refs}`,
+      text: `${refs} wait for the owner. ${askInThread}. Then record the answer: \`bun run pr babysit ${input.number} --owner-said "<answer>"\`.`,
     };
   }
   if (input.now.length > 0) {

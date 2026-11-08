@@ -320,6 +320,7 @@ test("the owner's approval answers the threads left for the owner, with no model
   const next = plan(state({ threads: [left], approved: true }), now);
   expect(next.triggers).toEqual(['owner-approved']);
   expect(next.approvedThreads.map((t) => t.id)).toEqual(['T9']);
+  expect(next.ownerThreads.map((t) => t.id)).toEqual(['T9']);
   expect(next.threads).toEqual([]);
 });
 

@@ -22,8 +22,8 @@ Before asking anything: reuse a settled decision; look up observable facts;
 choose reversible implementation details yourself. Ask only an unresolved product,
 access, cost or retention decision that blocks the task. The owner decides the
 product and proof decides the code: see
-[proof gates code](../../../docs/principles/proof-gates-code.md). Continue independent
-work while that answer is pending. Do not ask for approval of routine next steps.
+[proof gates code](../../../docs/principles/proof-gates-code.md). Finish independent
+work before you ask, because the question holds the turn. Do not ask for approval of routine next steps.
 
 ### Ask the owner
 
@@ -50,6 +50,8 @@ A keeps 3 clicks. B stops a typo before the account exists.
 A, because the budget is the product's promise.
 ```
 
+An approval ask uses the same form. The options are approve and hold.
+
 The owner stops at most 2 times a day. Put a question that can wait into the
 next stop, and ask once for each PR head. A lane does not ask. It puts the
 question at the end of its reply, and the coordinator asks once.
@@ -60,7 +62,10 @@ open one issue in the same form:
 labels the issue `needs-owner` and assigns the owner. It refuses a section with
 no text. Read the answer on the issue, and close it with `gh issue close <n>`.
 
-After the owner answers, write the answer into the issue or project intent, so
+After the owner answers, record it on the PR with
+`mise exec -- bun run pr babysit <n> --owner-said "<answer>"`, after the plan
+step. It replies in each thread left for the owner and resolves it. A blocking
+finding stays open. Then write the answer into the issue or project intent, so
 no agent asks again. Then merge on proof. A held path still needs the owner's
 approval, so give the approve link in the thread: the PR's URL plus `/files`. A push that changes
 the diff drops the approval. When the owner approved as well, do not push the

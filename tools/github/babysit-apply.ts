@@ -135,6 +135,7 @@ export async function apply(
     event: string;
     runUrl: string;
     now: string;
+    ownerSaid?: string;
   },
 ) {
   const context: Context = {
@@ -143,6 +144,7 @@ export async function apply(
     plan: input.plan,
     answers: afterApproval(input.answers, input.plan.approved),
     pushed: input.pushed,
+    ownerSaid: input.ownerSaid,
   };
   const items = [
     ...(await answerThreads(context)),

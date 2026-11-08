@@ -55,6 +55,8 @@ export type Plan = {
   comments: Array<Comment>;
   /** Threads left for the owner that the owner's approval of this head now answers. They need no model. */
   approvedThreads: Array<Thread>;
+  /** Threads left for the owner that their answer in the session's thread can close. */
+  ownerThreads: Array<Thread>;
   /** Why no round runs, when none does. */
   skip: string | null;
   /** True when the caps stop a round that has work. The workflow marks the PR stuck. */
@@ -81,9 +83,10 @@ export function plan(state: PrState, now: string): Plan {
   const threads = state.threads.filter((t) => !answeredByBabysitter(t.comments.at(-1)?.body ?? ''));
   // The owner's approval of the head answers each thread the babysitter left for the owner.
   // A blocking finding is never answered by the approval: only a fix closes it.
-  const approvedThreads = state.approved
-    ? state.threads.filter((t) => !threads.includes(t) && !isBlocking(t.comments[0]?.body))
-    : [];
+  const ownerThreads = state.threads.filter(
+    (t) => !threads.includes(t) && !isBlocking(t.comments[0]?.body),
+  );
+  const approvedThreads = state.approved ? ownerThreads : [];
   const comments = state.comments.filter(
     (c) =>
       !answered.has(c.id) && !answeredByBabysitter(c.body) && !machine.some((m) => m.test(c.body)),
@@ -114,6 +117,7 @@ export function plan(state: PrState, now: string): Plan {
     threads,
     comments,
     approvedThreads,
+    ownerThreads,
   } as const;
   const skip = (reason: string, stuck = false): Plan => ({ ...base, skip: reason, stuck });
   if (!state.open || state.draft) {

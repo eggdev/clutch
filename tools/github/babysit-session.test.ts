@@ -39,6 +39,7 @@ test('the session asks the owner once for each head', async () => {
     expect(await firstAsk(plan, '7', 'h3ad')).toBe(false);
     expect(await firstAsk(plan, '8', 'h3ad')).toBe(true);
     expect(await firstAsk(plan, '7', 'n3wer')).toBe(true);
+    expect(await firstAsk(plan, '7', 'h3ad')).toBe(false);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

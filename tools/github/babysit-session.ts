@@ -43,9 +43,13 @@ async function context(run: Run, number: string) {
  */
 export async function firstAsk(planFile: string, number: string, key: string) {
   const file = path.join(path.dirname(planFile), `asked-${number}.txt`);
-  const asked = await readFile(file, 'utf-8').catch(() => '');
-  await writeFile(file, key);
-  return asked.trim() !== key;
+  const text = await readFile(file, 'utf-8').catch(() => '');
+  const asked = text.split('\n').filter(Boolean);
+  if (asked.includes(key)) {
+    return false;
+  }
+  await writeFile(file, [...asked, key].join('\n'));
+  return true;
 }
 
 /** Prints an ask the first time, and tells a later round not to repeat it. */
@@ -55,7 +59,7 @@ async function askOnce(file: string, number: string, ask: ReturnType<typeof owne
   }
   return (await firstAsk(file, number, ask.key))
     ? ` ${ask.text}`
-    : ' A round on this head already printed this ask. Ask only if no session has asked yet.';
+    : ` Already printed on this head, so ask only if this session has not: ${ask.text}`;
 }
 
 /** Plans the round for PR `number`, prints it, and keeps it for the apply step. */
@@ -65,7 +69,7 @@ async function babysitPlan(run: Run, number: string, now: string) {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, JSON.stringify(next, null, 1));
   console.log(JSON.stringify(next, null, 1));
-  const left = next.skip === nothingToDo && (await ownerLeft(run, repo, owner, Number(number)));
+  const left = next.skip === nothingToDo ? await ownerLeft(run, repo, owner, Number(number)) : null;
   const ask = await askOnce(
     file,
     number,
@@ -83,7 +87,14 @@ async function babysitPlan(run: Run, number: string, now: string) {
 async function babysitApply(
   run: Run,
   number: string,
-  input: { answers?: string; pushed?: string; sync?: string; stuck?: string; now: string },
+  input: {
+    answers?: string;
+    pushed?: string;
+    sync?: string;
+    stuck?: string;
+    'owner-said'?: string;
+    now: string;
+  },
 ) {
   const { repo, owner, file } = await context(run, number);
   const kept = JSON.parse(await readFile(file, 'utf-8').catch(() => 'null')) as Plan | null;
@@ -109,13 +120,13 @@ async function babysitApply(
     const ask = await askOnce(
       file,
       number,
-      ownerAsk({ repo, number, head: kept.head, stuck: true, left: false, now: [] }),
+      ownerAsk({ repo, number, head: kept.head, stuck: true, left: null, now: [] }),
     );
     console.log(`#${number}: stuck. ${input.stuck}${ask}`);
     return 1;
   }
   // The plan's caps hold the apply step too: a skipped round only logs as stuck.
-  if (kept.skip) {
+  if (kept.skip && !input['owner-said']) {
     throw new Error(
       `No round for #${number}: ${kept.skip}. Log it with \`bun run pr babysit ${number} --stuck "<why>"\`.`,
     );
@@ -124,10 +135,15 @@ async function babysitApply(
     ? ((JSON.parse(await readFile(input.answers, 'utf-8')) as { items?: Array<Answer> }).items ??
       [])
     : [];
+  // An owner's answer closes only what was left for them. Other work has its own round.
+  const planned = input['owner-said']
+    ? { ...kept, threads: [], comments: [], failed: [], approvedThreads: kept.ownerThreads }
+    : kept;
   const round = await apply(run, {
     repo,
     owner,
-    plan: kept,
+    plan: planned,
+    ownerSaid: input['owner-said'],
     answers,
     pushed: input.pushed ?? null,
     sync,
@@ -145,7 +161,7 @@ async function babysitApply(
       number,
       head: kept.head,
       stuck,
-      left: !stuck && (await ownerLeft(run, repo, owner, kept.number)),
+      left: stuck ? null : await ownerLeft(run, repo, owner, kept.number),
       now: decisionsNow(round.items),
     }),
   );
@@ -157,9 +173,16 @@ async function babysitApply(
 export function babysit(
   run: Run,
   number: string,
-  input: { answers?: string; pushed?: string; sync?: string; stuck?: string; now: string },
+  input: {
+    answers?: string;
+    pushed?: string;
+    sync?: string;
+    stuck?: string;
+    'owner-said'?: string;
+    now: string;
+  },
 ) {
-  return input.answers || input.stuck
+  return input.answers || input.stuck || input['owner-said']
     ? babysitApply(run, number, input)
     : babysitPlan(run, number, input.now);
 }
