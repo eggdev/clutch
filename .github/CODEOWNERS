@@ -21,6 +21,7 @@
 /tools/github/auto-merge-enable.ts @eggdev
 /tools/github/auto-merge-rules.ts @eggdev
 /tools/github/bot-rule.ts @eggdev
+/tools/github/weaker-journeys.ts @eggdev
 /.github/workflows/auto-merge.yml @eggdev
 /.github/workflows/agent-review.yml @eggdev
 /docs/contributing/review.md @eggdev

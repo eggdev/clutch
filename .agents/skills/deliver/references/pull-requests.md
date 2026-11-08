@@ -85,15 +85,15 @@ Two kinds of PR wait for the owner without a GitHub approval rule:
 - A rule with `lines`, such as a workflow's `permissions:` or the `automerge`
   section of `clutch.yaml`. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
-- A PR with an `owner` finding from agent review. Auto-merge holds it, except
-  a pure Clutch sync whose findings are approved upstream (see
-  [Auto-merge](#auto-merge)).
+- A PR that weakens a journey or a budget. Auto-merge holds it, by the
+  comparison in `tools/github/weaker-journeys.ts`.
 
-Do not merge either kind with `pr merge` until the owner says so. `pr status` counts the `owner` findings and reports such a PR as not ready. `pr merge` refuses it until the owner approves it.
+Do not merge either kind with `pr merge` until the owner says so. A model
+finding holds neither `pr status` nor `pr merge`. The session still answers it.
 
 The owner's approval is the last step. When `automerge.owner` in `clutch.yaml`
 approves the head commit, an `on` run of Auto-merge passes an agent PR at any
-tier, and drops agent review's `owner` findings. The bot rule still holds a bot
+tier, and lifts a weaker journey. The bot rule still holds a bot
 PR, and a PR that a person opened is still refused. The required checks, a
 draft, the base branch and a red `main` still hold any PR. The session that
 watches the PR sees the approval and runs `bun run pr merge` again. A later
@@ -245,8 +245,7 @@ it. The check gives the message that names the reviewer.
 line in its `## Review disposition` comment. See
 [answer each finding](#answer-each-finding).
 
-`merge` accepts the owner's approval of the current head as the answer to the
-owner findings. The owner is `automerge.owner` in `clutch.yaml`, else the
+The owner is `automerge.owner` in `clutch.yaml`, else the
 default owner in `.github/CODEOWNERS`. A dismissed approval, or one on an older
 commit, does not count, and neither does another login's approval.
 
@@ -304,7 +303,7 @@ takes the PRs of the steps before it:
 | -------- | --------------------------------------------------------------------------------------------- |
 | `bots`   | Bot PRs that pass the bot rule, and the revert PRs below.                                     |
 | `low`    | Also agent PRs that `clutch risk` gives `low`.                                                |
-| `medium` | Also agent PRs that it gives `medium`. Agent review passed, so they have 0 blocking findings. |
+| `medium` | Also agent PRs that it gives `medium`. |
 
 The revert rule: a `revert/<number>` PR, which the Revert workflow opens, merges
 at every step. It merges when auto-merge merged PR `<number>` and the revert's
@@ -330,9 +329,6 @@ The bot rule:
   `add_on_sync` entry, such as the factory tree. The bot rule does not accept
   that file yet (CL-518), so a person merges that PR. The `clutch / doctor` check, which the project's CI
   runs and no ruleset requires, proves that the managed files match the release.
-  When it succeeds on the head, its `owner` findings are approved upstream and
-  hold nothing, as [decision 0003](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md)
-  records. The verdict still lists them.
 
 At each step, the PR also needs all of these:
 
@@ -344,11 +340,8 @@ At each step, the PR also needs all of these:
   from another app or token counts for nothing.
 - No required check is red on the default branch's latest commit. A red
   `main` stops every auto-merge until it is green again, except a revert PR.
-- Agent review left no `owner` finding on its head, unless the PR is a pure
-  Clutch sync, as above. A change to the hard core gets one, and so does a
-  change that weakens a check that gates the merge, whatever its path. See
-  [owner findings](../../../../docs/contributing/review.md#owner-findings). The
-  owner merges such a PR.
+- The PR weakens no journey or budget, by the comparison in
+  `tools/github/weaker-journeys.ts`. The owner's approval of the head lifts this.
 
 The workflow runs only from the default branch, with the default branch's
 rules, so a PR cannot change the rules that judge it. It refuses a fork's PR,

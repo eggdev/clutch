@@ -11,10 +11,13 @@ const oneWayDoor: [string, { out: string }] = [
 ];
 
 test("the owner's approval of the head lifts the tier and the owner findings, and nothing else", () => {
-  const held = facts({ tier: 'one-way-door', ownerFindings: ['It adds a migration.'] });
+  const held = facts({
+    tier: 'one-way-door',
+    weakerJourneys: ['x.pw.ts: it no longer proves the outcome `paid`.'],
+  });
   expect(blockers(held, 'medium')).toEqual([
     'The risk tier is one-way-door, not low or medium.',
-    'Agent review asks the owner: It adds a migration.',
+    'A journey gets weaker, so the owner decides: x.pw.ts: it no longer proves the outcome `paid`.',
   ]);
   expect(blockers({ ...held, ownerApproved: true }, 'bots')).toEqual([]);
   expect(
@@ -35,7 +38,7 @@ test("the owner's approval of the head lifts the tier and the owner findings, an
   expect(blockers(facts({ ownerApproved: true }, { isDraft: true }), 'medium')).toEqual([
     'The pull request is a draft.',
   ]);
-  expect(verdictText([], 'medium', [], true)).toBe(
+  expect(verdictText([], 'medium', true)).toBe(
     'Would auto-merge at the step medium. The owner approved this head.',
   );
 });

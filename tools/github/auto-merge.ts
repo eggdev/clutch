@@ -15,7 +15,6 @@ import {
   noVerdictYet,
   revertProblems,
   steps,
-  upstreamFindings,
   verdictText,
 } from '@tools/github/auto-merge-rules';
 import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rules';
@@ -47,9 +46,6 @@ const root = path.resolve(import.meta.dir, '../..');
 
 /** The check that agent review reports. It joins the required checks of the default branch. */
 const agentReview = 'agent-review';
-
-/** The check that a project's CI runs for Clutch: `clutch doctor --check`. No ruleset requires it, so the rule reads it. */
-const doctorCheck = 'clutch / doctor';
 
 /** `automerge` in clutch.yaml. A project without it is `off`, and the step defaults to `bots`. */
 export async function readConfig(): Promise<Config> {
@@ -259,21 +255,21 @@ export async function runAutoMerge(
   } else if (bot === 'revert') {
     botProblems = await revertProblems(pr.headRefName, tier, (n) => autoMerged(run, repo, n));
   }
-  const conclusions = await checkConclusions(run, repo, pr.headRefOid, [...names, doctorCheck]);
-  const { [doctorCheck]: doctor, ...checks } = conclusions;
+  const checks = await checkConclusions(run, repo, pr.headRefOid, names);
+  // Loaded here because `pr status` imports this file, and a project's `pr` runs without TypeScript.
+  const { weakerJourneys: weaker } = await import('@tools/github/weaker-journeys');
   const facts: Facts = {
     pr,
     defaultBranch,
     tier,
     checks,
-    doctor,
-    ownerFindings: await ownerFindings(run, repo, pr.headRefOid),
+    weakerJourneys: await weaker(run, defaultBranch, pr.headRefOid),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
     ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),
   };
   const reasons = blockers(facts, step);
-  const verdict = verdictText(reasons, step, upstreamFindings(facts), facts.ownerApproved);
+  const verdict = verdictText(reasons, step, facts.ownerApproved);
   if (mode === 'on' && reasons.length === 0) {
     if (handoff) {
       await handoff(step);
