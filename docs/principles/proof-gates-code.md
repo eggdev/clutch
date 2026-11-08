@@ -51,8 +51,8 @@ Every PR runs the core journeys, whatever its risk tier. A cache change in an
 app can break sign-in as surely as a change to auth.
 
 Each sensitive path in `.clutch/risk.yaml` also names the journeys that prove
-it. Sensitive paths include auth, billing, roles and access, migrations,
-credentials and the merge gate. A change to a sensitive path merges when:
+it. Sensitive paths include auth, billing, roles and access, a migration that
+can lose data, credentials and the merge gate. A change to a sensitive path merges when:
 
 1. each journey that its paths name passes on the PR head, on each platform
    that the change reaches

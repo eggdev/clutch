@@ -84,6 +84,7 @@ test('policy docs are low', async () => {
     'docs/contributing/review.md',
     'docs/contributing/decisions/0001-a.md',
     'docs/principles/fail-loudly.md',
+    '.clutch/PLAN.md',
   ]) {
     expect(await tierOf([file])).toBe('low');
   }

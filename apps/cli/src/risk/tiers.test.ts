@@ -134,6 +134,7 @@ test("this repository's risk file holds only a migration that can lose data", ()
     'ALTER TABLE "a" DROP COLUMN "b";',
     'ALTER TABLE "a" DROP "b";',
     'TRUNCATE "a";',
+    'UPDATE "a" SET "b" = NULL;',
     'DELETE FROM "a";',
     'ALTER TABLE "a" ALTER COLUMN "b" SET DATA TYPE integer;',
     'ALTER TABLE "a" ALTER COLUMN "b" TYPE integer;',

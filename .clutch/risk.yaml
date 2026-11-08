@@ -65,6 +65,7 @@ rules:
       - '\bdrop\s+(table|column|schema|database)\b'
       - '\balter\s+table\b.*\bdrop\s+(?!constraint\b|default\b|not\s+null\b)'
       - '\btruncate\b'
+      - '\bupdate\s+\S+\s+set\b'
       - '\bdelete\s+from\b'
       - '\balter\s+(column\s+)?\S+\s+(set\s+data\s+)?type\b'
       - '^\s*drop\s+(?!constraint\b|default\b|not\s+null\b|index\b)'
