@@ -1,6 +1,6 @@
 # 0003: A pure Clutch sync takes owner findings as approved upstream
 
-- **Status:** accepted
+- **Status:** superseded on 2026-11-08 by CL-455: no model finding holds a merge, so a sync needs no exemption
 - **Date:** 2026-11-03
 
 ## Context
