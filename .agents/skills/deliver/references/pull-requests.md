@@ -106,7 +106,7 @@ Between open and merge, the session that opened the PR stays with it and runs
 the [babysit-pr](../../babysit-pr/SKILL.md) skill. Each round syncs the PR with
 its base by merge, answers every review thread and comment, fixes what needs a
 fix, resolves each answered thread and keeps a `## Babysit log` comment. The
-main ruleset requires each review thread to be resolved before a merge. No
+open review thread does not hold a merge. No
 workflow or schedule does this for the session. In T3, the session watches the
 PR, and each change to its checks or reviews starts the next round. Elsewhere,
 `pr wait` blocks until the checks finish.
