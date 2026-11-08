@@ -478,11 +478,11 @@ Clutch's own rules follow
   `permissions:`, an environment, a secret, an app token's permissions or a
   privileged trigger. The `automerge` and `agentReview` sections of
   `clutch.yaml`.
-- Auth (`packages/access`, `packages/identity` and any `auth` folder) and
-  migrations.
+- Auth (`packages/access`, `packages/identity` and any `auth` folder), and a
+  migration whose SQL can lose data.
 - A billing rule and an infra, deploy and secrets rule, both empty until a
   project names its paths.
-- Decision records, `docs/principles`, project intent and `.clutch/PLAN.md`.
+- Project intent.
 
 Docs, tests, changesets and tracker files are `low`. Every other path is
 `medium`: product code, skills, check scripts, lint config and workflows.

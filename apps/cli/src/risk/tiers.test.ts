@@ -123,6 +123,8 @@ test("this repository's risk file holds only a migration that can lose data", ()
     'CREATE TABLE "a" ("b" text);',
     'ALTER TABLE "a" DROP CONSTRAINT "b";',
     'ALTER TABLE "a" ALTER COLUMN "b" DROP NOT NULL;',
+    '  DROP CONSTRAINT "b";',
+    'DROP INDEX "b";',
   ]) {
     expect(tierFor(line)).toBe('medium');
   }
@@ -135,6 +137,8 @@ test("this repository's risk file holds only a migration that can lose data", ()
     'DELETE FROM "a";',
     'ALTER TABLE "a" ALTER COLUMN "b" SET DATA TYPE integer;',
     'ALTER TABLE "a" ALTER COLUMN "b" TYPE integer;',
+    'ALTER TABLE "a" ALTER "b" TYPE integer;',
+    '  DROP "b";',
   ]) {
     expect(tierFor(line)).toBe('one-way-door');
   }
