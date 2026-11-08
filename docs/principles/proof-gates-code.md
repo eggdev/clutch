@@ -133,8 +133,8 @@ Each journey proves its outcome as the weakest real user meets it:
 - A model's review finding is advice. The session answers it, and it holds no
   merge.
 - A skipped deploy is red.
-- The core journeys run on production after each deploy. A red run marks the
-  deploy red, and opens a T3 thread for the owner that names the deploy's PRs.
+- The core journeys run on production after each deploy. A second failure marks
+  the deploy red, and opens one `needs-owner` question that names the commit.
 
 ## Example
 

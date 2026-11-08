@@ -84,7 +84,9 @@ Apply these in the phase that owns the work:
   existing project, keep a framework and test runners that work, and record
   each departure from the template stack as a decision record.
 - In a new project, set up PR previews where the host supports them, and a
-  production deploy on merge. In an existing project, keep the deploy pipeline.
+  production deploy on merge. Name its command and URL in `deploy:` of
+  `clutch.yaml`, and add `deploy` to `autoRevert.watch`. In an existing project,
+  keep the deploy pipeline.
   Ask about staging only when a release requirement needs it.
 - Apply the standard API error shape, request context and authorization to the
   chosen surfaces. Fit them to the real access model.
