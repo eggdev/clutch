@@ -85,7 +85,10 @@ const answeredByBabysitter = (body: string) => body.includes(replyMarker);
  * is not here: it asks when the round decides it, and clears when it passes.
  */
 function waitingOwner(state: Pick<PrState, 'log' | 'threads'>) {
-  const open = new Set(state.threads.map((t) => t.id));
+  // Only a fix closes a blocking finding, so it never waits on an answer.
+  const open = new Set(
+    state.threads.filter((t) => !isBlocking(t.comments[0]?.body)).map((t) => t.id),
+  );
   const newest = new Map(
     state.log.rounds.flatMap((round) => round.items).map((item) => [item.ref, item]),
   );
@@ -111,9 +114,7 @@ export function plan(state: PrState, now: string): Plan {
     : [];
   const waiting = waitingOwner(state);
   const waitingRefs = new Set(waiting.map((item) => item.ref));
-  const ownerThreads = state.threads.filter(
-    (t) => waitingRefs.has(t.id) && !isBlocking(t.comments[0]?.body),
-  );
+  const ownerThreads = state.threads.filter((t) => waitingRefs.has(t.id));
   const comments = state.comments.filter(
     (c) =>
       !answered.has(c.id) && !answeredByBabysitter(c.body) && !machine.some((m) => m.test(c.body)),

@@ -18,7 +18,7 @@ const left: Item = {
   author: 'bot',
   commentId: 5,
   path: 'a.ts',
-  finding: 'owner: which copy?',
+  finding: 'note: which copy?',
   decision: 'owner',
   reason: 'a product decision',
   action: 'left for the owner',
@@ -48,7 +48,12 @@ const node = (id: number, body: string) => ({
 });
 
 /** A PR at `head` whose log holds `rounds`, with two threads where the babysitter spoke last. */
-function pr(head: string, rounds: Array<Round>, mergeState: string) {
+function pr(
+  head: string,
+  rounds: Array<Round>,
+  mergeState: string,
+  finding = 'owner: which copy?',
+) {
   let all = emptyLog();
   for (const round of rounds) {
     all = addRound(all, round, []);
@@ -60,7 +65,7 @@ function pr(head: string, rounds: Array<Round>, mergeState: string) {
     isOutdated: false,
     path: 'a.ts',
     line: 1,
-    comments: { nodes: [node(first, 'owner: which copy?'), node(6, `Left.\n\n${replyMarker}`)] },
+    comments: { nodes: [node(first, finding), node(6, `Left.\n\n${replyMarker}`)] },
   });
   const graph = {
     data: {
@@ -117,6 +122,7 @@ test('a decision left on an older head still waits after a push', async () => {
   expect(await leftOn('n3w', [roundOf('0ld', [left])], 'CLEAN')).toEqual({
     held: false,
     refs: ['T1'],
+    approval: false,
   });
 });
 
@@ -132,6 +138,29 @@ test('a named decision never sends the owner to the PR', async () => {
   });
   expect(ask?.text).toContain('T1 wait for the owner');
   expect(ask?.text).not.toContain('/files');
+});
+
+test('an owner finding carries the approve link in the one question', async () => {
+  const finding = { ...left, finding: 'owner: a new hatch.' };
+  const found = await leftOn('h3ad', [roundOf('h3ad', [finding])], 'CLEAN');
+  const ask = ownerAsk({
+    repo: 'a/b',
+    number: '7',
+    head: 'h3ad',
+    stuck: false,
+    left: found,
+    now: [],
+  });
+  expect(ask?.text).toContain('T1 wait for the owner');
+  expect(ask?.text).toContain('https://github.com/a/b/pull/7/files');
+});
+
+test('a blocking finding does not wait on an answer', async () => {
+  const gh = fake(pr('h3ad', [roundOf('h3ad', [left])], 'CLEAN', 'blocking: a real bug.'));
+  const state = await readPr(gh.run, 'a/b', 7, 'eggdev');
+  const next = plan(state, '2026-11-08T11:00:00Z');
+  expect(next.waiting).toEqual([]);
+  expect(next.ownerThreads).toEqual([]);
 });
 
 test('a later round that closes the item stops the ask', async () => {
@@ -203,6 +232,13 @@ test('the owner answer quotes itself in the waiting thread, and resolves it', as
     gh.calls.some((c) => c.includes('comments/5/replies') && c.includes('Keep 3 clicks.')),
   ).toBe(true);
   expect(gh.calls.some((c) => c.includes('resolveReviewThread') && c.includes('T1'))).toBe(true);
+});
+
+test('the owner answer reaches a PR that a cap labelled stuck', async () => {
+  await keep('labelled babysit:stuck');
+  expect(
+    await babysit(session().run, '7', { 'owner-said': 'Yes.', now: '2026-11-08T11:00:00Z' }),
+  ).toBe(0);
 });
 
 test('the owner answer does not reach a PR labelled off', async () => {

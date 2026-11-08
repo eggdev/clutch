@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { nothingToDo, plan } from '@tools/github/babysit';
+import { nothingToDo, plan, stuckLabel } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, writeLog } from '@tools/github/babysit-apply';
@@ -59,7 +59,7 @@ async function askOnce(file: string, number: string, ask: ReturnType<typeof owne
   }
   return (await firstAsk(file, number, ask.key))
     ? ` ${ask.text}`
-    : ` Already printed on this head, so ask only if this session has not: ${ask.text}`;
+    : ` Already printed, so ask only if this session has not: ${ask.text}`;
 }
 
 /** Plans the round for PR `number`, prints it, and keeps it for the apply step. */
@@ -81,6 +81,11 @@ async function babysitPlan(run: Run, number: string, now: string) {
       : `Plan kept in ${file}. Decide each item, fix, validate and push, then run \`bun run pr babysit ${number} --answers <file>\`.`,
   );
   return 0;
+}
+
+/** The owner's answer gets past no work, a cap or a stuck label, and no other skip. */
+function ownerMayAnswer(kept: Plan) {
+  return kept.skip === nothingToDo || kept.skip === `labelled ${stuckLabel}` || kept.stuck;
 }
 
 /** Applies the session's answers to the kept plan, then says whether the owner is needed. */
@@ -126,8 +131,7 @@ async function babysitApply(
     return 1;
   }
   // The plan's caps hold the apply step too: a skipped round only logs as stuck.
-  // The owner's answer gets past "nothing to do" and a cap, and no other skip.
-  if (kept.skip && !(input['owner-said'] && (kept.skip === nothingToDo || kept.stuck))) {
+  if (kept.skip && !(input['owner-said'] && ownerMayAnswer(kept))) {
     throw new Error(
       `No round for #${number}: ${kept.skip}. Log it with \`bun run pr babysit ${number} --stuck "<why>"\`.`,
     );

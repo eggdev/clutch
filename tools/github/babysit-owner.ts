@@ -3,6 +3,7 @@ import { blockingOnlyFix } from '@tools/github/babysit-answer';
 import { unanswered } from '@tools/github/babysit-log';
 import type { Item } from '@tools/github/babysit-log';
 import { readPr } from '@tools/github/babysit-read';
+import { levelOf } from '@tools/github/findings';
 import type { Run } from '@tools/github/stack';
 import { prStatus } from '@tools/github/status';
 import type { PrStatus } from '@tools/github/status';
@@ -65,7 +66,12 @@ export async function ownerLeft(run: Run, repo: string, owner: string, number: n
     return null;
   }
   const held = !status.ready && status.mergeState === 'BLOCKED';
-  return { held, refs: next.waiting.map((item) => item.ref) };
+  return {
+    held,
+    refs: next.waiting.map((item) => item.ref),
+    // `pr merge` holds an agent review `owner` finding until the owner approves the head.
+    approval: next.waiting.some((item) => levelOf(item.finding ?? '') === 'owner'),
+  };
 }
 
 /** How a round tells the session to reach the owner. */
@@ -78,9 +84,10 @@ export function ownerAsk(input: {
   number: string;
   head: string;
   stuck: boolean;
-  left: { held: boolean; refs: Array<string> } | null;
+  left: { held: boolean; refs: Array<string>; approval?: boolean } | null;
   now: ReadonlyArray<Pick<Item, 'ref'>>;
 }) {
+  const link = `https://github.com/${input.repo}/pull/${input.number}/files`;
   if (input.stuck) {
     return { key: `${input.head} stuck`, text: `${askInThread}.` };
   }
@@ -89,13 +96,13 @@ export function ownerAsk(input: {
     const refs = input.left.refs.join(', ');
     return {
       key: refs,
-      text: `${refs} wait for the owner. ${askInThread}. Ask about all of them at once. Then record the answer: \`bun run pr babysit ${input.number} --owner-said "<answer>"\`.`,
+      text: `${refs} wait for the owner. ${askInThread}. Ask about all of them at once. Then record the answer: \`bun run pr babysit ${input.number} --owner-said "<answer>"\`.${input.left.approval ? ` An owner finding also needs the approval, so give this approve link in the same question: ${link}` : ''}`,
     };
   }
   if (input.left?.held) {
     return {
       key: input.head,
-      text: `Only the owner is left. ${askInThread}, with this approve link: https://github.com/${input.repo}/pull/${input.number}/files`,
+      text: `Only the owner is left. ${askInThread}, with this approve link: ${link}`,
     };
   }
   if (input.now.length > 0) {

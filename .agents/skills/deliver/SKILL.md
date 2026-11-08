@@ -53,7 +53,7 @@ A, because the budget is the product's promise.
 An approval ask uses the same form. The options are approve and hold.
 
 The owner stops at most 2 times a day. Put a question that can wait into the
-next stop, and ask once for each PR head. A lane does not ask. It puts the
+next stop, and ask once for each decision, and once for each head that needs an approval. A lane does not ask. It puts the
 question at the end of its reply, and the coordinator asks once.
 
 When the session has no question tool, such as when the owner does not run T3,

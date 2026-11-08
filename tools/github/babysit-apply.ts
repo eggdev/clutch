@@ -121,17 +121,17 @@ export async function writeLog(
   }
 }
 
-/** The comments that the owner's answer in the thread closes. They have no thread to resolve. */
+/** The comments that the owner's answer or approval closes. They have no thread to resolve. */
 function closedComments(plan: Plan, ownerSaid?: string): Array<Item> {
-  if (!ownerSaid) {
+  if (!ownerSaid && !plan.approved) {
     return [];
   }
   return plan.waiting
     .filter((item) => item.kind === 'comment')
     .map((item) => ({
       ...item,
-      reason: 'the owner answered in the thread',
-      action: 'resolved by the answer',
+      reason: ownerSaid ? 'the owner answered in the thread' : 'the owner approved the head',
+      action: ownerSaid ? 'resolved by the answer' : 'resolved by the approval',
       resolved: true,
     }));
 }
