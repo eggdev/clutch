@@ -340,6 +340,7 @@ At each step, the PR also needs all of these:
   `main` stops every auto-merge until it is green again, except a revert PR.
 - The PR weakens no journey or budget, by the comparison in
   `tools/github/weaker-journeys.ts`. The owner's approval of the head lifts this.
+- No native journey job failed or is running on its head.
 
 The workflow runs only from the default branch, with the default branch's
 rules, so a PR cannot change the rules that judge it. It refuses a fork's PR,
