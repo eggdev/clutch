@@ -112,3 +112,19 @@ test('a changed coreJourneys decision holds, and a new one does not', () => {
     'clutch.yaml: the PR changes the coreJourneys decision for `sign-up`.',
   ]);
 });
+
+test('a removed screen or route holds, and a renamed one does not', async () => {
+  const gh = fake([
+    ['git merge-base', { out: 'b4se\n' }],
+    [
+      'git diff --name-status',
+      {
+        out: 'D\tfeatures/a/screens/x.tsx\nD\tapps/web/app/pay.tsx\nD\tapps/web/app/_layout.tsx\nR100\tfeatures/a/screens/y.tsx\tfeatures/a/screens/z.tsx\n',
+      },
+    ],
+  ]);
+  expect(await weakerJourneys(gh.run, 'main', 'h3ad')).toEqual([
+    'features/a/screens/x.tsx: the PR removes this screen or route, with no rename.',
+    'apps/web/app/pay.tsx: the PR removes this screen or route, with no rename.',
+  ]);
+});

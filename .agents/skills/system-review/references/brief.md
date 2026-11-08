@@ -14,7 +14,7 @@ Read `docs/principles/proof-gates-code.md`. It says when the owner stops. The go
 - `.clutch/risk.yaml`, `clutch.yaml`, `.github/CODEOWNERS`, `.github/rulesets/`
 - `tools/github/`, `.github/workflows/`, `tools/journeys/`, `.agents/skills/deliver/`, `.clutch/issues/`
 
-Read the code. A doc that says a thing does not prove the code does it.
+Read the code. A doc that says a thing does not prove the code does it. This repository is the template, so its project intent stays as kickoff slots until a project runs kickoff. Score the mechanism that enforces it.
 
 ## Scale
 

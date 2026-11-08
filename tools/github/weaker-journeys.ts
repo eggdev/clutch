@@ -17,6 +17,10 @@ import { parse } from 'yaml';
 
 const journeyFile = /^features\/[^/]+\/journeys\/.+\.(?:pw\.ts|maestro\.yaml)$/u;
 
+/** A file that users reach: a feature's screen, or a route of an app. */
+const userFacing =
+  /^(?:features\/[^/]+\/screens\/(?!\.gitkeep$).+|apps\/[^/]+\/app\/(?!.*_layout).+\.tsx?)$/u;
+
 type Shape = { outcomes: Map<string, string>; assertions: number };
 
 function webShape(body: string): Shape {
@@ -130,7 +134,9 @@ export async function weakerJourneys(run: Run, defaultBranch: string, sha: strin
   const reasons: Array<string> = [];
   for (const line of listed.split('\n').filter(Boolean)) {
     const [status = '', before = '', after = before] = line.split('\t');
-    if (status === 'D' && journeyFile.test(before)) {
+    if (status === 'D' && userFacing.test(before)) {
+      reasons.push(`${before}: the PR removes this screen or route, with no rename.`);
+    } else if (status === 'D' && journeyFile.test(before)) {
       reasons.push(`${before}: the PR deletes this journey.`);
     } else if (status !== 'A' && status !== 'D' && journeyFile.test(before)) {
       reasons.push(...weakerJourney(after, await show(base, before), await show(sha, after)));
