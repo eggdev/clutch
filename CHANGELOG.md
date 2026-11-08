@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.0 (2026-11-08)
+
+### Features
+
+- feat(journeys): run core journeys on every device with budgets (CL-442)
+
 ## 0.60.2 (2026-11-07)
 
 ### Fixes and maintenance
