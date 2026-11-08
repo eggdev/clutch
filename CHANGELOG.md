@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.62.0 (2026-11-08)
+
+### Features
+
+- feat(journeys): add core journey without and an inbox helper
+
 ## 0.61.0 (2026-11-08)
 
 ### Features
