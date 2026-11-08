@@ -258,7 +258,9 @@ export async function runAutoMerge(
   const checks = await checkConclusions(run, repo, pr.headRefOid, names);
   // Loaded here because `pr status` imports this file, and a project's `pr` runs without TypeScript.
   const { weakerJourneys: weaker } = await import('@tools/github/weaker-journeys');
+  const native = await checkConclusions(run, repo, pr.headRefOid, ['native-ios', 'native-android']);
   const facts: Facts = {
+    native,
     pr,
     defaultBranch,
     tier,

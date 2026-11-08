@@ -31,9 +31,6 @@
 /.gitleaksignore @eggdev
 /.mcp.json @eggdev
 /.cursor/mcp.json @eggdev
-**/auth/ @eggdev
-/packages/access/ @eggdev
-/packages/identity/ @eggdev
 /apps/**/migrations/ @eggdev
 /features/**/migrations/ @eggdev
 /packages/**/migrations/ @eggdev
@@ -41,3 +38,6 @@
 /docs/principles/ @eggdev
 /docs/contributing/project-intent.md @eggdev
 /.clutch/PLAN.md @eggdev
+**/auth/ @eggdev
+/packages/access/ @eggdev
+/packages/identity/ @eggdev

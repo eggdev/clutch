@@ -42,6 +42,8 @@ export type Facts = {
   tier: string;
   /** Each required check, with the conclusion of its latest run, `pending` or `missing`. */
   checks: Record<string, string>;
+  /** The conclusions of the native journey jobs that ran on the head. */
+  native: Record<string, string>;
   /** Why the PR weakens a journey or a budget, from `weakerJourneys`. */
   weakerJourneys: Array<string>;
   /** Why a bot PR fails its bot rule: a diff that is more than a version, or a revert that may not merge. Empty for an agent PR. */
@@ -141,6 +143,11 @@ export function blockers(facts: Facts, step: Step): Array<string> {
   for (const [name, conclusion] of Object.entries(checks)) {
     if (conclusion !== 'success') {
       reasons.push(`The required check ${name} is ${conclusion}.`);
+    }
+  }
+  for (const [name, conclusion] of Object.entries(facts.native)) {
+    if (!['success', 'skipped', 'missing'].includes(conclusion)) {
+      reasons.push(`The native journey ${name} is ${conclusion}.`);
     }
   }
   if (!facts.ownerApproved) {
