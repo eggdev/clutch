@@ -30,7 +30,7 @@ The owner stops for three things only:
 3. **A change to a critical experience.** The critical experiences are the
    [core journeys](#core-journeys) and the hard invariants in project intent.
    A change that keeps a journey's outcomes ships on proof. A change that
-   removes an outcome, or loosens a budget, goes to the owner.
+   removes an outcome, a screen or a route, or loosens a budget, goes to the owner.
 
 The merge gate and credentials also stay with the owner, so an agent cannot
 loosen its own gate. Ask before you build, never after.

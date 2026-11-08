@@ -61,16 +61,32 @@ function newFeatures(root: string, base: string, added: ReadonlyArray<string>) {
   return [...names].filter((name) => !git(root, 'ls-tree', base, `features/${name}/`));
 }
 
-/** Whether a changed issue has a `goal:` that project intent names. */
+/** The entries of project intent: each table cell and each bullet, in lower case. */
+function intentEntries(root: string) {
+  const file = path.join(root, intentFile);
+  const lines = existsSync(file) ? readFileSync(file, 'utf-8').split('\n') : [];
+  return new Set(
+    lines
+      .flatMap((line) => line.split('|'))
+      .map((part) =>
+        part
+          .replace(/^\s*[-*]\s*/u, '')
+          .trim()
+          .toLowerCase(),
+      ),
+  );
+}
+
+/** Whether a changed issue's `goal:` is an entry of project intent, whole. A substring is not. */
 function namesGoal(root: string, files: ReadonlyArray<string>) {
-  const intent = readFileSync(path.join(root, intentFile), 'utf-8').toLowerCase();
+  const entries = intentEntries(root);
   return files
-    .filter((file) => issue.test(file))
+    .filter((file) => issue.test(file) && existsSync(path.join(root, file)))
     .some((file) => {
       const goal = /^goal:\s*['"]?(.+?)['"]?\s*$/mu.exec(
         readFileSync(path.join(root, file), 'utf-8'),
       )?.[1];
-      return goal !== undefined && intent.includes(goal.toLowerCase());
+      return goal !== undefined && entries.has(goal.trim().toLowerCase());
     });
 }
 
