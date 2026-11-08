@@ -1,7 +1,13 @@
 import { expect, test } from 'bun:test';
 
 import { fake } from '@tools/github/fake-run';
-import { weakerBudgets, weakerJourney, weakerJourneys } from '@tools/github/weaker-journeys';
+import {
+  weakerBudgets,
+  weakerCi,
+  weakerCore,
+  weakerJourney,
+  weakerJourneys,
+} from '@tools/github/weaker-journeys';
 
 const file = 'features/billing/journeys/pay.pw.ts';
 const base = `await click('Pay');
@@ -86,5 +92,23 @@ test('a renamed journey is compared with its old copy', async () => {
   ]);
   expect(await weakerJourneys(gh.run, 'main', 'h3ad')).toEqual([
     `${moved}: it changes what the outcome \`paid\` expects.`,
+  ]);
+});
+
+const ci = (uses: string, run: string) =>
+  `jobs:\n  journeys:\n    steps:\n      - uses: ${uses}\n      - run: ${run}\n`;
+
+test('a changed command in the journeys job holds, and a pinned action does not', () => {
+  expect(weakerCi(ci('a@1', 'bun x --all'), ci('a@2', 'bun x --all'))).toEqual([]);
+  expect(weakerCi(ci('a@1', 'bun x --all'), ci('a@1', 'true'))).toEqual([
+    '.github/workflows/ci.yml: the PR changes the commands of the journeys job.',
+  ]);
+});
+
+test('a changed coreJourneys decision holds, and a new one does not', () => {
+  const old = 'coreJourneys:\n  sign-up: yes\n';
+  expect(weakerCore(old, `${old}  billing: yes\n`)).toEqual([]);
+  expect(weakerCore(old, 'coreJourneys:\n  sign-up: n/a\n')).toEqual([
+    'clutch.yaml: the PR changes the coreJourneys decision for `sign-up`.',
   ]);
 });
