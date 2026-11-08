@@ -410,7 +410,7 @@ mise exec -- bun run clutch labels --base origin/main --head HEAD --title "docs:
 It also gives `size/S` (up to 100 changed lines), `size/M` (300), `size/L`
 (800) or `size/XL`. Lockfiles, snapshots, `.clutch/` and the globs in
 `pr_size.exclude` do not count. Above `pr_size.warn` (300 by default) it
-prints a warning. It never fails.
+prints a warning. `tools/check-scope.ts` fails a PR above `pr_size.max`.
 
 `--json` adds the color and description of each label, the label prefixes
 that the command owns, and the person labels `one-way-door`, `revert` and
@@ -456,6 +456,8 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
   tier of its files, and a change with no files is `low`.
 - A rule with `guardrails: tools/guardrail-files.json` adds every pattern in
   that list to its paths, so the two cannot drift.
+- A rule with `journeys` holds nothing once each named journey exists on the
+  default branch. `tools/codeowners.ts` then leaves it out of CODEOWNERS too.
 - A rule with `lines` matches a file only when one of its added or removed
   lines matches one of those regular expressions. `tools/codeowners.ts` leaves
   such a rule out of CODEOWNERS, which cannot express it.
@@ -523,7 +525,8 @@ pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 sast: auto # optional: auto (the default), codeql or semgrep
 pr_size: # optional
-  warn: 300 # the default: clutch labels warns above it, and never fails
+  warn: 300 # the default: clutch labels warns above it
+  max: 1000 # a PR above it fails check-scope and splits
   exclude: [] # globs whose lines do not count, such as generated code
 factory: # optional
   root: factory # the default: the folder of the factory tree. . is the project root

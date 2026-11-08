@@ -1,6 +1,6 @@
 ---
 name: design-proposal
-description: Create, iterate, adopt and retire a design proposal - today's screen next to 2 or 3 directions, built on the project's real components and tokens, rendered in the app at phone and desktop widths, for the owner to pick one. Use before building a new visible feature or a material UI change, when the owner answers a proposal, when the build of an adopted proposal ships, and when gardening lists a stale proposal. Skip it for a routine change.
+description: Create, iterate, adopt and retire a design proposal - today's screen next to 2 or 3 directions, built on the project's real components and tokens, rendered in the app at phone and desktop widths, for the owner to pick one. Use when the owner asks for options on a new visible feature or a material UI change, when the owner answers a proposal, when the build of an adopted proposal ships, and when gardening lists a stale proposal. Skip it for a routine change.
 ---
 
 # Design proposals

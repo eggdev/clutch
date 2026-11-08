@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 
+import { missingJourneys } from '@tools/check-journeys';
 import { devApps, isUp, urlOf } from '@tools/dev';
 import type { DevApp } from '@tools/dev';
 import { isCore, unprovenCore } from '@tools/journeys/core-proof';
@@ -313,6 +314,12 @@ export async function main(
     return 1;
   }
   if (selected.length === 0) {
+    // A feature that ships a screen and has no journey is a gate with no proof.
+    const missing = missingJourneys(root, journeys(root));
+    if (missing.length > 0) {
+      sink.error(`No journey ran, and a feature ships a screen:\n${missing.join('\n')}`);
+      return 1;
+    }
     noJourneyNotice(sink);
     return 0;
   }

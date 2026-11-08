@@ -33,6 +33,17 @@ afterEach(() => rm(root, { recursive: true, force: true }));
 
 const limits = { max: 5, exclude: ['gen/**'] };
 
+test('a PR compares its own head with its own base', async () => {
+  await write('b.txt', 'x\n'.repeat(6));
+  git('add', '-A');
+  git('commit', '-qm', 'big');
+  const base = git('rev-parse', 'HEAD');
+  await write('c.txt', 'y\n');
+  git('add', '-A');
+  git('commit', '-qm', 'small');
+  expect(checkScope(root, base, limits, git('rev-parse', 'HEAD'))).toEqual([]);
+});
+
 test('a change over the limit fails, and excluded files do not count', async () => {
   await write('b.txt', 'x\n'.repeat(6));
   await write('gen/c.txt', 'x\n'.repeat(50));

@@ -36,9 +36,7 @@ jobs:
             clutch.yaml
           sparse-checkout-cone-mode: false
       # GitHub gives no secrets to a fork PR, and a project may have none. The
-      # review then passes with a notice, unless agentReview.missingCredential
-      # in clutch.yaml is fail: a required agent-review check then proves that
-      # a review ran.
+      # review then passes with a notice.
       - name: Find the Anthropic credential
         id: credential
         env:

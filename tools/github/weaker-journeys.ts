@@ -11,9 +11,12 @@ import { parse } from 'yaml';
  * goes. A renamed button or a moved field changes none of these, so it passes.
  * It also holds a change to the commands of the CI journeys job, or to a
  * `coreJourneys` decision, since either can remove the proof without touching a
- * journey. CI runs the journey kit from the base branch for the same reason.
+ * journey. A change to the journey kit holds too, since a no-op `outcome()` would
+ * pass every journey.
  * See docs/principles/proof-gates-code.md.
  */
+
+const journeyKit = /^(?:packages\/journeys\/testing|tools\/journeys)\//u;
 
 const journeyFile = /^features\/[^/]+\/journeys\/.+\.(?:pw\.ts|maestro\.yaml)$/u;
 
@@ -134,6 +137,9 @@ export async function weakerJourneys(run: Run, defaultBranch: string, sha: strin
   const reasons: Array<string> = [];
   for (const line of listed.split('\n').filter(Boolean)) {
     const [status = '', before = '', after = before] = line.split('\t');
+    if (journeyKit.test(before) || journeyKit.test(after)) {
+      reasons.push(`${after}: the PR changes the journey kit that proves every journey.`);
+    }
     if (status === 'D' && userFacing.test(before)) {
       reasons.push(`${before}: the PR removes this screen or route, with no rename.`);
     } else if (status === 'D' && journeyFile.test(before)) {
