@@ -1,5 +1,5 @@
 import { plan } from '@tools/github/babysit';
-import { blockingOnlyFix } from '@tools/github/babysit-answer';
+import { blockingOnlyFix, unanswered } from '@tools/github/babysit-answer';
 import type { Item } from '@tools/github/babysit-log';
 import { readPr } from '@tools/github/babysit-read';
 import type { Run } from '@tools/github/stack';
@@ -20,15 +20,17 @@ export function onlyOwnerLeft(
   approved: boolean,
   /** A thread or comment still needs a round, or the last round is stuck. */
   workLeft = false,
+  /** The last round left a thread or comment for the owner. */
+  waitingOwner = false,
 ) {
+  const held = !status.ready && status.mergeState === 'BLOCKED';
   return (
     !approved &&
-    !status.ready &&
+    (held || waitingOwner) &&
     status.counts.fail === 0 &&
     status.counts.pending === 0 &&
     status.agentReview.blocking === 0 &&
     status.mergeable === 'MERGEABLE' &&
-    status.mergeState === 'BLOCKED' &&
     !workLeft
   );
 }
@@ -42,6 +44,7 @@ export function decisionsNow(items: ReadonlyArray<Item>) {
   return items.filter(
     (item) =>
       item.decision === 'owner' &&
+      item.reason !== unanswered &&
       (item.kind === 'check' || item.reason.startsWith(blockingOnlyFix)),
   );
 }
@@ -57,5 +60,38 @@ export async function ownerLeft(run: Run, repo: string, owner: string, number: n
     next.threads.length > 0 ||
     next.comments.length > 0 ||
     state.log.rounds.at(-1)?.outcome === 'stuck';
-  return onlyOwnerLeft(status, state.approved, workLeft);
+  const waitingOwner = state.log.rounds.at(-1)?.outcome === 'waiting-owner';
+  return onlyOwnerLeft(status, state.approved, workLeft, waitingOwner);
+}
+
+/** How a round tells the session to reach the owner. */
+const askInThread =
+  "Ask in this session's thread with the question tool, in the fixed form of .agents/skills/deliver/SKILL.md#ask-the-owner";
+
+/** What the session must ask the owner, and the key that keeps it to one ask. */
+export function ownerAsk(input: {
+  repo: string;
+  number: string;
+  head: string;
+  stuck: boolean;
+  left: boolean;
+  now: ReadonlyArray<Pick<Item, 'ref'>>;
+}) {
+  if (input.stuck) {
+    return { key: `${input.head} stuck`, text: `${askInThread}.` };
+  }
+  if (input.left) {
+    return {
+      key: input.head,
+      text: `Only the owner is left. ${askInThread}, with this approve link: https://github.com/${input.repo}/pull/${input.number}/files`,
+    };
+  }
+  if (input.now.length > 0) {
+    const refs = input.now.map((item) => item.ref).join(', ');
+    return {
+      key: `${input.head} ${refs}`,
+      text: `${refs} need the owner now. ${askInThread}.`,
+    };
+  }
+  return null;
 }

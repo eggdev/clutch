@@ -116,8 +116,9 @@ the owner as a new direction.
 ## Ask the owner
 
 Ask in this session's thread, with the screenshots and the letters, as
-[ask the owner](../deliver/SKILL.md#ask-the-owner) says. The question is
-"Which direction: A, B or C? Or say what to change." The answer arrives in the
+[ask the owner](../deliver/SKILL.md#ask-the-owner) says. The goal is
+the screen's job. The options are the letters. Say what each direction changes
+for users, give your pick, and invite the owner to say what to change. The answer arrives in the
 thread. When no person can answer there, use `bun run pr ask`, and read the
 owner's reply on that issue.
 

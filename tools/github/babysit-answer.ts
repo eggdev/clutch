@@ -63,7 +63,7 @@ export type Context = {
   pushed: string | null;
 };
 
-const unanswered = 'the agent gave no decision';
+export const unanswered = 'the agent gave no decision';
 
 /** How the reason of a blocking finding that only a fix closes starts. */
 export const blockingOnlyFix = 'a blocking finding closes only with a fix';

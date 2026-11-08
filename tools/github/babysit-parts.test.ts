@@ -3,7 +3,7 @@ import { expect, test } from 'bun:test';
 import { blockingGuard } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import type { Item } from '@tools/github/babysit-log';
-import { decisionsNow, onlyOwnerLeft } from '@tools/github/babysit-owner';
+import { decisionsNow, onlyOwnerLeft, ownerAsk } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { fake } from '@tools/github/fake-run';
 
@@ -97,6 +97,10 @@ test('the owner is asked only when nothing but the approval is left', () => {
   // An open thread or a stuck round is work left, so the session does not ask yet.
   expect(onlyOwnerLeft(status, false, true)).toBe(false);
   expect(onlyOwnerLeft({ ...status, mergeState: 'CLEAN', ready: true }, false)).toBe(false);
+  // A decision left for the owner reaches them on a PR with no required approval.
+  expect(onlyOwnerLeft({ ...status, mergeState: 'CLEAN', ready: true }, false, false, true)).toBe(
+    true,
+  );
 });
 
 test('only a fix closes a blocking finding; any other answer leaves it for the owner', () => {
@@ -134,4 +138,21 @@ test('a failed check or an unfixed blocking finding left for the owner needs the
   expect(
     decisionsNow([item({}), check, blocking, item({ decision: 'no-change', kind: 'check' })]),
   ).toEqual([check, blocking]);
+});
+
+test('an unanswered item does not stop the owner', () => {
+  expect(decisionsNow([item({ kind: 'check', reason: 'the agent gave no decision' })])).toEqual([]);
+});
+
+test('the ask names what the owner must do, keyed so it prints once', () => {
+  const base = { repo: 'a/b', number: '7', head: 'h3ad', stuck: false, left: false, now: [] };
+  expect(ownerAsk(base)).toBeNull();
+  expect(ownerAsk({ ...base, stuck: true })?.key).toBe('h3ad stuck');
+  const left = ownerAsk({ ...base, left: true });
+  expect(left?.key).toBe('h3ad');
+  expect(left?.text).toContain('https://github.com/a/b/pull/7/files');
+  const now = ownerAsk({ ...base, now: [{ ref: 'deploy' }] });
+  expect(now?.key).toBe('h3ad deploy');
+  expect(now?.text).toContain('deploy need the owner now');
+  expect(ownerAsk({ ...base, now: [{ ref: 'build' }] })?.key).toBe('h3ad build');
 });

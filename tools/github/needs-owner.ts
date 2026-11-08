@@ -56,7 +56,7 @@ export async function ask(run: Run, title?: string, bodyFile?: string) {
     '--label',
     label,
     '--limit',
-    '100',
+    '1000',
     '--json',
     'title,url',
   ]);

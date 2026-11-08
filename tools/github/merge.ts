@@ -89,7 +89,7 @@ function reviewProblem(number: string, pr: Review) {
     const who = pr.latestReviews
       .filter((review) => review.state === 'CHANGES_REQUESTED')
       .map((review) => `@${review.author.login}`);
-    return `#${number} has changes requested by ${who.join(', ') || 'a reviewer'}. Address them, and ask for a new review.`;
+    return `#${number} has changes requested by ${who.join(', ') || 'a reviewer'}. Address them, and ask in this session's thread for a new approval.`;
   }
   // A ruleset's code owner review leaves reviewDecision empty. GitHub then
   // reports the PR as blocked, with the code owners still requested.

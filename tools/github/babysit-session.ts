@@ -1,12 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { plan } from '@tools/github/babysit';
+import { nothingToDo, plan } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, writeLog } from '@tools/github/babysit-apply';
 import type { Round } from '@tools/github/babysit-log';
-import { decisionsNow, ownerLeft } from '@tools/github/babysit-owner';
+import { decisionsNow, ownerAsk, ownerLeft } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
@@ -37,6 +37,27 @@ async function context(run: Run, number: string) {
   return { repo, owner, file: path.join(gitDir, 'clutch', `babysit-${number}.json`) };
 }
 
+/**
+ * Whether this is the first time the session asks `key`. The owner stops once
+ * for each ask, so a second round on the same head does not ask again.
+ */
+export async function firstAsk(planFile: string, number: string, key: string) {
+  const file = path.join(path.dirname(planFile), `asked-${number}.txt`);
+  const asked = await readFile(file, 'utf-8').catch(() => '');
+  await writeFile(file, key);
+  return asked.trim() !== key;
+}
+
+/** Prints an ask the first time, and tells a later round not to repeat it. */
+async function askOnce(file: string, number: string, ask: ReturnType<typeof ownerAsk>) {
+  if (!ask) {
+    return '';
+  }
+  return (await firstAsk(file, number, ask.key))
+    ? ` ${ask.text}`
+    : ' A round on this head already printed this ask. Ask only if no session has asked yet.';
+}
+
 /** Plans the round for PR `number`, prints it, and keeps it for the apply step. */
 async function babysitPlan(run: Run, number: string, now: string) {
   const { repo, owner, file } = await context(run, number);
@@ -44,27 +65,18 @@ async function babysitPlan(run: Run, number: string, now: string) {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, JSON.stringify(next, null, 1));
   console.log(JSON.stringify(next, null, 1));
+  const left = next.skip === nothingToDo && (await ownerLeft(run, repo, owner, Number(number)));
+  const ask = await askOnce(
+    file,
+    number,
+    ownerAsk({ repo, number, head: next.head, stuck: false, left, now: [] }),
+  );
   console.log(
     next.skip
-      ? `No round: ${next.skip}.${next.stuck ? ` Run \`bun run pr babysit ${number} --stuck "<why>"\` to log it.` : ''}`
+      ? `No round: ${next.skip}.${next.stuck ? ` Run \`bun run pr babysit ${number} --stuck "<why>"\` to log it.` : ''}${ask}`
       : `Plan kept in ${file}. Decide each item, fix, validate and push, then run \`bun run pr babysit ${number} --answers <file>\`.`,
   );
   return 0;
-}
-
-/** How a round tells the session to reach the owner. */
-const askInThread =
-  "Ask in this session's thread with the question tool, in the fixed form of .agents/skills/deliver/SKILL.md#ask-the-owner";
-
-/**
- * Whether this is the first time the session asks about `head`. A head that
- * was asked about needs no second ask, so the owner stops once for it.
- */
-export async function firstAsk(planFile: string, number: string, head: string) {
-  const file = path.join(path.dirname(planFile), `asked-${number}.txt`);
-  const asked = await readFile(file, 'utf-8').catch(() => '');
-  await writeFile(file, head);
-  return asked.trim() !== head;
 }
 
 /** Applies the session's answers to the kept plan, then says whether the owner is needed. */
@@ -94,7 +106,12 @@ async function babysitApply(
   if (input.stuck) {
     const round: Round = { ...common, sync, items: [], outcome: 'stuck', note: input.stuck };
     await writeLog(run, repo, owner, kept.number, round, []);
-    console.log(`#${number}: stuck. ${input.stuck} ${askInThread}.`);
+    const ask = await askOnce(
+      file,
+      number,
+      ownerAsk({ repo, number, head: kept.head, stuck: true, left: false, now: [] }),
+    );
+    console.log(`#${number}: stuck. ${input.stuck}${ask}`);
     return 1;
   }
   // The plan's caps hold the apply step too: a skipped round only logs as stuck.
@@ -119,16 +136,19 @@ async function babysitApply(
     runUrl: '',
     now: input.now,
   });
-  const now = decisionsNow(round.items);
-  const left = now.length === 0 && (await ownerLeft(run, repo, owner, kept.number));
-  let next = '';
-  if (now.length > 0) {
-    next = ` ${now.map((item) => item.ref).join(', ')} need the owner now. ${askInThread}.`;
-  } else if (left) {
-    next = (await firstAsk(file, number, kept.head))
-      ? ` Only the owner is left. ${askInThread}, with this approve link: https://github.com/${repo}/pull/${number}/files`
-      : ' Only the owner is left, and this head was already asked about. Do not ask again.';
-  }
+  const stuck = round.outcome === 'stuck';
+  const next = await askOnce(
+    file,
+    number,
+    ownerAsk({
+      repo,
+      number,
+      head: kept.head,
+      stuck,
+      left: !stuck && (await ownerLeft(run, repo, owner, kept.number)),
+      now: decisionsNow(round.items),
+    }),
+  );
   console.log(`#${number}: ${round.outcome}. ${round.note}${next}`);
   return 0;
 }
