@@ -76,8 +76,8 @@ runner from the base branch. When a PR changes a journey, its own copy must pass
 and a check compares the named outcomes of the two copies. A renamed button
 or a moved field passes that check. A removed or changed outcome, or a looser
 budget, entry or platform, is a weaker journey, and it goes to the owner. So a PR cannot weaken the proof or the gate
-that judges it. A path stays held for the owner until its journeys exist and
-pass.
+that judges it. A path stays held for the owner until its journeys exist. The required
+`journeys` check proves them on each PR.
 
 A migration also needs its rehearsal on a branch of the production database.
 A journey cannot show that a copy survives or rolls back. See
