@@ -12,8 +12,8 @@ Each finding has one level:
 
 | Level      | Means                                                        |
 | ---------- | ------------------------------------------------------------ |
-| `blocking` | The change must not merge until the author fixes it.         |
-| `owner`    | The change may merge only when the owner merges it.          |
+| `blocking` | The author fixes it or answers why not. It holds no merge.   |
+| `owner`    | The author weighs it with the owner. It holds no merge.      |
 | `note`     | The author reads it and decides. The change can merge as is. |
 
 A rule below says which level it gives. When a rule does not say, the level is
