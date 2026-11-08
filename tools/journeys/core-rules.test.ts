@@ -10,7 +10,8 @@ import {
   see,
   signUp,
 } from '@tools/journeys/core-fixtures';
-import { coreOutcomes } from '@tools/journeys/journeys';
+import { coreProblems } from '@tools/journeys/core-rules';
+import { coreFailureStates, coreOutcomes } from '@tools/journeys/journeys';
 
 /** The rules for `Core:` journeys, run through check-journeys. See core-rules.ts. */
 
@@ -231,4 +232,61 @@ test('the core outcomes match the outcomes and failure states of the catalog', (
     );
   }
   expect(named).toEqual(coreOutcomes);
+  const states: Record<string, ReadonlyArray<string>> = {};
+  for (const section of text.split('\n## ')) {
+    const name = /^[^\n]*\(`([a-z-]+)`\)/u.exec(section)?.[1];
+    const bullet = /\n- Failure states:([\s\S]*?)(?=\n- |$)/u.exec(section)?.[1];
+    if (name !== undefined && bullet !== undefined) {
+      states[name] = [...bullet.matchAll(/`([a-z][a-z0-9-]+)`/gu)].map((match) => match[1] ?? '');
+    }
+  }
+  expect(states).toEqual(coreFailureStates);
+});
+
+const passwordless = [
+  "import { test } from '@repo/journeys/testing/test';",
+  "import { outcomes } from '@repo/journeys/testing/outcome';",
+  "import { enterEmailCode } from '@repo/journeys/testing/inbox';",
+  "test('a visitor signs up', async ({ page }) => {",
+  '  const outcome = outcomes(page);',
+  `  const email = \`journey-${placeholder('Date.now().toString(36)')}@example.test\`;`,
+  "  await page.goto('/');",
+  "  await page.getByLabel('Email').fill(email);",
+  "  await page.getByRole('button', { name: 'Send code' }).click();",
+  "  await enterEmailCode(page, { to: email, into: 'Code' });",
+  "  await outcome('signed-up', { url: '/home', text: 'Welcome' });",
+  "  await page.getByRole('button', { name: 'Settings' }).click();",
+  "  await outcome('email-verified', { text: email });",
+  '});',
+].join('\n');
+
+const passwordFile = 'features/account/journeys/sign-up.pw.ts';
+const passwordlessJourney = {
+  id: 'sign-up',
+  feature: 'account',
+  file: passwordFile,
+  platform: 'web',
+} as const;
+const withoutPasswords = () => ['email-taken-refused', 'weak-password-refused'];
+
+test('a core journey may skip the failure states in without, and may read its email through the kit', () => {
+  expect(
+    coreProblems(passwordlessJourney, core('sign-up', 'sign-up', passwordless), withoutPasswords),
+  ).toEqual([]);
+  expect(coreProblems(passwordlessJourney, core('sign-up', 'sign-up', passwordless))).toEqual([
+    `${passwordFile}: it does not assert \`email-taken-refused\`, \`weak-password-refused\`, which the catalog names for sign-up. ${see}`,
+  ]);
+});
+
+test('without cannot leave out an outcome that is not a failure state', () => {
+  const body = passwordless.replace("  await outcome('email-verified', { text: email });\n", '');
+  expect(
+    coreProblems(passwordlessJourney, core('sign-up', 'sign-up', body), () => [
+      ...withoutPasswords(),
+      'email-verified',
+    ]),
+  ).toEqual([
+    `${passwordFile}: clutch.yaml leaves \`email-verified\` out of sign-up, but only a failure state of the journey may go in \`without\`. ${see}`,
+    `${passwordFile}: it does not assert \`email-verified\`, which the catalog names for sign-up. ${see}`,
+  ]);
 });

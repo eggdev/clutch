@@ -1,6 +1,7 @@
 import { webFindings } from '@tools/journeys/core-web';
 import {
   bodyOf,
+  coreFailureStates,
   coreJourneys,
   fieldOf,
   headerOf,
@@ -35,14 +36,24 @@ const catalog = 'docs/contributing/journeys/core.md';
 const seedProblem = (file: string) =>
   `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. See ${catalog}.`;
 
-function outcomeProblems(file: string, name: (typeof coreJourneys)[number], seen: Array<string>) {
-  const problems: Array<string> = [];
+function outcomeProblems(
+  file: string,
+  name: (typeof coreJourneys)[number],
+  seen: Array<string>,
+  without: ReadonlyArray<string>,
+) {
+  const problems: Array<string> = without
+    .filter((outcome) => !coreFailureStates[name].includes(outcome))
+    .map(
+      (outcome) =>
+        `${file}: clutch.yaml leaves \`${outcome}\` out of ${name}, but only a failure state of the journey may go in \`without\`. See ${catalog}.`,
+    );
   if (seen[0] !== 'signed-up') {
     problems.push(
       `${file}: it does not create its account through the sign-up screens first. Walk sign-up from the entry, and assert the \`signed-up\` outcome before any other. See ${catalog}.`,
     );
   }
-  const missing = requiredOutcomes(name).filter((outcome) => !seen.includes(outcome));
+  const missing = requiredOutcomes(name, without).filter((outcome) => !seen.includes(outcome));
   if (missing.length > 0) {
     problems.push(
       `${file}: it does not assert ${missing.map((item) => `\`${item}\``).join(', ')}, which the catalog names for ${name}. See ${catalog}.`,
@@ -51,9 +62,14 @@ function outcomeProblems(file: string, name: (typeof coreJourneys)[number], seen
   return problems;
 }
 
-function webProblems(file: string, name: (typeof coreJourneys)[number], body: string) {
+function webProblems(
+  file: string,
+  name: (typeof coreJourneys)[number],
+  body: string,
+  without: ReadonlyArray<string>,
+) {
   const { problems, seen } = webFindings(file, body);
-  return [...problems, ...outcomeProblems(file, name, seen)];
+  return [...problems, ...outcomeProblems(file, name, seen, without)];
 }
 
 type Step = { command: string; args: unknown; nested: boolean };
@@ -108,6 +124,7 @@ function nativeProblems(
   name: (typeof coreJourneys)[number],
   source: string,
   body: string,
+  without: ReadonlyArray<string>,
 ) {
   const documents = parseAllDocuments(source);
   const flow = Array.isArray(documents) ? documents.at(-1)?.toJS() : undefined;
@@ -173,11 +190,15 @@ function nativeProblems(
     );
   }
   const seen = asserts.map((step) => labelOf(step).replace(/^outcome /u, ''));
-  return [...problems, ...outcomeProblems(file, name, seen)];
+  return [...problems, ...outcomeProblems(file, name, seen, without)];
 }
 
 /** What makes a journey with a `Core:` line break the catalog. A journey with no `Core:` line has none. */
-export function coreProblems(journey: Journey, source: string): Array<string> {
+export function coreProblems(
+  journey: Journey,
+  source: string,
+  withoutOf: (name: string) => ReadonlyArray<string> = () => [],
+): Array<string> {
   const name = fieldOf(headerOf(source), 'Core');
   if (name === undefined) {
     return [];
@@ -189,7 +210,8 @@ export function coreProblems(journey: Journey, source: string): Array<string> {
   }
   const core = name as (typeof coreJourneys)[number];
   const body = bodyOf(source);
+  const without = withoutOf(core);
   return journey.platform === 'web'
-    ? webProblems(journey.file, core, body)
-    : nativeProblems(journey.file, core, source, body);
+    ? webProblems(journey.file, core, body, without)
+    : nativeProblems(journey.file, core, source, body, without);
 }

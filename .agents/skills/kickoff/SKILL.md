@@ -135,8 +135,10 @@ Then record the core journeys. Read the
 [core journey catalog](../../../docs/contributing/journeys/core.md), and draft
 `coreJourneys:` in `clutch.yaml`. Set `adopted` for each one that the product
 has. Give each one that it leaves out `status: n/a` and its reason, such as
-"the product has no paid plan". Show the draft, and ask the owner what is
-wrong with it.
+"the product has no paid plan". When the product has a journey but not one of
+its failure states, keep the journey. Write `status: adopted`, and put that
+state and its reason in `without`, such as `weak-password-refused` for a product
+with no password. Show the draft, and ask the owner what is wrong with it.
 
 Fill `budgets:` in `clutch.yaml` from the walk:
 

@@ -6,8 +6,11 @@ its failure states. The policy is in
 [proof gates code](../../principles/proof-gates-code.md#core-journeys).
 
 Kickoff records in `coreJourneys:` of `clutch.yaml` which core journeys the
-project has. A journey that the project leaves out has a reason there. A
-project adds its own core features to the
+project has. A journey that the project leaves out has a reason there.
+`{ status: adopted, without: { <failure state>: <reason> } }` keeps a journey
+and leaves out a failure state that the product does not have, such as
+`weak-password-refused` when sign-in is an emailed code. Only a failure state
+may go in `without`. A project adds its own core features to the
 [hard invariants](../project-intent.md#hard-invariants).
 
 Start each journey from its template in
@@ -102,6 +105,16 @@ A journey uses the test mode of each vendor that it touches, never a stand-in:
 - The email inbox: the local mail catcher, or the email vendor's test inbox.
   The journey reads the email and opens its link.
 - The payment provider: its test cards and its test clocks.
+
+A web journey reads the inbox through the journey kit:
+`enterEmailCode(page, { to, into })` and `openEmailLink(page, { to })` from
+`@repo/journeys/testing/inbox`. `journeys.inbox` in `clutch.yaml` names the
+project's command, as a list such as `[bun, tools/inbox.ts]`. The kit runs it
+with the address as the last argument. It prints one JSON object with `code`,
+`link` or both, from the newest email to that address, and `{}` until the email
+arrives. When the auth vendor has no test inbox, the command reads the issued
+code from the vendor's test store. The journey's `Limits:` line then says that
+the run does not prove delivery.
 
 ## Sign up (`sign-up`)
 
