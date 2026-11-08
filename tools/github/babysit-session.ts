@@ -5,7 +5,7 @@ import { nothingToDo, plan, stuckLabel } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, writeLog } from '@tools/github/babysit-apply';
-import type { Round } from '@tools/github/babysit-log';
+import type { Item, Round } from '@tools/github/babysit-log';
 import { decisionsNow, ownerAsk, ownerLeft } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
@@ -83,6 +83,8 @@ async function babysitPlan(run: Run, number: string, now: string) {
   return 0;
 }
 
+const isComment = (item: Item) => item.kind === 'comment';
+
 /** The owner's answer gets past no work, a cap or a stuck label, and no other skip. */
 function ownerMayAnswer(kept: Plan) {
   return kept.skip === nothingToDo || kept.skip === `labelled ${stuckLabel}` || kept.stuck;
@@ -102,7 +104,10 @@ async function babysitApply(
   },
 ) {
   const { repo, owner, file } = await context(run, number);
-  const kept = JSON.parse(await readFile(file, 'utf-8').catch(() => 'null')) as Plan | null;
+  // The owner's answer reads the PR now: a plan kept before the last round is stale.
+  const kept = input['owner-said']
+    ? plan(await readPr(run, repo, Number(number), owner), input.now)
+    : (JSON.parse(await readFile(file, 'utf-8').catch(() => 'null')) as Plan | null);
   if (kept?.number !== Number(number)) {
     throw new Error(`No kept plan for #${number}. Run \`bun run pr babysit ${number}\` first.`);
   }
@@ -131,6 +136,9 @@ async function babysitApply(
     return 1;
   }
   // The plan's caps hold the apply step too: a skipped round only logs as stuck.
+  if (input['owner-said'] && kept.ownerThreads.length === 0 && !kept.waiting.some(isComment)) {
+    throw new Error(`Nothing on #${number} waits for the owner's answer.`);
+  }
   if (kept.skip && !(input['owner-said'] && ownerMayAnswer(kept))) {
     throw new Error(
       `No round for #${number}: ${kept.skip}. Log it with \`bun run pr babysit ${number} --stuck "<why>"\`.`,

@@ -76,7 +76,7 @@ export async function ownerLeft(run: Run, repo: string, owner: string, number: n
 
 /** How a round tells the session to reach the owner. */
 const askInThread =
-  "Ask in this session's thread with the question tool, in the fixed form of .agents/skills/deliver/SKILL.md#ask-the-owner, filled in from each item's thread or check";
+  "Ask in this session's thread with the question tool, in the fixed form of .agents/skills/deliver/SKILL.md#ask-the-owner";
 
 /** What the session must ask the owner, and the key that keeps it to one ask. */
 export function ownerAsk(input: {
@@ -89,14 +89,15 @@ export function ownerAsk(input: {
 }) {
   const link = `https://github.com/${input.repo}/pull/${input.number}/files`;
   if (input.stuck) {
-    return { key: `${input.head} stuck`, text: `${askInThread}.` };
+    return { key: `${input.head} stuck`, text: `${askInThread}, filled in from the reason above.` };
   }
   // A named decision comes first: the owner answers it here, with no PR to open.
   if (input.left && input.left.refs.length > 0) {
     const refs = input.left.refs.join(', ');
     return {
-      key: refs,
-      text: `${refs} wait for the owner. ${askInThread}. Ask about all of them at once. Then record the answer: \`bun run pr babysit ${input.number} --owner-said "<answer>"\`.${input.left.approval ? ` An owner finding also needs the approval, so give this approve link in the same question: ${link}` : ''}`,
+      // An approval is per head, so an ask that carries one comes back on a new head.
+      key: input.left.approval ? `${input.head} ${refs}` : refs,
+      text: `${refs} wait for the owner. ${askInThread}, filled in from each item's thread. Ask about all of them at once. Then record the answer: \`bun run pr babysit ${input.number} --owner-said "<answer>"\`.${input.left.approval ? ` An owner finding also needs the approval, so give this approve link in the same question: ${link}` : ''}`,
     };
   }
   if (input.left?.held) {
@@ -109,7 +110,7 @@ export function ownerAsk(input: {
     const refs = input.now.map((item) => item.ref).join(', ');
     return {
       key: `${input.head} ${refs}`,
-      text: `${refs} need the owner now. ${askInThread}.`,
+      text: `${refs} need the owner now. ${askInThread}, filled in from each item's thread or check.`,
     };
   }
   return null;

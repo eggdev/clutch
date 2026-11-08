@@ -63,8 +63,7 @@ labels the issue `needs-owner` and assigns the owner. It refuses a section with
 no text. Read the answer on the issue, and close it with `gh issue close <n>`.
 
 After the owner answers, record it on the PR with
-`mise exec -- bun run pr babysit <n> --owner-said "<answer>"`, after the plan
-step. It replies in each thread left for the owner and resolves it. A blocking
+`mise exec -- bun run pr babysit <n> --owner-said "<answer>"`. It replies in each thread left for the owner and resolves it. A blocking
 finding stays open. Then write the answer into the issue or project intent, so
 no agent asks again. Then merge on proof. A held path still needs the owner's
 approval, so give the approve link in the thread: the PR's URL plus `/files`. A push that changes

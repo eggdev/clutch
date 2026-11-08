@@ -106,7 +106,10 @@ function waitingOwner(state: Pick<PrState, 'log' | 'threads'>) {
 export function plan(state: PrState, now: string): Plan {
   const answered = new Set(state.log.answered);
   // A thread is open work until the babysitter has the last word in it.
-  const threads = state.threads.filter((t) => !answeredByBabysitter(t.comments.at(-1)?.body ?? ''));
+  // A blocking finding stays open work until a fix closes it, whoever spoke last.
+  const threads = state.threads.filter(
+    (t) => !answeredByBabysitter(t.comments.at(-1)?.body ?? '') || isBlocking(t.comments[0]?.body),
+  );
   // The owner's approval of the head answers each thread the babysitter left for the owner.
   // A blocking finding is never answered by the approval: only a fix closes it.
   const approvedThreads = state.approved
@@ -132,7 +135,10 @@ export function plan(state: PrState, now: string): Plan {
     [state.failed.length > 0 && state.pending === 0, 'red-check'],
     [threads.length > 0, 'open-thread'],
     [comments.length > 0, 'new-comment'],
-    [approvedThreads.length > 0, 'owner-approved'],
+    [
+      approvedThreads.length > 0 || (state.approved && waiting.some((i) => i.kind === 'comment')),
+      'owner-approved',
+    ],
   ];
   const triggers = work.filter(([on]) => on).map(([, trigger]) => trigger);
   const base = {

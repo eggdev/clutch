@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -53,6 +53,7 @@ function pr(
   rounds: Array<Round>,
   mergeState: string,
   finding = 'owner: which copy?',
+  labels: Array<string> = [],
 ) {
   let all = emptyLog();
   for (const round of rounds) {
@@ -79,7 +80,7 @@ function pr(
           headRefOid: head,
           headRefName: 'clutch/cl-1-x',
           baseRefName: 'main',
-          labels: { nodes: [] },
+          labels: { nodes: labels.map((name) => ({ name })) },
           mergeable: 'MERGEABLE',
           commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [] } } } }] },
           reviewThreads: { nodes: [open('T1', 5), open('T2', 7)] },
@@ -115,8 +116,8 @@ function pr(
   ] as Array<[string, { out: string }]>;
 }
 
-const leftOn = (head: string, rounds: Array<Round>, mergeState: string) =>
-  ownerLeft(fake(pr(head, rounds, mergeState)).run, 'a/b', 'eggdev', 7);
+const leftOn = (head: string, rounds: Array<Round>, mergeState: string, finding?: string) =>
+  ownerLeft(fake(pr(head, rounds, mergeState, finding)).run, 'a/b', 'eggdev', 7);
 
 test('a decision left on an older head still waits after a push', async () => {
   expect(await leftOn('n3w', [roundOf('0ld', [left])], 'CLEAN')).toEqual({
@@ -193,37 +194,18 @@ beforeEach(async () => {
 });
 afterEach(() => rm(gitDir, { recursive: true, force: true }));
 
-const keep = (skip: string, stuck = false) =>
-  writeFile(
-    path.join(gitDir, 'clutch', 'babysit-7.json'),
-    JSON.stringify({
-      number: 7,
-      head: 'h3ad',
-      approved: false,
-      triggers: [],
-      sync: 'none',
-      failed: [],
-      threads: [],
-      comments: [],
-      approvedThreads: [],
-      waiting: [left],
-      ownerThreads: [
-        { id: 'T1', commentId: 5, path: 'a.ts', line: 1, outdated: false, comments: [] },
-      ],
-      skip,
-      stuck,
-    }),
-  );
-
-const session = () =>
+const session = (
+  rounds: Array<Round> = [roundOf('h3ad', [left])],
+  finding = 'note: which copy?',
+  labels: Array<string> = [],
+) =>
   fake([
     ['gh repo view', { out: 'a/b\n' }],
     ['git rev-parse --absolute-git-dir', { out: `${gitDir}\n` }],
-    ...pr('h3ad', [], 'CLEAN'),
+    ...pr('h3ad', rounds, 'CLEAN', finding, labels),
   ]);
 
 test('the owner answer quotes itself in the waiting thread, and resolves it', async () => {
-  await keep('nothing to do');
   const gh = session();
   expect(
     await babysit(gh.run, '7', { 'owner-said': 'Keep 3 clicks.', now: '2026-11-08T11:00:00Z' }),
@@ -235,15 +217,37 @@ test('the owner answer quotes itself in the waiting thread, and resolves it', as
 });
 
 test('the owner answer reaches a PR that a cap labelled stuck', async () => {
-  await keep('labelled babysit:stuck');
+  const stuck = { ...roundOf('h3ad', [left]), outcome: 'stuck' as const };
+  const gh = session([stuck], 'note: which copy?', ['babysit:stuck']);
+  expect(await babysit(gh.run, '7', { 'owner-said': 'Yes.', now: '2026-11-08T11:00:00Z' })).toBe(0);
+});
+
+test('the owner answer reads the live PR, not a plan kept before the last round', async () => {
+  const gh = session();
+  await babysit(gh.run, '7', { 'owner-said': 'Yes.', now: '2026-11-08T11:00:00Z' });
+  expect(gh.calls.some((c) => c.includes('resolveReviewThread') && c.includes('T1'))).toBe(true);
+});
+
+test('the owner answer refuses when nothing waits for it', async () => {
+  await expect(
+    babysit(session([]).run, '7', { 'owner-said': 'Yes.', now: '2026-11-08T11:00:00Z' }),
+  ).rejects.toThrow('Nothing on #7 waits');
+});
+
+test('a blocking finding left for the owner stays open work', async () => {
+  const gh = fake(pr('h3ad', [roundOf('h3ad', [left])], 'BLOCKED', 'blocking: a real bug.'));
+  const state = await readPr(gh.run, 'a/b', 7, 'eggdev');
+  expect(plan(state, '2026-11-08T11:00:00Z').threads.map((t) => t.id)).toContain('T1');
   expect(
-    await babysit(session().run, '7', { 'owner-said': 'Yes.', now: '2026-11-08T11:00:00Z' }),
-  ).toBe(0);
+    await leftOn('h3ad', [roundOf('h3ad', [left])], 'BLOCKED', 'blocking: a real bug.'),
+  ).toBeNull();
 });
 
 test('the owner answer does not reach a PR labelled off', async () => {
-  await keep('labelled babysit:off');
   await expect(
-    babysit(session().run, '7', { 'owner-said': 'Yes.', now: '2026-11-08T11:00:00Z' }),
+    babysit(session(undefined, undefined, ['babysit:off']).run, '7', {
+      'owner-said': 'Yes.',
+      now: '2026-11-08T11:00:00Z',
+    }),
   ).rejects.toThrow('No round for #7');
 });
