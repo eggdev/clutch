@@ -44,7 +44,8 @@ in every test file:
 An existence check is `toBeDefined`, `toBeTruthy`, `not.toBeNull`,
 `not.toBeUndefined`, `not.toBeFalsy` or `not.toThrow`. Assert the value
 instead. A helper that asserts has a name that starts with `expect` or
-`assert`, such as `expectErrorCode`, so the rule counts it.
+`assert`, such as `expectErrorCode`, so the rule counts it. The rule also counts
+`outcome(...)`, the one assertion of a core journey.
 
 ## Deleted tests
 
