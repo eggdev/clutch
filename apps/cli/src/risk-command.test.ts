@@ -61,24 +61,31 @@ test('tests alone are low, and app code is medium', async () => {
   expect(await tierOf(['apps/cli/src/worktree/new.ts', 'docs/a.md'])).toBe('medium');
 });
 
-test('the hard core is a one-way door: the merge gate, auth, migrations and policy docs', async () => {
+test('the hard core is a one-way door: the merge gate, auth, migrations and project intent', async () => {
   for (const file of [
     '.github/rulesets/main.json',
     '.github/CODEOWNERS',
     'tools/github/auto-merge.ts',
     'tools/github/bot-rule.ts',
     '.github/workflows/agent-review.yml',
-    'docs/contributing/review.md',
     'apps/cli/src/risk/tiers.ts',
     'packages/identity/service/actors.ts',
     'packages/access/service/access.ts',
     'apps/api/src/auth/session.ts',
     'packages/access/repo/migrations/20261030000000_x/migration.sql',
-    'docs/contributing/decisions/0001-a.md',
-    'docs/principles/fail-loudly.md',
-    '.clutch/PLAN.md',
+    'docs/contributing/project-intent.md',
   ]) {
     expect(await tierOf([file, 'docs/a.md'])).toBe('one-way-door');
+  }
+});
+
+test('policy docs are low', async () => {
+  for (const file of [
+    'docs/contributing/review.md',
+    'docs/contributing/decisions/0001-a.md',
+    'docs/principles/fail-loudly.md',
+  ]) {
+    expect(await tierOf([file])).toBe('low');
   }
 });
 

@@ -27,9 +27,9 @@ causes only. Start the finding with its level, `owner`, then name its cause,
 when another rule says so.
 
 1. **Hard core.** The diff changes a path of the `one-way-door` tier of
-   [`.clutch/risk.yaml`](../../.clutch/risk.yaml). That is the merge gate, credentials, a
-   workflow's permissions or secrets, auth and access, migrations, billing,
-   infra and deploy, and decision records and policy docs. CODEOWNERS or
+   [`.clutch/risk.yaml`](../../.clutch/risk.yaml). That is the merge gate, credentials, and a workflow's permissions or secrets.
+   It is also auth and access, migrations that can lose data, billing, infra and
+   deploy, and project intent. CODEOWNERS or
    auto-merge already holds such a PR, so the finding says what the owner
    should look at.
 2. **A weaker check.** The change makes a check that gates the merge catch

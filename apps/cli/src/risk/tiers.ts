@@ -147,7 +147,7 @@ export function classify(
 ): Array<FileTier> {
   const globs = config.rules.flatMap((rule) => {
     const except = rule.except.map((pattern) => new Bun.Glob(pattern));
-    const lines = rule.lines?.map((source) => new RegExp(source, 'u'));
+    const lines = rule.lines?.map((source) => new RegExp(source, 'iu'));
     return rule.paths.map((pattern) => ({
       tier: rule.tier,
       pattern,

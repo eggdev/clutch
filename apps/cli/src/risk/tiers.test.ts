@@ -1,4 +1,8 @@
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { parse } from 'yaml';
 
 import { changeTier, classify, validateRiskConfig } from '@/risk/tiers';
 import type { RiskConfig } from '@/risk/tiers';
@@ -103,4 +107,37 @@ test('lines must be a list of valid regular expressions', () => {
     { path: 'rules.0.lines', message: 'Expected a list of regular expressions.' },
   ]);
   expect(validateRiskConfig(linesRule(['^a'])).config?.rules[0].lines).toEqual(['^a']);
+});
+
+test("this repository's risk file holds only a migration that can lose data", () => {
+  const file = path.join(import.meta.dir, '../../../../.clutch/risk.yaml');
+  const { config: real } = validateRiskConfig(parse(readFileSync(file, 'utf-8')));
+  if (!real) {
+    throw new Error('.clutch/risk.yaml is not valid');
+  }
+  const migration = 'packages/notes/migrations/0007_x.sql';
+  const tierFor = (line: string) =>
+    classify(real, [migration], new Map([[migration, [line]]]))[0]?.tier;
+  for (const line of [
+    'ALTER TABLE "a" ADD COLUMN "b" text;',
+    'CREATE TABLE "a" ("b" text);',
+    'ALTER TABLE "a" DROP CONSTRAINT "b";',
+    'ALTER TABLE "a" ALTER COLUMN "b" DROP NOT NULL;',
+  ]) {
+    expect(tierFor(line)).toBe('medium');
+  }
+  for (const line of [
+    'DROP TABLE "a";',
+    'drop table "a";',
+    'ALTER TABLE "a" DROP COLUMN "b";',
+    'ALTER TABLE "a" DROP "b";',
+    'TRUNCATE "a";',
+    'DELETE FROM "a";',
+    'ALTER TABLE "a" ALTER COLUMN "b" SET DATA TYPE integer;',
+    'ALTER TABLE "a" ALTER COLUMN "b" TYPE integer;',
+  ]) {
+    expect(tierFor(line)).toBe('one-way-door');
+  }
+  expect(classify(real, ['docs/principles/x.md'])[0]?.tier).toBe('low');
+  expect(classify(real, ['docs/contributing/project-intent.md'])[0]?.tier).toBe('one-way-door');
 });

@@ -457,7 +457,7 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
 - A rule with `guardrails: tools/guardrail-files.json` adds every pattern in
   that list to its paths, so the two cannot drift.
 - A rule with `lines` matches a file only when one of its added or removed
-  lines matches one of those regular expressions. `tools/codeowners.ts` leaves
+  lines matches one of those regular expressions, in upper or lower case. `tools/codeowners.ts` leaves
   such a rule out of CODEOWNERS, which cannot express it.
 - The rules and the CLI come from the working tree. The
   [Labels workflow](../../.github/workflows/labels.yml) checks out the base
