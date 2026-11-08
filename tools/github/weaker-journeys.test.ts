@@ -112,3 +112,17 @@ test('a changed coreJourneys decision holds, and a new one does not', () => {
     'clutch.yaml: the PR changes the coreJourneys decision for `sign-up`.',
   ]);
 });
+
+test('a change to the journey kit holds', async () => {
+  const gh = fake([
+    ['git merge-base', { out: 'b4se\n' }],
+    [
+      'git diff --name-status',
+      { out: 'M\tpackages/journeys/testing/outcome.ts\nA\ttools/journeys/x.ts\nM\tapps/a.ts\n' },
+    ],
+  ]);
+  expect(await weakerJourneys(gh.run, 'main', 'h3ad')).toEqual([
+    'packages/journeys/testing/outcome.ts: the PR changes the journey kit that proves every journey.',
+    'tools/journeys/x.ts: the PR changes the journey kit that proves every journey.',
+  ]);
+});
