@@ -264,8 +264,8 @@ The [Labels workflow](../../../.github/workflows/labels.yml) labels each PR
 `risk/low`, `risk/medium`, `risk/high` or `risk/one-way-door` from the paths it
 touches. It runs `clutch risk` from the base branch, with the rules in
 `.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk). The
-`one-way-door` tier holds only the hard core: the merge gate, credentials, auth,
-migrations, and decision records and policy docs. It also holds two lists that
+`one-way-door` tier holds only the hard core: the merge gate, credentials, auth
+until its journeys exist, migrations, and decision records and policy docs. It also holds two lists that
 each project fills: its billing code, and its infra, deploy and secrets paths.
 See
 [decision record 0002](../decisions/0002-merge-most-prs-with-no-human.md).
