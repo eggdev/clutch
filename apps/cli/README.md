@@ -519,6 +519,9 @@ automerge: # optional
   mode: dry-run # off (the default), dry-run or on
   step: low # bots (the default), low or medium: how far auto-merge reaches
   owner: eggdev # optional: the login whose reactions grade the dry-run verdicts
+deploy: # optional: the production deploy and the URL that proves it
+  command: [bun, run, deploy]
+  url: https://example.com
 autoRevert: # optional
   watch: [production] # checks or jobs that also count as required for auto-revert only
 pr: # optional
