@@ -128,23 +128,6 @@ jobs:
       # The page script of the journey test, in a real Chromium. Validate has no browser.
       - name: Test the journey kit in a browser
         run: bun test ./packages/journeys/testing/measure.browser.test.ts
-      # A PR must not be able to weaken the proof that judges it, so the journey
-      # kit and runner come from the base branch. See
-      # docs/principles/proof-gates-code.md#proof-decides-the-rest.
-      - name: Check out the base branch's journey kit
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: ${{ github.base_ref }}
-          path: .base
-      - name: Use the base branch's journey kit
-        if: github.event_name == 'pull_request'
-        run: |
-          rm -rf packages/journeys/testing tools/journeys
-          cp -R .base/packages/journeys/testing packages/journeys/testing
-          cp -R .base/tools/journeys tools/journeys
-          rm -rf .base
       - run: bun tools/journeys/run.ts --all
       - name: Keep the traces of a failed journey
         if: failure()

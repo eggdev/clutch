@@ -283,8 +283,8 @@ warns. Above `pr_size.max`, `check-scope` fails the PR, so it splits. See
 
 The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
 `bun run pr merge <number>` dispatches it from the session that built the PR.
-It also runs when the owner approves a head, and when CI completes on a
-`revert/` or bot PR, which no session owns. No schedule starts it. It judges a pull request of this repository,
+It also runs when the owner approves a head, and when CI completes on an agent's
+`clutch/` PR, a `revert/` PR or a bot PR. No schedule starts it. It judges a pull request of this repository,
 never a fork's, and logs a person's as not judged.
 An agent's PR is one that a bot opens. A bot's PR is on a `renovate/`,
 `gardening/`, `clutch-sync/` or `revert/` branch. It acts on `automerge.mode`

@@ -69,7 +69,7 @@ function hasScreen(root: string, feature: string): boolean {
   return existsSync(screens) && readdirSync(screens).some((name) => name !== '.gitkeep');
 }
 
-function missingJourneys(root: string, all: ReadonlyArray<Journey>): Array<string> {
+export function missingJourneys(root: string, all: ReadonlyArray<Journey>): Array<string> {
   const features = existsSync(path.join(root, 'features'))
     ? readdirSync(path.join(root, 'features'), { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
