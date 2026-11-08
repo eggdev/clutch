@@ -16,12 +16,11 @@ name: Auto-merge
 #   main.
 # - The owner's approval of a head. The session may have ended by then, so the
 #   approval hands the PR to a dispatch from the default branch.
-# - A completed CI or Agent review run on a PR that no session owns: a
-#   `revert/` PR that the Auto-revert net opened, or a bot's `renovate/`,
-#   `gardening/` or `clutch-sync/` PR. An agent's `clutch/` PR merges from
-#   this event only after the owner approved it, so it otherwise merges only
-#   when its session asks. When CI turns green on the default branch, each
-#   approved agent PR is judged again, since a red main may have held it.
+# - A completed CI or Agent review run on an agent's `clutch/` PR, a `revert/`
+#   PR that the Auto-revert net opened, or a bot's `renovate/`, `gardening/` or
+#   `clutch-sync/` PR. A green agent PR merges with no session. A session that
+#   is still working keeps its PR a draft. When CI turns green on the default
+#   branch, each open agent PR is judged again, since a red main may have held it.
 #
 # Each run uses the default branch's code, so a pull request cannot change the
 # rules that judge it. The decide job judges the head that the PR has then, and
@@ -114,18 +113,6 @@ jobs:
               echo "::notice title=Auto-merge skipped::No open pull request has head $HEAD_SHA."
             fi
           fi
-          # An agent's clutch/ PR merges from a CI event only after the owner
-          # approved it: the approval's own run may have met a pending check.
-          # Its session merges it otherwise.
-          # A ruleset's code owner review leaves reviewDecision empty, so read the
-          # approvals on the head commit. The judge then checks that the owner gave one.
-          if [ "$GITHUB_EVENT_NAME" = workflow_run ] && [ -n "$PR" ] && [[ "$HEAD_BRANCH" == clutch/* ]]; then
-            approved="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/reviews" --jq ".[] | select(.state == \"APPROVED\" and .user.type != \"Bot\" and .commit_id == \"$HEAD_SHA\") | .id")"
-            if [ -z "$approved" ]; then
-              echo "::notice title=Auto-merge skipped::Agent PR $PR has no approval, so its session merges it."
-              PR=""
-            fi
-          fi
           echo "number=$PR" >> "$GITHUB_OUTPUT"
           echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
       # Only when this run found a PR that it may judge.
@@ -196,15 +183,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          # A ruleset's code owner review leaves reviewDecision empty, so read the
-          # approvals on each head commit. The judge checks that the owner gave one.
-          gh pr list --state open --limit 100 --json number,headRefName,headRefOid,isCrossRepository \
-            --jq '.[] | select((.headRefName | startswith("clutch/")) and (.isCrossRepository | not)) | "\(.number) \(.headRefOid)"' |
-            while read -r pr head; do
-              approved="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/reviews" --jq ".[] | select(.state == \"APPROVED\" and .user.type != \"Bot\" and .commit_id == \"$head\") | .id")"
-              if [ -n "$approved" ]; then
-                gh workflow run auto-merge.yml --ref "$DEFAULT_BRANCH" -f pr="$pr"
-              fi
+          gh pr list --state open --limit 100 --json number,headRefName,isCrossRepository \
+            --jq '.[] | select((.headRefName | startswith("clutch/")) and (.isCrossRepository | not)) | .number' |
+            while read -r pr; do
+              gh workflow run auto-merge.yml --ref "$DEFAULT_BRANCH" -f pr="$pr"
             done
 
   # Enables GitHub's auto-merge, `gh pr merge --auto --merge`, with the release

@@ -15,7 +15,8 @@ Inspect the checkout before editing. Use [task records](./references/task-record
 for one authoritative brief, evidence and resume point; do not invent a ticket.
 
 Extract outcome, acceptance criteria, exclusions, destination and permissions.
-An unspecified destination means a verified local result, not merge or release.
+An issue with `owner: agent` ends merged to `main`. Any other unspecified
+destination means a verified local result, not merge or release.
 A plain task request does not authorize an unattended queue.
 
 Before asking anything: reuse a settled decision; look up observable facts;
