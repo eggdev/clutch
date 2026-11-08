@@ -312,19 +312,7 @@ own `clutch risk` tier is `low` or `medium`. It may merge while `main` is red,
 because it is the fix. A revert of a PR that a person merged waits for a person.
 See [auto-revert](../../../../docs/contributing/operations/rollback.md#auto-revert).
 
-The revert brake: the step steps down by itself. Each run counts the PRs that
-merged in the last 30 days, and how many of them have a head branch that starts
-with `revert/` and no `drill` label. A drill is a rehearsal, so it counts in the
-merges but not in the reverts. When there are at least 20 merges and reverts
-pass 2% of them, the run judges at the step below the configured one: `medium`
-acts as `low`,
-and `low` acts as `bots`. The verdict names the rate and the step. The brake
-lifts by itself when the rate falls back to 2% or less. The limits are `brake`
-in `tools/github/auto-merge-rules.ts`, and they come from
-[decision 0002](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
-Revert PRs merge at every step, so the brake does not hold them. When the count
-fails, the run uses the configured step and logs a warning. A person still
-tightens a path from its `risk-tighten` issue.
+A person tightens a path from its `risk-tighten` issue.
 
 The bot rule:
 

@@ -106,7 +106,7 @@ Each PR carries labels that tools and people route on:
 | `risk/<tier>`    | The [Labels workflow](../../.github/workflows/labels.yml)  | The paths in `.clutch/risk.yaml`. See [risk](../../apps/cli/README.md#risk).                                          |
 | `one-way-door`   | A person                                                   | The change is one-way. See [two-way and one-way doors](../principles/two-way-doors.md).                               |
 | `revert`         | A person, or auto-revert                                   | Adding it to a merged PR starts its [revert](./operations/rollback.md#revert-a-merged-pull-request).                  |
-| `drill`          | A person                                                   | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the brake or the metric. |
+| `drill`          | A person                                                   | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the revert metric.       |
 | `needs-owner`    | `bun run pr ask`                                           | An issue waits for the owner, when no T3 thread can reach them. The issue holds the question in the fixed form.       |
 | `babysit:stuck`  | The [babysitter](../../.agents/skills/babysit-pr/SKILL.md) | A cap or a conflict stopped it. Its `## Babysit log` comment says why, and the session tells the owner in its thread. |
 | `babysit:off`    | A person                                                   | The babysitter leaves the PR alone.                                                                                   |
