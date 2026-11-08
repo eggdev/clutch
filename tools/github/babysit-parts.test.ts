@@ -2,7 +2,8 @@ import { expect, test } from 'bun:test';
 
 import { blockingGuard } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
-import { onlyOwnerLeft } from '@tools/github/babysit-owner';
+import type { Item } from '@tools/github/babysit-log';
+import { decisionsNow, onlyOwnerLeft } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { fake } from '@tools/github/fake-run';
 
@@ -113,4 +114,24 @@ test('only a fix closes a blocking finding; any other answer leaves it for the o
   );
   expect(blockingGuard(answer, 'note: rename')?.decision).toBe('no-change');
   expect(blockingGuard(undefined, 'blocking: x')).toBeUndefined();
+});
+
+const item = (fields: Partial<Item>): Item => ({
+  kind: 'thread',
+  ref: 'T1',
+  url: 'u',
+  author: 'bot',
+  decision: 'owner',
+  reason: 'a policy call',
+  action: 'left for the owner',
+  resolved: false,
+  ...fields,
+});
+
+test('a failed check or an unfixed blocking finding left for the owner needs them now', () => {
+  const check = item({ kind: 'check', ref: 'deploy', reason: 'a missing secret' });
+  const blocking = item({ ref: 'T2', reason: 'a blocking finding closes only with a fix; no' });
+  expect(
+    decisionsNow([item({}), check, blocking, item({ decision: 'no-change', kind: 'check' })]),
+  ).toEqual([check, blocking]);
 });

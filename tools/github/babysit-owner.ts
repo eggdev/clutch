@@ -1,4 +1,6 @@
 import { plan } from '@tools/github/babysit';
+import { blockingOnlyFix } from '@tools/github/babysit-answer';
+import type { Item } from '@tools/github/babysit-log';
 import { readPr } from '@tools/github/babysit-read';
 import type { Run } from '@tools/github/stack';
 import { prStatus } from '@tools/github/status';
@@ -28,6 +30,19 @@ export function onlyOwnerLeft(
     status.mergeable === 'MERGEABLE' &&
     status.mergeState === 'BLOCKED' &&
     !workLeft
+  );
+}
+
+/**
+ * What only the owner can settle while work is still open: a failed check
+ * that the round left for them, or a blocking finding that no one could fix.
+ * These do not wait for the checks to pass, since nothing else can clear them.
+ */
+export function decisionsNow(items: ReadonlyArray<Item>) {
+  return items.filter(
+    (item) =>
+      item.decision === 'owner' &&
+      (item.kind === 'check' || item.reason.startsWith(blockingOnlyFix)),
   );
 }
 

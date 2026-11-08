@@ -16,10 +16,18 @@ const label = 'needs-owner';
 /** The sections of the fixed question form, in the order that the owner reads them. */
 const sections = ['## Goal', '## Options', '## What each option changes for users', '## My pick'];
 
-/** The sections that `body` lacks. */
+/** The sections that `body` lacks, or that hold no text. */
 export function missingSections(body: string) {
-  const headings = new Set(body.split('\n').map((line) => line.trim()));
-  return sections.filter((section) => !headings.has(section));
+  const lines = body.split('\n').map((line) => line.trim());
+  return sections.filter((section) => {
+    const start = lines.indexOf(section);
+    if (start === -1) {
+      return true;
+    }
+    const rest = lines.slice(start + 1);
+    const end = rest.findIndex((line) => line.startsWith('## '));
+    return !rest.slice(0, end === -1 ? undefined : end).some(Boolean);
+  });
 }
 
 /** Opens the question, or names the open issue that already asks it. Returns the exit code. */
@@ -29,7 +37,9 @@ export async function ask(run: Run, title?: string, bodyFile?: string) {
   }
   const missing = missingSections(await readFile(bodyFile, 'utf-8'));
   if (missing.length > 0) {
-    throw new Error(`The question lacks ${missing.join(', ')}. Each section is its own heading.`);
+    throw new Error(
+      `The question lacks ${missing.join(', ')}. Each section is a heading with text under it.`,
+    );
   }
   const owner = await ownerLogin();
   if (!owner) {

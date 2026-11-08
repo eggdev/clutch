@@ -29,7 +29,8 @@ work while that answer is pending. Do not ask for approval of routine next steps
 
 Ask in this session's own thread, with the question tool, so T3 shows the
 thread as waiting. A PR label, a PR comment or a review request does not reach
-the owner. Use one fixed form:
+the owner. The question tool holds the turn until the owner answers, so finish
+the work that does not depend on the answer first. Use one fixed form:
 
 ```markdown
 ## Goal
@@ -49,10 +50,15 @@ A keeps 3 clicks. B stops a typo before the account exists.
 A, because the budget is the product's promise.
 ```
 
-When no person can answer in the thread, such as when the owner does not run
-T3, open one issue in the same form:
+The owner stops at most 2 times a day. Put a question that can wait into the
+next stop, and ask once for each PR head. A lane does not ask. It puts the
+question at the end of its reply, and the coordinator asks once.
+
+When the session has no question tool, such as when the owner does not run T3,
+open one issue in the same form:
 `mise exec -- bun run pr ask --title "<the question>" --body-file <file>`. It
-labels the issue `needs-owner` and assigns the owner.
+labels the issue `needs-owner` and assigns the owner. It refuses a section with
+no text.
 
 After the owner answers, write the answer into the issue or project intent, so
 no agent asks again. Then merge on proof. A held path still needs the owner's

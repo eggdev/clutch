@@ -6,7 +6,7 @@ import type { Plan } from '@tools/github/babysit';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, writeLog } from '@tools/github/babysit-apply';
 import type { Round } from '@tools/github/babysit-log';
-import { ownerLeft } from '@tools/github/babysit-owner';
+import { decisionsNow, ownerLeft } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
@@ -17,7 +17,7 @@ import { ownerLogin } from '@tools/github/status';
  * built the PR. Without `--answers`, it plans the round, prints the plan and
  * keeps it in the git directory. With `--answers`, it replies, resolves,
  * reruns flaky checks, writes the disposition and the `## Babysit log`, and
- * asks for the owner's review only when nothing is left. See
+ * says when to ask the owner in this session's thread. See
  * .agents/skills/babysit-pr/SKILL.md.
  */
 
@@ -52,7 +52,22 @@ async function babysitPlan(run: Run, number: string, now: string) {
   return 0;
 }
 
-/** Applies the session's answers to the kept plan, then asks the owner last. */
+/** How a round tells the session to reach the owner. */
+const askInThread =
+  "Ask in this session's thread with the question tool, in the fixed form of .agents/skills/deliver/SKILL.md#ask-the-owner";
+
+/**
+ * Whether this is the first time the session asks about `head`. A head that
+ * was asked about needs no second ask, so the owner stops once for it.
+ */
+export async function firstAsk(planFile: string, number: string, head: string) {
+  const file = path.join(path.dirname(planFile), `asked-${number}.txt`);
+  const asked = await readFile(file, 'utf-8').catch(() => '');
+  await writeFile(file, head);
+  return asked.trim() !== head;
+}
+
+/** Applies the session's answers to the kept plan, then says whether the owner is needed. */
 async function babysitApply(
   run: Run,
   number: string,
@@ -79,7 +94,7 @@ async function babysitApply(
   if (input.stuck) {
     const round: Round = { ...common, sync, items: [], outcome: 'stuck', note: input.stuck };
     await writeLog(run, repo, owner, kept.number, round, []);
-    console.log(`#${number}: stuck. ${input.stuck} Tell the owner in this session's thread.`);
+    console.log(`#${number}: stuck. ${input.stuck} ${askInThread}.`);
     return 1;
   }
   // The plan's caps hold the apply step too: a skipped round only logs as stuck.
@@ -104,10 +119,17 @@ async function babysitApply(
     runUrl: '',
     now: input.now,
   });
-  const left = await ownerLeft(run, repo, owner, kept.number);
-  console.log(
-    `#${number}: ${round.outcome}. ${round.note}${left ? ` Only the owner is left. Ask in this session's thread, with this approve link: https://github.com/${repo}/pull/${number}/files` : ''}`,
-  );
+  const now = decisionsNow(round.items);
+  const left = now.length === 0 && (await ownerLeft(run, repo, owner, kept.number));
+  let next = '';
+  if (now.length > 0) {
+    next = ` ${now.map((item) => item.ref).join(', ')} need the owner now. ${askInThread}.`;
+  } else if (left) {
+    next = (await firstAsk(file, number, kept.head))
+      ? ` Only the owner is left. ${askInThread}, with this approve link: https://github.com/${repo}/pull/${number}/files`
+      : ' Only the owner is left, and this head was already asked about. Do not ask again.';
+  }
+  console.log(`#${number}: ${round.outcome}. ${round.note}${next}`);
   return 0;
 }
 

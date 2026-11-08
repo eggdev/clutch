@@ -53,8 +53,9 @@ test('a question outside the fixed form is refused and names what it lacks', asy
   await writeFile(thin, '## Goal\nShip it?\n');
   const gh = fake([]);
   await expect(ask(gh.run, 'Ship it?', thin)).rejects.toThrow(
-    'The question lacks ## Options, ## What each option changes for users, ## My pick.',
+    'The question lacks ## Options, ## What each option changes for users, ## My pick. Each section is a heading with text under it.',
   );
   expect(gh.calls).toEqual([]);
   expect(missingSections(form)).toEqual([]);
+  expect(missingSections(form.replace('A or B.', ''))).toEqual(['## Options']);
 });

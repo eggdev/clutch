@@ -105,8 +105,8 @@ of these hold:
 - Every required check passed, and agent review passed with 0 blocking
   findings.
 - The PR head marks the issue `done`.
-- The owner approved it, when the ruleset requires a code owner review. A lane
-  asks once for its whole stack. See
+- The owner approved it, when the ruleset requires a code owner review. The
+  coordinator asks once for the whole stack. See
   [one approval round per batch](../deliver/references/pull-requests.md#one-approval-round-per-batch).
 - The coordinator has not put the PR on hold.
 
@@ -121,14 +121,14 @@ For example, one lane adds a workflow while another adds a workflow lint. Each
 PR is green. Merged minutes apart, the lint fails on the new workflow, and
 `main` is red for every lane.
 
-Before a lane asks the owner for approval, it checks whether `main` moved
-since its last green run:
+Before the coordinator asks the owner for approval, each lane checks whether
+`main` moved since its last green run:
 
 1. Run `git fetch origin` and compare each PR's base with `origin/main`.
 2. When `main` moved, run `mise exec -- bun run pr sync` on the bottom PR of the
    stack, and wait for the new runs to pass.
-3. Then ask the owner in the coordinator's thread to approve the whole stack
-   in one round, with each approve link.
+3. Then put the request at the end of the lane's reply. The coordinator asks
+   the owner to approve the whole stack in one round, with each approve link.
 
 After the approval, a lane pushes only to a PR that GitHub reports as `DIRTY`.
 A push drops the approval. A `CLEAN` PR merges as it is with
@@ -153,8 +153,11 @@ issue that decides on a merge queue. Incidents are the evidence for one.
 
 ## 7. Relay the owner's questions
 
-Lanes put the owner's decisions at the end of each reply. Collect them, drop
-the ones that a lane already settled with a default, and ask the owner once.
+A lane does not ask the owner. Its question tool would hold the lane, and the
+owner would stop once for each lane. Lanes put the owner's decisions at the end
+of each reply. Collect them, and drop the ones that a lane already settled with
+a default. [Ask the owner](../deliver/SKILL.md#ask-the-owner) once, in your own
+thread.
 Relay each answer to the lane that asked, in the owner's own words, with the
-date. A decision that changes the plan also goes into the project's plan or
-decision records, in the PR that acts on it.
+date. A decision that changes the plan also goes into the issue or project
+intent, in the PR that acts on it.

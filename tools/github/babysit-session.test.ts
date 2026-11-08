@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { babysit } from '@tools/github/babysit-session';
+import { babysit, firstAsk } from '@tools/github/babysit-session';
 import { fake } from '@tools/github/fake-run';
 
 test('the apply step refuses a round that the plan capped, and points to --stuck', async () => {
@@ -28,5 +28,18 @@ test('the apply step refuses a round that the plan capped, and points to --stuck
     expect(gh.calls.some((call) => call.startsWith('gh api'))).toBe(false);
   } finally {
     await rm(gitDir, { recursive: true, force: true });
+  }
+});
+
+test('the session asks the owner once for each head', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'babysit-ask-'));
+  try {
+    const plan = path.join(dir, 'babysit-7.json');
+    expect(await firstAsk(plan, '7', 'h3ad')).toBe(true);
+    expect(await firstAsk(plan, '7', 'h3ad')).toBe(false);
+    expect(await firstAsk(plan, '8', 'h3ad')).toBe(true);
+    expect(await firstAsk(plan, '7', 'n3wer')).toBe(true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });

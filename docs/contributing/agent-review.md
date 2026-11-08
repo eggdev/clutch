@@ -107,11 +107,12 @@ Each PR carries labels that tools and people route on:
 | `one-way-door`   | A person                                                   | The change is one-way. See [two-way and one-way doors](../principles/two-way-doors.md).                               |
 | `revert`         | A person, or auto-revert                                   | Adding it to a merged PR starts its [revert](./operations/rollback.md#revert-a-merged-pull-request).                  |
 | `drill`          | A person                                                   | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the brake or the metric. |
+| `needs-owner`    | `bun run pr ask`                                           | An issue waits for the owner, when no T3 thread can reach them. The issue holds the question in the fixed form.       |
 | `babysit:stuck`  | The [babysitter](../../.agents/skills/babysit-pr/SKILL.md) | A cap or a conflict stopped it. Its `## Babysit log` comment says why, and the session tells the owner in its thread. |
 | `babysit:off`    | A person                                                   | The babysitter leaves the PR alone.                                                                                   |
 
 The workflows replace a stale `kind/`, `area/`, `size/` or `risk/` label on each push.
-The Labels workflow also creates `one-way-door`, `revert`, `drill` and the `babysit:` labels, so a person can always add
+The Labels workflow also creates `one-way-door`, `revert`, `drill`, `needs-owner` and the `babysit:` labels, so a person can always add
 them. `risk/one-way-door` comes from paths. `one-way-door` is a person's call
 about a change that the paths do not show, such as one that breaks a hard
 invariant.

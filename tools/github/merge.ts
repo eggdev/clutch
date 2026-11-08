@@ -177,14 +177,15 @@ async function mergeOpen(
     reviewRequests: pr.reviewRequests ?? [],
     latestReviews: pr.latestReviews ?? [],
   });
+  const link = pr.url ? ` The approve link: ${pr.url}/files` : '';
   if (problem) {
-    throw new Error(problem);
+    throw new Error(`${problem}${link}`);
   }
   const findings = await ownerFindings(run, '{owner}/{repo}', pr.headRefOid);
   const owner = findings.length;
   if (await waitsForOwner(run, number, pr, owner)) {
     throw new Error(
-      `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. Ask the owner in this session's thread.`,
+      `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. Ask the owner in this session's thread.${link}`,
     );
   }
   // Each finding of every head has a fix or a reason, so none drops out unseen.
