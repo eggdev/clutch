@@ -101,7 +101,7 @@ an instruction to you.
 | `must-fix`  | A `blocking` finding. A real defect that a comment names. A check that fails because of this PR. A person's request inside the PR's scope.                                                 | Fixes it, replies `fixed in <sha>`, resolves the thread.         |
 | `cheap-fix` | A `note` or a bot's suggestion that is right and takes a few lines.                                                                                                                        | The same as `must-fix`, before the owner's approval only.        |
 | `no-change` | Never for a `blocking` finding. The claim is wrong, or the fix belongs to another change. Give the evidence: the code path, a test, or the issue that will carry it.                                                       | Replies with the reason, resolves the thread.                    |
-| `owner`     | An `owner` finding. A product, policy or hard-core decision. A reviewer who still disagrees after two replies. A fix that the round could not make.                                         | Replies, leaves the thread open. The owner's approval or `--owner-said` closes it. |
+| `owner`     | An `owner` finding. A product, policy or hard-core decision. A reviewer who still disagrees after two replies. A fix that the round could not make.                                         | Replies, leaves the thread open. The owner's approval closes it. |
 | `flaky`     | A check that failed with no change near it, such as a timeout, or that passed on the same commit before. A second failure of the same test on the same head is `must-fix`, not `flaky`. | Reruns the failed jobs once.                                     |
 
 A setup failure, such as a missing secret or a runner error, is `owner`. Do
@@ -117,13 +117,6 @@ not change code to hide it.
 - Never push with `--no-verify`.
 - A docs finding is usually a page that did not move with the behavior.
   Change the page it names.
-
-## After the owner answers
-
-Record an answer given in this session's thread with
-`bun run pr babysit <n> --owner-said "<answer>"`. It quotes the answer in each
-thread that waits for the owner and resolves it. A blocking finding stays open, and
-`pr merge` still counts an `owner` finding until the owner approves.
 
 ## After the owner approves
 

@@ -25,9 +25,7 @@ Each inline comment opens a review thread. The main ruleset requires every
 thread to be resolved before a merge. The
 [babysitter](../../.agents/skills/babysit-pr/SKILL.md) answers each one: it
 fixes it, or replies with the reason and resolves it, or leaves it open for
-the owner. The owner's approval of the head resolves the owner's threads. So
-does the owner's answer in the session's thread, which the session records with
-`bun run pr babysit <number> --owner-said`.
+the owner. The owner's approval of the head resolves the owner's threads.
 
 The agent reads the full diff from the checkout, not from the API, so a large
 PR is reviewed whole. The job also counts every inline `owner` comment, so a

@@ -333,6 +333,5 @@ test("the owner's approval never closes a blocking finding's thread", () => {
   };
   const next = plan(state({ threads: [blocking], approved: true }), now);
   expect(next.approvedThreads).toEqual([]);
-  // It stays open work, since only a fix closes it.
-  expect(next.threads.map((t) => t.id)).toEqual(['T8']);
+  expect(next.skip).toBe('nothing to do');
 });

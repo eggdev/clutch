@@ -1,7 +1,6 @@
 import { replyMarker } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
 import type { Decision, Item } from '@tools/github/babysit-log';
-import { unanswered } from '@tools/github/babysit-log';
 import { isBlocking } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
@@ -62,10 +61,9 @@ export type Context = {
   plan: Plan;
   answers: Array<Answer>;
   pushed: string | null;
-
-  /** What the owner answered in the session's thread, when this round records it. */
-  ownerSaid?: string;
 };
+
+export const unanswered = 'the agent gave no decision';
 
 /** How the reason of a blocking finding that only a fix closes starts. */
 export const blockingOnlyFix = 'a blocking finding closes only with a fix';
@@ -139,15 +137,12 @@ export async function answerThreads({ run, repo, plan, answers, pushed }: Contex
   return items;
 }
 
-/** Resolves each thread left for the owner, once the owner approves the head or answers. */
-export async function closeApproved({ run, repo, plan, ownerSaid }: Context) {
+/** Resolves each thread left for the owner, once the owner approves the head. */
+export async function closeApproved({ run, repo, plan }: Context) {
   const items: Array<Item> = [];
   for (const thread of plan.approvedThreads ?? []) {
     const first = thread.comments[0];
-    const said = ownerSaid
-      ? `The owner answered in the session's thread: ${ownerSaid}`
-      : `The owner approved \`${plan.head.slice(0, 7)}\`, which answers this.`;
-    const body = `${said}\n\n${replyMarker}`;
+    const body = `The owner approved \`${plan.head.slice(0, 7)}\`, which answers this.\n\n${replyMarker}`;
     await must(run, [
       'gh',
       'api',
@@ -173,8 +168,8 @@ export async function closeApproved({ run, repo, plan, ownerSaid }: Context) {
       path: thread.path,
       finding: firstLine(first?.body),
       decision: 'owner',
-      reason: ownerSaid ? 'the owner answered in the thread' : 'the owner approved the head',
-      action: ownerSaid ? 'resolved by the answer' : 'resolved by the approval',
+      reason: 'the owner approved the head',
+      action: 'resolved by the approval',
       resolved: true,
     });
   }
@@ -187,13 +182,10 @@ export async function answerComments({ run, repo, plan, answers, pushed }: Conte
   const lines: Array<string> = [];
   for (const comment of plan.comments) {
     const answer = answers.find((a) => a.kind === 'comment' && a.ref === String(comment.id));
-    if (!answer) {
-      continue;
-    }
-    const { decision } = answer;
+    const decision = answer?.decision ?? 'owner';
     const action = actionOf(decision, pushed);
     const quote = comment.body.trim().split('\n')[0]?.slice(0, 140) ?? '';
-    const reply = answer.reply.trim();
+    const reply = answer?.reply.trim() ?? 'No decision yet. The owner decides.';
     lines.push(
       `- [${comment.author}](${comment.url}): > ${quote}\n  ${reply} _${decision}: ${action}._`,
     );
@@ -203,7 +195,7 @@ export async function answerComments({ run, repo, plan, answers, pushed }: Conte
       url: comment.url,
       author: comment.author,
       decision,
-      reason: answer.reason,
+      reason: answer?.reason ?? unanswered,
       action,
       resolved: false,
     });

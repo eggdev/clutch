@@ -1,9 +1,7 @@
 import { plan } from '@tools/github/babysit';
-import { blockingOnlyFix } from '@tools/github/babysit-answer';
-import { unanswered } from '@tools/github/babysit-log';
+import { blockingOnlyFix, unanswered } from '@tools/github/babysit-answer';
 import type { Item } from '@tools/github/babysit-log';
 import { readPr } from '@tools/github/babysit-read';
-import { levelOf } from '@tools/github/findings';
 import type { Run } from '@tools/github/stack';
 import { prStatus } from '@tools/github/status';
 import type { PrStatus } from '@tools/github/status';
@@ -62,56 +60,30 @@ export async function ownerLeft(run: Run, repo: string, owner: string, number: n
     next.threads.length > 0 ||
     next.comments.length > 0 ||
     state.log.rounds.at(-1)?.outcome === 'stuck';
-  if (!onlyOwnerLeft(status, state.approved, workLeft, next.waiting.length > 0)) {
-    return null;
-  }
-  const held = !status.ready && status.mergeState === 'BLOCKED';
-  return {
-    held,
-    refs: next.waiting.map((item) => item.ref),
-    // `pr merge` holds an agent review `owner` finding until the owner approves the head.
-    approval: next.waiting.some((item) => levelOf(item.finding ?? '') === 'owner'),
-  };
+  const waitingOwner = state.log.rounds.at(-1)?.outcome === 'waiting-owner';
+  return onlyOwnerLeft(status, state.approved, workLeft, waitingOwner);
 }
 
 /** How a round tells the session to reach the owner. */
 const askInThread =
   "Ask in this session's thread with the question tool, in the fixed form of .agents/skills/deliver/SKILL.md#ask-the-owner";
 
-/** What the session must ask the owner, and the key that keeps it to one ask. */
+/** What the session must ask the owner, when anything. */
 export function ownerAsk(input: {
   repo: string;
   number: string;
-  head: string;
   stuck: boolean;
-  left: { held: boolean; refs: Array<string>; approval?: boolean } | null;
+  left: boolean;
   now: ReadonlyArray<Pick<Item, 'ref'>>;
 }) {
-  const link = `https://github.com/${input.repo}/pull/${input.number}/files`;
   if (input.stuck) {
-    return { key: `${input.head} stuck`, text: `${askInThread}, filled in from the reason above.` };
+    return `${askInThread}.`;
   }
-  // A named decision comes first: the owner answers it here, with no PR to open.
-  if (input.left && input.left.refs.length > 0) {
-    const refs = input.left.refs.join(', ');
-    return {
-      // An approval is per head, so an ask that carries one comes back on a new head.
-      key: input.left.approval ? `${input.head} ${refs}` : refs,
-      text: `${refs} wait for the owner. ${askInThread}, filled in from each item's thread. Ask about all of them at once. Then record the answer: \`bun run pr babysit ${input.number} --owner-said "<answer>"\`.${input.left.approval ? ` An owner finding also needs the approval, so give this approve link in the same question: ${link}` : ''}`,
-    };
-  }
-  if (input.left?.held) {
-    return {
-      key: input.head,
-      text: `Only the owner is left. ${askInThread}, with this approve link: ${link}`,
-    };
+  if (input.left) {
+    return `Only the owner is left. ${askInThread}, with this approve link: https://github.com/${input.repo}/pull/${input.number}/files`;
   }
   if (input.now.length > 0) {
-    const refs = input.now.map((item) => item.ref).join(', ');
-    return {
-      key: `${input.head} ${refs}`,
-      text: `${refs} need the owner now. ${askInThread}, filled in from each item's thread or check.`,
-    };
+    return `${input.now.map((item) => item.ref).join(', ')} need the owner now. ${askInThread}.`;
   }
   return null;
 }

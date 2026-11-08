@@ -1,6 +1,5 @@
 import { isAgentPr as agentRule } from '@tools/github/auto-merge-rules';
-import { roundsToday, unanswered } from '@tools/github/babysit-log';
-import type { Item } from '@tools/github/babysit-log';
+import { roundsToday } from '@tools/github/babysit-log';
 import { isBlocking } from '@tools/github/babysit-read';
 import type { Comment, FailedCheck, PrState, Thread } from '@tools/github/babysit-read';
 
@@ -56,10 +55,6 @@ export type Plan = {
   comments: Array<Comment>;
   /** Threads left for the owner that the owner's approval of this head now answers. They need no model. */
   approvedThreads: Array<Thread>;
-  /** Threads and comments that a round left for the owner, and no later round closed. */
-  waiting: Array<Item>;
-  /** The waiting threads that the owner's answer in the session's thread can close. */
-  ownerThreads: Array<Thread>;
   /** Why no round runs, when none does. */
   skip: string | null;
   /** True when the caps stop a round that has work. The workflow marks the PR stuck. */
@@ -79,45 +74,16 @@ export function isAgentPr(state: Pick<PrState, 'author' | 'authorIsBot' | 'headR
 
 const answeredByBabysitter = (body: string) => body.includes(replyMarker);
 
-/**
- * What the log still leaves for the owner: the newest entry for each thread or
- * comment, when it waits for them and its thread is still open. A failed check
- * is not here: it asks when the round decides it, and clears when it passes.
- */
-function waitingOwner(state: Pick<PrState, 'log' | 'threads'>) {
-  // Only a fix closes a blocking finding, so it never waits on an answer.
-  const open = new Set(
-    state.threads.filter((t) => !isBlocking(t.comments[0]?.body)).map((t) => t.id),
-  );
-  const newest = new Map(
-    state.log.rounds.flatMap((round) => round.items).map((item) => [item.ref, item]),
-  );
-  return [...newest.values()].filter(
-    (item) =>
-      item.kind !== 'check' &&
-      item.decision === 'owner' &&
-      !item.resolved &&
-      item.reason !== unanswered &&
-      (item.kind !== 'thread' || open.has(item.ref)),
-  );
-}
-
 /** The work on a PR now, and whether the caps let a round run. `now` is an ISO time. */
 export function plan(state: PrState, now: string): Plan {
   const answered = new Set(state.log.answered);
   // A thread is open work until the babysitter has the last word in it.
-  // A blocking finding stays open work until a fix closes it, whoever spoke last.
-  const threads = state.threads.filter(
-    (t) => !answeredByBabysitter(t.comments.at(-1)?.body ?? '') || isBlocking(t.comments[0]?.body),
-  );
+  const threads = state.threads.filter((t) => !answeredByBabysitter(t.comments.at(-1)?.body ?? ''));
   // The owner's approval of the head answers each thread the babysitter left for the owner.
   // A blocking finding is never answered by the approval: only a fix closes it.
   const approvedThreads = state.approved
     ? state.threads.filter((t) => !threads.includes(t) && !isBlocking(t.comments[0]?.body))
     : [];
-  const waiting = waitingOwner(state);
-  const waitingRefs = new Set(waiting.map((item) => item.ref));
-  const ownerThreads = state.threads.filter((t) => waitingRefs.has(t.id));
   const comments = state.comments.filter(
     (c) =>
       !answered.has(c.id) && !answeredByBabysitter(c.body) && !machine.some((m) => m.test(c.body)),
@@ -135,10 +101,7 @@ export function plan(state: PrState, now: string): Plan {
     [state.failed.length > 0 && state.pending === 0, 'red-check'],
     [threads.length > 0, 'open-thread'],
     [comments.length > 0, 'new-comment'],
-    [
-      approvedThreads.length > 0 || (state.approved && waiting.some((i) => i.kind === 'comment')),
-      'owner-approved',
-    ],
+    [approvedThreads.length > 0, 'owner-approved'],
   ];
   const triggers = work.filter(([on]) => on).map(([, trigger]) => trigger);
   const base = {
@@ -151,8 +114,6 @@ export function plan(state: PrState, now: string): Plan {
     threads,
     comments,
     approvedThreads,
-    waiting,
-    ownerThreads,
   } as const;
   const skip = (reason: string, stuck = false): Plan => ({ ...base, skip: reason, stuck });
   if (!state.open || state.draft) {

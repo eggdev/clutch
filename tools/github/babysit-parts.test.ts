@@ -1,7 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import type { Plan } from '@tools/github/babysit';
-import { blockingGuard, closeApproved } from '@tools/github/babysit-answer';
+import { blockingGuard } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import type { Item } from '@tools/github/babysit-log';
 import { decisionsNow, onlyOwnerLeft, ownerAsk } from '@tools/github/babysit-owner';
@@ -145,56 +144,10 @@ test('an unanswered item does not stop the owner', () => {
   expect(decisionsNow([item({ kind: 'check', reason: 'the agent gave no decision' })])).toEqual([]);
 });
 
-test('the ask names what the owner must do, keyed so it prints once', () => {
-  const base = { repo: 'a/b', number: '7', head: 'h3ad', stuck: false, left: null, now: [] };
+test('the ask names what the owner must do', () => {
+  const base = { repo: 'a/b', number: '7', stuck: false, left: false, now: [] };
   expect(ownerAsk(base)).toBeNull();
-  expect(ownerAsk({ ...base, stuck: true })?.key).toBe('h3ad stuck');
-  expect(ownerAsk({ ...base, left: { held: true, refs: ['T1'] } })?.text).not.toContain('/files');
-  const left = ownerAsk({ ...base, left: { held: true, refs: [] } });
-  expect(left?.key).toBe('h3ad');
-  expect(left?.text).toContain('https://github.com/a/b/pull/7/files');
-  const now = ownerAsk({ ...base, now: [{ ref: 'deploy' }] });
-  expect(now?.key).toBe('h3ad deploy');
-  expect(now?.text).toContain('deploy need the owner now');
-  expect(ownerAsk({ ...base, now: [{ ref: 'build' }] })?.key).toBe('h3ad build');
-  const open = ownerAsk({ ...base, left: { held: false, refs: ['T1'] } });
-  expect(open?.key).toBe('T1');
-  expect(open?.text).toContain('--owner-said');
-  expect(open?.text).not.toContain('/files');
-});
-
-test("the owner's answer in the thread closes what was left for them", async () => {
-  const gh = fake([['gh api', { out: '{}' }]]);
-  const thread: Plan['approvedThreads'][number] = {
-    id: 'T1',
-    commentId: 5,
-    path: 'a.ts',
-    line: 1,
-    outdated: false,
-    comments: [],
-  };
-  const items = await closeApproved({
-    run: gh.run,
-    repo: 'a/b',
-    answers: [],
-    pushed: null,
-    ownerSaid: 'Keep 3 clicks.',
-    plan: {
-      number: 7,
-      head: 'h3adbeef',
-      approved: false,
-      triggers: [],
-      sync: 'none',
-      failed: [],
-      threads: [],
-      comments: [],
-      approvedThreads: [thread],
-      waiting: [],
-      ownerThreads: [thread],
-      skip: null,
-      stuck: false,
-    },
-  });
-  expect(gh.calls.some((call) => call.includes('Keep 3 clicks.'))).toBe(true);
-  expect(items.map((i) => [i.resolved, i.action])).toEqual([[true, 'resolved by the answer']]);
+  expect(ownerAsk({ ...base, stuck: true })).toContain('fixed form');
+  expect(ownerAsk({ ...base, left: true })).toContain('https://github.com/a/b/pull/7/files');
+  expect(ownerAsk({ ...base, now: [{ ref: 'deploy' }] })).toContain('deploy need the owner now');
 });

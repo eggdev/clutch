@@ -121,21 +121,6 @@ export async function writeLog(
   }
 }
 
-/** The comments that the owner's answer or approval closes. They have no thread to resolve. */
-function closedComments(plan: Plan, ownerSaid?: string): Array<Item> {
-  if (!ownerSaid && !plan.approved) {
-    return [];
-  }
-  return plan.waiting
-    .filter((item) => item.kind === 'comment')
-    .map((item) => ({
-      ...item,
-      reason: ownerSaid ? 'the owner answered in the thread' : 'the owner approved the head',
-      action: ownerSaid ? 'resolved by the answer' : 'resolved by the approval',
-      resolved: true,
-    }));
-}
-
 /** Applies one round's answers and returns the round for the log. */
 export async function apply(
   run: Run,
@@ -150,7 +135,6 @@ export async function apply(
     event: string;
     runUrl: string;
     now: string;
-    ownerSaid?: string;
   },
 ) {
   const context: Context = {
@@ -159,14 +143,12 @@ export async function apply(
     plan: input.plan,
     answers: afterApproval(input.answers, input.plan.approved),
     pushed: input.pushed,
-    ownerSaid: input.ownerSaid,
   };
   const items = [
     ...(await answerThreads(context)),
     ...(await closeApproved(context)),
     ...(await answerComments(context)),
     ...(await answerChecks(context)),
-    ...closedComments(input.plan, input.ownerSaid),
   ];
   const round: Round = {
     at: input.now,
@@ -187,7 +169,7 @@ export async function apply(
     input.owner,
     input.plan.number,
     round,
-    items.filter((item) => item.kind === 'comment').map((item) => Number(item.ref)),
+    input.plan.comments.map((c) => c.id),
   );
   return round;
 }
