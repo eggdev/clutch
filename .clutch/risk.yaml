@@ -58,7 +58,9 @@ rules:
     # A migration that can lose data: it drops, empties, deletes or retypes
     # stored data. Any other migration is medium. A move to a new system, or
     # a delete in a script, has no line here: the issue names those at
-    # scoping. See docs/contributing/setup/migrations.md.
+    # scoping. See docs/contributing/setup/migrations.md. DROP CONSTRAINT,
+    # DEFAULT, NOT NULL and INDEX are exempt: each removes a rule or a lookup
+    # path, and every stored row stays.
     paths:
       - '{apps,features,packages}/**/migrations/**'
     lines:
