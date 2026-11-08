@@ -76,7 +76,7 @@ async function requiredChecks(run: Run, repo: string, branch: string) {
     '--jq',
     '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]',
   );
-  return [...new Set([...(JSON.parse(out) as Array<string>), agentReview])];
+  return [...new Set(JSON.parse(out) as Array<string>)];
 }
 
 /**

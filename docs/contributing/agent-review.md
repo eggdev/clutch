@@ -33,7 +33,7 @@ this head's comments is reported as a warning. A failed listing of the earlier
 heads' comments fails the job, so a re-run lists them again.
 
 Model findings are advisory. The job reports each finding, and no finding holds
-the merge. The job fails only when the agent returns no result. The session
+the merge. The job warns when the agent returns no result. The session
 still answers each finding. `tools/github/weaker-journeys.ts` holds a PR that
 weakens a journey or a budget, by comparing the two copies. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
@@ -51,10 +51,8 @@ reads the setting from the base branch, so a pull request cannot change it.
 Clutch sets `fail`. A fork pull request then fails agent review, and the owner
 reviews it.
 
-The main ruleset in `.github/rulesets/main.json` makes `agent-review` a
-required status check, so the review must run on each head. A project that
-has not set up the credential keeps the default, `notice`, and the check
-passes with a notice until the project adopts it.
+Agent review is advice, so no ruleset requires it. A project with no credential
+gets a notice, and the check passes.
 
 ## Visual review
 

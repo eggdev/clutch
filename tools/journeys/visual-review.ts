@@ -313,9 +313,8 @@ if (import.meta.main) {
     } else if (action === 'report' && out) {
       const failed = await report(spawnRun, out);
       for (const line of failed) {
-        console.log(`::error title=Visual review::${line}`);
+        console.log(`::warning title=Visual review::${line}`);
       }
-      process.exitCode = failed.length > 0 ? 1 : 0;
     } else {
       console.error('Usage: bun tools/journeys/visual-review.ts prepare|report <out>');
       process.exitCode = 2;

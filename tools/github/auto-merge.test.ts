@@ -314,7 +314,7 @@ test('no dry-run comment while a required check is still running', async () => {
   ]);
   const [line] = await decide(running, { mode: 'dry-run', step: 'low' });
   expect(line).toContain('- The required check validate is pending.');
-  expect(line).toEndWith('No dry-run comment: Waiting for validate, agent-review to finish.');
+  expect(line).toEndWith('No dry-run comment: Waiting for validate to finish.');
   expect([...merges(running.calls), ...comments(running.calls)]).toEqual([]);
 });
 

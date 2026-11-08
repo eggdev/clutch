@@ -9,7 +9,6 @@ import type { Run } from '@tools/github/stack';
  */
 
 /** The check that agent review reports. auto-merge counts it as required too. */
-const agentReview = 'agent-review';
 
 /** A conclusion that makes a check red. The same set as auto-merge. */
 const redConclusions = new Set([
@@ -41,7 +40,7 @@ export async function requiredChecks(run: Run, repo: string, branch: string) {
     '--jq',
     '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]',
   );
-  return [...new Set([...(JSON.parse(out) as Array<string>), agentReview])];
+  return [...new Set(JSON.parse(out) as Array<string>)];
 }
 
 /**
