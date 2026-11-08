@@ -294,7 +294,7 @@ export async function main(
   }
   if (selected.length === 0) {
     // A feature that ships a screen and has no journey is a gate with no proof.
-    const missing = missingJourneys(root, []);
+    const missing = missingJourneys(root, journeys(root));
     if (missing.length > 0) {
       sink.error(`No journey ran, and a feature ships a screen:\n${missing.join('\n')}`);
       return 1;

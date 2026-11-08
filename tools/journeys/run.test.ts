@@ -69,6 +69,26 @@ test('no journey ran while a feature ships a screen fails, and names the feature
   );
 });
 
+test('a native feature with its native journey and no web journey still exits 0', async () => {
+  await inRepo(
+    {
+      'package.json': JSON.stringify({ name: 'shop' }),
+      'apps/mobile/package.json': JSON.stringify({
+        name: 'mobile',
+        dependencies: { '@features/billing': 'workspace:*' },
+        nx: { tags: ['platform:native'] },
+      }),
+      'features/billing/package.json': JSON.stringify({ name: '@features/billing' }),
+      'features/billing/screens/pay.tsx': 'export const Pay = 1;\n',
+      'features/billing/journeys/pay.maestro.yaml': 'appId: x\n---\n- launchApp\n',
+    },
+    async (root) => {
+      const { sink } = capture({});
+      expect(await main(root, '--all', sink)).toBe(0);
+    },
+  );
+});
+
 test('several web apps and no journeys.webApp fail before any server starts', async () => {
   await inRepo(
     {
