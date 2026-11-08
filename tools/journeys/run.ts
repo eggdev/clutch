@@ -6,8 +6,10 @@ import type { DevApp } from '@tools/dev';
 import {
   budgetOf,
   coreJourneys,
+  coreWithout,
   fieldOf,
   headerOf,
+  inboxCommandOf,
   journeys,
   requiredOutcomes,
   webDevices,
@@ -211,9 +213,10 @@ export function unprovenCore(
       const at = `${journey.file} on ${device.name}`;
       const last = runs.find((run) => run.device === device.name)?.attempts.at(-1);
       const seen = (last?.outcomes ?? []).map((outcome) => outcome.name);
-      const missing = requiredOutcomes(name as (typeof coreJourneys)[number]).filter(
-        (outcome) => !seen.includes(outcome),
-      );
+      const missing = requiredOutcomes(
+        name as (typeof coreJourneys)[number],
+        coreWithout(root, name),
+      ).filter((outcome) => !seen.includes(outcome));
       const problems: Array<string> = [];
       if (seen[0] !== 'signed-up') {
         problems.push(
@@ -308,7 +311,11 @@ export async function main(
       selected.map((journey) => journey.file),
       urls.get(web.name) ?? '',
       budget,
-      { JOURNEY_MEASURES_DIR: dir, JOURNEY_BUDGETS: JSON.stringify(budgets) },
+      {
+        JOURNEY_MEASURES_DIR: dir,
+        JOURNEY_BUDGETS: JSON.stringify(budgets),
+        JOURNEY_INBOX: JSON.stringify(inboxCommandOf(root) ?? []),
+      },
     );
     const { runsOf, failed } = await collect(root, selected, dir, sink, fileFlake);
     for (const line of failed) {

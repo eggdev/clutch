@@ -28,5 +28,10 @@ journey with a `Core:` line asserts only through it. At the outcome where a
 core journey's click budget ends, it fails a run over the budget. See the
 [core journey catalog](https://github.com/eggdev/clutch/blob/main/docs/contributing/journeys/core.md).
 
+A core journey reads email through `@repo/journeys/testing/inbox`:
+`enterEmailCode` and `openEmailLink`. Each runs the command in `journeys.inbox`
+of `clutch.yaml`. See the
+[core journey catalog](https://github.com/eggdev/clutch/blob/main/docs/contributing/journeys/core.md#vendors-in-test-mode).
+
 The runner and the Playwright config live in `tools/journeys/`. A feature may
 import only packages, so the checks live here.

@@ -224,6 +224,13 @@ function countOutcomeCalls(source: ts.SourceFile) {
 /** Any name, so a step's own arguments do not decide whether it counts as a step. The allow list checks them. */
 const everyName: Names = { has: () => true };
 
+/** Opening an emailed link or typing an emailed code is a step that a user takes. */
+const isEmailStep = (call: ts.Expression | null) =>
+  call !== null &&
+  ts.isCallExpression(call) &&
+  ts.isIdentifier(call.expression) &&
+  ['enterEmailCode', 'openEmailLink'].includes(call.expression.text);
+
 /** Each outcome is an awaited statement of the test body, in order, after a user step. */
 function steps(file: string, body: ts.Block, found: Found) {
   let entered = false;
@@ -251,7 +258,7 @@ function steps(file: string, body: ts.Block, found: Found) {
     const member = call ? pageStep(call, everyName) : null;
     if (member === 'goto') {
       entered = true;
-    } else if (member !== null && actions.has(member)) {
+    } else if ((member !== null && actions.has(member)) || isEmailStep(call)) {
       stepped = true;
     }
   }

@@ -26,18 +26,35 @@ const webAppPattern = /^apps\/[\w.-]+$/u;
 
 export function readJourneys(value: unknown, errors: Errors) {
   if (!isObject(value)) {
-    errors.push({ path: 'journeys', message: 'Expected a map with webApp.' });
+    errors.push({ path: 'journeys', message: 'Expected a map with webApp or inbox.' });
     return;
   }
-  unknownKeys(value, ['webApp'], 'journeys', errors);
-  if (typeof value.webApp !== 'string' || !webAppPattern.test(value.webApp)) {
+  unknownKeys(value, ['webApp', 'inbox'], 'journeys', errors);
+  const before = errors.length;
+  const { webApp, inbox } = value;
+  if (webApp !== undefined && (typeof webApp !== 'string' || !webAppPattern.test(webApp))) {
     errors.push({
       path: 'journeys.webApp',
       message: 'Expected the folder of an app under apps/, such as apps/app.',
     });
+  }
+  const isCommand =
+    Array.isArray(inbox) &&
+    inbox.length > 0 &&
+    inbox.every((part) => typeof part === 'string' && part.trim() !== '');
+  if (inbox !== undefined && !isCommand) {
+    errors.push({
+      path: 'journeys.inbox',
+      message: 'Expected a command as a list of strings, such as [bun, tools/inbox.ts].',
+    });
+  }
+  if (errors.length > before) {
     return;
   }
-  return { webApp: value.webApp };
+  return {
+    ...(webApp === undefined ? {} : { webApp: webApp as string }),
+    ...(inbox === undefined ? {} : { inbox: inbox as Array<string> }),
+  };
 }
 
 /**

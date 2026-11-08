@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { parse } from 'yaml';
+
 /**
  * A journey proves one user goal through the real entry point. It lives in
  * `features/<feature>/journeys/`: `<id>.pw.ts` runs in a browser with
@@ -55,10 +57,56 @@ export const coreOutcomes: Readonly<Record<(typeof coreJourneys)[number], Readon
     'contact-support': ['support-request-sent', 'empty-request-refused'],
   };
 
-/** The outcomes that a `Core: <name>` journey must record: `signed-up` first, then the catalog's. */
-export function requiredOutcomes(name: (typeof coreJourneys)[number]): Array<string> {
-  return [...new Set(['signed-up', ...coreOutcomes[name]])];
+/**
+ * The failure states of each core journey, a part of `coreOutcomes`. Only
+ * these may go in `without` of `clutch.yaml`, for a product that does not have
+ * the state, so no project leaves out what a journey exists to prove.
+ */
+export const coreFailureStates: Readonly<
+  Record<(typeof coreJourneys)[number], ReadonlyArray<string>>
+> = {
+  'sign-up': ['email-taken-refused', 'weak-password-refused'],
+  'sign-in': ['wrong-password-refused'],
+  onboarding: ['onboarding-resumed', 'required-field-refused'],
+  'profile-management': ['invalid-field-refused'],
+  'billing-and-checkout': ['card-declined', 'renewal-failed'],
+  'roles-and-access': ['role-refused'],
+  'account-security': ['wrong-password-refused'],
+  'contact-support': ['empty-request-refused'],
+};
+
+/**
+ * The outcomes that a `Core: <name>` journey must record: `signed-up` first,
+ * then the catalog's, less the failure states in `without`.
+ */
+export function requiredOutcomes(
+  name: (typeof coreJourneys)[number],
+  without: ReadonlyArray<string> = [],
+): Array<string> {
+  const leftOut = new Set(coreFailureStates[name].filter((state) => without.includes(state)));
+  return [...new Set(['signed-up', ...coreOutcomes[name]])].filter(
+    (outcome) => !leftOut.has(outcome),
+  );
 }
+
+type JourneyConfig = {
+  coreJourneys?: Record<string, { without?: Record<string, unknown> } | string>;
+  journeys?: { inbox?: ReadonlyArray<string> };
+};
+
+function journeyConfig(root: string): JourneyConfig | null {
+  const file = path.join(root, 'clutch.yaml');
+  return existsSync(file) ? (parse(readFileSync(file, 'utf-8')) as JourneyConfig | null) : null;
+}
+
+/** The failure states that `clutch.yaml` leaves out of the core journey `name`. */
+export function coreWithout(root: string, name: string): ReadonlyArray<string> {
+  const decision = journeyConfig(root)?.coreJourneys?.[name];
+  return typeof decision === 'object' ? Object.keys(decision.without ?? {}) : [];
+}
+
+/** The command that reads the project's test inbox, which `journeys.inbox` names. */
+export const inboxCommandOf = (root: string) => journeyConfig(root)?.journeys?.inbox;
 
 /**
  * The devices that each web journey runs on, on every PR: the three widths of

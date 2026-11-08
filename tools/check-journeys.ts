@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { coreProblems } from '@tools/journeys/core-rules';
 import {
+  coreWithout,
   fieldOf,
   headerOf,
   journeyCommand,
@@ -158,7 +159,7 @@ function headerProblems(root: string, journey: Journey): Array<string> {
       `${journey.file}: ${plain} Take \`test\` from @repo/journeys/testing/test, so the run is measured against its budgets. See docs/contributing/end-to-end-testing.md#measures.`,
     );
   }
-  return [...problems, ...coreProblems(journey, source)];
+  return [...problems, ...coreProblems(journey, source, (name) => coreWithout(root, name))];
 }
 
 function registrationProblems(root: string, all: ReadonlyArray<Journey>): Array<string> {

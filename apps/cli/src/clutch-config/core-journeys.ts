@@ -20,14 +20,37 @@ export const coreJourneys = [
 export type CoreJourney = (typeof coreJourneys)[number];
 
 /** Whether the project has a core journey. A journey it leaves out has a reason. */
-export type CoreDecision = { status: 'adopted' } | { status: 'n/a'; reason: string };
+export type CoreDecision =
+  | { status: 'adopted'; without?: Record<string, string> }
+  | { status: 'n/a'; reason: string };
 
 const isCoreJourney = (key: string): key is CoreJourney =>
   (coreJourneys as ReadonlyArray<string>).includes(key);
 
+/** `without`: each failure state that the product does not have, with the reason. */
+function readWithout(value: unknown, at: string, errors: Errors) {
+  if (!isObject(value) || Object.keys(value).length === 0) {
+    errors.push({ path: at, message: 'Expected a map of failure states to reasons.' });
+    return;
+  }
+  const without: Record<string, string> = {};
+  for (const [outcome, reason] of Object.entries(value)) {
+    if (typeof reason !== 'string' || !reason.trim()) {
+      errors.push({
+        path: `${at}.${outcome}`,
+        message: 'A failure state that the product does not have needs a reason.',
+      });
+      return;
+    }
+    without[outcome] = reason;
+  }
+  return without;
+}
+
 /**
  * `coreJourneys`: one decision for each core journey, which kickoff records.
- * `adopted` in the short form, or `{ status: n/a, reason }`.
+ * `adopted` in the short form, `{ status: adopted, without }` for a journey
+ * whose product has no such failure state, or `{ status: n/a, reason }`.
  */
 export function readCoreJourneys(value: unknown, errors: Errors) {
   if (!isObject(value)) {
@@ -52,11 +75,19 @@ export function readCoreJourneys(value: unknown, errors: Errors) {
       decisions[name] = { status: 'adopted' };
       continue;
     }
+    if (isObject(entry) && entry.status === 'adopted') {
+      unknownKeys(entry, ['status', 'without'], at, errors);
+      const without = readWithout(entry.without, `${at}.without`, errors);
+      if (without) {
+        decisions[name] = { status: 'adopted', without };
+      }
+      continue;
+    }
     if (!isObject(entry) || entry.status !== 'n/a') {
       errors.push({
         path: at,
         message:
-          'Expected adopted, or { status: n/a, reason } for a journey the project leaves out.',
+          'Expected adopted, { status: adopted, without } or { status: n/a, reason } for a journey the project leaves out.',
       });
       continue;
     }

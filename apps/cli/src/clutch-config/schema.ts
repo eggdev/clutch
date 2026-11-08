@@ -66,7 +66,7 @@ export type ClutchConfig = {
   /** The quality budgets of the core journeys, which kickoff fills. */
   budgets?: Budgets;
   /** The app that a web journey drives. Without it, the runner finds the one web app under apps/. */
-  journeys?: { webApp: string };
+  journeys?: { webApp?: string; inbox?: Array<string> };
   /**
    * `root`: the folder of the factory tree, from the project root. `factory` by
    * default. `intake`: the labels and the tracker states that are ready for the
