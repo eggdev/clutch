@@ -73,6 +73,7 @@ function intentEntries(root: string) {
   const lines = existsSync(file) ? readFileSync(file, 'utf-8').split('\n') : [];
   return new Set(
     lines
+      .filter((line) => /^\s*[|*-]/u.test(line))
       .flatMap((line) => line.split('|'))
       .map((part) =>
         part

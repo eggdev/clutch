@@ -69,7 +69,10 @@ test('a new screen needs an issue that states hand_test', async () => {
 });
 
 test('after kickoff, a new feature needs an issue with a goal from project intent', async () => {
-  await write('docs/contributing/project-intent.md', 'Teams | Share notes with a client\n');
+  await write(
+    'docs/contributing/project-intent.md',
+    '| Teams | Share notes with a client |\nPlain prose here.\n',
+  );
   git('add', '-A');
   git('commit', '-qm', 'intent');
   await write('features/b/x.ts', 'x\n');
