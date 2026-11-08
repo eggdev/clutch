@@ -63,6 +63,9 @@ open one issue in the same form:
 labels the issue `needs-owner` and assigns the owner. It refuses a section with
 no text. Read the answer on the issue, and close it with `gh issue close <n>`.
 
+When the issue says `Hand test: yes`, ask the owner to test it after it deploys,
+with its link. The merge does not wait for that test.
+
 After the owner answers, write the answer into the issue or project intent, so
 no agent asks again. Then merge on proof. A held path still needs the owner's
 approval, so give the approve link in the thread: the PR's URL plus `/files`. A push that changes
