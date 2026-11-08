@@ -410,7 +410,7 @@ mise exec -- bun run clutch labels --base origin/main --head HEAD --title "docs:
 It also gives `size/S` (up to 100 changed lines), `size/M` (300), `size/L`
 (800) or `size/XL`. Lockfiles, snapshots, `.clutch/` and the globs in
 `pr_size.exclude` do not count. Above `pr_size.warn` (300 by default) it
-prints a warning. It never fails.
+prints a warning. `tools/check-scope.ts` fails a PR above `pr_size.max`.
 
 `--json` adds the color and description of each label, the label prefixes
 that the command owns, and the person labels `one-way-door`, `revert` and
@@ -523,7 +523,8 @@ pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 sast: auto # optional: auto (the default), codeql or semgrep
 pr_size: # optional
-  warn: 300 # the default: clutch labels warns above it, and never fails
+  warn: 300 # the default: clutch labels warns above it
+  max: 1000 # a PR above it fails check-scope and splits
   exclude: [] # globs whose lines do not count, such as generated code
 factory: # optional
   root: factory # the default: the folder of the factory tree. . is the project root
