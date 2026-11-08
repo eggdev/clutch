@@ -127,7 +127,8 @@ since its last green run:
 1. Run `git fetch origin` and compare each PR's base with `origin/main`.
 2. When `main` moved, run `mise exec -- bun run pr sync` on the bottom PR of the
    stack, and wait for the new runs to pass.
-3. Then ask the owner to approve the whole stack in one round.
+3. Then ask the owner in the coordinator's thread to approve the whole stack
+   in one round, with each approve link.
 
 After the approval, a lane pushes only to a PR that GitHub reports as `DIRTY`.
 A push drops the approval. A `CLEAN` PR merges as it is with

@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 
 import { blockingGuard } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
-import { ownerStep } from '@tools/github/babysit-owner';
+import { onlyOwnerLeft } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { fake } from '@tools/github/fake-run';
 
@@ -87,19 +87,15 @@ test('the owner is asked only when nothing but the approval is left', () => {
     mergeState: 'BLOCKED',
     ready: false,
   };
-  expect(ownerStep(status, false, false)).toBe('ask');
-  expect(ownerStep(status, false, true)).toBe('keep');
-  expect(ownerStep({ ...status, counts: { pass: 5, fail: 0, pending: 1 } }, false, true)).toBe(
-    'withdraw',
-  );
+  expect(onlyOwnerLeft(status, false)).toBe(true);
+  expect(onlyOwnerLeft({ ...status, counts: { pass: 5, fail: 0, pending: 1 } }, false)).toBe(false);
   expect(
-    ownerStep({ ...status, agentReview: { posted: true, blocking: 1, owner: 0 } }, false, false),
-  ).toBe('keep');
-  expect(ownerStep(status, true, true)).toBe('keep');
-  // An open thread or a stuck round is work left, so the request waits.
-  expect(ownerStep(status, false, false, true)).toBe('keep');
-  expect(ownerStep(status, false, true, true)).toBe('withdraw');
-  expect(ownerStep({ ...status, mergeState: 'CLEAN', ready: true }, false, false)).toBe('keep');
+    onlyOwnerLeft({ ...status, agentReview: { posted: true, blocking: 1, owner: 0 } }, false),
+  ).toBe(false);
+  expect(onlyOwnerLeft(status, true)).toBe(false);
+  // An open thread or a stuck round is work left, so the session does not ask yet.
+  expect(onlyOwnerLeft(status, false, true)).toBe(false);
+  expect(onlyOwnerLeft({ ...status, mergeState: 'CLEAN', ready: true }, false)).toBe(false);
 });
 
 test('only a fix closes a blocking finding; any other answer leaves it for the owner', () => {

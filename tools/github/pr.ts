@@ -17,6 +17,7 @@ import {
 } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import { merge } from '@tools/github/merge';
+import { ask } from '@tools/github/needs-owner';
 import { revert } from '@tools/github/revert-start';
 import {
   ghStack,
@@ -50,6 +51,7 @@ export const usage = [
   '       bun run pr ready <CL-id> <number>',
   '       bun run pr merge <number> [--owner] [--timeout 30m]',
   '       bun run pr revert <number> [--timeout 15m]',
+  '       bun run pr ask --title TEXT --body-file FILE',
 ].join('\n');
 
 const root = path.resolve(import.meta.dir, '../..');
@@ -361,6 +363,7 @@ export async function runPr(
     ready: [2, ([id, number]) => ready(run, root, id, number)],
     merge: [1, ([n]) => merge(run, n, clock, waits('30m'), { owner: values.owner === true })],
     revert: [1, ([n]) => revert(run, n, clock, waits('15m'))],
+    ask: [0, () => ask(run, values.title, values['body-file'])],
   };
   const [command = '', ...rest] = positionals;
   const entry = Object.hasOwn(commands, command) ? commands[command] : undefined;

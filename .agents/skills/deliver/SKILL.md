@@ -25,6 +25,39 @@ product and proof decides the code: see
 [proof gates code](../../../docs/principles/proof-gates-code.md). Continue independent
 work while that answer is pending. Do not ask for approval of routine next steps.
 
+### Ask the owner
+
+Ask in this session's own thread, with the question tool, so T3 shows the
+thread as waiting. A PR label, a PR comment or a review request does not reach
+the owner. Use one fixed form:
+
+```markdown
+## Goal
+
+Sign-up needs an email check, and the budget is 3 clicks.
+
+## Options
+
+A. Check the email on a later screen. B. Add a fourth click.
+
+## What each option changes for users
+
+A keeps 3 clicks. B stops a typo before the account exists.
+
+## My pick
+
+A, because the budget is the product's promise.
+```
+
+When no person can answer in the thread, such as when the owner does not run
+T3, open one issue in the same form:
+`mise exec -- bun run pr ask --title "<the question>" --body-file <file>`. It
+labels the issue `needs-owner` and assigns the owner.
+
+After the owner answers, write the answer into the issue or project intent, so
+no agent asks again. Then merge on proof. A held path still needs the owner's
+approval, so give the approve link in the thread: the PR's URL plus `/files`.
+
 For ambiguous reports, unfamiliar modules or relevant earlier work, follow
 [research and design](./references/research-and-design.md). Recover prior
 decisions, check them against current code and restate the problem before

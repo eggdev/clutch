@@ -68,7 +68,7 @@ attention is not.
 8. **Open the proposal PR** on the issue for the work. The prototype is
    development-only code, so it merges like any PR. Merging it does not adopt
    anything.
-9. **Ask the owner once**, in the cheapest place they read. See
+9. **Ask the owner once**, in this session's thread. See
    [ask the owner](#ask-the-owner).
 
 ## Iterate
@@ -115,16 +115,13 @@ the owner as a new direction.
 
 ## Ask the owner
 
-Ask in one place, with the screenshots and the letters:
+Ask in this session's thread, with the screenshots and the letters, as
+[ask the owner](../deliver/SKILL.md#ask-the-owner) says. The question is
+"Which direction: A, B or C? Or say what to change." The answer arrives in the
+thread. When no person can answer there, use `bun run pr ask`, and read the
+owner's reply on that issue.
 
-- When the session can write to the owner's daily brief ledger, add one open
-  `text` thought to its `thoughts.json`. The title names the screen. The
-  thought holds one line per direction and the link to the proposal PR. The
-  question is "Which direction: A, B or C? Or say what to change." The answer
-  arrives in `answers.json` under the thought's id.
-- Otherwise, ask in the proposal PR body, and read the owner's reply there.
-
-Do not ask in both places, and do not ask again before the answer arrives.
+Do not ask again before the answer arrives.
 Continue other work while it waits.
 
 ## Related

@@ -55,10 +55,11 @@ Run every command through `mise exec --`.
    merged nothing. It replies in each thread, and it resolves each thread
    with a pushed fix or a `no-change` reason. It answers the other comments in
    one comment, reruns each flaky check once, and edits the disposition and
-   the log. Then it asks for the owner's review only when the checks pass,
-   agent review has no blocking finding and the branch merges cleanly. While
-   work is left, it withdraws the request, so the owner never approves a head
-   that is about to change.
+   the log. When the checks pass, agent review has no blocking finding and
+   the branch merges cleanly, it prints that only the owner is left, with the
+   approve link. Then [ask the owner](../deliver/SKILL.md#ask-the-owner) in
+   this session's thread. Do not ask while work is left, so the owner never
+   approves a head that is about to change.
 9. **Merge** when the PR is ready: `bun run pr merge <n>`. See
    [merge](#merge).
 
@@ -125,8 +126,8 @@ fix it would make and is resolved, and the log keeps it for a later PR.
 - A PR gets at most 8 rounds in a UTC day.
 - When a cap stops a round, or a conflict needs a person, log it with
   `bun run pr babysit <n> --stuck "<why>"`. That labels the PR
-  `babysit:stuck`. Tell the owner in the session's report, and do not ping
-  them on the PR. A new head or a person's new comment clears it.
+  `babysit:stuck`, which is state for the next round. Tell the owner in this
+  session's thread. A new head or a person's new comment clears it.
 - Label a PR `babysit:off` to leave it alone.
 
 ## The log

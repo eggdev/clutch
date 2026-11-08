@@ -6,7 +6,7 @@ import type { Plan } from '@tools/github/babysit';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, writeLog } from '@tools/github/babysit-apply';
 import type { Round } from '@tools/github/babysit-log';
-import { askOwnerLast } from '@tools/github/babysit-owner';
+import { ownerLeft } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
@@ -79,7 +79,7 @@ async function babysitApply(
   if (input.stuck) {
     const round: Round = { ...common, sync, items: [], outcome: 'stuck', note: input.stuck };
     await writeLog(run, repo, owner, kept.number, round, []);
-    console.log(`#${number}: stuck. ${input.stuck}`);
+    console.log(`#${number}: stuck. ${input.stuck} Tell the owner in this session's thread.`);
     return 1;
   }
   // The plan's caps hold the apply step too: a skipped round only logs as stuck.
@@ -104,8 +104,10 @@ async function babysitApply(
     runUrl: '',
     now: input.now,
   });
-  const step = await askOwnerLast(run, repo, owner, kept.number);
-  console.log(`#${number}: ${round.outcome}. ${round.note} Owner review request: ${step}.`);
+  const left = await ownerLeft(run, repo, owner, kept.number);
+  console.log(
+    `#${number}: ${round.outcome}. ${round.note}${left ? ` Only the owner is left. Ask in this session's thread, with this approve link: https://github.com/${repo}/pull/${number}/files` : ''}`,
+  );
   return 0;
 }
 

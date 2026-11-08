@@ -196,7 +196,8 @@ stale reviews. So the owner approves a batch once:
 1. Before you ask the owner for approval, put your finished PRs in one stack
    with `open --base`, so `gh stack` links them bottom to top. Each PR is green,
    with 0 blocking findings and its head already marks the issue `done`.
-2. Ask the owner to approve every PR in the stack in one sitting.
+2. Ask the owner in this session's thread to approve every PR in the stack in
+   one sitting, with each approve link.
 3. Run `bun run pr merge <top> --owner`. It merges the whole stack, bottom
    up, in one step.
 4. After the approval, push only a sync with the base or a blocking fix.
@@ -221,8 +222,8 @@ the PR with the default branch's rules, under `automerge.mode` and
 `automerge.step` in `clutch.yaml`, and merges it with the release bot's token.
 The bot's merge starts the release and CI on `main`, and the session's own
 token would start neither. When the judge holds the PR, `merge` prints the
-verdict and exits 3. The PR then waits for the owner: ask them to approve the
-head. The approval starts the judge again, so the PR merges even when the
+verdict and exits 3. The PR then waits for the owner: ask in this session's
+thread, with the approve link that `merge` prints. The approval starts the judge again, so the PR merges even when the
 session has ended. A session that still runs sees the merge, and goes on to
 watch `main`.
 
@@ -269,7 +270,7 @@ The exit code of `merge` says what comes next:
 | ---- | --------------------------------------- | ------------------------------------------------------------------------------- |
 | 0    | Merged, released, and `main` is green.  | Report the task done.                                                           |
 | 1    | The release failed, or `main` went red. | Read the output. When a revert started, babysit the revert PR and merge it.     |
-| 3    | The judge holds the PR for the owner.   | Ask the owner to approve the head. Keep watching, and merge after the approval. |
+| 3    | The judge holds the PR for the owner.   | Ask in this session's thread, with the approve link. Keep watching, and merge after the approval. |
 
 The default branch takes no direct pushes, so a task cannot become `done`
 after its merge. The PR head makes it so: `open` commits the task as `done`

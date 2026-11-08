@@ -107,7 +107,7 @@ Each PR carries labels that tools and people route on:
 | `one-way-door`   | A person                                                   | The change is one-way. See [two-way and one-way doors](../principles/two-way-doors.md).                               |
 | `revert`         | A person, or auto-revert                                   | Adding it to a merged PR starts its [revert](./operations/rollback.md#revert-a-merged-pull-request).                  |
 | `drill`          | A person                                                   | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the brake or the metric. |
-| `babysit:stuck`  | The [babysitter](../../.agents/skills/babysit-pr/SKILL.md) | A cap or a conflict stopped it. Its `## Babysit log` comment says why. The owner's brief lists the PR.                |
+| `babysit:stuck`  | The [babysitter](../../.agents/skills/babysit-pr/SKILL.md) | A cap or a conflict stopped it. Its `## Babysit log` comment says why, and the session tells the owner in its thread. |
 | `babysit:off`    | A person                                                   | The babysitter leaves the PR alone.                                                                                   |
 
 The workflows replace a stale `kind/`, `area/`, `size/` or `risk/` label on each push.
