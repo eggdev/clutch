@@ -70,8 +70,8 @@ A change reaches web when it touches the web app or anything it imports. It
 reaches native when it touches a native app, a shared runtime package or a
 sensitive path. A sensitive path reaches every platform.
 
-The judge reads its rules from the default branch, and the journeys run from
-the default branch too. When a PR changes a journey, its own copy must pass,
+The judge reads its rules from the default branch. CI takes the journey kit and
+runner from the base branch. When a PR changes a journey, its own copy must pass,
 and a check compares the named outcomes of the two copies. A renamed button
 or a moved field passes that check. A removed or changed outcome, or a looser
 budget, entry or platform, is a weaker journey, and it goes to the owner. So a PR cannot weaken the proof or the gate
