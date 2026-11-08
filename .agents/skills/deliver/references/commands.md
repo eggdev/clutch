@@ -53,11 +53,12 @@ the merge, itself.
 | `bun run pr failures <number>`                           | A check failed.                                      | Digging in `gh run view --log`.                 |
 | `bun run pr findings <number> [--check]` | The checks finished. Answer each agent review finding, from every head, in one `## Review disposition` comment. | Reading only the latest review, which can drop an older finding. |
 | `bun run pr babysit <number>`                            | A babysit round starts. It prints and keeps the round's plan. | Reading every thread, comment and check by hand. |
-| `bun run pr babysit <number> --answers <file>`           | You decided, fixed, validated and pushed. It replies, resolves, reruns flaky checks, logs and asks the owner last. | Replying and resolving each thread by hand. |
+| `bun run pr babysit <number> --answers <file>`           | You decided, fixed, validated and pushed. It replies, resolves, reruns flaky checks, logs and says when to ask the owner in the session's thread. | Replying and resolving each thread by hand. |
 | `bun run pr sync <number>`                               | The base moved, or the tracker conflicts.            | A manual rebase, tracker fix, validate and push. |
 | `bun run pr ready <id> <number>`                         | Optional, once the PR exists: it adds the PR link to the issue. | `clutch issues set ... done`, commit and push.  |
 | `bun run pr merge <number> [--owner]`                    | The PR is ready. It dispatches the auto-merge judge, waits for the merge, the release and CI on `main`, and starts the revert when `main` goes red. `--owner` only on the owner's word. | `gh pr merge`, `gh stack merge` and watching `main` by hand. |
 | `bun run pr revert <number>`                             | A merged PR must come out. It starts the Revert workflow and names the revert PR. | A hand-made `git revert` and PR.                |
+| `bun run pr ask --title TEXT --body-file FILE` | The owner must decide and no T3 thread can reach them. It opens one `needs-owner` issue in the fixed question form. | A PR comment or a review request. |
 
 ## Measure
 

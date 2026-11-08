@@ -41,6 +41,9 @@ type Trigger =
   | 'new-comment'
   | 'owner-approved';
 
+/** Why a plan has no round when the PR needs no work. */
+export const nothingToDo = 'nothing to do';
+
 export type Plan = {
   number: number;
   head: string;
@@ -123,7 +126,7 @@ export function plan(state: PrState, now: string): Plan {
     return skip(`labelled ${offLabel}`);
   }
   if (triggers.length === 0) {
-    return skip('nothing to do');
+    return skip(nothingToDo);
   }
   // A stuck PR waits for a new head or a person's new comment, not for the next event.
   const stuckAt = state.labels.includes(stuckLabel)

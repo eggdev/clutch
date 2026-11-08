@@ -1,12 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { plan } from '@tools/github/babysit';
+import { nothingToDo, plan } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, writeLog } from '@tools/github/babysit-apply';
 import type { Round } from '@tools/github/babysit-log';
-import { askOwnerLast } from '@tools/github/babysit-owner';
+import { decisionsNow, ownerAsk, ownerLeft } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
@@ -17,7 +17,7 @@ import { ownerLogin } from '@tools/github/status';
  * built the PR. Without `--answers`, it plans the round, prints the plan and
  * keeps it in the git directory. With `--answers`, it replies, resolves,
  * reruns flaky checks, writes the disposition and the `## Babysit log`, and
- * asks for the owner's review only when nothing is left. See
+ * says when to ask the owner in this session's thread. See
  * .agents/skills/babysit-pr/SKILL.md.
  */
 
@@ -44,15 +44,17 @@ async function babysitPlan(run: Run, number: string, now: string) {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, JSON.stringify(next, null, 1));
   console.log(JSON.stringify(next, null, 1));
+  const left = next.skip === nothingToDo && (await ownerLeft(run, repo, owner, Number(number)));
+  const ask = ownerAsk({ repo, number, stuck: false, left, now: [] }) ?? '';
   console.log(
     next.skip
-      ? `No round: ${next.skip}.${next.stuck ? ` Run \`bun run pr babysit ${number} --stuck "<why>"\` to log it.` : ''}`
+      ? `No round: ${next.skip}.${next.stuck ? ` Run \`bun run pr babysit ${number} --stuck "<why>"\` to log it.` : ''}${ask && ` ${ask}`}`
       : `Plan kept in ${file}. Decide each item, fix, validate and push, then run \`bun run pr babysit ${number} --answers <file>\`.`,
   );
   return 0;
 }
 
-/** Applies the session's answers to the kept plan, then asks the owner last. */
+/** Applies the session's answers to the kept plan, then says whether the owner is needed. */
 async function babysitApply(
   run: Run,
   number: string,
@@ -79,7 +81,8 @@ async function babysitApply(
   if (input.stuck) {
     const round: Round = { ...common, sync, items: [], outcome: 'stuck', note: input.stuck };
     await writeLog(run, repo, owner, kept.number, round, []);
-    console.log(`#${number}: stuck. ${input.stuck}`);
+    const ask = ownerAsk({ repo, number, stuck: true, left: false, now: [] }) ?? '';
+    console.log(`#${number}: stuck. ${input.stuck}${ask && ` ${ask}`}`);
     return 1;
   }
   // The plan's caps hold the apply step too: a skipped round only logs as stuck.
@@ -104,8 +107,16 @@ async function babysitApply(
     runUrl: '',
     now: input.now,
   });
-  const step = await askOwnerLast(run, repo, owner, kept.number);
-  console.log(`#${number}: ${round.outcome}. ${round.note} Owner review request: ${step}.`);
+  const stuck = round.outcome === 'stuck';
+  const next =
+    ownerAsk({
+      repo,
+      number,
+      stuck,
+      left: !stuck && (await ownerLeft(run, repo, owner, kept.number)),
+      now: decisionsNow(round.items),
+    }) ?? '';
+  console.log(`#${number}: ${round.outcome}. ${round.note}${next && ` ${next}`}`);
   return 0;
 }
 

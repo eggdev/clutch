@@ -101,7 +101,7 @@ test('merge proceeds with an owner finding once the owner approves the current h
 test('merge refuses an owner finding unless the owner approved the current head', async () => {
   const me = await repoOwner();
   const refusal =
-    '#17 has 1 owner finding(s) from agent review, such as a weaker check. The owner approves it before it merges.';
+    "#17 has 1 owner finding(s) from agent review, such as a weaker check. Ask the owner in this session's thread.";
   const attempts = await Promise.all([
     mergeOutcome([]),
     mergeOutcome([{ login: me, state: 'DISMISSED', commit: 'h3ad' }]),

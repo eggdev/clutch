@@ -118,7 +118,7 @@ PR, and each change to its checks or reviews starts the next round. Elsewhere,
 | `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. A job with no log, such as one that never started, gets its check run's annotations instead. |
 | `bun run pr findings <number> [--check]` | After the checks finish, and after each new review. It lists every agent review finding from every head, and which ones the `## Review disposition` comment answers. See [answer each finding](#answer-each-finding). |
 | `bun run pr babysit <number>`           | At the start of each babysit round. It prints the round's plan: each open thread, each unanswered comment, each failed check, and the sync that the branch needs. It keeps the plan in the git directory. |
-| `bun run pr babysit <number> --answers <file> [--pushed <sha>] [--sync merge]` | After you decide, fix, validate and push. It replies in each thread, resolves the answered ones, reruns each flaky check once, writes the disposition and the `## Babysit log`, and asks for the owner's review only when nothing else is left. `--stuck "<why>"` logs a round that a cap or a conflict stopped. |
+| `bun run pr babysit <number> --answers <file> [--pushed <sha>] [--sync merge]` | After you decide, fix, validate and push. It replies in each thread, resolves the answered ones, reruns each flaky check once, writes the disposition and the `## Babysit log`, and says when to ask the owner in the session's thread. `--stuck "<why>"` logs a round that a cap or a conflict stopped. |
 | `bun run pr sync <number, branch or id>` | When GitHub reports the PR as conflicting. It rebases on the PR's base, takes the base's copy of `.clutch/TRACKER.md` if an older branch still committed it, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits, even when another clone rewrote the base. On a PR in the middle of a stack, it keeps the PRs above it linked. After a rebase that you finished by hand, it rebases as usual. |
 | `bun run pr ready <id> <number>`        | Optional, once the PR exists. It adds the PR link to the issue's `done` record, commits only the issue file as `chore(tracker): mark <id> done`, and pushes. It makes no commit when the issue already says `done` with that link. The release regenerates `.clutch/TRACKER.md` on `main`. |
 
@@ -196,7 +196,8 @@ stale reviews. So the owner approves a batch once:
 1. Before you ask the owner for approval, put your finished PRs in one stack
    with `open --base`, so `gh stack` links them bottom to top. Each PR is green,
    with 0 blocking findings and its head already marks the issue `done`.
-2. Ask the owner to approve every PR in the stack in one sitting.
+2. Ask the owner in this session's thread to approve every PR in the stack in
+   one sitting, with each approve link.
 3. Run `bun run pr merge <top> --owner`. It merges the whole stack, bottom
    up, in one step.
 4. After the approval, push only a sync with the base or a blocking fix.
@@ -221,8 +222,10 @@ the PR with the default branch's rules, under `automerge.mode` and
 `automerge.step` in `clutch.yaml`, and merges it with the release bot's token.
 The bot's merge starts the release and CI on `main`, and the session's own
 token would start neither. When the judge holds the PR, `merge` prints the
-verdict and exits 3. The PR then waits for the owner: ask them to approve the
-head. The approval starts the judge again, so the PR merges even when the
+verdict and exits 3. The PR then waits for the owner: finish the work that does not
+depend on the answer, then ask in this session's thread, in the
+[fixed form](../SKILL.md#ask-the-owner), with the approve link that `merge`
+prints. The approval starts the judge again, so the PR merges even when the
 session has ended. A session that still runs sees the merge, and goes on to
 watch `main`.
 
@@ -268,8 +271,8 @@ The exit code of `merge` says what comes next:
 | Exit | Meaning                                 | Next                                                                            |
 | ---- | --------------------------------------- | ------------------------------------------------------------------------------- |
 | 0    | Merged, released, and `main` is green.  | Report the task done.                                                           |
-| 1    | The release failed, or `main` went red. | Read the output. When a revert started, babysit the revert PR and merge it.     |
-| 3    | The judge holds the PR for the owner.   | Ask the owner to approve the head. Keep watching, and merge after the approval. |
+| 1    | `merge` refused before it merged, the release failed, or `main` went red. | Read the output. When a revert started, babysit the revert PR and merge it.     |
+| 3    | The judge holds the PR for the owner.   | Finish the work that does not depend on the answer. Ask in this session's thread, in the fixed form, with the approve link. The approval merges the PR. |
 
 The default branch takes no direct pushes, so a task cannot become `done`
 after its merge. The PR head makes it so: `open` commits the task as `done`

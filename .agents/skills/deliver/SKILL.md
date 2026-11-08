@@ -22,8 +22,51 @@ Before asking anything: reuse a settled decision; look up observable facts;
 choose reversible implementation details yourself. Ask only an unresolved product,
 access, cost or retention decision that blocks the task. The owner decides the
 product and proof decides the code: see
-[proof gates code](../../../docs/principles/proof-gates-code.md). Continue independent
-work while that answer is pending. Do not ask for approval of routine next steps.
+[proof gates code](../../../docs/principles/proof-gates-code.md). Finish independent
+work before you ask, because the question holds the turn. Do not ask for approval of routine next steps.
+
+### Ask the owner
+
+Ask in this session's own thread, with the question tool, so T3 shows the
+thread as waiting. A PR label, a PR comment or a review request does not reach
+the owner. The question tool holds the turn until the owner answers, so finish
+the work that does not depend on the answer first. Use one fixed form:
+
+```markdown
+## Goal
+
+Sign-up needs an email check, and the budget is 3 clicks.
+
+## Options
+
+A. Check the email on a later screen. B. Add a fourth click.
+
+## What each option changes for users
+
+A keeps 3 clicks. B stops a typo before the account exists.
+
+## My pick
+
+A, because the budget is the product's promise.
+```
+
+An approval ask uses the same form. The options are approve and hold.
+
+The owner stops at most 2 times a day. Put a question that can wait into the
+next stop, and ask once for each decision, and once for each head that needs an approval. A lane does not ask. It puts the
+question at the end of its reply, and the coordinator asks once.
+
+When the session has no question tool, such as when the owner does not run T3,
+open one issue in the same form:
+`mise exec -- bun run pr ask --title "<the question>" --body-file <file>`. It
+labels the issue `needs-owner` and assigns the owner. It refuses a section with
+no text. Read the answer on the issue, and close it with `gh issue close <n>`.
+
+After the owner answers, write the answer into the issue or project intent, so
+no agent asks again. Then merge on proof. A held path still needs the owner's
+approval, so give the approve link in the thread: the PR's URL plus `/files`. A push that changes
+the diff drops the approval. When the owner approved as well, do not push the
+answer. Write it in a follow-up PR after the merge.
 
 For ambiguous reports, unfamiliar modules or relevant earlier work, follow
 [research and design](./references/research-and-design.md). Recover prior

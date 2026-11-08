@@ -63,6 +63,11 @@ const babysitLabels: Array<Label> = [
     description: 'The babysitter stopped here. Its Babysit log comment says why.',
   },
   { name: 'babysit:off', color: 'd4d4d4', description: 'The babysitter leaves this PR alone.' },
+  {
+    name: 'needs-owner',
+    color: 'd93f0b',
+    description: 'A question for the owner, when no T3 thread can reach them.',
+  },
 ];
 
 /** `kind/<type>` from a conventional title, such as `feat(cli)!: add x`, or nothing. */

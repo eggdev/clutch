@@ -89,7 +89,7 @@ function reviewProblem(number: string, pr: Review) {
     const who = pr.latestReviews
       .filter((review) => review.state === 'CHANGES_REQUESTED')
       .map((review) => `@${review.author.login}`);
-    return `#${number} has changes requested by ${who.join(', ') || 'a reviewer'}. Address them, and ask for a new review.`;
+    return `#${number} has changes requested by ${who.join(', ') || 'a reviewer'}. Address them, and ask in this session's thread for a new approval.`;
   }
   // A ruleset's code owner review leaves reviewDecision empty. GitHub then
   // reports the PR as blocked, with the code owners still requested.
@@ -99,7 +99,7 @@ function reviewProblem(number: string, pr: Review) {
     const who = pr.reviewRequests.map((request) =>
       request.login ? `@${request.login}` : `the ${request.slug ?? request.name} team`,
     );
-    return `#${number} needs an approving review from ${who.join(', ') || 'a code owner'} before it merges. Ask them to approve it.`;
+    return `#${number} needs an approving review from ${who.join(', ') || 'a code owner'} before it merges. Ask them in this session's thread.`;
   }
   return null;
 }
@@ -150,7 +150,12 @@ async function mergeAsOwner(
   ]);
 }
 
-type OpenPr = Review & { baseRefName: string; headRefName: string; headRefOid: string };
+type OpenPr = Review & {
+  baseRefName: string;
+  headRefName: string;
+  headRefOid: string;
+  url?: string;
+};
 
 /**
  * The checks before the merge of an open PR, then the merge. Returns the merge
@@ -172,14 +177,15 @@ async function mergeOpen(
     reviewRequests: pr.reviewRequests ?? [],
     latestReviews: pr.latestReviews ?? [],
   });
+  const link = pr.url ? ` The approve link: ${pr.url}/files` : '';
   if (problem) {
-    throw new Error(problem);
+    throw new Error(`${problem}${link}`);
   }
   const findings = await ownerFindings(run, '{owner}/{repo}', pr.headRefOid);
   const owner = findings.length;
   if (await waitsForOwner(run, number, pr, owner)) {
     throw new Error(
-      `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. The owner approves it before it merges.`,
+      `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. Ask the owner in this session's thread.${link}`,
     );
   }
   // Each finding of every head has a fix or a reason, so none drops out unseen.
@@ -212,7 +218,7 @@ async function mergeOpen(
   if (!result.merged) {
     console.log(result.message);
     console.log(
-      `#${number} waits for the owner. Ask them to approve the head. The approval merges it, then run \`bun run pr merge ${number}\` again to watch main.`,
+      `#${number} waits for the owner. Ask in this session's thread${pr.url ? `, with this approve link: ${pr.url}/files` : ''}. The approval merges it, then run \`bun run pr merge ${number}\` again to watch main.`,
     );
     return heldCode;
   }
@@ -246,7 +252,7 @@ export async function merge(
     'view',
     number,
     '--json',
-    'baseRefName,headRefName,headRefOid,reviewDecision,mergeStateStatus,reviewRequests,latestReviews,state,mergeCommit',
+    'baseRefName,headRefName,headRefOid,reviewDecision,mergeStateStatus,reviewRequests,latestReviews,state,mergeCommit,url',
   ]);
   const pr = JSON.parse(out) as OpenPr & {
     state?: string;

@@ -2,7 +2,8 @@ import { expect, test } from 'bun:test';
 
 import { blockingGuard } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
-import { ownerStep } from '@tools/github/babysit-owner';
+import type { Item } from '@tools/github/babysit-log';
+import { decisionsNow, onlyOwnerLeft, ownerAsk } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { fake } from '@tools/github/fake-run';
 
@@ -87,19 +88,19 @@ test('the owner is asked only when nothing but the approval is left', () => {
     mergeState: 'BLOCKED',
     ready: false,
   };
-  expect(ownerStep(status, false, false)).toBe('ask');
-  expect(ownerStep(status, false, true)).toBe('keep');
-  expect(ownerStep({ ...status, counts: { pass: 5, fail: 0, pending: 1 } }, false, true)).toBe(
-    'withdraw',
-  );
+  expect(onlyOwnerLeft(status, false)).toBe(true);
+  expect(onlyOwnerLeft({ ...status, counts: { pass: 5, fail: 0, pending: 1 } }, false)).toBe(false);
   expect(
-    ownerStep({ ...status, agentReview: { posted: true, blocking: 1, owner: 0 } }, false, false),
-  ).toBe('keep');
-  expect(ownerStep(status, true, true)).toBe('keep');
-  // An open thread or a stuck round is work left, so the request waits.
-  expect(ownerStep(status, false, false, true)).toBe('keep');
-  expect(ownerStep(status, false, true, true)).toBe('withdraw');
-  expect(ownerStep({ ...status, mergeState: 'CLEAN', ready: true }, false, false)).toBe('keep');
+    onlyOwnerLeft({ ...status, agentReview: { posted: true, blocking: 1, owner: 0 } }, false),
+  ).toBe(false);
+  expect(onlyOwnerLeft(status, true)).toBe(false);
+  // An open thread or a stuck round is work left, so the session does not ask yet.
+  expect(onlyOwnerLeft(status, false, true)).toBe(false);
+  expect(onlyOwnerLeft({ ...status, mergeState: 'CLEAN', ready: true }, false)).toBe(false);
+  // A decision left for the owner reaches them on a PR with no required approval.
+  expect(onlyOwnerLeft({ ...status, mergeState: 'CLEAN', ready: true }, false, false, true)).toBe(
+    true,
+  );
 });
 
 test('only a fix closes a blocking finding; any other answer leaves it for the owner', () => {
@@ -117,4 +118,36 @@ test('only a fix closes a blocking finding; any other answer leaves it for the o
   );
   expect(blockingGuard(answer, 'note: rename')?.decision).toBe('no-change');
   expect(blockingGuard(undefined, 'blocking: x')).toBeUndefined();
+});
+
+const item = (fields: Partial<Item>): Item => ({
+  kind: 'thread',
+  ref: 'T1',
+  url: 'u',
+  author: 'bot',
+  decision: 'owner',
+  reason: 'a policy call',
+  action: 'left for the owner',
+  resolved: false,
+  ...fields,
+});
+
+test('a failed check or an unfixed blocking finding left for the owner needs them now', () => {
+  const check = item({ kind: 'check', ref: 'deploy', reason: 'a missing secret' });
+  const blocking = item({ ref: 'T2', reason: 'a blocking finding closes only with a fix; no' });
+  expect(
+    decisionsNow([item({}), check, blocking, item({ decision: 'no-change', kind: 'check' })]),
+  ).toEqual([check, blocking]);
+});
+
+test('an unanswered item does not stop the owner', () => {
+  expect(decisionsNow([item({ kind: 'check', reason: 'the agent gave no decision' })])).toEqual([]);
+});
+
+test('the ask names what the owner must do', () => {
+  const base = { repo: 'a/b', number: '7', stuck: false, left: false, now: [] };
+  expect(ownerAsk(base)).toBeNull();
+  expect(ownerAsk({ ...base, stuck: true })).toContain('fixed form');
+  expect(ownerAsk({ ...base, left: true })).toContain('https://github.com/a/b/pull/7/files');
+  expect(ownerAsk({ ...base, now: [{ ref: 'deploy' }] })).toContain('deploy need the owner now');
 });

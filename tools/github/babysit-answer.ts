@@ -63,7 +63,10 @@ export type Context = {
   pushed: string | null;
 };
 
-const unanswered = 'the agent gave no decision';
+export const unanswered = 'the agent gave no decision';
+
+/** How the reason of a blocking finding that only a fix closes starts. */
+export const blockingOnlyFix = 'a blocking finding closes only with a fix';
 
 const firstLine = (body = '') => body.trimStart().split('\n')[0]?.slice(0, 200) ?? '';
 
@@ -78,7 +81,7 @@ export function blockingGuard(answer: Answer | undefined, finding: string): Answ
   return {
     ...answer,
     decision: 'owner',
-    reason: `a blocking finding closes only with a fix; the triage said ${answer.decision}: ${answer.reason}`,
+    reason: `${blockingOnlyFix}; the triage said ${answer.decision}: ${answer.reason}`,
   };
 }
 
