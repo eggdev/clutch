@@ -28,8 +28,7 @@ required check reaches each project. This repository's file is the example.
    [babysitter](../../../.agents/skills/babysit-pr/SKILL.md) still answers each one.
 3. Require the status checks that run the canonical check command. This
    repository requires `validate`, `journeys`, `secrets` and `commits`, plus
-   `sast` (see [CodeQL / SAST](./codeql-sast.md)) and `agent-review` (see
-   [review](../review.md)). Pin each one to the GitHub Actions app with
+   `sast` (see [CodeQL / SAST](./codeql-sast.md)). Pin each one to the GitHub Actions app with
    `"integration_id": 15368`. Then a check run with the same name from another
    app, or from a token with `checks: write`, cannot pass the rule. Auto-merge
    counts only those runs too.
