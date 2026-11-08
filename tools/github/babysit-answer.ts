@@ -1,6 +1,7 @@
 import { replyMarker } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
 import type { Decision, Item } from '@tools/github/babysit-log';
+import { unanswered } from '@tools/github/babysit-log';
 import { isBlocking } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
@@ -65,8 +66,6 @@ export type Context = {
   /** What the owner answered in the session's thread, when this round records it. */
   ownerSaid?: string;
 };
-
-export const unanswered = 'the agent gave no decision';
 
 /** How the reason of a blocking finding that only a fix closes starts. */
 export const blockingOnlyFix = 'a blocking finding closes only with a fix';
@@ -188,10 +187,13 @@ export async function answerComments({ run, repo, plan, answers, pushed }: Conte
   const lines: Array<string> = [];
   for (const comment of plan.comments) {
     const answer = answers.find((a) => a.kind === 'comment' && a.ref === String(comment.id));
-    const decision = answer?.decision ?? 'owner';
+    if (!answer) {
+      continue;
+    }
+    const { decision } = answer;
     const action = actionOf(decision, pushed);
     const quote = comment.body.trim().split('\n')[0]?.slice(0, 140) ?? '';
-    const reply = answer?.reply.trim() ?? 'No decision yet. The owner decides.';
+    const reply = answer.reply.trim();
     lines.push(
       `- [${comment.author}](${comment.url}): > ${quote}\n  ${reply} _${decision}: ${action}._`,
     );
@@ -201,7 +203,7 @@ export async function answerComments({ run, repo, plan, answers, pushed }: Conte
       url: comment.url,
       author: comment.author,
       decision,
-      reason: answer?.reason ?? unanswered,
+      reason: answer.reason,
       action,
       resolved: false,
     });

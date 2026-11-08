@@ -126,7 +126,8 @@ async function babysitApply(
     return 1;
   }
   // The plan's caps hold the apply step too: a skipped round only logs as stuck.
-  if (kept.skip && !input['owner-said']) {
+  // The owner's answer gets past "nothing to do" and a cap, and no other skip.
+  if (kept.skip && !(input['owner-said'] && (kept.skip === nothingToDo || kept.stuck))) {
     throw new Error(
       `No round for #${number}: ${kept.skip}. Log it with \`bun run pr babysit ${number} --stuck "<why>"\`.`,
     );
@@ -137,7 +138,14 @@ async function babysitApply(
     : [];
   // An owner's answer closes only what was left for them. Other work has its own round.
   const planned = input['owner-said']
-    ? { ...kept, threads: [], comments: [], failed: [], approvedThreads: kept.ownerThreads }
+    ? {
+        ...kept,
+        triggers: [],
+        threads: [],
+        comments: [],
+        failed: [],
+        approvedThreads: kept.ownerThreads,
+      }
     : kept;
   const round = await apply(run, {
     repo,

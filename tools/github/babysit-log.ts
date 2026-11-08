@@ -18,6 +18,9 @@ export type Decision =
   | 'flaky'
   | 'after-approval';
 
+/** Why an item with no answer from the session is left open. */
+export const unanswered = 'the agent gave no decision';
+
 export type Item = {
   kind: 'thread' | 'comment' | 'check';
   /** The thread id, the comment id or the check name. */

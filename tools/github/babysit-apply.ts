@@ -121,6 +121,21 @@ export async function writeLog(
   }
 }
 
+/** The comments that the owner's answer in the thread closes. They have no thread to resolve. */
+function closedComments(plan: Plan, ownerSaid?: string): Array<Item> {
+  if (!ownerSaid) {
+    return [];
+  }
+  return plan.waiting
+    .filter((item) => item.kind === 'comment')
+    .map((item) => ({
+      ...item,
+      reason: 'the owner answered in the thread',
+      action: 'resolved by the answer',
+      resolved: true,
+    }));
+}
+
 /** Applies one round's answers and returns the round for the log. */
 export async function apply(
   run: Run,
@@ -151,6 +166,7 @@ export async function apply(
     ...(await closeApproved(context)),
     ...(await answerComments(context)),
     ...(await answerChecks(context)),
+    ...closedComments(input.plan, input.ownerSaid),
   ];
   const round: Round = {
     at: input.now,
@@ -171,7 +187,7 @@ export async function apply(
     input.owner,
     input.plan.number,
     round,
-    input.plan.comments.map((c) => c.id),
+    items.filter((item) => item.kind === 'comment').map((item) => Number(item.ref)),
   );
   return round;
 }

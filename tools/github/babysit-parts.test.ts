@@ -149,6 +149,7 @@ test('the ask names what the owner must do, keyed so it prints once', () => {
   const base = { repo: 'a/b', number: '7', head: 'h3ad', stuck: false, left: null, now: [] };
   expect(ownerAsk(base)).toBeNull();
   expect(ownerAsk({ ...base, stuck: true })?.key).toBe('h3ad stuck');
+  expect(ownerAsk({ ...base, left: { held: true, refs: ['T1'] } })?.text).not.toContain('/files');
   const left = ownerAsk({ ...base, left: { held: true, refs: [] } });
   expect(left?.key).toBe('h3ad');
   expect(left?.text).toContain('https://github.com/a/b/pull/7/files');
@@ -157,7 +158,7 @@ test('the ask names what the owner must do, keyed so it prints once', () => {
   expect(now?.text).toContain('deploy need the owner now');
   expect(ownerAsk({ ...base, now: [{ ref: 'build' }] })?.key).toBe('h3ad build');
   const open = ownerAsk({ ...base, left: { held: false, refs: ['T1'] } });
-  expect(open?.key).toBe('h3ad T1');
+  expect(open?.key).toBe('T1');
   expect(open?.text).toContain('--owner-said');
   expect(open?.text).not.toContain('/files');
 });
@@ -188,6 +189,7 @@ test("the owner's answer in the thread closes what was left for them", async () 
       threads: [],
       comments: [],
       approvedThreads: [thread],
+      waiting: [],
       ownerThreads: [thread],
       skip: null,
       stuck: false,

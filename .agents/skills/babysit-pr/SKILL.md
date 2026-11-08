@@ -122,7 +122,7 @@ not change code to hide it.
 
 Record an answer given in this session's thread. Run the plan step, then
 `bun run pr babysit <n> --owner-said "<answer>"`. It quotes the answer in each
-thread left for the owner and resolves it. A blocking finding stays open, and
+thread that waits for the owner and resolves it. A blocking finding stays open, and
 `pr merge` still counts an `owner` finding until the owner approves.
 
 ## After the owner approves
