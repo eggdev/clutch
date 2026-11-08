@@ -50,6 +50,25 @@ test('with no web journey, --all exits 0 and warns, and the step summary names t
   );
 });
 
+test('no journey ran while a feature ships a screen fails, and names the feature', async () => {
+  await inRepo(
+    {
+      'package.json': JSON.stringify({ name: 'shop' }),
+      'apps/web/package.json': JSON.stringify({
+        name: 'web',
+        dependencies: { '@features/billing': 'workspace:*' },
+      }),
+      'features/billing/package.json': JSON.stringify({ name: '@features/billing' }),
+      'features/billing/screens/pay.tsx': 'export const Pay = 1;\n',
+    },
+    async (root) => {
+      const { sink, lines } = capture({});
+      expect(await main(root, '--all', sink)).toBe(1);
+      expect(lines.join('\n')).toContain('features/billing');
+    },
+  );
+});
+
 test('several web apps and no journeys.webApp fail before any server starts', async () => {
   await inRepo(
     {
