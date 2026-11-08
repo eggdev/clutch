@@ -120,6 +120,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A raised file-size budget                                                         | `tools/file-size-budgets.json`                                                                                      |
 | A screenshot baseline replaced with CI's shot                                     | `bun run visual pull`, which rewrites `__screenshots__/*.png`; the PR body gives the reason                         |
 | Pixel noise a screenshot may show without a baseline change                       | `maxDiffPixelRatio` in `packages/journeys/testing/visual.ts`: 0.1% of the pixels                                    |
+| A core journey failure state that the product does not have                       | `clutch.yaml`, `coreJourneys.<name>.without`, with a reason for each one                                            |
 | A knip ignore or entry                                                            | `knip.jsonc`                                                                                                        |
 | An import exception                                                               | `primitives.yaml`, `exceptions`                                                                                     |
 | A transaction-safe service                                                        | `primitives.yaml`, `transactionSafe`                                                                                |

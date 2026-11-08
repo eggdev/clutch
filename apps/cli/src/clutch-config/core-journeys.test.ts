@@ -40,4 +40,7 @@ test('journeys takes a web app, an inbox command, or both', () => {
   expect(
     validateClutchConfig({ ...valid, journeys: { inbox: [] } }).errors.map((error) => error.path),
   ).toEqual(['journeys.inbox']);
+  expect(
+    validateClutchConfig({ ...valid, journeys: {} }).errors.map((error) => error.path),
+  ).toEqual(['journeys']);
 });

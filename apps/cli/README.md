@@ -529,14 +529,19 @@ agentReview: # optional
   missingCredential: notice # notice (the default) or fail
 factory: # optional
   root: factory # the default: the folder of the factory tree. . is the project root
-journeys: # optional
+journeys: # optional: set webApp, inbox or both
   webApp: apps/app # the app that web journeys drive. Without it, the one app under apps/ with a web entry
+  inbox: [bun, tools/inbox.ts] # the command that reads the test inbox for enterEmailCode and openEmailLink
 coreJourneys: # optional: kickoff records one decision for each core journey
   sign-up: adopted
+  sign-in:
+    status: adopted
+    without: # optional: each failure state that the product does not have
+      wrong-password-refused: Sign-in is an emailed code. # required for each one
   billing-and-checkout:
     status: n/a # adopted or n/a
     reason: The product has no paid plan. # required for n/a
-  # ... and sign-in, onboarding, profile-management, roles-and-access, account-security, contact-support
+  # ... and onboarding, profile-management, roles-and-access, account-security, contact-support
 budgets: # optional: kickoff fills it
   layoutShift: 0.01 # the cumulative layout shift limit of a journey
   clicks: { sign-up: 3 } # the clicks or taps to finish each core journey

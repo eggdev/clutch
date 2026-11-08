@@ -25,7 +25,7 @@ export function readAutoRevert(value: unknown, errors: Errors) {
 const webAppPattern = /^apps\/[\w.-]+$/u;
 
 export function readJourneys(value: unknown, errors: Errors) {
-  if (!isObject(value)) {
+  if (!isObject(value) || (value.webApp === undefined && value.inbox === undefined)) {
     errors.push({ path: 'journeys', message: 'Expected a map with webApp or inbox.' });
     return;
   }
