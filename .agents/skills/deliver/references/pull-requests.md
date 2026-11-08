@@ -283,11 +283,10 @@ merge, set its task back to `todo` in the next branch.
 The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges one pull
 request of this repository, never a fork's. No schedule starts it. It runs
 when `pr merge` dispatches it, when the owner approves a head, and when CI or
-agent review completes on a PR that no session owns: a `revert/` PR or a bot's
-`renovate/`, `gardening/` or `clutch-sync/` PR. An agent's `clutch/` PR merges
-only when its session runs `pr merge`, or after the owner approves it. Its CI
-event judges it only once the owner approved it. When CI turns green on the
-default branch, each approved agent PR is judged again, since a red `main` may
+agent review completes on an agent's `clutch/` PR, a `revert/` PR or a bot's
+`renovate/`, `gardening/` or `clutch-sync/` PR. A green agent PR merges with no
+session. A session that is still working keeps its PR a draft. When CI turns
+green on the default branch, each open agent PR is judged again, since a red `main` may
 have held it. An agent PR is one that the release
 bot opens, so its author is a bot. The workflow also judges a PR on a
 `clutch/cl-NNN-<slug>` branch, which an agent makes, as a fallback for a project

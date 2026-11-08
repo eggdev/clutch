@@ -21,8 +21,7 @@ draft. It runs the Claude Code GitHub Action with [review](./review.md) as its r
 5. It returns the number of blocking findings and each `owner` finding to the
    workflow.
 
-Each inline comment opens a review thread. The main ruleset requires every
-thread to be resolved before a merge. The
+Each inline comment opens a review thread. An open thread does not hold a merge. The
 [babysitter](../../.agents/skills/babysit-pr/SKILL.md) answers each one: it
 fixes it, or replies with the reason and resolves it, or leaves it open for
 the owner. The owner's approval of the head resolves the owner's threads.
