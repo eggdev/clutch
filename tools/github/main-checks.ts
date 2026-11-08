@@ -8,8 +8,6 @@ import type { Run } from '@tools/github/stack';
  * by the same checks.
  */
 
-/** The check that agent review reports. auto-merge counts it as required too. */
-
 /** A conclusion that makes a check red. The same set as auto-merge. */
 const redConclusions = new Set([
   'failure',
