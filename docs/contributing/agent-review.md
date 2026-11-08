@@ -44,12 +44,7 @@ gardening workflow reads the same variable.
 
 When the repository has no `ANTHROPIC_API_KEY` secret and no
 `CLAUDE_CODE_OAUTH_TOKEN` secret, the job writes a notice and passes. A pull
-request from a fork gets no secrets, so the same notice applies. Set
-`agentReview.missingCredential: fail` in `clutch.yaml` to fail the job
-instead, so a green `agent-review` check proves that a review ran. The job
-reads the setting from the base branch, so a pull request cannot change it.
-Clutch sets `fail`. A fork pull request then fails agent review, and the owner
-reviews it.
+request from a fork gets no secrets, so the same notice applies.
 
 Agent review is advice, so no ruleset requires it. A project with no credential
 gets a notice, and the check passes.
