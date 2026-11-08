@@ -511,7 +511,6 @@ capabilities:
       - grep:
           files: .github/workflows/*review*.y*ml
           pattern: '\.blocking'
-      - remote: required_check:agent-review
   - id: ci_failure_explainer
     name: CI failure explainer / investigation agent
     category: Review & merge
