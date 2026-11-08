@@ -51,6 +51,14 @@ test('with no web journey, --all exits 0 and warns, and the step summary names t
   );
 });
 
+test('production with no URL fails', async () => {
+  await inRepo({ 'package.json': JSON.stringify({ name: 'shop' }) }, async (root) => {
+    const { sink, lines } = capture({});
+    expect(await main(root, '--production', sink)).toBe(1);
+    expect(lines.join('\n')).toContain('needs the URL');
+  });
+});
+
 test('production with no core journey fails, since it has no proof', async () => {
   await inRepo(
     { 'package.json': JSON.stringify({ name: 'shop' }), 'apps/web/package.json': app },

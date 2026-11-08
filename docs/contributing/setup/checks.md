@@ -94,6 +94,7 @@ tests the workflow and dependency checks.
 | `check-vendor-leaks`         | A vendor type in the built declarations of a public section. It runs after `typecheck`                                                                                                                                                                                                                                                                                                  |
 | `check-bundle`               | A first screen of `apps/web` over 150 kB compressed, or with Effect code in it. It builds the app                                                                                                                                                                                                                                                                                       |
 | `check-decisions`            | Duplicate decision numbers, or an index that does not match                                                                                                                                                                                                                                                                                                                             |
+| `check-deploy`               | A project past kickoff with a shippable app and no `deploy:` in `clutch.yaml`.                                                                                                                                                                                                                                                                                                          |
 | `check-proposals`            | A design proposal with a bad status, too few or too many directions, or prototype code left after the build shipped                                                                                                                                                                                                                                                                     |
 | `check-file-size`            | An `AGENTS.md` file over 20 lines at any depth, or a source file over its limit. See [file size](#file-size)                                                                                                                                                                                                                                                                            |
 | `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                                                                                                                                                                                                                                                                                                       |
@@ -264,8 +265,8 @@ The [Labels workflow](../../../.github/workflows/labels.yml) labels each PR
 `risk/low`, `risk/medium`, `risk/high` or `risk/one-way-door` from the paths it
 touches. It runs `clutch risk` from the base branch, with the rules in
 `.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk). The
-`one-way-door` tier holds only the hard core: the merge gate, credentials, auth,
-migrations, and decision records and policy docs. It also holds two lists that
+`one-way-door` tier holds only the hard core: the merge gate, credentials, auth
+until its journeys exist, migrations, and decision records and policy docs. It also holds two lists that
 each project fills: its billing code, and its infra, deploy and secrets paths.
 See
 [decision record 0002](../decisions/0002-merge-most-prs-with-no-human.md).

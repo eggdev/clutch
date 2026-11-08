@@ -304,6 +304,10 @@ export async function main(
     sink.error(found);
     return 1;
   }
+  if (id === '--production' && !productionUrl) {
+    sink.error('--production needs the URL to prove.');
+    return 1;
+  }
   if (productionUrl) {
     return runProduction(root, found, productionUrl, sink, fileFlake);
   }

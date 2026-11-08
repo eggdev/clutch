@@ -519,6 +519,9 @@ automerge: # optional
   mode: dry-run # off (the default), dry-run or on
   step: low # bots (the default), low or medium: how far auto-merge reaches
   owner: eggdev # optional: the login whose reactions grade the dry-run verdicts
+deploy: # optional: the production deploy and the URL that proves it
+  command: [bun, run, deploy]
+  url: https://example.com
 autoRevert: # optional
   watch: [production] # checks or jobs that also count as required for auto-revert only
 pr: # optional
@@ -587,8 +590,7 @@ Semgrep even on a public repository. See
 The loader rejects unknown keys. Each error names its YAML path, such as
 `template.mode` or `capabilities.codeql_sast.reason`. An older `clutch.yaml`
 has `template.commit`. The loader accepts it and reads nothing from it, and
-the next sync removes it. Its `automerge` and
-`agentReview` sections are in the one-way-door tier. For the rest of the
+the next sync removes it. Its `automerge` section is in the one-way-door tier. For the rest of the
 file, agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
 
 ## Init
