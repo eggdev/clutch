@@ -48,8 +48,96 @@ const none: DeviceHost = {
   build: () => Promise.reject(new DeviceHostError(setup)),
 };
 
-/** Each host by its `DEVICE_HOST` name. Kickoff adds the project's host here. */
-const hosts: Record<string, () => DeviceHost> = { none: () => none };
+/**
+ * The `ci` device host: the one simulator or emulator that a CI job booted on
+ * its own runner. The job boots the device, builds the app and installs it in
+ * its own steps, so this host finds the device and runs Maestro on it. It
+ * never boots a device, and it builds nothing. See
+ * docs/contributing/end-to-end-testing.md#native-journeys.
+ */
+
+export type Run = (command: Array<string>) => Promise<{ exitCode: number; output: string }>;
+
+const spawnRun: Run = async (command) => {
+  const [tool = ''] = command;
+  if (Bun.which(tool) === null) {
+    throw new DeviceHostError(
+      `\`${tool}\` is not installed, so the ci device host cannot reach a device. It runs on a CI runner with a booted device. See docs/contributing/end-to-end-testing.md#native-journeys.`,
+    );
+  }
+  const proc = Bun.spawn(command, { stdout: 'pipe', stderr: 'pipe' });
+  const [out, err, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { exitCode, output: `${out}${err}` };
+};
+
+async function must(run: Run, command: Array<string>) {
+  const result = await run(command);
+  if (result.exitCode !== 0) {
+    throw new DeviceHostError(`${command.join(' ')} failed: ${result.output}`);
+  }
+  return result.output;
+}
+
+type Simulators = {
+  devices: Record<string, Array<{ udid: string; name: string; state: string }>>;
+};
+
+async function bootedSimulator(run: Run): Promise<Device | null> {
+  const list = JSON.parse(
+    await must(run, ['xcrun', 'simctl', 'list', 'devices', 'booted', '--json']),
+  ) as Simulators;
+  const booted = Object.values(list.devices)
+    .flat()
+    .find((item) => item.state === 'Booted');
+  return booted ? { platform: 'ios', id: booted.udid, name: booted.name } : null;
+}
+
+async function bootedEmulator(run: Run): Promise<Device | null> {
+  const listed = await must(run, ['adb', 'devices']);
+  const id = listed
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/u))
+    .find(([serial, state]) => serial?.startsWith('emulator-') && state === 'device')?.[0];
+  if (!id) {
+    return null;
+  }
+  const avd = await run(['adb', '-s', id, 'emu', 'avd', 'name']);
+  const name = avd.exitCode === 0 ? avd.output.split('\n')[0]?.trim() : '';
+  return { platform: 'android', id, name: name || id };
+}
+
+export function ciHost(run: Run = spawnRun): DeviceHost {
+  return {
+    name: 'ci',
+    bootedDevice: (platform: Platform) =>
+      platform === 'ios' ? bootedSimulator(run) : bootedEmulator(run),
+    install: async (device, app) => {
+      await must(
+        run,
+        device.platform === 'ios'
+          ? ['xcrun', 'simctl', 'install', device.id, app]
+          : ['adb', '-s', device.id, 'install', '-r', app],
+      );
+    },
+    runFlow: (device, flow) => run(['maestro', '--device', device.id, 'test', flow]),
+    build: () =>
+      Promise.reject(
+        new DeviceHostError(
+          'The ci device host builds nothing. The CI job builds the app in its own step. See docs/contributing/end-to-end-testing.md#native-journeys.',
+        ),
+      ),
+  };
+}
+
+/**
+ * Each host by its `DEVICE_HOST` name. `ci` drives the device that a CI job
+ * booted on its own runner. Kickoff adds the project's host here.
+ */
+const hosts: Record<string, () => DeviceHost> = { none: () => none, ci: () => ciHost() };
 
 /** The host that `DEVICE_HOST` names. It is `none` when the variable is not set. */
 export function deviceHost(env: NodeJS.ProcessEnv = process.env): DeviceHost {

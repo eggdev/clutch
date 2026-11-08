@@ -29,7 +29,7 @@ same header and outcome names. Give each assertion `label: outcome <name>`.
  * Evidence: the Playwright list output, and a trace and the axe report in `test-results/journeys/` on failure
  * Limits: <what this journey does not prove>
  */
-import { test } from '@playwright/test';
+import { test } from '@repo/journeys/testing/test';
 import { accessible } from '@repo/journeys/testing/a11y';
 import { outcomes } from '@repo/journeys/testing/outcome';
 

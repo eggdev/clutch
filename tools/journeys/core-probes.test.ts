@@ -8,7 +8,7 @@ test('outcomes that hold on the entry screen, a mocked backend, page scripts and
   const file = 'features/account/journeys/sign-up.pw.ts';
   // The bypasses of the second review: each outcome holds on the entry page.
   const body = [
-    "import { test } from '@playwright/test';",
+    "import { test } from '@repo/journeys/testing/test';",
     "import { outcomes } from '@repo/journeys/testing/outcome';",
     "test('a visitor signs up', async ({ page }) => {",
     '  const outcome = outcomes(page);',
@@ -39,7 +39,7 @@ test('bracket access, a template that hides code, a fake step and a branch fail'
   const file = 'features/account/journeys/sign-up.pw.ts';
   // The probes of the third review.
   const body = [
-    "import { test } from '@playwright/test';",
+    "import { test } from '@repo/journeys/testing/test';",
     "import { outcomes } from '@repo/journeys/testing/outcome';",
     "test.use({ extraHTTPHeaders: { authorization: 'Bearer pro' } });",
     "test('a visitor signs up', async ({ page }) => {",
@@ -76,7 +76,7 @@ test('reflection, a constructor, page scripts, a fake screen, a destructured got
   const file = 'features/account/journeys/sign-up.pw.ts';
   // The probes of the fourth review.
   const body = [
-    "import { test } from '@playwright/test';",
+    "import { test } from '@repo/journeys/testing/test';",
     "import { outcomes } from '@repo/journeys/testing/outcome';",
     "test.beforeEach(async ({ page }) => { await page.getByRole('button').click(); });",
     "test('a visitor signs up', async ({ page }) => {",
@@ -110,7 +110,7 @@ test('an import that leaves the journey kit, a side-effect import or a test from
   // The probe of the fifth review: `..` in the path reaches a fixture that no rule reads.
   const body = signUp
     .replace(
-      "import { test } from '@playwright/test';",
+      "import { test } from '@repo/journeys/testing/test';",
       [
         "import { test } from '@repo/journeys/testing/../../../../apps/web/journeys/fixtures';",
         "import { seedless } from '@repo/journeys/testing/../x';",
@@ -120,10 +120,10 @@ test('an import that leaves the journey kit, a side-effect import or a test from
     .replace("  await page.goto('/');", "  await page.goto('/');\n  await seedless(page, 'x');");
   const problems = await coreRepo({ [file]: core('sign-up', 'sign-up', body) });
   expect(problems).toContain(
-    `${file}: it imports @repo/journeys/testing/../../../../apps/web/journeys/fixtures. A core journey imports only @playwright/test and @repo/journeys/testing, so every step is in the journey. ${see}`,
+    `${file}: it imports @repo/journeys/testing/../../../../apps/web/journeys/fixtures. A core journey imports only @repo/journeys/testing, so every step is in the journey. ${see}`,
   );
   expect(problems).toContain(
-    `${file}: it imports @repo/journeys/testing/../x. A core journey imports only @playwright/test and @repo/journeys/testing, so every step is in the journey. ${see}`,
+    `${file}: it imports @repo/journeys/testing/../x. A core journey imports only @repo/journeys/testing, so every step is in the journey. ${see}`,
   );
   expect(problems.find((item) => item.includes('are not steps'))).toContain(
     'lines 1, 2, 3, 8 are not steps',

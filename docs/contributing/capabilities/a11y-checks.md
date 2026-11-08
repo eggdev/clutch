@@ -1,10 +1,10 @@
 # Accessibility checks in journeys (axe)
 
-Each web journey runs axe on the pages it renders. A `serious` or `critical` violation fails the journey.
+Each web journey runs axe on the pages it renders. Any violation fails the journey, `minor` included.
 
 ## Why
 
-A journey already drives the real app through its main flows. That makes it the cheapest place to catch a button with no name, a field with no label or text with too little contrast. Unit tests render parts, not pages. A person who reviews a screenshot misses what a screen reader hears. The axe engine finds these defects with no false alarms at the `serious` and `critical` levels.
+A journey already drives the real app through its main flows. That makes it the cheapest place to catch a button with no name, a field with no label or text with too little contrast. Unit tests render parts, not pages. A person who reviews a screenshot misses what a screen reader hears. The policy is no accessibility error, so `accessible()` in `packages/journeys/testing/a11y.ts` fails at every impact level.
 
 ## Detection
 
@@ -12,11 +12,12 @@ A journey already drives the real app through its main flows. That makes it the 
 
 ## How it works
 
-`packages/journeys/testing/a11y.ts` exports `accessible(page, where)`. A journey imports it beside `test` and `expect` from `@playwright/test`:
+`packages/journeys/testing/a11y.ts` exports `accessible(page, where)`. A journey imports it beside `test` from `@repo/journeys/testing/test` and `expect` from `@playwright/test`:
 
 ```ts
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { accessible } from '@repo/journeys/testing/a11y';
+import { test } from '@repo/journeys/testing/test';
 
 test('…', async ({ page }) => {
   await page.goto('/');
@@ -25,7 +26,7 @@ test('…', async ({ page }) => {
 });
 ```
 
-Call it after each step that renders a new page or a new state, once the page shows what the step expects. It fails with one line for each violation, which names the rule, the elements it hit and a link to the rule's page. It also attaches the full axe report to the test, in `test-results/journeys/`.
+Call it after each step that renders a new page or a new state, once the page shows what the step expects. In a core journey, `outcome()` runs it after each outcome holds. The journey test also runs it on the last page, and keeps each result in the journey's [measures](../end-to-end-testing.md#measures). A violation on any try fails the run, also when the retry passes. It fails with one line for each violation, which names the rule, the elements it hit and a link to the rule's page. It also attaches the full axe report to the test, in `test-results/journeys/`.
 
 The check has no way to skip a rule, so fix each defect it reports. A rule that must stay off needs the owner's decision, and a guardrail file that holds it. Add that file to the escape hatch table in [harness engineering](../harness-engineering.md#guardrail-files).
 

@@ -1,17 +1,18 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { markFailure, measureOf } from '@repo/journeys/testing/measure';
 
 /**
  * The accessibility check of web journeys. A journey calls
- * `accessible(page, 'where')` after each step that renders a page. It runs axe
- * on the whole page and fails on a `serious` or `critical` violation. It has
- * no way to skip a rule: fix the defect. See
+ * `accessible(page, 'where')` after each step that renders a page, and
+ * `outcome()` calls it after each outcome holds. It runs axe on the whole page
+ * and fails on any violation, `minor` included, because a journey has no
+ * accessibility error. It has no way to skip a rule: fix the defect. It keeps
+ * each result in the measures of the run. A failure there fails the run, also
+ * when the retry passes. See
  * https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/a11y-checks.md.
  */
-
-/** The impacts that fail a journey. axe also reports `minor` and `moderate`. */
-const failingImpacts = new Set(['serious', 'critical']);
 
 type Violations = Awaited<ReturnType<AxeBuilder['analyze']>>['violations'];
 
@@ -26,17 +27,32 @@ function describe(violations: Violations) {
   });
 }
 
-/** Fails the journey when axe finds a serious or critical violation on the page, and attaches its report. */
+/** Fails the journey when axe finds any violation on the page, and attaches its report. */
 export async function accessible(page: Page, where: string) {
   const result = await new AxeBuilder({ page }).analyze();
-  const failing = result.violations.filter((violation) =>
-    failingImpacts.has(violation.impact ?? ''),
-  );
+  const measure = measureOf(page);
+  measure?.axe.push({
+    where,
+    elapsedMs: Date.now() - measure.startedAt,
+    violations: result.violations.map((violation) => ({
+      id: violation.id,
+      impact: violation.impact ?? null,
+      nodes: violation.nodes.length,
+    })),
+  });
+  const failing = result.violations;
   if (failing.length > 0) {
+    if (measure) {
+      markFailure(
+        measure,
+        'axe',
+        `axe found violations at "${where}": ${describe(failing).join('; ')}`,
+      );
+    }
     await test.info().attach(`axe ${where}`, {
       body: JSON.stringify(failing, null, 2),
       contentType: 'application/json',
     });
   }
-  expect(describe(failing), `axe found serious violations at "${where}"`).toEqual([]);
+  expect(describe(failing), `axe found violations at "${where}"`).toEqual([]);
 }

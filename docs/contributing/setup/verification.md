@@ -51,11 +51,15 @@ mise exec -- bun run journey --all
 
 The runner uses the dev servers that already run. When a server is down, it
 starts the missing ones through `tools/dev.ts`. It stops only the servers that
-it started. A journey that runs past its budget fails. A `Core:` journey also
-fails when its run passed but did not record `signed-up` first, then every
-outcome that its catalog section names. `outcome()` writes each outcome that
-held to a folder for that run, under `test-results/journeys/outcomes/`. See
-[core journeys](../journeys/core.md#outcomes).
+it started. Each web journey runs on a phone, a tablet and a desktop. A
+journey that runs past its budget fails. A failed journey runs once more, and
+a pass on the retry files a `flake` friction entry. A layout shift, click
+budget or axe failure on any try still fails the run. A `Core:` journey also
+fails when its run on a device passed but did not record each outcome. That
+is `signed-up` first, then every outcome that its catalog section names. Each journey writes its
+[measures](../end-to-end-testing.md#measures) to
+`test-results/journeys/measures/`. See [core journeys](../journeys/core.md#outcomes)
+and [devices](../end-to-end-testing.md#devices).
 
 Each journey is also a verify flow, so `verify.py` runs it and keeps the
 evidence:
@@ -73,6 +77,9 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
   `Isolation and cleanup:` line.
 - A journey that `verification.json` does not register, and a flow that runs a
   journey that does not exist.
+- A web journey that does not take `test` from `@repo/journeys/testing/test`.
+  This includes one that takes the `test` of `@playwright/test` by name, as its
+  default export or through a namespace.
 - A journey with a `Core:` line that breaks the
   [core journey rules](../journeys/core.md#rules-for-every-core-journey). It
   names no core journey, or opens a URL other than `/` on web or a link on
@@ -81,7 +88,7 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
 
 Each web journey also calls `accessible(page, 'where')` from
 `@repo/journeys/testing/a11y` after each step that renders a page. It fails on
-a `serious` or `critical` axe violation. See
+any axe violation. See
 [accessibility checks](../capabilities/a11y-checks.md).
 
 ### Screenshots
@@ -89,20 +96,26 @@ a `serious` or `critical` axe violation. See
 A web journey calls `snap(page, 'name')` from `@repo/journeys/testing/visual`
 at a stable point, the same way it calls `accessible`. A gallery or component
 page is a journey that opens each group and snaps it. `snap` captures the page
-4 times, at 390 px and 1280 px wide, in the light and dark schemes. It changes
-the viewport and the `dark` class on `<html>` in place. Then it puts them back,
-so the journey's next step sees the page it left.
+on the device of the run, in the light and dark schemes. So each journey keeps
+a baseline for each device. The phone gives `mobile`, 390 px wide. The tablet
+gives `tablet`, 820 px wide, and the desktop gives `desktop`, 1440 px wide. It changes the `dark` class on
+`<html>` in place. Then it puts it back, so the journey's next step sees the
+page it left.
 
 Each shot is deterministic. Animations are off, the caret is hidden, fonts are
 loaded, and `snap` takes shots until two in a row match. The locale is `en-US`
 and the time zone UTC. Pass `mask` for a region that changes on each run, such
-as a generated name. A screen that shows the time sets the clock first with
+as a generated name. Pass `style` with CSS that hides a region whose size
+changes on each run. An example is a list that grows with the data of earlier
+runs.
+The CSS applies only to the shot. A layout shift that the snap makes does not
+count toward the budget. A screen that shows the time sets the clock first with
 `page.clock.setFixedTime`.
 
 The baselines are committed PNG files:
 
 ```text
-features/<name>/journeys/__screenshots__/<snap>-<mobile|desktop>-<light|dark>.png
+features/<name>/journeys/__screenshots__/<snap>-<mobile|tablet|desktop>-<light|dark>.png
 ```
 
 CI is the only renderer. Fonts and anti-aliasing differ between machines, so a
@@ -152,8 +165,10 @@ project before its first journey can merge, but it tests nothing.
 A web journey shares the dev database. It writes records with unique names, so
 runs do not collide. Delete `.data/` to reset the dev database.
 
-A native journey runs only through the device host. The runner refuses a
-`.maestro.yaml` file, and `verify.py` refuses a native flow.
+A native journey runs only through the device host, with
+`mise exec -- bun run journey --native <ios|android>`. See
+[native journeys](../end-to-end-testing.md#native-journeys). `verify.py`
+refuses a native flow.
 
 ## Proof and limits
 

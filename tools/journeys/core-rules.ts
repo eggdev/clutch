@@ -17,7 +17,7 @@ import { parseAllDocuments } from 'yaml';
  *   on native
  * - loads no seed fixture, no saved session and no token, and logs in through
  *   no API
- * - imports only `@playwright/test` and `@repo/journeys/testing/*`, so no
+ * - imports only `@repo/journeys/testing/*`, so no
  *   helper in another file can do any of these
  * - asserts each outcome that the catalog names for it, `signed-up` first,
  *   with a literal name: `outcome('<name>', expected)` on web, and an

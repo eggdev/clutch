@@ -49,16 +49,29 @@ test('a core journey that gets around the rules through a fixture, an API login,
     `${file}: it changes the URL or runs code in the page without a tap. A core journey reaches each screen through the buttons that a user taps. ${see}`,
     `${file}: it does not assert \`signed-up\`, \`plan-upgraded\`, \`plan-cancelled\`, \`card-declined\`, \`renewal-failed\`, which the catalog names for billing-and-checkout. ${see}`,
     `${file}: it does not create its account through the sign-up screens first. Walk sign-up from the entry, and assert the \`signed-up\` outcome before any other. ${see}`,
-    `${file}: it imports ./fixtures. A core journey imports only @playwright/test and @repo/journeys/testing, so every step is in the journey. ${see}`,
+    `${file}: it imports ./fixtures. A core journey imports only @repo/journeys/testing, so every step is in the journey. ${see}`,
+    `${file}: it imports @playwright/test. A core journey takes \`test\` from @repo/journeys/testing/test, so each run is measured against its budgets. ${see}`,
     `${file}: it loads a seed fixture, a saved session or a token, or logs in through the API. A core journey makes a new account through the sign-up screens. ${see}`,
     `${file}: lines 1, 2, 4, 6, 8 are not steps that a core journey takes. A test holds only page steps from \`page\`, outcomes, journey kit calls and consts of plain values. ${see}`,
+  ]);
+});
+
+test('a core journey that takes test from @playwright/test fails, so no run skips its measures', async () => {
+  const file = 'features/account/journeys/sign-up.pw.ts';
+  const body = signUp.replace(
+    "import { test } from '@repo/journeys/testing/test';",
+    "import { test } from '@playwright/test';",
+  );
+  expect(await coreRepo({ [file]: core('sign-up', 'sign-up', body) })).toEqual([
+    `${file}: it imports @playwright/test. A core journey takes \`test\` from @repo/journeys/testing/test, so each run is measured against its budgets. ${see}`,
+    `${file}: line 1 is not a step that a core journey takes. A test holds only page steps from \`page\`, outcomes, journey kit calls and consts of plain values. ${see}`,
   ]);
 });
 
 test('a core journey that opens a second URL, names an outcome with a variable or skips catalog outcomes fails', async () => {
   const file = 'features/account/journeys/sign-in.pw.ts';
   const body = [
-    "import { test } from '@playwright/test';",
+    "import { test } from '@repo/journeys/testing/test';",
     "import { outcomes } from '@repo/journeys/testing/outcome';",
     "test('a member signs in', async ({ page }) => {",
     '  const outcome = outcomes(page);',

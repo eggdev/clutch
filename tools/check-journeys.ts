@@ -10,6 +10,7 @@ import {
   verificationFile,
 } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
+import ts from 'typescript';
 
 /**
  * Journeys are the main behavioral tests, so each feature that ships has one.
@@ -24,6 +25,9 @@ import type { Journey } from '@tools/journeys/journeys';
  *   that runs a journey that does not exist.
  * - A journey with `Core: <name>` that breaks the core journey catalog: see
  *   `journeys/core-rules.ts`.
+ * - A web journey that does not take `test` from `@repo/journeys/testing/test`,
+ *   or that takes it from `@playwright/test` by name, as the default export or
+ *   through a namespace. Each run must be measured against its budgets.
  *
  * See docs/contributing/setup/verification.md#journeys.
  */
@@ -85,6 +89,53 @@ function missingJourneys(root: string, all: ReadonlyArray<Journey>): Array<strin
     );
 }
 
+/** Whether an import gives the name `test` as a value: `{ test }`, or `{ test as other }`. */
+function givesTest(clause: ts.ImportClause | undefined) {
+  const bindings = clause?.namedBindings;
+  return (
+    !clause?.isTypeOnly &&
+    bindings !== undefined &&
+    ts.isNamedImports(bindings) &&
+    bindings.elements.some(
+      (item) => !item.isTypeOnly && (item.propertyName ?? item.name).text === 'test',
+    )
+  );
+}
+
+/**
+ * Why a web journey does not take `test` from the journey kit, or null. A
+ * default or namespace import of `@playwright/test` gives its `test` under
+ * another name, so each one is refused too.
+ */
+function plainTestProblem(source: string): string | null {
+  const file = ts.createSourceFile('journey.ts', source, ts.ScriptTarget.Latest, true);
+  const imports = file.statements.filter(
+    (statement): statement is ts.ImportDeclaration & { moduleSpecifier: ts.StringLiteral } =>
+      ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier),
+  );
+  const playwright = imports.filter(
+    (item) => item.moduleSpecifier.text === '@playwright/test' && !item.importClause?.isTypeOnly,
+  );
+  for (const item of playwright) {
+    const clause = item.importClause;
+    const bindings = clause?.namedBindings;
+    if (clause?.name) {
+      return 'it takes the default export of @playwright/test, which is its `test`.';
+    }
+    if (bindings && ts.isNamespaceImport(bindings)) {
+      return 'it takes all of @playwright/test as a namespace, which holds its `test`.';
+    }
+    if (givesTest(clause)) {
+      return 'it takes `test` from @playwright/test.';
+    }
+  }
+  const kit = imports.some(
+    (item) =>
+      item.moduleSpecifier.text === '@repo/journeys/testing/test' && givesTest(item.importClause),
+  );
+  return kit ? null : 'it does not take `test` from @repo/journeys/testing/test.';
+}
+
 function headerProblems(root: string, journey: Journey): Array<string> {
   const source = readFileSync(path.join(root, journey.file), 'utf-8');
   const header = headerOf(source);
@@ -96,6 +147,16 @@ function headerProblems(root: string, journey: Journey): Array<string> {
   }
   for (const name of requiredFields.filter((field) => fieldOf(header, field) === undefined)) {
     problems.push(`${journey.file}: the header has no \`${name}:\` line. Add it.`);
+  }
+  // A core journey's own rules name this problem.
+  const plain =
+    journey.platform === 'web' && fieldOf(header, 'Core') === undefined
+      ? plainTestProblem(source)
+      : null;
+  if (plain !== null) {
+    problems.push(
+      `${journey.file}: ${plain} Take \`test\` from @repo/journeys/testing/test, so the run is measured against its budgets. See docs/contributing/end-to-end-testing.md#measures.`,
+    );
   }
   return [...problems, ...coreProblems(journey, source)];
 }

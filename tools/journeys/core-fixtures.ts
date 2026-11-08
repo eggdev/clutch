@@ -16,7 +16,7 @@ export const core = (id: string, name: string, body: string) =>
   `/**\n * ${id}: A visitor proves a core journey.\n * Contract: docs/contributing/journeys/core.md\n * Entry: the first screen\n * Isolation and cleanup: a new account\n * Core: ${name}\n */\n${body}`;
 
 export const signUp = [
-  "import { test } from '@playwright/test';",
+  "import { test } from '@repo/journeys/testing/test';",
   "import { outcomes } from '@repo/journeys/testing/outcome';",
   "test('a visitor signs up', async ({ page }) => {",
   '  const outcome = outcomes(page);',
