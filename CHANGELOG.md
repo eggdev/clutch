@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.70.0 (2026-11-12)
+
+### Features
+
+- Let a sensitive path leave the owner's hold when its journeys exist, and hold a PR on a failed native journey.
+
 ## 0.69.0 (2026-11-12)
 
 ### Features
