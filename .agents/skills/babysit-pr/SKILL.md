@@ -112,7 +112,7 @@ not change code to hide it.
 
 An `owner` finding of agent review is `must-fix` when the task does not need
 the weaker check. Else it is `no-change`, with the reason. The
-[weekly digest](../../../docs/contributing/capabilities/factory-observability.md#weekly-digest)
+[weekly digest](https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/factory-observability.md#weekly-digest)
 lists it.
 
 ## Fix
