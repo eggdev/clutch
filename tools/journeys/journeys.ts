@@ -6,7 +6,9 @@ import { parse } from 'yaml';
 /**
  * A journey proves one user goal through the real entry point. It lives in
  * `features/<feature>/journeys/`: `<id>.pw.ts` runs in a browser with
- * Playwright, and `<id>.maestro.yaml` runs on a device with Maestro. Its
+ * Playwright, and `<id>.maestro.yaml` runs on a device with Maestro. A
+ * `<id>.journey.ts` file is one journey in data form: it runs in a browser,
+ * and the native runner compiles it to a Maestro flow. Its
  * header follows the journey specification in
  * `.agents/skills/setup-verification/references/journey-specification.md`.
  * See docs/contributing/setup/verification.md#journeys.
@@ -19,10 +21,15 @@ export type Journey = {
   readonly platform: 'web' | 'native';
 };
 
+/** The suffix of each journey file, and the platforms that run it. */
 const kinds = [
-  ['.pw.ts', 'web'],
-  ['.maestro.yaml', 'native'],
+  ['.pw.ts', ['web']],
+  ['.maestro.yaml', ['native']],
+  ['.journey.ts', ['web', 'native']],
 ] as const;
+
+/** Whether a journey is in data form: one `<id>.journey.ts` file that runs on each platform. */
+export const isDataJourney = (journey: Journey) => journey.file.endsWith('.journey.ts');
 
 /**
  * The core journeys that every product has, as `docs/contributing/journeys/core.md`
@@ -149,15 +156,13 @@ export function journeys(root: string): Array<Journey> {
       if (kind === undefined) {
         return [];
       }
-      const [suffix, platform] = kind;
-      return [
-        {
-          id: name.slice(0, -suffix.length),
-          feature,
-          file: `features/${feature}/journeys/${name}`,
-          platform,
-        },
-      ];
+      const [suffix, platforms] = kind;
+      return platforms.map((platform) => ({
+        id: name.slice(0, -suffix.length),
+        feature,
+        file: `features/${feature}/journeys/${name}`,
+        platform,
+      }));
     });
   });
 }

@@ -28,5 +28,17 @@ export class SyncGroups extends Context.Service<
       actor: Actor,
       group: string,
     ) => Effect.Effect<boolean, unknown>;
+    /**
+     * Whether the actor's role on a group grants a permission, such as
+     * `project:publish`. A project with roles provides it. Without it, a
+     * command that declares a permission is refused, so a missing rule
+     * never opens a command.
+     */
+    readonly allows?: (
+      db: DrizzleDatabase,
+      actor: Actor,
+      group: string,
+      permission: string,
+    ) => Effect.Effect<boolean, unknown>;
   }
 >()('sync/SyncGroups') {}

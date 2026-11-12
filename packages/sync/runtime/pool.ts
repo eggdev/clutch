@@ -1,6 +1,21 @@
+import type { Replayable, Waits } from '@repo/sync/contract/command';
+import { stamped } from '@repo/sync/contract/fields';
+import type { CallOf, Fields } from '@repo/sync/contract/fields';
+import type { Model, RecordRow } from '@repo/sync/contract/record';
+import {
+  consoleReport,
+  declarationsByName,
+  deltaRecordMisfit,
+  deviceStamps,
+  runMisfit,
+  savedCommandMisfit,
+  savedRecordsMisfit,
+} from '@repo/sync/runtime/pool-doors';
+import type { PoolDeclarations, PoolOptions } from '@repo/sync/runtime/pool-doors';
 import {
   copy,
   draftOver,
+  groupWaits,
   keepUnchanged,
   listenerMap,
   readAs,
@@ -8,24 +23,25 @@ import {
   sameJson,
   sortedIds,
   tableOf,
+  wake,
 } from '@repo/sync/runtime/tables';
 import type { Tables } from '@repo/sync/runtime/tables';
 import type { PoolState, RecordMeta } from '@repo/sync/types/local-database';
 import type { Change, Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
-import type {
-  Command,
-  Model,
-  ReadablePool,
-  RecordRow,
-  Rejection,
-  Replayable,
-} from '@repo/sync/types/records';
+import type { ReadablePool, Rejection } from '@repo/sync/types/records';
 
 type Pending = { readonly transaction: Transaction; sent: boolean; acceptedAt: number | null };
 
 /** The object pool, with the writes that only the sync engine and commands use. */
 export type Pool = ReadablePool & {
-  readonly run: <Input>(command: Command<Input>, input: Input) => string;
+  /**
+   * Runs a command and returns the ID of its transaction. The pool fills the
+   * stamps of the input that the caller left out: a new ID, and the time.
+   */
+  readonly run: <F extends Fields>(
+    command: { readonly name: string; readonly input: F; readonly waits: Waits },
+    input: CallOf<F>,
+  ) => string;
   readonly isPending: (transactionId: string) => boolean;
   readonly lastSyncId: () => number;
   readonly load: (state: PoolState) => void;
@@ -41,15 +57,22 @@ export type Pool = ReadablePool & {
   /** The groups loaded now, which the engine names when it connects. */
   readonly loadedGroups: () => ReadonlyArray<string>;
   /**
-   * Asks the engine to load a group, and resolves once its records are in
-   * the pool. A group that is loaded resolves at once.
+   * Asks the engine to load a group. It resolves `true` once the records of
+   * the group are in the pool, and `false` when the server refuses the group.
    */
-  readonly loadGroup: (group: string) => Promise<void>;
+  readonly loadGroup: (group: string) => Promise<boolean>;
+  /** The server will not load this group for the actor. Only the engine uses it. */
+  readonly refuseGroup: (group: string) => void;
   /** The groups that a gate asked for and that are not loaded yet. */
   readonly requestedGroups: () => ReadonlyArray<string>;
   /** Wakes when a gate asks for a group. Only the engine uses it. */
   readonly onLoadRequest: (listener: (group: string) => void) => () => void;
   readonly resetConfirmed: () => void;
+  /**
+   * The engine names the build by the digest of its contracts. A saved copy
+   * that another build left a record out of is then loaded again from 0.
+   */
+  readonly nameBuild: (digest: string) => void;
   readonly settle: (outcomes: ReadonlyArray<Outcome>) => void;
   readonly onPending: (listener: () => void) => () => void;
   /** Wakes after every change to the pool, so the engine can save it. Screens never use it. */
@@ -60,15 +83,28 @@ export type Pool = ReadablePool & {
  * Creates the object pool. Confirmed records come only from server deltas.
  * What screens see is the confirmed records with each pending local change
  * applied again on top, so a delta rebases pending work and a rejection rolls
- * it back. `commands` lists every command, so a pending transaction loaded
- * from the local database can run its local change again.
+ * it back. `changes` lists the local change of every command that shows at
+ * once, so a pending transaction loaded from the local database can run its
+ * local change again.
  *
  * Each change keeps every record that did not change as the same object, and
  * wakes only the watchers of the models and records that changed. A rename of
  * one record re-renders the one component that reads it.
+ *
+ * `declarations` lists the records and commands that the doors check against.
+ * `options.stamps` gives each new ID and the time of each run. Only the pool
+ * reads the clock and makes IDs on the client, so a test that gives its own
+ * stamps gets the same records on every run.
  */
-export function createPool(commands: ReadonlyArray<Replayable>): Pool {
-  const byName = new Map(commands.map((command) => [command.name, command]));
+export function createPool(
+  changes: ReadonlyArray<Replayable>,
+  declarations: PoolDeclarations,
+  options: PoolOptions = {},
+): Pool {
+  const stamps = options.stamps ?? deviceStamps;
+  const report = options.report ?? consoleReport;
+  const declared = declarationsByName(declarations.records);
+  const byName = new Map(changes.map((change) => [change.name, change]));
   let confirmed: Tables = new Map();
   let visible: Tables = new Map();
   let pending: Array<Pending> = [];
@@ -77,8 +113,10 @@ export function createPool(commands: ReadonlyArray<Replayable>): Pool {
   // The groups and last sync ID of each confirmed record, by `recordKey`.
   let meta = new Map<string, RecordMeta>();
   let loaded = new Set<string>();
-  const waiters = new Map<string, Array<() => void>>();
-  const loadListeners = new Set<(group: string) => void>();
+  // The build that left a record of a delta out of the confirmed records, if one did.
+  let leftOutBy: string | undefined;
+  let build = 'unnamed';
+  const waits = groupWaits();
   // The ID lists handed out, keyed by model and order. A list is rebuilt only
   // after its model changes, and the old array is kept when the IDs match.
   const idLists = new Map<string, { ids: ReadonlyArray<string>; stale: boolean }>();
@@ -92,10 +130,7 @@ export function createPool(commands: ReadonlyArray<Replayable>): Pool {
     const next = copy(confirmed);
     const draft = draftOver(next);
     for (const { transaction } of pending) {
-      const command = byName.get(transaction.command);
-      if (command?.waits === 'local') {
-        command.replay(draft, transaction.input);
-      }
+      byName.get(transaction.command)?.replay(draft, transaction.input);
     }
     const changed = keepUnchanged(visible, next);
     visible = next;
@@ -111,26 +146,36 @@ export function createPool(commands: ReadonlyArray<Replayable>): Pool {
     for (const name of models) {
       modelWatchers.wake(name);
     }
-    for (const listener of changeListeners) {
-      listener();
-    }
+    wake(changeListeners);
   }
 
-  /** Applies one change unless the record already holds a later one. */
+  /** Applies one change unless the record already holds a later one. Door 2 checks each record. */
   function applyChange(change: Change, syncId: number) {
     const key = recordKey(change.model, change.id);
     const known = meta.get(key);
     if (known && known.syncId > syncId) {
       return;
     }
-    const table = tableOf(confirmed, change.model);
-    if (change.action === 'delete' || change.data === null) {
-      table.delete(change.id);
-      meta.delete(key);
-    } else {
-      table.set(change.id, { ...change.data, id: change.id });
+    if (change.action === 'upsert' && change.data !== null) {
+      const row = { ...change.data, id: change.id };
+      const misfit = deltaRecordMisfit(declared, change.model, change.id, row);
+      if (misfit) {
+        report(misfit);
+        leftOutBy = build;
+        return;
+      }
+      tableOf(confirmed, change.model).set(change.id, row);
       meta.set(key, { groups: change.groups, syncId });
+    } else {
+      tableOf(confirmed, change.model).delete(change.id);
+      meta.delete(key);
     }
+  }
+
+  /** Records a refusal the way the server's refusal is recorded, and wakes the rejection watchers. */
+  function refuse(transactionId: string, command: string, reason: string) {
+    rejection = { transactionId, command, code: 'invalid-input', reason };
+    wake(rejectionWatchers);
   }
 
   /** Deletes each confirmed record that is in no loaded group. */
@@ -146,18 +191,24 @@ export function createPool(commands: ReadonlyArray<Replayable>): Pool {
   }
 
   function wakeLoaded() {
-    for (const [group, resolves] of waiters) {
-      if (loaded.has(group)) {
-        waiters.delete(group);
-        for (const resolve of resolves) {
-          resolve();
-        }
-      }
-    }
+    waits.wake((group) => loaded.has(group));
   }
 
   function dropSettled() {
     pending = pending.filter(({ acceptedAt }) => acceptedAt === null || acceptedAt > lastSyncId);
+  }
+
+  function resetConfirmed() {
+    confirmed = new Map();
+    meta = new Map();
+    lastSyncId = 0;
+    leftOutBy = undefined;
+    for (const entry of pending) {
+      entry.sent = false;
+      entry.acceptedAt = null;
+    }
+    recompute();
+    wake(pendingListeners);
   }
 
   return {
@@ -181,42 +232,67 @@ export function createPool(commands: ReadonlyArray<Replayable>): Pool {
       return () => rejectionWatchers.delete(listener);
     },
     run(command, input) {
-      const id = crypto.randomUUID();
+      if (command.waits === 'local' && !byName.has(command.name)) {
+        throw new Error(
+          `The command ${command.name} shows at once, and this pool has no local change for it. Add its local change to the list that the app gives the pool.`,
+        );
+      }
+      const id = stamps.newId();
+      const filled = stamped(command.input, input, stamps);
+      // Door 3: a caller that the compiler did not see gets a refusal, and nothing is queued.
+      const misfit = runMisfit(command, filled);
+      if (misfit) {
+        refuse(id, command.name, misfit);
+        return id;
+      }
       pending.push({
-        transaction: { id, command: command.name, input },
+        transaction: { id, command: command.name, input: filled },
         sent: false,
         acceptedAt: null,
       });
       recompute();
-      for (const listener of pendingListeners) {
-        listener();
-      }
+      wake(pendingListeners);
       return id;
     },
     isPending: (transactionId) =>
       pending.some(({ transaction }) => transaction.id === transactionId),
     lastSyncId: () => lastSyncId,
     load(state) {
-      // A state saved before records had groups cannot be purged by group.
-      // Start empty: the next connection loads everything again.
-      if (!state.meta || !state.groups) {
-        return;
+      const misfit = savedRecordsMisfit(state, declared);
+      if (misfit) {
+        report(misfit);
+        meta = new Map();
+        loaded = new Set();
+        confirmed = new Map();
+        lastSyncId = 0;
+        leftOutBy = undefined;
+        // The pool asks the server again for each group of the dropped copy.
+        for (const group of Array.isArray(state.groups) ? state.groups : []) {
+          waits.keep(group);
+        }
+      } else {
+        meta = new Map(Object.entries(state.meta));
+        loaded = new Set(state.groups);
+        confirmed = new Map(
+          Object.entries(state.tables).map(([name, rows]) => [
+            name,
+            new Map(rows.map((row) => [row.id, row])),
+          ]),
+        );
+        ({ lastSyncId, leftOutBy } = state);
+        wakeLoaded();
       }
-      meta = new Map(Object.entries(state.meta));
-      loaded = new Set(state.groups);
-      confirmed = new Map(
-        Object.entries(state.tables).map(([name, rows]) => [
-          name,
-          new Map(rows.map((row) => [row.id, row])),
-        ]),
-      );
-      ({ lastSyncId } = state);
-      wakeLoaded();
-      pending = state.pending.map((transaction) => ({
-        transaction,
-        sent: false,
-        acceptedAt: null,
-      }));
+      pending = [];
+      // A copy with another shape may hold no list of saved commands.
+      for (const transaction of Array.isArray(state.pending) ? state.pending : []) {
+        const reason = savedCommandMisfit(transaction, declarations.commands);
+        if (reason) {
+          report(reason);
+          refuse(transaction.id, transaction.command, reason);
+        } else {
+          pending.push({ transaction, sent: false, acceptedAt: null });
+        }
+      }
       recompute();
     },
     snapshot: () => ({
@@ -227,6 +303,7 @@ export function createPool(commands: ReadonlyArray<Replayable>): Pool {
         [...confirmed].map(([name, table]) => [name, [...table.values()]]),
       ),
       pending: pending.map(({ transaction }) => transaction),
+      ...(leftOutBy === undefined ? {} : { leftOutBy }),
     }),
     unsent: () => pending.filter(({ sent }) => !sent).map(({ transaction }) => transaction),
     markSent(ids, sent) {
@@ -262,35 +339,23 @@ export function createPool(commands: ReadonlyArray<Replayable>): Pool {
       wakeLoaded();
     },
     loadedGroups: () => [...loaded],
-    loadGroup(group) {
-      if (loaded.has(group)) {
-        return Promise.resolve();
-      }
-      return new Promise((resolve) => {
-        const resolves = waiters.get(group) ?? [];
-        resolves.push(resolve);
-        waiters.set(group, resolves);
-        for (const listener of loadListeners) {
-          listener(group);
-        }
-      });
+    loadGroup: (group) => (loaded.has(group) ? Promise.resolve(true) : waits.wait(group)),
+    refuseGroup(group) {
+      report(
+        `The server refused to load ${group} for this account, so its screen shows no records.`,
+      );
+      waits.refuse(group);
     },
-    requestedGroups: () => [...waiters.keys()],
-    onLoadRequest(listener) {
-      loadListeners.add(listener);
-      return () => loadListeners.delete(listener);
-    },
-    resetConfirmed() {
-      confirmed = new Map();
-      meta = new Map();
-      lastSyncId = 0;
-      for (const entry of pending) {
-        entry.sent = false;
-        entry.acceptedAt = null;
-      }
-      recompute();
-      for (const listener of pendingListeners) {
-        listener();
+    requestedGroups: waits.requested,
+    onLoadRequest: waits.onRequest,
+    resetConfirmed,
+    nameBuild(digest) {
+      build = digest;
+      if (leftOutBy !== undefined && leftOutBy !== digest) {
+        report(
+          'Another build of this app left out a record that it could not read, so this build loads each record again from the server.',
+        );
+        resetConfirmed();
       }
     },
     settle(outcomes) {
@@ -304,6 +369,8 @@ export function createPool(commands: ReadonlyArray<Replayable>): Pool {
           pending = pending.filter((item) => item !== entry);
           rejection = {
             transactionId: outcome.transactionId,
+            command: entry.transaction.command,
+            code: outcome.code ?? 'failed',
             reason: outcome.reason ?? 'rejected',
           };
         } else {
@@ -313,9 +380,7 @@ export function createPool(commands: ReadonlyArray<Replayable>): Pool {
       dropSettled();
       recompute();
       if (rejection !== before) {
-        for (const listener of rejectionWatchers) {
-          listener();
-        }
+        wake(rejectionWatchers);
       }
     },
     onPending(listener) {

@@ -1,22 +1,27 @@
+import { job } from '@repo/sync/contract/job';
 import { deleteDoneJobs } from '@repo/sync/repo/jobs';
 import { Database } from '@repo/sync/service/database';
 import { defineJob, defineSchedule } from '@repo/sync/service/jobs';
-import { Clock, Duration, Effect, Schema } from 'effect';
+import { Clock, Duration, Effect } from 'effect';
 
 /** Done jobs stay this long, for a person to read, then this job deletes them. */
 const keepDoneJobs = Duration.days(7);
 
+/**
+ * The declaration of the sweep job. The sync engine has no contract of its
+ * own, so the job declares itself here, next to its code, not in a
+ * `defineContract`.
+ */
+const sweepJobDeclaration = job('sync/sweep-jobs', { payload: {} });
+
 /** Deletes done jobs older than seven days. Failed jobs stay. */
-const sweepJobs = defineJob({
-  name: 'sync/sweep-jobs',
-  payload: Schema.Struct({}),
-  run: () =>
-    Effect.gen(function* () {
-      const db = yield* Database;
-      const now = yield* Clock.currentTimeMillis;
-      yield* deleteDoneJobs(db, new Date(now - Duration.toMillis(keepDoneJobs)));
-    }),
-});
+const sweepJobs = defineJob(sweepJobDeclaration, () =>
+  Effect.gen(function* () {
+    const db = yield* Database;
+    const now = yield* Clock.currentTimeMillis;
+    yield* deleteDoneJobs(db, new Date(now - Duration.toMillis(keepDoneJobs)));
+  }),
+);
 
 /** Sweeps the outbox once an hour. */
 export const sweepJobsHourly = defineSchedule('sync/sweep-jobs', {

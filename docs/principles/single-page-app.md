@@ -9,8 +9,8 @@ device already has, not from HTML that a server made.
 - **The browser renders each route.** A new route needs no setting to render
   in the browser. That is the default in every web profile.
 - **The root document is the one static file.** It holds `<html>`, `<head>`,
-  the inline shell CSS and the boot script. It is `index.html` in a Vite app,
-  or the root layout that the framework renders once at build time. A deep
+  the inline shell CSS and the boot script. In `apps/app`, it is the root layout
+  in `apps/app/app/_layout+ssg.tsx`, which One renders once at build time. A deep
   link paints the shell and the theme before any module loads, and the page
   fills in when its modules arrive.
 - **A server render is an exception for one route.** A route renders on the

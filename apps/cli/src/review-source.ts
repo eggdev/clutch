@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { lstat, readFile, readlink } from 'node:fs/promises';
 import path from 'node:path';
 
+import { gitProgram } from '@/git';
+
 export type ReviewFile = { mode: string; content: Buffer; hash: string };
 
 export function fingerprint(mode: string, content: Buffer): string {
@@ -22,7 +24,7 @@ export function safeRelative(value: string): void {
 }
 
 export async function gitBytes(root: string, args: Array<string>): Promise<Buffer> {
-  const child = Bun.spawn(['git', ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' });
+  const child = Bun.spawn([gitProgram, ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' });
   const [output, error, code] = await Promise.all([
     new Response(child.stdout).arrayBuffer(),
     new Response(child.stderr).text(),

@@ -4,9 +4,10 @@ import type { Tree } from '@nx/devkit';
 import { generateFiles, names } from '@nx/devkit';
 import { addGate } from '@tools/generators/shared/gates.ts';
 import {
+  addAppDependency,
   addPrimitive,
   afterWrite,
-  register,
+  clientAppDirectories,
   versionOf,
   writeProject,
 } from '@tools/generators/shared/workspace.ts';
@@ -21,7 +22,10 @@ export type FeatureOptions = { readonly name: string };
 const verificationFile = '.agents/skills/verify/verification.json';
 const journeyCommand = (id: string) => ['mise', 'exec', '--', 'bun', 'run', 'journey', id];
 
-/** Registers a web journey as a flow in the verify config. A project without one is skipped. */
+/**
+ * Registers a data journey as its web flow in the verify config. The native run
+ * compiles the same file, so it has no flow of its own. A project without the config is skipped.
+ */
 function addJourneyFlow(tree: Tree, id: string) {
   const source = tree.read(verificationFile, 'utf-8');
   if (source === null) {
@@ -45,7 +49,7 @@ function addJourneyFlow(tree: Tree, id: string) {
 /**
  * Writes a feature with its gate, a screen, an empty `components/` and a
  * draft journey, then registers it: a primitive, the gate in the `one-gate`
- * lint options, a route in the web app, and the journey as a verify flow.
+ * lint options, a route in the client app, and the journey as a verify flow.
  */
 export function addFeature(tree: Tree, options: FeatureOptions) {
   const name = names(options.name);
@@ -55,13 +59,16 @@ export function addFeature(tree: Tree, options: FeatureOptions) {
     directory,
     name: `@features/${name.fileName}`,
     tag: 'type:feature',
-    dependencies: { react: versionOf(tree, 'react') },
+    // The screen is made of the components of the design system.
+    dependencies: { '@repo/design-system': 'workspace:*', react: versionOf(tree, 'react') },
     // The journey imports the accessibility check from @repo/journeys.
     devDependencies: {
       '@repo/journeys': 'workspace:*',
       '@types/react': versionOf(tree, '@types/react'),
+      // The types that give React Native components a `className` prop.
+      'react-native-css': versionOf(tree, 'react-native-css'),
     },
-    references: [],
+    references: ['../../packages/design-system'],
     react: true,
   });
   const substitutions = {
@@ -80,26 +87,17 @@ export function addFeature(tree: Tree, options: FeatureOptions) {
     docs: ['docs/principles/one-gate-per-feature.md'],
   });
   addJourneyFlow(tree, `${name.fileName}-open`);
-  const routes = `apps/web/src/routes/${name.fileName}`;
-  addGate(tree, `/${name.fileName}`, `${directory}/gate.ts`, routes);
-  if (tree.exists('apps/web/src/router.ts')) {
-    generateFiles(tree, path.join(import.meta.dirname, 'route'), routes, substitutions);
-    register(
-      tree,
-      'apps/web/src/router.ts',
-      `import { ${name.propertyName}Route } from '@/routes/${name.fileName}/route';`,
-      { call: 'addChildren' },
-      `${name.propertyName}Route`,
-    );
-    const manifest = JSON.parse(tree.read('apps/web/package.json', 'utf-8') ?? '{}');
-    manifest.dependencies = {
-      ...manifest.dependencies,
-      [`@features/${name.fileName}`]: 'workspace:*',
-    };
-    tree.write('apps/web/package.json', `${JSON.stringify(manifest, null, 2)}\n`);
+  // The route is a file in the first client app that has an `app/` folder (One's file routes).
+  const app = clientAppDirectories(tree).find((item) => tree.children(`${item}/app`).length > 0);
+  if (app) {
+    const route = `${app}/app/${name.fileName}.tsx`;
+    addGate(tree, `/${name.fileName}`, `${directory}/gate.ts`, route);
+    generateFiles(tree, path.join(import.meta.dirname, 'route'), `${app}/app`, substitutions);
+    addAppDependency(tree, `${app}/package.json`, `@features/${name.fileName}`);
   }
 }
 
+/** Adds a feature, and returns the step that installs and formats the result. */
 export function featureGenerator(tree: Tree, options: FeatureOptions) {
   addFeature(tree, options);
   return afterWrite(tree, true);

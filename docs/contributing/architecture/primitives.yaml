@@ -85,6 +85,8 @@ primitives:
     vendors:
       - vendor: IndexedDB through idb
         imports: ^idb(?:/|$)
+      - vendor: SQLite through op-sqlite
+        imports: ^@op-engineering/op-sqlite(?:/|$)
       - vendor: PGlite
         imports: ^(?:@electric-sql/pglite|@effect/sql-pglite)(?:/|$)
       - vendor: Postgres driver
@@ -132,15 +134,25 @@ primitives:
     docs:
       - docs/principles/one-gate-per-feature.md
 
-  - id: web
+  - id: app
     group: product
-    name: Web app
+    name: Universal app
     kind: app
-    summary: The Vite app. It loads the object pool before the first paint and starts sync after it.
+    summary: The One app. It runs on the web, iOS and Android, and loads the object pool before the first paint.
     code:
-      - apps/web/
+      - apps/app/
     docs:
       - docs/principles/fast-first-load.md
+
+  - id: app-build
+    group: product
+    name: App build
+    kind: package
+    summary: The Vite plugins of the app. They give native components className and compile its classes.
+    code:
+      - packages/app-build/
+    docs:
+      - docs/contributing/architecture/styling.md
 
   - id: api
     group: product
@@ -171,12 +183,22 @@ languages:
       - ui/
       - testing/
     files:
-      - /apps/web/
+      - /apps/app/
       - /features/
-  - imports: ^@tanstack/
-    where: '`apps/web`'
+  - imports: ^react-native(?:-web|-css|-safe-area-context|-screens)?(?:/|$)
+    where: '`ui/`, features, `apps/app`, `@repo/design-system` and `@repo/app-build`'
+    primitives:
+      - design-system
+    packagePaths:
+      - ui/
     files:
-      - /apps/web/
+      - /apps/app/
+      - /features/
+      - /packages/app-build/
+  - imports: ^(?:one|expo(?:-[a-z-]+)?|@react-navigation/[a-z-]+)(?:/|$)
+    where: '`apps/app`'
+    files:
+      - /apps/app/
   - imports: ^effect(?:/|$)
     where: '`types/`, `config/`, `repo/`, `service/`, `jobs/`, `runtime/`, `testing/`, `.server` files, tests, `packages/sync` and the API'
     primitives:

@@ -14,7 +14,7 @@ test('product code may not assert a type, outside repo mappings and tests', asyn
         'features/notes/screens/notes-screen.tsx': cast,
         'apps/web/src/main.tsx': cast,
         'apps/api/src/server.ts': cast,
-        'packages/notes/models/note.ts': asConst,
+        'packages/notes/contract/notes.ts': asConst,
       },
       ['typescript'],
     ),

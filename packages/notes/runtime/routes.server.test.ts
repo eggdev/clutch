@@ -1,11 +1,13 @@
 import { expect, test } from 'bun:test';
 
+import { notesContract } from '@repo/notes/contract/notes';
+import { listNotes } from '@repo/notes/repo/notes';
 import { importNoteRoute } from '@repo/notes/runtime/routes.server';
-import { Notes } from '@repo/notes/service/notes';
 import { sign } from '@repo/notes/service/webhook-signature';
 import { NotesTest } from '@repo/notes/testing/notes';
 import { WebhookSignatureTest, webhookTestSecret } from '@repo/notes/testing/webhook';
-import { EventLogLive } from '@repo/sync/service/event-log';
+import { Database } from '@repo/sync/service/database';
+import { eventLog } from '@repo/sync/service/event-log';
 import { Effect, Layer } from 'effect';
 import { HttpServerRequest } from 'effect/http';
 
@@ -35,14 +37,16 @@ test('the import webhook checks the signature and the body, and a repeat commits
       const bad = yield* post('{}', yield* sign(webhookTestSecret, '{}'));
       const first = yield* post(body, signature);
       const repeat = yield* post(body, signature);
-      const notes = yield* (yield* Notes).list('org-test');
+      const notes = yield* listNotes(yield* Database, 'org-test');
       return {
         statuses: [forged.status, bad.status, first.status, repeat.status],
         notes: notes.map((note) => note.title),
       };
     }).pipe(
       Effect.provide(
-        Layer.mergeAll(EventLogLive, WebhookSignatureTest).pipe(Layer.provideMerge(NotesTest())),
+        Layer.mergeAll(eventLog([notesContract]), WebhookSignatureTest).pipe(
+          Layer.provideMerge(NotesTest()),
+        ),
       ),
     ),
   );

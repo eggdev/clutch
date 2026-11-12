@@ -41,34 +41,56 @@ for what to do when the check gets slow.
 - A membership is a record in the user's own group. A change to it makes the
   sync server ask `groupsFor` again.
 
-`SyncGroupsFromAccess` in `service/access.ts` gives both to the sync engine
+`SyncGroupsFromAccess` in `packages/access/service/access.ts` gives both to the sync engine
 through the `SyncGroups` seam. See [local-first sync](./local-first-sync.md#sync-groups).
 
 ## One door for each write
 
-Each server change declares its access rule in a required `access` field.
-`defineServerChange` runs the rule before the change, so a server change never
-checks access by hand. A server change without the field does not compile.
+Each command declares its access in a required `access` field.
+`serverChange` runs the rule before the change, so a server change never
+checks access by hand. A command without the field does not compile.
 
-| Rule                                | Who may run the change                                    |
-| ----------------------------------- | --------------------------------------------------------- |
-| `'organization'`                    | Any actor of the organization                             |
-| `{ group: (input, { db, actor }) }` | An actor that `canUseGroup` allows for the returned group |
+| Rule                                       | Who may run the change                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------ |
+| `access: 'organization'`                   | Any actor of the organization                                            |
+| `access: 'group'`, with a `group` function | An actor that `canUseGroup` allows for the returned group                |
+| `permission`, when the command has one     | An actor whose role on the group grants the permission, through `allows` |
 
 The `group` function returns the sync group of the record that the change
 writes. It returns `null` when the record does not exist, and the change is
 rejected. `packages/notes/commands/rename-note.server.ts` reads the note's
 space this way.
 
-## Every surface declares its permission
+A command with `access: 'group'` writes only records of the group that its `group` function returns.
+`serverChange` checks each change that `run` returns. A change without that group is a defect, and nothing commits.
+The rule does not apply to `access: 'organization'`, because a record of the organization may sit in a smaller group of it.
+`packages/sync/commands/server-change.server.test.ts` tests both cases.
+
+## Permissions
+
+A command may name a `permission`, such as `project:publish`. The server
+checks it after the access rule. The sync engine calls `allows` on the
+`SyncGroups` seam with the database, the actor, the group and the permission.
+
+- The group is the group of the record, or the organization group when `access` is `'organization'`.
+- `allows` is optional. A project with roles provides it. `SyncGroupsFromAccess` in `packages/access/service/access.ts` gives none.
+- Without `allows`, a command with a permission is refused with `forbidden`. A missing rule never opens a command.
+- A refused permission gives `forbidden` and the reason `You need the <permission> permission.`
+- `packages/sync/commands/server-change.server.test.ts` tests all three cases.
+
+## Which surfaces check a permission
 
 This page applies [one door for each decision](../../principles/one-door-for-each-decision.md).
-Each route, API operation and tool declares the permission it needs.
-`'none'` is an explicit value: the surface touches no tenant data.
+A command may declare a `permission`. A tool runs its command, so it has the command's rule.
+A route declares no permission, so no check covers it. `tool: 'none'` is an explicit value: the command offers no tool.
+A command with a `permission` is refused until a project supplies `allows`.
 
-- A server change declares its access rule in a required field, so one
-  without it does not compile. `packages/sync/commands/define.server.test.ts`
-  proves it.
+- A command declares `access` in a required field, so one without it does not
+  compile. A server half with `access: 'group'` needs a `group` function, and
+  one without it does not compile. `packages/sync/commands/server-change.server.test.ts`
+  proves both.
+- A command that changes who is a member declares `tool: 'none'`, so no agent
+  may call it. `packages/access/contract/access.ts` does this.
 - An HTTP route from `defineRoute` has no permission field yet, and no check
   covers it. A route checks its caller itself, such as a webhook that checks
   a signature.
@@ -91,5 +113,5 @@ A surface declares the requirement once, and the dispatch path checks it.
 
 <!-- kickoff: The files that define permissions, the access check and the route table test. -->
 
-- `packages/access/service/access.ts` and `packages/sync/commands/define.server.ts`
+- `packages/access/service/access.ts`, `packages/access/contract/access.ts` and `packages/sync/commands/server-change.server.ts`
 - [Request context](./request-context.md)

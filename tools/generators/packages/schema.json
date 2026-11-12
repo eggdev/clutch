@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "packages",
+  "title": "Sync the app lists of the packages",
+  "type": "object",
+  "properties": {}
+}

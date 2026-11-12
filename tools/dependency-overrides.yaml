@@ -15,7 +15,24 @@
 
 - package: undici
   reason: >-
-    Pins 7.29.1, above GHSA-w293-vg96-wgc3, GHSA-rfgv-xxqx-mfg5 and the other
-    advisories fixed in 7.29.1. Nx pins undici to exactly 7.29.0, so
-    `bun audit fix` cannot move it.
-  revisit: Nx depends on undici 7.29.1 or later.
+    Pins 7.30.1, above GHSA-2m5v-pch6-74hx (TLS certificate validation bypass
+    in Agent), GHSA-4w7w-5xrc-9h26 and the other undici 7.29 advisories. Nx
+    pins undici to exactly 7.29.0, so `bun audit fix` cannot move it.
+  revisit: Nx depends on undici 7.30.1 or later.
+
+- package: image-size
+  reason: >-
+    Pins 2.0.4, above GHSA-5p2g-fcmc-qvqq and GHSA-w3rx-r6r6-pgpr (infinite
+    loops in the JXL, HEIF and ICNS parsers). vxrn 1.27.1, under One, asks for
+    ^1.2.1, and no 1.x release has the fix. Version 2 reads bytes, not file
+    paths, so patches/vxrn@1.27.1.patch gives vxrn the file bytes.
+  revisit: The vxrn that One uses depends on image-size 2.0.3 or later. Remove the image-size hunks of the patch too.
+
+- package: lightningcss
+  reason: >-
+    Pins 1.30.1, the CSS engine that NativeWind 5.0.0-rc.0 and
+    react-native-css 3.1.0-rc.0 were tested with. The NativeWind 5 migration
+    guide asks for this pin. Vite asks for ^1.33.0, but the app transforms CSS
+    with PostCSS. react-native-css-interop asks for ~1.27.0, and One's
+    NativeWind 4 path that uses it stays off.
+  revisit: NativeWind 5 ships a stable release that names a lightningcss range.

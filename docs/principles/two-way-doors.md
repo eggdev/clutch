@@ -49,6 +49,13 @@ Before a one-way change merges:
 - Record the no in [decision records](../contributing/decisions/index.md) when
   the next agent would otherwise propose it again.
 
+A request shape that an installed build sends is a stored shape too. The
+contract check `check-contract` compares each record, command and load function
+with the base branch. It sorts each change into two-way or one-way, and it fails
+a one-way change that `contract.json` does not name under `breaks`. Keep the old
+shape working, or add the replacement beside it. Name a break only when the owner
+agreed to it.
+
 ## Move data between stores
 
 Moving a fact from one store to another is one-way. Do it in this order:

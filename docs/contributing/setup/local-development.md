@@ -27,11 +27,10 @@ gives each app a stable name in place of a port:
 
 | App        | Command                   | URL                                |
 | ---------- | ------------------------- | ---------------------------------- |
-| `apps/web` | `vite`                    | `http://clutch.localhost:1355`     |
+| `apps/app` | `one dev`                 | `http://app.clutch.localhost:1355` |
 | `apps/api` | `bun --watch src/main.ts` | `http://api.clutch.localhost:1355` |
 
-The name comes from the root `package.json` name. The web app gets the bare
-name, and each other app gets `<app>.<name>`. In a linked Git worktree,
+The name comes from the root `package.json` name. Each app gets `<app>.<name>`. In a linked Git worktree,
 portless puts the branch name in front, so two checkouts never collide.
 
 The API keeps Postgres in the process with PGlite, in `apps/api/.data/pglite`,

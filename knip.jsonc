@@ -29,12 +29,44 @@
       "entry": ["src/main.ts", "**/*.test.{ts,tsx}"],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },
-    "apps/web": {
-      "entry": ["**/*.test.{ts,tsx}"],
+    "apps/app": {
+      // The One runtime loads the route files under app/ and the native setup
+      // file, and react-native.config.cjs loads the native commands. The native
+      // bundle loads the lib/*.native files by platform, which knip cannot read.
+      "entry": [
+        "react-native.config.cjs",
+        "fingerprint.config.cjs",
+        // Expo loads this config plugin by the path that app.json names.
+        "scene-lifecycle.cjs",
+        // Vite loads the One plugin and the app's build settings by file name.
+        "vite.config.ts",
+        // Expo loads the app config by its file name.
+        "app.config.ts",
+        "native-setup.ts",
+        // Each platform's file loads by its suffix, which knip does not read.
+        "lib/*.native.{ts,tsx}",
+        "app/**/*.{ts,tsx}",
+      ],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
-      // The token file loads Tailwind through a CSS `@import`, which knip does
-      // not read. `@tailwindcss/vite` also needs it as a peer.
-      "ignoreDependencies": ["tailwindcss"],
+      // Expo reads app.json and app.config.ts for its own default modules, which
+      // the app does not install.
+      "expo": false,
+      // The One plugin loads the route tree when knip loads the Vite config,
+      // and no route tree exists before the first route is generated.
+      "vite": false,
+      "ignoreDependencies": [
+        // The global stylesheet and the env types load Tailwind and NativeWind
+        // through CSS `@import` and a triple-slash reference, which knip does not read.
+        "tailwindcss",
+        "nativewind",
+        // The native build links each native module that the app lists, so the
+        // app lists the SQLite library that packages/sync imports.
+        "@op-engineering/op-sqlite",
+        // tools/native/build.ts loads the fingerprint tool from the app.
+        "@expo/fingerprint",
+        // One loads the compiler for `react: { compiler: true }` in vite.config.ts.
+        "babel-plugin-react-compiler",
+      ],
     },
     "tools/generators": {
       // Nx loads each generator through generators.json.
@@ -45,13 +77,21 @@
       // A gate is the way into its feature. A new feature has no caller yet:
       // the first button or link that opens it calls the gate. Playwright runs
       // each journey through tools/journeys/playwright.config.ts.
-      "entry": ["gate.ts", "**/*.test.{ts,tsx}", "journeys/*.pw.ts"],
+      "entry": ["gate.ts", "**/*.test.{ts,tsx}", "journeys/*.pw.ts", "journeys/*.journey.ts"],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },
     "packages/*": {
-      // A model is how screens read a record. A new model has no reader until
-      // the first screen uses it.
-      "entry": ["models/*.ts", "**/*.test.{ts,tsx}"],
+      // A contract declares each record, command and load function. A new one
+      // has no reader until the first screen uses it, and the contract check
+      // loads each contract file by path. A `.native` file replaces its twin
+      // in the native bundle, so the bundler loads it by suffix, which knip
+      // does not read.
+      "entry": [
+        "contract/*.ts",
+        "runtime/*.native.{ts,tsx}",
+        "ui/*.native.{ts,tsx}",
+        "**/*.test.{ts,tsx}",
+      ],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },
     "packages/journeys": {
@@ -60,8 +100,21 @@
       // flagging it. The journey generator's template imports it. The same
       // holds for `snap` in testing/visual.ts until a journey snaps a screen,
       // and for `outcomes` in testing/outcome.ts and the helpers of
-      // testing/inbox.ts until a core journey exists.
-      "entry": ["testing/a11y.ts", "testing/visual.ts", "testing/outcome.ts", "testing/inbox.ts"],
+      // testing/inbox.ts until a core journey exists, and for `ownOrganization`
+      // in testing/organization.ts until a journey takes an organization. The
+      // same holds for `poolState`, `records` and `settled` in testing/pool.ts,
+      // for `callTool` in testing/tools.ts and for the screen checks in
+      // testing/screen.ts, until a journey reads the pool, calls a tool or checks a screen.
+      "entry": [
+        "testing/a11y.ts",
+        "testing/visual.ts",
+        "testing/outcome.ts",
+        "testing/inbox.ts",
+        "testing/organization.ts",
+        "testing/pool.ts",
+        "testing/tools.ts",
+        "testing/screen.ts",
+      ],
       "project": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     },
     "{apps,features,packages}/*": {

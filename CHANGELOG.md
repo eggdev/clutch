@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.0.0 (2026-11-12)
+
+### Breaking changes
+
+- feat(contract)!: declare each package once in a contract, and derive the checks, the manifest and the agent tools from it
+- feat(app)!: ship one universal client on One with Expo and React Native, with a universal design system, a SQLite local database on a device, and a first-screen check that reads each built page
+
+### Features
+
+- Let a sensitive path leave the owner's hold when its journeys exist, and hold a PR on a failed native journey.
+
+## 0.70.0 (2026-11-12)
+
+### Features
+
+- Let a sensitive path leave the owner's hold when its journeys exist, and hold a PR on a failed native journey.
+
+## 0.69.0 (2026-11-12)
+
+### Features
+
+- Take agent review and the visual verdict out of the merge decision.
+
+## 0.68.0 (2026-11-12)
+
+### Features
+
+- Let the server merge a green agent PR with no session, and stop open review threads holding a merge.
+- Add the system-review skill, a fixed council review of how well a project ships with its owner hands off.
+
+## 0.67.0 (2026-11-12)
+
+### Features
+
+- Let the server merge a green agent PR with no session, and stop open review threads holding a merge.
+
+## 0.66.0 (2026-11-12)
+
+### Features
+
+- Hold a PR that weakens a journey or budget, by a deterministic comparison, and make model review findings advisory.
+
 ## 0.65.0 (2026-11-12)
 
 ### Features

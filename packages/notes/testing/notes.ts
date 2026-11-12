@@ -1,7 +1,6 @@
 import { SyncGroupsFromAccess } from '@repo/access/service/access';
 import { accessTables } from '@repo/access/testing/access';
-import { migrateNotes } from '@repo/notes/runtime/migrate.server';
-import { NotesLive } from '@repo/notes/service/notes';
+import { migrateNotes } from '@repo/notes/runtime/server.server';
 import { OutboxLive } from '@repo/sync/service/jobs';
 import { DatabaseTest } from '@repo/sync/testing/database';
 import { Layer } from 'effect';
@@ -10,11 +9,8 @@ import { Layer } from 'effect';
 export const NotesDatabaseTest = () => DatabaseTest(accessTables, migrateNotes);
 
 /**
- * The `Notes` service, the `SyncGroups` seam that the notes server changes use
- * for their access rule, and the outbox, over a fresh in-memory database.
+ * The `SyncGroups` seam that the notes server changes use for their access
+ * rule, and the outbox, over a fresh in-memory database.
  */
 export const NotesTest = () =>
-  Layer.provideMerge(
-    Layer.mergeAll(NotesLive, SyncGroupsFromAccess, OutboxLive),
-    NotesDatabaseTest(),
-  );
+  Layer.provideMerge(Layer.mergeAll(SyncGroupsFromAccess, OutboxLive), NotesDatabaseTest());

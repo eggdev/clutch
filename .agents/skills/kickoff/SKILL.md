@@ -190,7 +190,7 @@ Write the registry entries as the owner agrees to each part:
    a vendor. Its Live Layer goes in `runtime/` and its Test Layer in
    `testing/`.
 3. A `languages` entry for each other shared language, with the folders that
-   may import it. React, Effect, Drizzle and TanStack already have one.
+   may import it. React, React Native, Effect and Drizzle already have one.
 4. An `invariants` entry for each hard invariant from phase 1. Its `docs` list
    links `docs/contributing/project-intent.md#hard-invariants`.
 
@@ -254,10 +254,10 @@ Set up the guardrails for agents:
    [weekly gardening](../../../docs/contributing/harness-engineering.md#weekly-gardening)
    pass. Fill its slot with the agent, its day and its reviewer.
 
-Pick the profile of each client app. The template ships Vite with TanStack
-Router in `apps/web`. For a project with no client, delete `apps/web`,
-`features/notes` and the React language entry. For a native profile, add the
-app and fill the native slot in `docs/contributing/architecture/styling.md`.
+Pick the profile of each client app. The template ships One with Expo and
+React Native in `apps/app`. For a project with no client, delete `apps/app`,
+`features/notes` and the React language entry. For a web-only profile, replace
+the app and delete the native slot in `docs/contributing/architecture/styling.md`.
 Then add the SQLite adapter of the local database. Follow the steps in
 [local database](../../../docs/contributing/architecture/client.md#local-database):
 the driver at an exact version, its vendor entry, `runtime/sqlite.ts` in

@@ -1,8 +1,8 @@
-import { membershipId, membershipModel } from '@repo/access/models/membership';
+import { membershipId, membershipRecord } from '@repo/access/contract/access';
+import type { Membership } from '@repo/access/contract/access';
 import { memberships } from '@repo/access/repo/schema';
 import type { MembershipRow } from '@repo/access/repo/schema';
-import type { Membership } from '@repo/access/types/membership';
-import { deleteChange, upsertChange } from '@repo/sync/models/change';
+import { deleteChange, upsertChange } from '@repo/sync/contract/change';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { and, eq } from 'drizzle-orm';
 import { Effect } from 'effect';
@@ -27,12 +27,12 @@ export function toRow(record: Membership, organizationId: string): MembershipRow
 
 /** The change that tells the user about a new membership. */
 export function joinedChange(row: MembershipRow) {
-  return upsertChange(membershipModel, toRecord(row), { organizationId: row.organizationId });
+  return upsertChange(membershipRecord, toRecord(row), { organizationId: row.organizationId });
 }
 
 /** The change that tells the user that a membership ended. */
 export function leftChange(row: MembershipRow) {
-  return deleteChange(membershipModel, toRecord(row), { organizationId: row.organizationId });
+  return deleteChange(membershipRecord, toRecord(row), { organizationId: row.organizationId });
 }
 
 const keyOf = (organizationId: string, spaceId: string, userId: string) =>

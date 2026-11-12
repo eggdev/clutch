@@ -1,8 +1,12 @@
+import { matches } from '@repo/sync/contract/fields';
+import type { TypeOf } from '@repo/sync/contract/fields';
+import type { JobDeclaration, PayloadFields } from '@repo/sync/contract/job';
 import { insertJob } from '@repo/sync/repo/jobs';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { transactionSafe } from '@repo/sync/service/transaction-safe';
+import { JobPayloadMismatch } from '@repo/sync/types/job-payload-mismatch';
 import type { Change } from '@repo/sync/types/protocol';
-import { Clock, Context, Duration, Effect, Layer, Schema } from 'effect';
+import { Clock, Context, Duration, Effect, Layer } from 'effect';
 
 /** What a job receives as it runs. */
 export type JobContext = {
@@ -34,18 +38,24 @@ export type Job<Payload, R = never> = RunnableJob<R> & {
  * any service, a vendor service too. It may fail: the job runner tries it
  * again with a growing wait. Make `run` safe to repeat.
  */
-export function defineJob<Payload, Encoded, R = never>(definition: {
-  readonly name: string;
-  readonly payload: Schema.Codec<Payload, Encoded>;
-  readonly run: (payload: Payload, context: JobContext) => Effect.Effect<void, unknown, R>;
-}): Job<Payload, R> {
-  const decode = Schema.decodeUnknownEffect(definition.payload);
-  const encode = Schema.encodeSync(definition.payload);
+export function defineJob<const Name extends string, const F extends PayloadFields, R = never>(
+  declaration: JobDeclaration<Name, F>,
+  run: (payload: TypeOf<F>, context: JobContext) => Effect.Effect<void, unknown, R>,
+): Job<TypeOf<F>, R> & { readonly name: Name } {
   return {
-    name: definition.name,
-    encode,
+    name: declaration.name,
+    // A payload is plain JSON, so it is its own encoding.
+    encode: (payload) => payload,
     execute: (payload, context) =>
-      decode(payload).pipe(Effect.flatMap((value) => definition.run(value, context))),
+      Effect.gen(function* () {
+        if (!matches(declaration.payload, payload)) {
+          return yield* new JobPayloadMismatch({
+            job: declaration.name,
+            reason: `The payload of the job ${declaration.name} does not match its declaration. Check what enqueued it.`,
+          });
+        }
+        return yield* run(payload, context);
+      }),
   };
 }
 

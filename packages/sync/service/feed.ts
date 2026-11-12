@@ -1,4 +1,4 @@
-import { userGroup } from '@repo/sync/models/define';
+import { userGroup } from '@repo/sync/contract/engine-groups';
 import type { EventLog } from '@repo/sync/service/event-log';
 import type { Granted } from '@repo/sync/service/sync-groups';
 import type { Delta, SyncMessage } from '@repo/sync/types/protocol';
@@ -74,7 +74,7 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
           if (seen) {
             out.push({ _tag: 'Deltas', deltas: [seen] });
           }
-          const own = userGroup(connection.userId);
+          const own = userGroup.of(connection.userId);
           if (delta.changes.some((change) => change.groups.includes(own))) {
             const granted = yield* connection.granted;
             const allowed = new Set([...granted.eager, ...granted.lazy]);

@@ -60,12 +60,18 @@ export const Transaction = Schema.Struct({
 });
 export type Transaction = typeof Transaction.Type;
 
-/** The answer for one transaction. An accepted one names the event that holds it. */
+/**
+ * The answer for one transaction. An accepted one names the event that holds
+ * it. A rejected one has the stable `code` of its refusal and the `reason`
+ * for the person. `code` is an optional key, so a client still reads the
+ * answer of a server that does not send it.
+ */
 export const Outcome = Schema.Struct({
   transactionId: Schema.String,
   status: Schema.Literals(['accepted', 'rejected']),
   syncId: Schema.NullOr(Schema.Int),
   reason: Schema.NullOr(Schema.String),
+  code: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type Outcome = typeof Outcome.Type;
 
@@ -80,7 +86,13 @@ export class SyncRpcs extends RpcGroup.make(
     success: Schema.Array(Outcome),
   }),
   Rpc.make('Pull', {
-    payload: { lastSyncId: Schema.Int, groups: Schema.Array(Schema.String) },
+    payload: {
+      lastSyncId: Schema.Int,
+      groups: Schema.Array(Schema.String),
+      // The digest of the client's contracts. An optional key, so the server
+      // still reads the call of a build that does not send it.
+      contract: Schema.optionalKey(Schema.String),
+    },
     success: SyncMessage,
     error: Schema.Union([SessionEnded, ServerBehind]),
     stream: true,

@@ -12,6 +12,7 @@
   "sortPackageJson": true,
   "ignorePatterns": [
     "bun.lock",
+    "**/native-fingerprint.json",
     ".agents/**",
     ".claude/**",
     ".codex/**",

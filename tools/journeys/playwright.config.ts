@@ -46,7 +46,7 @@ const use = (device: Device) => ({
  */
 export default defineConfig({
   testDir: path.resolve(import.meta.dirname, '../../features'),
-  testMatch: '*/journeys/*.pw.ts',
+  testMatch: ['*/journeys/*.pw.ts', '*/journeys/*.journey.ts'],
   outputDir: path.resolve(import.meta.dirname, '../../test-results/journeys'),
   fullyParallel: false,
   workers: 1,

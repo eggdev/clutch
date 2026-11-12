@@ -8,7 +8,7 @@
 - [Tooling installation](./tooling-installation.md): committed-source propagation,
   safe updates, custom-file conflicts and project verify preservation. Run installer once.
 
-- [Notes sync](../../../../features/notes/journeys/notes-sync.pw.ts): a note
+- [Notes sync](../../../../features/notes/journeys/notes-sync.journey.ts): a note
   that one device adds, renames, and renames offline reaches a second device
   with no reload. Run notes-sync once.
 

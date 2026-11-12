@@ -3,27 +3,32 @@
     "package": {
       "factory": "./package/generator.ts#packageGenerator",
       "schema": "./package/schema.json",
-      "description": "A package with only the sections it needs, its first record and its primitive."
+      "description": "A package with its contract and only the sections it needs, its first record and its primitive."
     },
     "feature": {
       "factory": "./feature/generator.ts#featureGenerator",
       "schema": "./feature/schema.json",
-      "description": "A feature with its gate, a screen, its route in the web app and its primitive."
+      "description": "A feature with its gate, a screen, its route in the client app and its primitive."
     },
     "command": {
       "factory": "./command/generator.ts#commandGenerator",
       "schema": "./command/schema.json",
-      "description": "A command as paired files, registered in the package and the apps."
+      "description": "A command in the package contract, with its server change and, when it shows at once, its local change."
     },
-    "model": {
-      "factory": "./model/generator.ts#modelGenerator",
-      "schema": "./model/schema.json",
-      "description": "A record schema in types/ and its model in models/."
+    "record": {
+      "factory": "./record/generator.ts#recordGenerator",
+      "schema": "./record/schema.json",
+      "description": "A record in the package contract, and its table in repo/ when the package has one."
     },
     "job": {
       "factory": "./job/generator.ts#jobGenerator",
       "schema": "./job/schema.json",
       "description": "A job in jobs/, registered in the package and in the server app."
+    },
+    "packages": {
+      "factory": "./packages/generator.ts#packagesGenerator",
+      "schema": "./packages/schema.json",
+      "description": "Writes the app lists, packages.ts, from the packages that have runtime/client.ts or runtime/server.server.ts. Runs with nx sync."
     }
   }
 }

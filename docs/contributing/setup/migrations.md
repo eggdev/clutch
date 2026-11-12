@@ -15,13 +15,15 @@ Drizzle Kit `1.0.0-rc.5` writes each package's migrations. It reads
 `repo/schema.ts` and writes `repo/migrations/<timestamp>_<name>/migration.sql`
 with a `snapshot.json`. Each package's `drizzle.config.ts` names both paths.
 
-| Task               | Command                                                                           |
-| ------------------ | --------------------------------------------------------------------------------- |
-| Make a migration   | `mise exec -- bun nx run @repo/<package>:db-generate`                             |
-| Apply migrations   | Start the API. `apps/api/src/server.ts` runs them first.                          |
-| Register a package | The `package` generator adds its `migrate` function to `apps/api/src/packages.ts` |
+| Task               | Command                                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Make a migration   | `mise exec -- bun nx run @repo/<package>:db-generate`                                                                                 |
+| Apply migrations   | Start the API. `apps/api/src/server.ts` runs them first.                                                                              |
+| Register a package | The `package` generator writes its `migrate` in `runtime/server.server.ts`. `nx sync` lists the package in `apps/api/src/packages.ts` |
 
-The API runs each package's migrations in order, with the sync tables first.
+The API runs the sync tables first, then each package's migrations, by package
+name. A package owns its tables: `repo/` is private to it, so no migration
+needs the table of another package.
 The same migrator runs on PGlite and on Postgres.
 
 <!-- kickoff: The command that dry-runs a migration against a copy of production data. -->

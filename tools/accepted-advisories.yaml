@@ -15,4 +15,25 @@
 #     runs the flawed code, and it never ships.
 #   revisit: A fixed some-package ships.
 
-[]
+- id: GHSA-3g3m-2fjr-6pw4
+  package: glob
+  reason: >-
+    No release has a fix. Expo's fingerprint tool and CLI pull it in. Only
+    build tools on a developer machine or in CI run it, and it ships in no
+    app and no server.
+  revisit: A fixed glob ships.
+- id: GHSA-g3hv-75wg-m249
+  package: minimatch
+  reason: >-
+    No release has a fix. Nx's tooling pulls it in. Only build tools on a
+    developer machine or in CI run it, and it ships in no app and no server.
+  revisit: A fixed minimatch ships.
+- id: GHSA-rmxm-3fg6-px4f
+  package: '@hono/node-server'
+  reason: >-
+    No release has a fix. One pulls it in for its own web server. The flaw is
+    in serveStatic, which no code of this repository calls. The web build is
+    static files, and the API does not use Hono. A project that serves its web
+    build through One's server, with middleware that guards static paths, is
+    exposed and must not accept this.
+  revisit: A fixed @hono/node-server ships, or a project serves its web build through One's server.
