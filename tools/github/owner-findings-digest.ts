@@ -95,8 +95,17 @@ export function findingsOf(
   return findings;
 }
 
-/** A finding text as a table cell: cut, with `|` escaped. */
-const cell = (text: string) => text.trim().slice(0, maxText).replaceAll('|', '\\|');
+/**
+ * A finding text as a table cell. The cell is the text of one link, so a link
+ * inside the finding keeps only its words, and a bracket that is left is
+ * escaped. Then the text is cut, with `|` escaped.
+ */
+const cell = (text: string) =>
+  text
+    .trim()
+    .replaceAll(/\[([^\]]*)\]\([^)]*\)/gu, '$1')
+    .slice(0, maxText)
+    .replaceAll(/[[\]|]/gu, (mark) => `\\${mark}`);
 
 /** The Markdown section of the owner findings, newest merged pull request first. */
 export function renderSection(merged: ReadonlyArray<Merged>, days: number): string {

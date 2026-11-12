@@ -113,6 +113,28 @@ test('the section lists two pull requests newest first, with escaped pipes, a cu
   );
 });
 
+test('a link inside a finding keeps only its words, and a bracket that is left is escaped', () => {
+  const text = renderSection(
+    [
+      {
+        pull: pull(9, '2026-11-10T09:00:00Z'),
+        findings: [
+          {
+            path: 'a.yml',
+            line: 1,
+            text: 'owner (weaker check): see [Owner findings](docs/review.md#owner-findings) and a[0].',
+            url: 'https://github.com/acme/tools/pull/9#discussion_r1',
+          },
+        ],
+      },
+    ],
+    7,
+  );
+  expect(text).toContain(
+    '| [owner (weaker check): see Owner findings and a\\[0\\].](https://github.com/acme/tools/pull/9#discussion_r1) |',
+  );
+});
+
 test('the section shows maxRows rows and counts the findings past them', () => {
   const findings = Array.from({ length: maxRows + 3 }, (_, index) => ({
     path: `tools/f${index}.ts`,
