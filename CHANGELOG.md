@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 (2026-11-12)
+
+### Fixes and maintenance
+
+- chore(clutch): file the findings of the council review
+
 ## 1.0.0 (2026-11-12)
 
 ### Breaking changes
