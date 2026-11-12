@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0 (2026-11-12)
+
+### Breaking changes
+
+- feat(contract)!: declare each package once in a contract, and derive the checks, the manifest and the agent tools from it
+- feat(app)!: ship one universal client on One with Expo and React Native, with a universal design system, a SQLite local database on a device, and a first-screen check that reads each built page
+
+### Features
+
+- Let a sensitive path leave the owner's hold when its journeys exist, and hold a PR on a failed native journey.
+
 ## 0.70.0 (2026-11-12)
 
 ### Features
