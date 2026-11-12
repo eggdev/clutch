@@ -80,7 +80,7 @@ agent PR, so the owner approves it on GitHub like any other PR from another auth
 drifts. After a change to the one-way-door tier, run
 `mise exec -- bun tools/codeowners.ts --write`.
 
-Three kinds of PR wait for the owner without a GitHub approval rule:
+Four kinds of PR wait for the owner without a GitHub approval rule:
 
 - A rule with `lines`, such as a workflow's `permissions:`. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
@@ -89,8 +89,10 @@ Three kinds of PR wait for the owner without a GitHub approval rule:
   [Auto-merge](#auto-merge)).
 - A PR that makes a contract break. Its diff changes `contract.json`, and the
   snapshot names the break. Auto-merge holds it, whatever its tier.
+- A major change. Its title has `!` before the colon, or a changeset in its
+  diff names a major bump. Auto-merge holds it, whatever its tier.
 
-Do not merge any of these kinds with `pr merge` until the owner says so. `pr status` counts the `owner` findings and the contract breaks, and reports such a PR as not ready. `pr merge` refuses it until the owner approves it.
+Do not merge any of these kinds with `pr merge` until the owner says so. `pr status` counts the `owner` findings, the contract breaks and a major change, and reports such a PR as not ready. `pr merge` refuses it until the owner approves it.
 
 The owner's approval is the last step. When `automerge.owner` in `clutch.yaml`
 approves the head commit, an `on` run of Auto-merge passes an agent PR at any
@@ -363,6 +365,8 @@ At each step, the PR also needs all of these:
   owner merges such a PR.
 - Its diff makes no contract break. A PR whose diff changes `contract.json`, and
   whose snapshot names a break, waits for the owner.
+- It is not a major change. A PR with `!` in its title, or with a changeset
+  that names a major bump, waits for the owner's sign-off.
 
 The workflow runs only from the default branch, with the default branch's
 rules, so a PR cannot change the rules that judge it. It refuses a fork's PR,
