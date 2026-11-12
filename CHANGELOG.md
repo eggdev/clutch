@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 (2026-11-12)
+
+### Features
+
+- Take agent review and the visual verdict out of the merge decision.
+- Replace the design stop with a hand-test marker, and fail a pull request over its scope limit.
+
 ## 1.0.2 (2026-11-12)
 
 ### Fixes and maintenance
