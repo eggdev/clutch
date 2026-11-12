@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.68.0 (2026-11-12)
+
+### Features
+
+- Let the server merge a green agent PR with no session, and stop open review threads holding a merge.
+- Add the system-review skill, a fixed council review of how well a project ships with its owner hands off.
+
 ## 0.67.0 (2026-11-12)
 
 ### Features
