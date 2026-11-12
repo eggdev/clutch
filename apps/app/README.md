@@ -29,5 +29,9 @@ An iOS run needs a simulator that the owner booted. No command boots one.
   and on a device.
 - `vite.config.ts`: the web build. `global.css` holds the Tailwind entry.
 - `app.json` and `app.config.ts`: the native app configuration.
+- `scene-lifecycle.cjs`: an Expo config plugin that `app.json` names. iOS 27
+  closes an app at launch unless it adopts the scene life cycle, and the
+  project template of Expo 57 does not. The plugin makes the generated iOS
+  project adopt it. Delete the plugin when the app moves to Expo 58.
 
 <!-- kickoff: the name, the identifiers and the scheme of the app, in app.json and app.config.ts -->

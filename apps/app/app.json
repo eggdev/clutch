@@ -6,7 +6,7 @@
     "scheme": "clutch",
     "userInterfaceStyle": "automatic",
     "platforms": ["ios"],
-    "plugins": ["one/expo-plugin"],
+    "plugins": ["one/expo-plugin", "./scene-lifecycle.cjs"],
     "ios": {
       "bundleIdentifier": "dev.clutch.app",
       "infoPlist": {

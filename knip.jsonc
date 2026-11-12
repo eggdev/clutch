@@ -36,6 +36,8 @@
       "entry": [
         "react-native.config.cjs",
         "fingerprint.config.cjs",
+        // Expo loads this config plugin by the path that app.json names.
+        "scene-lifecycle.cjs",
         // Vite loads the One plugin and the app's build settings by file name.
         "vite.config.ts",
         // Expo loads the app config by its file name.

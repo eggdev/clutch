@@ -26,6 +26,14 @@
         "hash": "b4fde17bb78b74180e836c60eaaed7de4f4219c0"
       },
       {
+        "type": "file",
+        "filePath": "scene-lifecycle.cjs",
+        "reasons": [
+          "expoConfigPlugins"
+        ],
+        "hash": "f0e32f7fb697b89193e69222443269c0cfa1d1bd"
+      },
+      {
         "type": "dir",
         "filePath": "../../node_modules/@expo/dom-webview/ios",
         "reasons": [
@@ -191,11 +199,11 @@
       {
         "type": "contents",
         "id": "expoConfig",
-        "contents": "{\"ios\":{\"bundleIdentifier\":\"dev.clutch.app\",\"infoPlist\":{\"NSAppTransportSecurity\":{\"NSAllowsLocalNetworking\":true,\"NSExceptionDomains\":{\"localhost\":{\"NSExceptionAllowsInsecureHTTPLoads\":true,\"NSIncludesSubdomains\":true}}}}},\"name\":\"Clutch\",\"platforms\":[\"ios\"],\"plugins\":[\"one/expo-plugin\"],\"scheme\":\"clutch\",\"sdkVersion\":\"57.0.0\",\"slug\":\"clutch\",\"userInterfaceStyle\":\"automatic\",\"version\":\"0.1.0\"}",
+        "contents": "{\"ios\":{\"bundleIdentifier\":\"dev.clutch.app\",\"infoPlist\":{\"NSAppTransportSecurity\":{\"NSAllowsLocalNetworking\":true,\"NSExceptionDomains\":{\"localhost\":{\"NSExceptionAllowsInsecureHTTPLoads\":true,\"NSIncludesSubdomains\":true}}}}},\"name\":\"Clutch\",\"platforms\":[\"ios\"],\"plugins\":[\"./scene-lifecycle.cjs\",\"one/expo-plugin\"],\"scheme\":\"clutch\",\"sdkVersion\":\"57.0.0\",\"slug\":\"clutch\",\"userInterfaceStyle\":\"automatic\",\"version\":\"0.1.0\"}",
         "reasons": [
           "expoConfig"
         ],
-        "hash": "f3df36a0b633c0d32c27dbd223b8cbe1acdb1491"
+        "hash": "27abfb9f0c4eaada9fd50ff9692f6a512222e0e6"
       },
       {
         "type": "contents",
@@ -216,6 +224,6 @@
         "hash": "4b971165899447aa931b2c4941280e4397d60aa7"
       }
     ],
-    "hash": "84d236ff7237fef258ea39648c647f18b7d86f7b"
+    "hash": "35473d8344b2ced9342af4d58aac8c72a2402eb4"
   }
 }

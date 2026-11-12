@@ -260,13 +260,15 @@ async function main(root: string, check: boolean): Promise<number> {
         continue;
       }
       // Each client app proxies the sync socket to the API, and the API accepts
-      // the origin of each client app.
-      const clients = apps
-        .filter((other) => other.health === '/')
-        .map((other) => urls.get(other.name))
-        .join(',');
+      // the origin of each client app. The socket of a native app goes to the
+      // API directly and carries the origin of the API itself, so the API
+      // accepts its own origin too.
+      const origins = [
+        ...apps.filter((other) => other.health === '/').map((other) => urls.get(other.name)),
+        urlFor('apps/api'),
+      ].join(',');
       const links = pick(
-        { DEV_API_URL: urlFor('apps/api'), SYNC_ORIGINS: clients },
+        { DEV_API_URL: urlFor('apps/api'), SYNC_ORIGINS: origins },
         app.folder === 'apps/api' ? ['SYNC_ORIGINS'] : ['DEV_API_URL'],
       );
       const child = Bun.spawn([portless(root), 'run', '--name', app.name, ...app.command], {
