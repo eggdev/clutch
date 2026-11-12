@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0 (2026-11-12)
+
+### Features
+
+- feat(risk): ask the owner only for what cannot be paid back (CL-463)
+
 ## 1.5.0 (2026-11-12)
 
 ### Features
