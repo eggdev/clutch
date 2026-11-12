@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "out-tsc/spec",
     "tsBuildInfoFile": "out-tsc/spec/tsconfig.spec.tsbuildinfo",
-    "types": ["bun"],
+    "types": ["bun", "react-native-css/types"],
     "lib": ["es2024", "dom", "dom.iterable"],
     "jsx": "react-jsx"
   },
@@ -12,12 +12,16 @@
     "**/*.test.tsx",
     "testing/**/*.ts",
     "testing/**/*.tsx",
-    "journeys/**/*.pw.ts"
+    "journeys/**/*.pw.ts",
+    "journeys/**/*.journey.ts"
   ],
   "exclude": ["out-tsc/**", "node_modules/**"],
   "references": [
     {
       "path": "./tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/notes/tsconfig.lib.json"
     },
     {
       "path": "../../packages/sync/tsconfig.spec.json"

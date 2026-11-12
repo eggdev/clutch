@@ -23,9 +23,10 @@ and [fail loudly](../../principles/fail-loudly.md).
   function turns it into a response with the status from the table. A handler
   never builds an error response by hand. Server code never throws. See
   [server](./server.md#edges-and-errors).
-- **A rejected command is not an HTTP error.** On the sync socket, a server
-  change fails with `CommandRejected`. The client gets a rejected outcome with
-  the reason, and drops the local change.
+- **A refused command is not an HTTP error.** On the sync socket, a server
+  change refuses with `refuse(code, reason)` from its run context. The refusal has a stable
+  code. The code is one that the command declares in `refuses`, or a built-in
+  one. The client gets the code and the reason, and drops the local change.
 - **A closed set of codes.** A new code is a row in the table, in the change
   that adds it. A code never changes meaning. A client that sees an unknown
   code treats it as the generic code for its status.

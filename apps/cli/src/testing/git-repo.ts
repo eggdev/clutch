@@ -11,8 +11,13 @@ async function writeFiles(root: string, files: Record<string, string>) {
   }
 }
 
-/** The repo's own identity and no commit signing, as `git config` writes them. */
-const localConfig =
+/**
+ * The identity of a test repo, and no commit signing. One write to the config
+ * file of the repo sets all three, where three `git config` processes did.
+ * A test file calls `gitRepo` many times, and each process costs more on a
+ * busy machine.
+ */
+const repoConfig =
   '[user]\n\tname = Test\n\temail = test@example.com\n[commit]\n\tgpgsign = false\n';
 
 /**
@@ -31,9 +36,11 @@ export async function gitRepo(
   await writeFiles(root, files);
   if (options.git !== false) {
     await gitOrThrow(root, 'init', '--quiet', '--initial-branch=main');
-    // One write in place of three `git config` processes.
-    await appendFile(path.join(root, '.git/config'), localConfig);
-    await gitOrThrow(root, 'add', '--all');
+    await appendFile(path.join(root, '.git/config'), repoConfig);
+    // A repo with no file has nothing to add, so the commit alone makes it.
+    if (Object.keys(files).length > 0) {
+      await gitOrThrow(root, 'add', '--all');
+    }
     await gitOrThrow(root, 'commit', '--quiet', '--allow-empty', '--message', 'Initial commit');
   }
   return {

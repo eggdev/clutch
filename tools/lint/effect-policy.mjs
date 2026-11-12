@@ -20,7 +20,7 @@ const effectHooks = new Set(['useEffect', 'useLayoutEffect', 'useInsertionEffect
 
 const filenameOf = (context) => (context.filename ?? context.getFilename()).replaceAll('\\', '/');
 const isTestFile = (filename) =>
-  /(?:^|\/)test\//u.test(filename) || /\.(?:test|spec|pw)\.[cm]?[jt]sx?$/u.test(filename);
+  /(?:^|\/)test\//u.test(filename) || /\.(?:test|spec|pw|journey)\.[cm]?[jt]sx?$/u.test(filename);
 
 /** An edge: the code that runs an Effect. `runtime/` of a package, an app, tooling or a test. */
 export function isEdge(filename) {

@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process';
 
 import type { Tree } from '@nx/devkit';
 import { installPackagesTask, readJson, updateJson, writeJson } from '@nx/devkit';
+import { isClientApp } from '@tools/apps';
+import type { Manifest } from '@tools/apps';
 import type { ArrayTarget } from '@tools/generators/shared/registry.ts';
 import { addImport, addToArray } from '@tools/generators/shared/registry.ts';
 import { parseDocument } from 'yaml';
@@ -87,7 +89,8 @@ export function writeProject(tree: Tree, project: Project) {
       outDir: 'out-tsc/lib',
       tsBuildInfoFile: 'out-tsc/lib/tsconfig.lib.tsbuildinfo',
       ...compilerOptions,
-      types: [],
+      // A React project styles React Native components with `className`.
+      types: project.react ? ['react-native-css/types'] : [],
     },
     include: ['**/*.ts', '**/*.tsx'],
     exclude: [
@@ -105,7 +108,7 @@ export function writeProject(tree: Tree, project: Project) {
     compilerOptions: {
       outDir: 'out-tsc/spec',
       tsBuildInfoFile: 'out-tsc/spec/tsconfig.spec.tsbuildinfo',
-      types: ['bun'],
+      types: project.react ? ['bun', 'react-native-css/types'] : ['bun'],
       ...compilerOptions,
     },
     include: [
@@ -113,7 +116,7 @@ export function writeProject(tree: Tree, project: Project) {
       '**/*.test.tsx',
       'testing/**/*.ts',
       'testing/**/*.tsx',
-      ...(journeys ? ['journeys/**/*.pw.ts'] : []),
+      ...(journeys ? ['journeys/**/*.pw.ts', 'journeys/**/*.journey.ts'] : []),
     ],
     exclude: ['out-tsc/**', 'node_modules/**'],
     references: [
@@ -145,6 +148,21 @@ export function addDependencies(
   });
 }
 
+/**
+ * The client apps, as `apps/<name>`, sorted. A client app is one whose package.json
+ * depends on React or React Native, the rule of `isClientApp` in `tools/apps.ts`.
+ */
+export function clientAppDirectories(tree: Tree): Array<string> {
+  return tree
+    .children('apps')
+    .filter((app) => {
+      const manifest = `apps/${app}/package.json`;
+      return tree.exists(manifest) && isClientApp(readJson<Manifest>(tree, manifest));
+    })
+    .map((app) => `apps/${app}`)
+    .toSorted();
+}
+
 /** Adds a workspace dependency to an app. A project without that app is skipped. */
 export function addAppDependency(tree: Tree, file: string, dependency: string) {
   const source = tree.read(file, 'utf-8');
@@ -172,6 +190,13 @@ export function register(
     return;
   }
   tree.write(file, addToArray(addImport(source, importLine), target, element));
+}
+
+/** Writes a file that holds a registration list, unless it exists. A file that exists stays as it is. */
+export function ensureFile(tree: Tree, file: string, content: string) {
+  if (!tree.exists(file)) {
+    tree.write(file, content);
+  }
 }
 
 /**

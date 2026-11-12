@@ -5,7 +5,9 @@ import path from 'node:path';
  * everywhere (docs/contributing/setup/lint-rules.md), so no file may silence
  * one. A Semgrep false positive may be silenced on its line when the comment
  * names the rule and a reason: `nosemgrep: rule-id -- reason`. The directive
- * names are joined from parts, so this file does not match itself.
+ * names are joined from parts, so this file does not match itself. The check
+ * skips each file that git ignores, such as a generated file that a tool
+ * writes again on every run.
  */
 const sources = '{apps,features,packages,tools}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,css}';
 const rootFiles = '*.{ts,mts,js,mjs,cjs,css}';
@@ -53,14 +55,43 @@ export function findSuppressions(file: string, content: string): Array<Match> {
   return matches;
 }
 
-export async function checkSuppressions(root: string): Promise<Array<Match>> {
-  const matches: Array<Match> = [];
+/**
+ * The files of `files` that git ignores, as paths relative to `root`. A tracked
+ * file is never ignored, even when a pattern matches it. Outside a git
+ * repository, `git check-ignore` fails and nothing is ignored.
+ */
+export async function ignoredFiles(root: string, files: Array<string>): Promise<Set<string>> {
+  if (files.length === 0) {
+    return new Set();
+  }
+  const git = Bun.spawn(['git', '-C', root, 'check-ignore', '--stdin'], {
+    stdin: new Blob([`${files.join('\n')}\n`]),
+    stdout: 'pipe',
+    stderr: 'ignore',
+  });
+  const output = await new Response(git.stdout).text();
+  await git.exited;
+  return new Set(output.split('\n').filter((line) => line !== ''));
+}
+
+/** Every file of the scanned patterns that git does not ignore, and so is checked. */
+export async function checkedFiles(root: string): Promise<Array<string>> {
+  const files: Array<string> = [];
   for (const pattern of [sources, rootFiles, scripts]) {
     for await (const file of new Bun.Glob(pattern).scan({ cwd: root, dot: true })) {
       if (!file.split('/').includes('node_modules')) {
-        matches.push(...findSuppressions(file, await Bun.file(path.join(root, file)).text()));
+        files.push(file);
       }
     }
+  }
+  const ignored = await ignoredFiles(root, files);
+  return files.filter((file) => !ignored.has(file));
+}
+
+export async function checkSuppressions(root: string): Promise<Array<Match>> {
+  const matches: Array<Match> = [];
+  for (const file of await checkedFiles(root)) {
+    matches.push(...findSuppressions(file, await Bun.file(path.join(root, file)).text()));
   }
   return matches.toSorted((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
 }

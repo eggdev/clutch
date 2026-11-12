@@ -1,22 +1,60 @@
+import { ListItem } from '@repo/design-system/ui/list';
 import { TextField } from '@repo/design-system/ui/text-field';
-import { renameNote } from '@repo/notes/commands/rename-note';
-import { maxTitleLength } from '@repo/notes/models/note';
+import { maxTitleLength, renameNote } from '@repo/notes/contract/notes';
 import { useNote } from '@repo/notes/ui/use-notes';
 import { useCommand } from '@repo/sync/ui/sync-provider';
-import { memo } from 'react';
-import type { KeyboardEvent } from 'react';
+import { memo, useRef, useState } from 'react';
+import type { TextInput } from 'react-native';
 
-/** Enter ends the edit, which commits the title on blur. */
-function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-  if (event.key === 'Enter') {
-    event.currentTarget.blur();
+/**
+ * The title of a note, edited in place. Enter or a tap elsewhere ends the
+ * edit, and the end of the edit saves the title. Escape puts the saved title
+ * back. An empty title is not saved.
+ */
+function NoteTitle({
+  title,
+  onRename,
+}: {
+  readonly title: string;
+  readonly onRename: (title: string) => void;
+}) {
+  const [draft, setDraft] = useState(title);
+  // The end of the edit reads the newest text, also in the same task as a key press.
+  const latest = useRef(title);
+  const input = useRef<TextInput>(null);
+  function change(text: string) {
+    latest.current = text;
+    setDraft(text);
   }
+  return (
+    <TextField
+      ref={input}
+      variant="inline"
+      label="Note title"
+      value={draft}
+      maxLength={maxTitleLength}
+      onChangeText={change}
+      onKeyPress={(event) => {
+        if (event.nativeEvent.key === 'Escape') {
+          change(title);
+          input.current?.blur();
+        }
+      }}
+      onBlur={() => {
+        const next = latest.current.trim();
+        if (next && next !== title) {
+          onRename(next);
+        } else {
+          change(title);
+        }
+      }}
+    />
+  );
 }
 
 /**
- * One note, with a title that renames the note when the field loses focus.
- * The row reads its own record and runs its own command, so its only prop is
- * the ID.
+ * One note, with a title that renames the note when its edit ends. The row
+ * reads its own record and runs its own command, so its only prop is the ID.
  */
 function NoteRowView({ id }: { readonly id: string }) {
   const note = useNote(id);
@@ -24,25 +62,11 @@ function NoteRowView({ id }: { readonly id: string }) {
   if (!note) {
     return null;
   }
-  const current = note.title;
-  function commit(value: string) {
-    const title = value.trim();
-    if (title && title !== current) {
-      rename({ id, title, at: new Date().toISOString() });
-    }
-  }
   return (
-    <li className="rounded-surface border border-line bg-surface px-3 py-2">
-      <TextField
-        key={current}
-        variant="inline"
-        label="Note title"
-        defaultValue={current}
-        maxLength={maxTitleLength}
-        onBlur={(event) => commit(event.currentTarget.value)}
-        onKeyDown={onKeyDown}
-      />
-    </li>
+    <ListItem>
+      {/* A title that another device changed starts a new field with that title. */}
+      <NoteTitle key={note.title} title={note.title} onRename={(title) => rename({ id, title })} />
+    </ListItem>
   );
 }
 

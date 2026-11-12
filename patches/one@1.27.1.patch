@@ -1,0 +1,107 @@
+diff --git a/node_modules/one/.bun-tag-8e1adbe577cd17e5 b/.bun-tag-8e1adbe577cd17e5
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/dist/cjs/Root.cjs b/dist/cjs/Root.cjs
+index eba04180c7776f42334ab547c62a9a324f3bae19..bc8e7028c7d77c5851bccdec0544476aaf5786b0 100644
+--- a/dist/cjs/Root.cjs
++++ b/dist/cjs/Root.cjs
+@@ -142,7 +142,7 @@ function Root(props) {
+           requestAnimationFrame(() => {
+             if (window.location.pathname + window.location.search !== initialPath) return;
+             const nav = store.navigationRef?.current;
+-            if (!nav) return;
++            if (!nav || !nav.isReady()) return;
+             const linking2 = (0, import_linkingConfig.getResolvedLinking)();
+             if (linking2?.getStateFromPath) {
+               const freshState = linking2.getStateFromPath(initialPath, linking2.config);
+diff --git a/dist/cjs/Root.native.js b/dist/cjs/Root.native.js
+index 5587e29ff78de4a28d85a406733193c753265d67..d3dcea83c03e1c8c00ce3a6bbc0e4f1c4b2ea0a4 100644
+--- a/dist/cjs/Root.native.js
++++ b/dist/cjs/Root.native.js
+@@ -151,7 +151,7 @@ function Root(props) {
+             var _store_navigationRef;
+             if (window.location.pathname + window.location.search !== initialPath) return;
+             var nav = (_store_navigationRef = store.navigationRef) === null || _store_navigationRef === void 0 ? void 0 : _store_navigationRef.current;
+-            if (!nav) return;
++            if (!nav || !nav.isReady()) return;
+             var linking2 = (0, import_linkingConfig.getResolvedLinking)();
+             if (linking2 === null || linking2 === void 0 ? void 0 : linking2.getStateFromPath) {
+               var freshState = linking2.getStateFromPath(initialPath, linking2.config);
+diff --git a/dist/cjs/server/getServerManifest.cjs b/dist/cjs/server/getServerManifest.cjs
+index 224e3a095d98b12b0e0191e992b734ef292691c4..60cf56415b9135204893dbc65f9a2ab573f9719c 100644
+--- a/dist/cjs/server/getServerManifest.cjs
++++ b/dist/cjs/server/getServerManifest.cjs
+@@ -89,7 +89,7 @@ function getServerManifest(route) {
+   const flat = getFlatNodes(route).sort(sortByPathSpecificity);
+   const pathToRoute = {};
+   for (const [path, route2] of flat) {
+-    if (pathToRoute[path]) {
++    if (pathToRoute[path] && pathToRoute[path].contextKey !== route2.contextKey) {
+       console.warn(`
+ [one] \u274C Duplicate routes error`);
+       console.warn(`  Multiple routes at the same path! One route will always win over the other.`);
+diff --git a/dist/cjs/server/getServerManifest.native.js b/dist/cjs/server/getServerManifest.native.js
+index 05cdab93b7ca938ec4e2ee00d6d45ede29c6fe4b..99ded5459173bbce63b20795f4917c59a73e2add 100644
+--- a/dist/cjs/server/getServerManifest.native.js
++++ b/dist/cjs/server/getServerManifest.native.js
+@@ -98,7 +98,7 @@ function getServerManifest(route) {
+   try {
+     for (var _iterator = flat[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+       var [path, _$route] = _step.value;
+-      if (pathToRoute[path]) {
++      if (pathToRoute[path] && pathToRoute[path].contextKey !== _$route.contextKey) {
+         console.warn(`
+ [one] \u274C Duplicate routes error`);
+         console.warn(`  Multiple routes at the same path! One route will always win over the other.`);
+diff --git a/dist/esm/Root.mjs b/dist/esm/Root.mjs
+index 65acbe47915443569aafbe26dce4d4ad4d0ca6f9..ec6152e46f9bb4221d54594bd00356ebb43a30e2 100644
+--- a/dist/esm/Root.mjs
++++ b/dist/esm/Root.mjs
+@@ -115,7 +115,7 @@ function Root(props) {
+           requestAnimationFrame(() => {
+             if (window.location.pathname + window.location.search !== initialPath) return;
+             const nav = store.navigationRef?.current;
+-            if (!nav) return;
++            if (!nav || !nav.isReady()) return;
+             const linking2 = getResolvedLinking();
+             if (linking2?.getStateFromPath) {
+               const freshState = linking2.getStateFromPath(initialPath, linking2.config);
+diff --git a/dist/esm/Root.native.js b/dist/esm/Root.native.js
+index 3733bbe9e285327e57b61cbb67ceb96a3b25388b..a9494b1f914cae61afeac69243b7edd6fe4baf03 100644
+--- a/dist/esm/Root.native.js
++++ b/dist/esm/Root.native.js
+@@ -122,7 +122,7 @@ function Root(props) {
+             var _store_navigationRef;
+             if (window.location.pathname + window.location.search !== initialPath) return;
+             var nav = (_store_navigationRef = store.navigationRef) === null || _store_navigationRef === void 0 ? void 0 : _store_navigationRef.current;
+-            if (!nav) return;
++            if (!nav || !nav.isReady()) return;
+             var linking2 = getResolvedLinking();
+             if (linking2 === null || linking2 === void 0 ? void 0 : linking2.getStateFromPath) {
+               var freshState = linking2.getStateFromPath(initialPath, linking2.config);
+diff --git a/dist/esm/server/getServerManifest.mjs b/dist/esm/server/getServerManifest.mjs
+index 2f427add58bdde413b27a65c7414d70589b58f25..9f0a3b5b2cb347118ce5f2b63a35ec940d4dfaf3 100644
+--- a/dist/esm/server/getServerManifest.mjs
++++ b/dist/esm/server/getServerManifest.mjs
+@@ -61,7 +61,7 @@ function getServerManifest(route) {
+   const flat = getFlatNodes(route).sort(sortByPathSpecificity);
+   const pathToRoute = {};
+   for (const [path, route2] of flat) {
+-    if (pathToRoute[path]) {
++    if (pathToRoute[path] && pathToRoute[path].contextKey !== route2.contextKey) {
+       console.warn(`
+ [one] \u274C Duplicate routes error`);
+       console.warn(`  Multiple routes at the same path! One route will always win over the other.`);
+diff --git a/dist/esm/server/getServerManifest.native.js b/dist/esm/server/getServerManifest.native.js
+index 497e409a2e208d2138c52872f845f2b9184d336c..a817dc322b7cb3802ad2330ac74cfd932f35c927 100644
+--- a/dist/esm/server/getServerManifest.native.js
++++ b/dist/esm/server/getServerManifest.native.js
+@@ -68,7 +68,7 @@ function getServerManifest(route) {
+   try {
+     for (var _iterator = flat[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+       var [path, _$route] = _step.value;
+-      if (pathToRoute[path]) {
++      if (pathToRoute[path] && pathToRoute[path].contextKey !== _$route.contextKey) {
+         console.warn(`
+ [one] \u274C Duplicate routes error`);
+         console.warn(`  Multiple routes at the same path! One route will always win over the other.`);

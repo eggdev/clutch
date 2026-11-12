@@ -1,8 +1,8 @@
-import { spaceNoteCountModel } from '@repo/notes/models/space-note-count';
+import { spaceNoteCountRecord } from '@repo/notes/contract/notes';
+import type { SpaceNoteCount } from '@repo/notes/contract/notes';
 import { notes, spaceNoteCounts } from '@repo/notes/repo/schema';
 import type { SpaceNoteCountRow } from '@repo/notes/repo/schema';
-import type { SpaceNoteCount } from '@repo/notes/types/space-note-count';
-import { upsertChange } from '@repo/sync/models/change';
+import { upsertChange } from '@repo/sync/contract/change';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { and, count, eq } from 'drizzle-orm';
 import { Effect } from 'effect';
@@ -19,7 +19,7 @@ function toCountRecord(row: SpaceNoteCountRow): SpaceNoteCount {
 
 /** The change that tells each member of the space about its count. */
 export function toCountChange(row: SpaceNoteCountRow) {
-  return upsertChange(spaceNoteCountModel, toCountRecord(row), {
+  return upsertChange(spaceNoteCountRecord, toCountRecord(row), {
     organizationId: row.organizationId,
   });
 }

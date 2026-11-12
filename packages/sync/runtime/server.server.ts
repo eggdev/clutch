@@ -1,11 +1,13 @@
 import { Actors } from '@repo/identity/service/actors';
-import type { ServerChange } from '@repo/sync/commands/define.server';
+import type { ServerChange } from '@repo/sync/commands/server-change.server';
 import { originAllowed, syncOrigins } from '@repo/sync/config/origins';
+import type { Contract } from '@repo/sync/contract/define';
+import { manifestOf } from '@repo/sync/contract/manifest';
 import { EventLog } from '@repo/sync/service/event-log';
 import { feed } from '@repo/sync/service/feed';
 import { Sessions } from '@repo/sync/service/sessions';
+import { settle } from '@repo/sync/service/settle';
 import { SyncGroups } from '@repo/sync/service/sync-groups';
-import { CommandRejected } from '@repo/sync/types/command-rejected';
 import { GroupNotAllowed } from '@repo/sync/types/group-not-allowed';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import type { Outcome, Transaction } from '@repo/sync/types/protocol';
@@ -16,10 +18,6 @@ import { RpcServer } from 'effect/rpc';
 
 /** The path of the sync socket on the server app. */
 const syncPath = '/sync';
-
-function rejected(transaction: Transaction, reason: string): Outcome {
-  return { transactionId: transaction.id, status: 'rejected', syncId: null, reason };
-}
 
 /**
  * The WebSocket protocol of the RPC server, with each socket kept in
@@ -62,15 +60,33 @@ const trackedWebsocket = Layer.effect(RpcServer.Protocol)(
 /**
  * The sync server: `Push`, `Pull` and `Load` over one WebSocket. `changes`
  * lists the server change of every command, from each package's
- * `runtime/handlers.server.ts`. The layer needs the services of every
- * change, and the one `EventLog` of the server app. The actor of each call comes from `Actors`,
+ * `runtime/server.server.ts`. The layer needs the services of every
+ * change, and the one `EventLog` of the server app. The server app names
+ * them with `SyncServer<ServicesOf<typeof serverChanges>>(serverChanges, contracts)`,
+ * where `serverOf(packages)` gives both lists.
+ * `contracts` lists each contract that the app serves. A command of one of
+ * them with no server change stops the server at its start. The actor of each call comes from `Actors`,
  * and the groups it may load come from `SyncGroups`. A server app adds this
  * layer to its router.
  */
-export function SyncServer<R>(changes: ReadonlyArray<ServerChange<R>>) {
+export function SyncServer<R>(
+  changes: ReadonlyArray<ServerChange<R>>,
+  contracts: ReadonlyArray<Contract>,
+) {
   const byName = new Map(changes.map((change) => [change.name, change]));
+  const manifest = manifestOf(contracts);
+  const unserved = manifest.commands.filter((declared) => !byName.has(declared.name));
   const handlers = SyncRpcs.toLayer(
     Effect.gen(function* () {
+      // A command that a contract declares and no server change serves would
+      // refuse every write of it. The server stops at its start instead.
+      if (unserved.length) {
+        return yield* Effect.die(
+          new Error(
+            `The server app passes no server change for: ${unserved.map((declared) => declared.name).join(', ')}. Add the server change of each command to its package's \`runtime/server.server.ts\`.`,
+          ),
+        );
+      }
       const log = yield* EventLog;
       // The services of every server change. The composition root provides
       // them, so a missing service fails the typecheck of the server app.
@@ -93,41 +109,43 @@ export function SyncServer<R>(changes: ReadonlyArray<ServerChange<R>>) {
       const push = (transaction: Transaction, headers: Readonly<Record<string, string>>) =>
         Effect.gen(function* () {
           const actor = yield* actors.fromHeaders(headers);
-          const change = byName.get(transaction.command);
-          if (!change) {
-            return rejected(transaction, `The server has no command ${transaction.command}.`);
-          }
-          return yield* log
-            .commit(actor.organizationId, transaction.id, (db) =>
-              change.run(transaction.input, { db, actor }).pipe(Effect.provideContext(services)),
-            )
-            .pipe(
-              Effect.matchEffect({
-                onSuccess: (syncId) =>
-                  Effect.succeed<Outcome>({
-                    transactionId: transaction.id,
-                    status: 'accepted',
-                    syncId,
-                    reason: null,
-                  }),
-                onFailure: (failure) =>
-                  failure instanceof CommandRejected
-                    ? Effect.succeed(rejected(transaction, failure.reason))
-                    : Effect.logError('A server change failed', failure).pipe(
-                        Effect.as(rejected(transaction, 'The server could not apply this change.')),
-                      ),
-              }),
-            );
+          return yield* settle(byName.get(transaction.command), transaction, actor).pipe(
+            Effect.provideContext(services),
+            Effect.provideService(EventLog, log),
+          );
         });
       return {
+        // The outcomes come in the order of the transactions. When the database
+        // does not answer, the list ends there: that write and each write
+        // behind it get no outcome, so the client keeps them in their order.
         Push: ({ transactions }, { headers }) =>
-          Effect.all(transactions.map((transaction) => push(transaction, headers))),
+          Effect.gen(function* () {
+            const outcomes: Array<Outcome> = [];
+            for (const transaction of transactions) {
+              const outcome = yield* push(transaction, headers).pipe(
+                Effect.catchTag('ServerUnavailable', () => Effect.void),
+              );
+              if (!outcome) {
+                yield* Effect.logWarning('The database did not answer, so a push stopped');
+                break;
+              }
+              outcomes.push(outcome);
+            }
+            return outcomes;
+          }),
         // After a database restore, the log can end before the client's last
         // sync ID. The client then loads again from 0.
-        Pull: ({ lastSyncId, groups }, { client, headers }) =>
+        Pull: ({ lastSyncId, groups, contract }, { client, headers }) =>
           Stream.unwrap(
             Effect.gen(function* () {
               const actor = yield* actors.fromHeaders(headers);
+              // A build of another contract still syncs. The line names it,
+              // so the traffic of each older build can be counted by digest.
+              if (contract !== manifest.digest) {
+                yield* Effect.logInfo('A client of another contract connected').pipe(
+                  Effect.annotateLogs({ client: contract ?? 'unknown', server: manifest.digest }),
+                );
+              }
               const head = yield* log.head(actor.organizationId).pipe(Effect.orDie);
               if (lastSyncId > head) {
                 return yield* new ServerBehind({ head });

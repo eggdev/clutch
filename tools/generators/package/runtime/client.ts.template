@@ -1,0 +1,9 @@
+import { <%= propertyName %>Contract } from '@repo/<%= fileName %>/contract/<%= fileName %>';
+import { clientPackage } from '@repo/sync/contract/define';
+
+/**
+ * The client half of the <%= title %> package: its contract and the local change of
+ * each command that shows at once. A command with `waits: 'local'` and no local
+ * change here does not compile. The client apps list it in `packages`.
+ */
+export const <%= propertyName %>Client = clientPackage(<%= propertyName %>Contract, []);

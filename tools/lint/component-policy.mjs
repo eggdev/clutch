@@ -103,7 +103,7 @@ export function isExempt(file) {
   return (
     file.startsWith(`${designSystemFolder.split('/').slice(0, 2).join('/')}/`) ||
     /(?:^|\/)(?:test|testing)\//u.test(file) ||
-    /\.(?:test|spec|pw)\.[cm]?[jt]sx?$/u.test(file)
+    /\.(?:test|spec|pw|journey)\.[cm]?[jt]sx?$/u.test(file)
   );
 }
 

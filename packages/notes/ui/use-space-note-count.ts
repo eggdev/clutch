@@ -1,4 +1,4 @@
-import { spaceNoteCountModel } from '@repo/notes/models/space-note-count';
+import { spaceNoteCountRecord } from '@repo/notes/contract/notes';
 import { useRecord } from '@repo/sync/ui/sync-provider';
 
 /**
@@ -6,5 +6,5 @@ import { useRecord } from '@repo/sync/ui/sync-provider';
  * until the first count arrives. The screen never counts the notes itself.
  */
 export function useSpaceNoteCount(spaceId: string): number | undefined {
-  return useRecord(spaceNoteCountModel, spaceId)?.noteCount;
+  return useRecord(spaceNoteCountRecord, spaceId)?.noteCount;
 }

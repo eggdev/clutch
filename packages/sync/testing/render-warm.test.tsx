@@ -4,11 +4,9 @@ import { poolState, testModel } from '@repo/sync/testing/pool-state';
 import { renderWarm } from '@repo/sync/testing/render-warm';
 import { useRecord, useRecordIds } from '@repo/sync/ui/sync-provider';
 
-const card = testModel<{ readonly id: string; readonly title: string }>('Card', {
-  id: 'string',
-  title: 'string',
-});
+const card = testModel('Card', { id: 'string', title: 'string' });
 const state = poolState({ lastSyncId: 1, tables: { Card: [{ id: 'a', title: 'Warm' }] } });
+const declared = { records: [card], commands: [] };
 
 function CardItem({ id }: { readonly id: string }) {
   return <li>{useRecord(card, id)?.title}</li>;
@@ -31,9 +29,11 @@ function Fetching() {
 }
 
 test('a screen that reads the pool paints with no request', () => {
-  expect(renderWarm(() => <Cards />, state)).toContain('Warm');
+  expect(renderWarm(() => <Cards />, state, [], declared)).toContain('Warm');
 });
 
 test('a screen that starts a request fails the warm render', () => {
-  expect(() => renderWarm(() => <Fetching />, state)).toThrow('fetch ran during a warm render.');
+  expect(() => renderWarm(() => <Fetching />, state, [], declared)).toThrow(
+    'fetch ran during a warm render.',
+  );
 });

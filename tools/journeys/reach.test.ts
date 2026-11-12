@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { reachOf } from '@tools/journeys/reach';
+import { outputsOf, reachOf } from '@tools/journeys/reach';
 import { inRepo } from '@tools/testing/in-repo';
 
 const files = {
@@ -19,6 +19,12 @@ const files = {
 };
 
 const medium = (path: string) => ({ path, tier: 'medium' });
+
+/** The files of the repository, with the app.json of the native app. */
+const withApp = (app: object) => ({
+  ...files,
+  'apps/mobile/app.json': JSON.stringify({ expo: app }),
+});
 
 test('every change reaches web, and only web code reaches no native platform', async () => {
   await inRepo(files, (root) => {
@@ -51,6 +57,38 @@ test('a native app, a shared runtime package, a feature that a native app uses, 
         'tools/native/device-host.ts is in tools/native',
         '.clutch/risk.yaml is a sensitive path',
       ],
+    });
+  });
+});
+
+test('the ios and android outputs need native reach, and an app ID that the native app declares', async () => {
+  const native = medium('apps/mobile/app/index.tsx');
+  await inRepo(withApp({ ios: { bundleIdentifier: 'dev.x.app' } }), (root) => {
+    expect(outputsOf(root, reachOf(root, [native]))).toEqual({
+      native: true,
+      ios: true,
+      android: false,
+    });
+  });
+  await inRepo(withApp({ android: { package: 'dev.x.app' } }), (root) => {
+    expect(outputsOf(root, reachOf(root, [native]))).toEqual({
+      native: true,
+      ios: false,
+      android: true,
+    });
+  });
+  await inRepo(withApp({}), (root) => {
+    expect(outputsOf(root, reachOf(root, [native]))).toEqual({
+      native: true,
+      ios: false,
+      android: false,
+    });
+  });
+  await inRepo(withApp({ ios: { bundleIdentifier: 'dev.x.app' } }), (root) => {
+    expect(outputsOf(root, reachOf(root, [medium('apps/web/src/home.tsx')]))).toEqual({
+      native: false,
+      ios: false,
+      android: false,
     });
   });
 });

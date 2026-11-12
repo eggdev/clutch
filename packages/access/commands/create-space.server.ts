@@ -1,20 +1,16 @@
-import { createSpace } from '@repo/access/commands/create-space';
+import { createSpace } from '@repo/access/contract/access';
 import { insertMembership, joinedChange } from '@repo/access/repo/membership';
 import { findSpace, insertSpace, spaceChange } from '@repo/access/repo/space';
-import { CreateSpaceInput } from '@repo/access/types/create-space';
-import { defineServerChange } from '@repo/sync/commands/define.server';
-import { CommandRejected } from '@repo/sync/types/command-rejected';
+import { serverChange } from '@repo/sync/commands/server-change.server';
 import { Clock, Effect } from 'effect';
 
 /** Writes the space for the actor's organization, and makes the actor its first member. */
-export const createSpaceServer = defineServerChange(createSpace, {
-  input: CreateSpaceInput,
-  access: 'organization',
-  run: (input, { db, actor }) =>
+export const createSpaceServer = serverChange(createSpace, {
+  run: (input, { db, actor, refuse }) =>
     Effect.gen(function* () {
       const name = input.name.trim();
       if (!name) {
-        return yield* new CommandRejected({ reason: 'A space needs a name.' });
+        return yield* refuse('name-missing', 'A space needs a name.');
       }
       const existing = yield* findSpace(db, actor.organizationId, input.id);
       if (existing) {

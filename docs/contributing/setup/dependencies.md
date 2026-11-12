@@ -121,3 +121,38 @@ closes, and the event that removes it. `check-dependency-overrides` fails when:
   override.
 - `package.json` repeats a key at any depth. JSON keeps only the last value, so
   the first one does nothing.
+
+## Patches
+
+Bun applies each file in `patches/` that `patchedDependencies` in the root
+`package.json` names. A patch changes the code of a dependency, so each one
+has a section here with its reason and the event that removes it.
+
+### One and a navigator that mounts late
+
+The root layout of the app is
+[`apps/app/app/_layout+ssg.tsx`](../../../apps/app/app/_layout+ssg.tsx), so
+One renders it at build time as the document of each page. In that mode, One
+1.27.1 resets its navigation one frame after the page loads. The app mounts
+its navigator only after it reads the local database, so the reset finds no
+navigator. React Navigation then logs that the navigation object is not
+ready. `patches/one@1.27.1.patch` skips the reset until the navigator is
+ready, in each build of `Root`. The same patch keeps the duplicate-route
+warning of `getServerManifest` to routes that differ.
+
+Remove the patch when One checks `isReady()` before the reset. To see whether
+One still needs it, remove the patch and load the app: the browser console
+shows the error on each load.
+
+### vxrn, image sizes and the address of the dev server
+
+`patches/vxrn@1.27.1.patch` has two parts. The first gives image-size the
+bytes of a file. The override of image-size pins version 2, which reads bytes
+and not file paths. Its entry in
+[`tools/dependency-overrides.yaml`](../../../tools/dependency-overrides.yaml)
+holds the reason and the event that removes this part.
+
+The second part makes the Expo manifest and the native bundle read
+`ONE_SERVER_URL`. Without it, a dev server behind a proxy gives a native app
+the address of the machine, not the address of the proxy. Remove this part
+when One keeps the public address in both places.

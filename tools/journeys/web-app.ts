@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { isWebApp, manifestOf } from '@tools/apps';
 import { devApps } from '@tools/dev';
 import type { DevApp } from '@tools/dev';
 import { parse } from 'yaml';
@@ -8,8 +9,8 @@ import { parse } from 'yaml';
 /**
  * The app that a web journey drives. `journeys.webApp` in `clutch.yaml` names
  * it, as `apps/app`. Without the key, it is the one app under `apps/` with a
- * web entry: an Nx `dev` target, and neither the `platform:server` nor the
- * `platform:native` tag. Several candidates without the key fail, so a journey
+ * web entry: an Nx `dev` target, and a web app by the rule of `isWebApp` in
+ * `tools/apps.ts`. Several candidates without the key fail, so a journey
  * never runs against the wrong app. See
  * docs/contributing/setup/verification.md#journeys.
  */
@@ -25,11 +26,6 @@ function configuredWebApp(root: string): string | undefined {
   return typeof webApp === 'string' ? webApp : undefined;
 }
 
-function tagsOf(root: string, folder: string): ReadonlyArray<string> {
-  const manifest = JSON.parse(readFileSync(path.join(root, folder, 'package.json'), 'utf-8'));
-  return manifest.nx?.tags ?? [];
-}
-
 /** The web app, or the message that says why there is none. */
 export function webAppOf(root: string): DevApp | string {
   const apps = devApps(root);
@@ -41,16 +37,15 @@ export function webAppOf(root: string): DevApp | string {
       `clutch.yaml sets journeys.webApp to ${configured}, but that app has no Nx \`dev\` target. Name an app under apps/ that has one.`
     );
   }
-  const candidates = apps.filter((app) => {
-    const tags = tagsOf(root, app.folder);
-    return !tags.includes('platform:server') && !tags.includes('platform:native');
-  });
+  const candidates = apps.filter((app) =>
+    isWebApp(manifestOf(root, app.folder.replace(/^apps\//u, ''))),
+  );
   const [only] = candidates;
   if (candidates.length === 1 && only) {
     return only;
   }
   if (candidates.length === 0) {
-    return 'No app under apps/ has a web entry, which is an Nx `dev` target that is not tagged platform:server or platform:native. A web journey needs one. Add the dev target, or name the app in clutch.yaml with `journeys: { webApp: apps/<name> }`.';
+    return 'No app under apps/ has a web entry, which is an Nx `dev` target on a web app. A web journey needs one. Add the dev target, or name the app in clutch.yaml with `journeys: { webApp: apps/<name> }`.';
   }
   // Sorted, since the order of a directory read depends on the file system.
   const folders = candidates

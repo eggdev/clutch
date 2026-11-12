@@ -20,25 +20,25 @@ Docs follow ASD-STE100 Simplified Technical English, but not every rule.
 
 ## Workspace
 
-| Term             | Meaning                                                                                                                                          | Do not use                         |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
-| Primitive        | One part of the system in the [primitives registry](./architecture/primitives.yaml). Its kind is package, feature, app or tool.                  | component, unit                    |
-| Registry         | A file that lists every instance of one thing, such as the primitives registry. A check reads it.                                                | manifest, index (for this)         |
-| Tier             | One of the three top folders: `apps/`, `features/` and `packages/`. See [architecture](./architecture/index.md#tiers).                           | layer, level                       |
-| App              | A runnable program in `apps/`. It holds routes, the composition root and runtime configuration. Nothing imports an app.                          | application package                |
-| Feature          | One folder in `features/` with the gate, the screens and the components of one area of the product.                                              | page module                        |
-| Package          | One folder in `packages/` that owns one area of the product, with its records and vendors.                                                       | library, domain, module (for this) |
-| Tool             | A package or an app that is template tooling, such as `packages/runtime`. The product rules for Effect do not apply to it.                       | utility package                    |
-| Section          | One folder in a package, such as `types/` or `repo/`, with a fixed role. See [package sections](./architecture/index.md#package-sections).       | layer                              |
-| Public section   | A section that code outside its package can import.                                                                                              | exported layer                     |
-| Private section  | A section that only its own package can import.                                                                                                  | internal layer                     |
-| Server code      | `config/`, `repo/`, `service/`, `testing/` and each `.server.ts` file. Only server code, a server app or a test imports it.                      | backend code                       |
-| Composition root | The one place in an app that selects each Layer and starts the program.                                                                          | bootstrap, setup file              |
-| Vendor           | A third-party service or library that exactly one package owns.                                                                                  | provider (for a vendor)            |
-| Vendor owner     | The package that imports a vendor. Its public sections do not show the vendor.                                                                   | wrapper                            |
-| Language         | A dependency that many folders use, such as a query builder or a UI framework. Its registry entry lists the folders that may import it.          | layer                              |
-| Invariant        | A rule about the product that must always hold. The project intent page lists the hard invariants.                                               | constraint (for this)              |
-| Profile          | The stack of one client app: Vite with TanStack Router, Next.js, One or Expo. Kickoff picks it. See [client](./architecture/client.md#profiles). | stack choice                       |
+| Term             | Meaning                                                                                                                                               | Do not use                         |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Primitive        | One part of the system in the [primitives registry](./architecture/primitives.yaml). Its kind is package, feature, app or tool.                       | component, unit                    |
+| Registry         | A file that lists every instance of one thing, such as the primitives registry. A check reads it.                                                     | manifest, index (for this)         |
+| Tier             | One of the three top folders: `apps/`, `features/` and `packages/`. See [architecture](./architecture/index.md#tiers).                                | layer, level                       |
+| App              | A runnable program in `apps/`. It holds routes, the composition root and runtime configuration. Nothing imports an app.                               | application package                |
+| Feature          | One folder in `features/` with the gate, the screens and the components of one area of the product.                                                   | page module                        |
+| Package          | One folder in `packages/` that owns one area of the product, with its records and vendors.                                                            | library, domain, module (for this) |
+| Tool             | A package or an app that is template tooling, such as `packages/runtime`. The product rules for Effect do not apply to it.                            | utility package                    |
+| Section          | One folder in a package, such as `types/` or `repo/`, with a fixed role. See [package sections](./architecture/index.md#package-sections).            | layer                              |
+| Public section   | A section that code outside its package can import.                                                                                                   | exported layer                     |
+| Private section  | A section that only its own package can import.                                                                                                       | internal layer                     |
+| Server code      | `config/`, `repo/`, `service/`, `jobs/`, `testing/` and each `.server.ts` file. Only server code, a server app or a test imports it.                  | backend code                       |
+| Composition root | The one place in an app that selects each Layer and starts the program.                                                                               | bootstrap, setup file              |
+| Vendor           | A third-party service or library that exactly one package owns.                                                                                       | provider (for a vendor)            |
+| Vendor owner     | The package that imports a vendor. Its public sections do not show the vendor.                                                                        | wrapper                            |
+| Language         | A dependency that many folders use, such as a query builder or a UI framework. Its registry entry lists the folders that may import it.               | layer                              |
+| Invariant        | A rule about the product that must always hold. The project intent page lists the hard invariants.                                                    | constraint (for this)              |
+| Profile          | The stack of one client app: One with Expo, Vite with TanStack Router, or Next.js. Kickoff picks it. See [client](./architecture/client.md#profiles). | stack choice                       |
 
 ## Module design
 
@@ -57,48 +57,56 @@ These terms come from the
 
 ## Client data
 
-| Term                   | Meaning                                                                                                                                       | Do not use                      |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| Local store            | The client copy of the records: the object pool and the local database together.                                                              | cache (for records)             |
-| Object pool            | The in-memory map of records, keyed by model and ID. Screens read it.                                                                         | state, cache                    |
-| Local database         | Device storage for the confirmed records, the last sync ID and the transaction queue. It is IndexedDB on the web and SQLite on native.        | offline cache                   |
-| Sync engine            | The code in `packages/sync` that moves transactions to the server and deltas to the client. It is the only client code that uses the network. | API client, data layer          |
-| Model                  | The definition of one kind of record, in `models/`.                                                                                           | entity, schema (for this)       |
-| Record                 | One instance of a model, with one ID. Each fact has exactly one owner record.                                                                 | entity, row (on the client)     |
-| Derived state          | A value that a screen computes from records, such as a filtered list. Nothing stores it.                                                      | computed copy                   |
-| Command                | The one definition of a change: its input, its local change, its server change and whether it waits for the server.                           | action, handler (for the whole) |
-| Local change           | The part of a command that changes the object pool at once, in plain TypeScript.                                                              | reducer                         |
-| Server change          | The `.server.ts` part of a command. It changes the owner record on the server and checks access.                                              | resolver                        |
-| Transaction            | One run of a command. It waits in the transaction queue until the server accepts or rejects it.                                               | request, job                    |
-| Transaction queue      | The transactions that the server has not settled yet. The local database keeps a copy, so the queue survives a reload.                        | outbox, mutation queue          |
-| Optimistic update      | The screen shows a local change at once. A rejected transaction rolls it back.                                                                | instant update                  |
-| Server-confirmed write | A command with `waits: 'server'`. The screen shows it as done only after the server confirms it.                                              | blocking write                  |
-| Event                  | One entry in the server's append-only log. Each event has a sync ID.                                                                          | action, log row                 |
-| Sync ID                | The number that the server gives each event. It only increases. Each client stores the last sync ID that it applied.                          | version, cursor, offset         |
-| Delta                  | One event with its changed records, as the server pushes it to each client of the organization.                                               | patch, diff                     |
-| Rebase                 | Apply the pending local changes again on top of the confirmed records after a delta arrives.                                                  | replay                          |
-| Sync group             | A label on a record, such as `space:<id>`, that decides which clients get it. A client gets a change when it has loaded one of its groups.    | channel, room, topic            |
-| Load function          | A function from `defineLoad` that names the group holding the records a screen asks for. A gate calls it through `useLoad`.                   | loader, fetcher                 |
-| Gate                   | The one function that opens a feature. It settles the needs of the feature, then navigates once.                                              | guard, wrapper                  |
+| Term                   | Meaning                                                                                                                                                                                                                    | Do not use                      |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| Local store            | The client copy of the records: the object pool and the local database together.                                                                                                                                           | cache (for records)             |
+| Object pool            | The in-memory map of records, keyed by record name and ID. Screens read it.                                                                                                                                                | state, cache                    |
+| Local database         | Device storage for the confirmed records, the last sync ID and the transaction queue. It is IndexedDB on the web and SQLite on native.                                                                                     | offline cache                   |
+| Sync engine            | The code in `packages/sync` that moves transactions to the server and deltas to the client. It is the only client code that uses the network.                                                                              | API client, data layer          |
+| Contract               | The one declaration of a package's records, commands and load functions, in `contract/`. Client code may import it.                                                                                                        | schema, models (for this)       |
+| Model                  | The object-pool view of one record kind: its name, its groups and its check. The type `Model` is in `contract/record.ts`.                                                                                                  | entity, schema (for this)       |
+| Record                 | One instance of a record kind, with one ID. Declared with `record()` in a contract. Each fact has exactly one owner record.                                                                                                | entity, row (on the client)     |
+| Manifest               | The sorted plain JSON of every record, command and load function of an app's contracts. `manifestOf` builds it.                                                                                                            | snapshot (for this)             |
+| Digest                 | The 16-character name of a manifest. The client sends it in each `Pull`, so the server can see which build it runs.                                                                                                        | hash, version (for this)        |
+| Stamp                  | An input field kind, `new-id` or `now`, that the object pool fills when a command runs. A screen never passes one.                                                                                                         | default, auto field             |
+| Field kind             | The kind that one field of a record or of a command input names, such as `string`, `integer`, `oneOf` or `list`. `matches` checks a value against it.                                                                      | type (for a field kind), schema |
+| Derived state          | A value that a screen computes from records, such as a filtered list. Nothing stores it.                                                                                                                                   | computed copy                   |
+| Command                | The one declaration of a change in a contract: its name, input, `waits`, `access`, `permission`, `refuses` and `tool`. Its two halves are code.                                                                            | action, handler (for the whole) |
+| Local change           | The client half of a command with `waits: 'local'`. It changes the object pool at once, in plain TypeScript, with `localChange`.                                                                                           | reducer                         |
+| Server change          | The server half of a command, in `<name>.server.ts`, built with `serverChange`. It writes the owner records after the access check.                                                                                        | resolver                        |
+| Transaction            | One run of a command. It waits in the transaction queue until the server accepts or rejects it.                                                                                                                            | request, job                    |
+| Transaction queue      | The transactions that the server has not settled yet. The local database keeps a copy, so the queue survives a reload.                                                                                                     | outbox, mutation queue          |
+| Optimistic update      | The screen shows a local change at once. A rejected transaction rolls it back.                                                                                                                                             | instant update                  |
+| Server-confirmed write | A command with `waits: 'server'`. The screen shows it as done only after the server confirms it.                                                                                                                           | blocking write                  |
+| Event                  | One entry in the server's append-only log. Each event has a sync ID.                                                                                                                                                       | action, log row                 |
+| Sync ID                | The number that the server gives each event. It only increases. Each client stores the last sync ID that it applied.                                                                                                       | version, cursor, offset         |
+| Delta                  | One event with its changed records, as the server pushes it to each client of the organization.                                                                                                                            | patch, diff                     |
+| Rebase                 | Apply the pending local changes again on top of the confirmed records after a delta arrives.                                                                                                                               | replay                          |
+| Sync group             | A label on a record, such as `space:<id>`, that decides which clients get it. A client gets a change when it has loaded one of its groups. A group may hold a record only under a condition, made with `when` or `unless`. | channel, room, topic            |
+| Load function          | A declaration from `load()` in a contract. It names the group that holds the records a screen asks for, and the `tool` that an agent reads them through. A gate calls it through `useLoad`.                                | loader, fetcher                 |
+| Gate                   | The one function that opens a feature. It settles the needs of the feature, then navigates once.                                                                                                                           | guard, wrapper                  |
 
 ## Server
 
-| Term                     | Meaning                                                                                                           | Do not use                  |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| Effect                   | The server language and standard library. See [server](./architecture/server.md).                                 |                             |
-| Service                  | An Effect `Context.Service` and the operations that it declares. It lives in `service/`.                          | manager, helper             |
-| Layer                    | An Effect value that builds a service. Write it with a capital L, and use it only for Effect.                     | module, tier, section       |
-| Live Layer               | The Layer that uses the real vendor.                                                                              | prod adapter                |
-| Test Layer               | The Layer that uses a fake.                                                                                       | mock layer                  |
-| Edge                     | The code that runs an Effect: `runtime/`, an app or a test.                                                       | entry point (for this)      |
-| Repo                     | The private section with the Drizzle tables, queries and migrations of one package.                               | DAO, db folder              |
-| Tagged error             | An error class from `Schema.TaggedError`. Server code fails with one and never throws.                            | exception                   |
-| Transaction-safe service | A service that reads and writes only the transaction it is given. Only such a service may run in a server change. | pure service                |
-| Job                      | Work that runs after a commit, such as a vendor call. A server change asks for one through the outbox.            | background task, worker     |
-| Outbox                   | The `sync_jobs` table. A server change writes its jobs there in its own transaction.                              | queue (for this)            |
-| Schedule                 | A job that the job runner asks for at each interval.                                                              | cron                        |
-| System actor             | The actor of a write that no person makes, such as a job or a webhook. No access rule runs for it.                | admin, root                 |
-| Access rule              | The required `access` field of a server change. It decides who may run the change, before the change runs.        | permission check (for this) |
+| Term                     | Meaning                                                                                                                            | Do not use                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| Effect                   | The server language and standard library. See [server](./architecture/server.md).                                                  |                               |
+| Service                  | An Effect `Context.Service` and the operations that it declares. It lives in `service/`.                                           | manager, helper               |
+| Layer                    | An Effect value that builds a service. Write it with a capital L, and use it only for Effect.                                      | module, tier, section         |
+| Live Layer               | The Layer that uses the real vendor.                                                                                               | prod adapter                  |
+| Test Layer               | The Layer that uses a fake.                                                                                                        | mock layer                    |
+| Edge                     | The code that runs an Effect: `runtime/`, an app or a test.                                                                        | entry point (for this)        |
+| Repo                     | The private section with the Drizzle tables, queries and migrations of one package.                                                | DAO, db folder                |
+| Tagged error             | An error class from `Schema.TaggedError`. Server code fails with one and never throws.                                             | exception                     |
+| Transaction-safe service | A service that reads and writes only the transaction it is given. Only such a service may run in a server change.                  | pure service                  |
+| Job                      | Work that runs after a commit, such as a vendor call. A server change asks for one through the outbox.                             | background task, worker       |
+| Outbox                   | The `sync_jobs` table. A server change writes its jobs there in its own transaction.                                               | queue (for this)              |
+| Schedule                 | A job that the job runner asks for at each interval.                                                                               | cron                          |
+| System actor             | The actor of a write that no person makes, such as a job or a webhook. No access rule runs for it.                                 | admin, root                   |
+| Access rule              | The required `access` field of a command: `'organization'` or `'group'`. The server checks it before the server change runs.       | permission check (for this)   |
+| Permission               | The optional `permission` of a command, such as `project:publish`. The server checks it after the access rule, through `allows`.   | role check (for this)         |
+| Read tool                | An agent tool that a load function's `tool` declaration makes. It has a list tool and a get tool, and both only read.              | query tool, search tool       |
+| Refusal code             | A kebab-case code that a server change gives with `refuse`. A command lists its own codes in `refuses`, beside the built-in codes. | error code (for this), status |
 
 ## Checks and process
 
@@ -107,9 +115,9 @@ These terms come from the
 | Check              | A script in `tools/check-*.ts` that rejects a problem in the repository.                                                                            | validator                                |
 | Lint rule          | A rule that oxlint or Stylelint runs on one file.                                                                                                   | check (for a lint rule)                  |
 | Validate           | The one command that runs every check: `mise exec -- bun run validate`.                                                                             | gate (for this command)                  |
-| Generator          | An Nx generator in `tools/generators/` that makes a package, feature, command or model in its one shape.                                            | scaffold script                          |
+| Generator          | An Nx generator in `tools/generators/` that makes a package, feature, record, command or job in its one shape.                                      | scaffold script                          |
 | ---------------    | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Journey            | A test that proves one user goal through the real app: a Playwright `.pw.ts` file or a Maestro `.maestro.yaml` file in `features/<name>/journeys/`. | end-to-end test (for one file), scenario |
+| Journey            | A test that proves one user goal through the real app. It is a `.pw.ts`, a `.maestro.yaml` or a `.journey.ts` file in `features/<name>/journeys/`.  | end-to-end test (for one file), scenario |
 | Verify flow        | A flow in `.agents/skills/verify/verification.json` that `verify.py` runs and keeps evidence for. Each journey is one.                              | test suite (for this)                    |
 | Agent hook         | A script in `.agents/hooks/` that Claude Code and Codex run before or after a tool call, or at the end of a turn.                                   | plugin (for this)                        |
 | Guardrail file     | A file that configures a check, a lint rule, a hook or a budget. `tools/guardrail-files.json` lists them.                                           | config (alone)                           |

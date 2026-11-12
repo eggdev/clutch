@@ -102,19 +102,22 @@ its primitive. A language applies to the package folders of its `primitives`.
 are regular expressions on the full file path, for apps, features and file
 suffixes.
 
-The template registry has four languages:
+The template registry has five languages:
 
-| Language      | Allowed in                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `react`       | `ui/`, `testing/`, features, `apps/web` and `@repo/design-system`                                                        |
-| `@tanstack/*` | `apps/web`                                                                                                               |
-| `effect`      | `types/`, `config/`, `repo/`, `service/`, `runtime/`, `testing/`, `.server` files, tests, `packages/sync` and `apps/api` |
-| `drizzle-orm` | `repo/`, `service/`, `.server` files and `packages/sync`                                                                 |
+| Language                             | Allowed in                                                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `react`                              | `ui/`, features, `apps/app` and `@repo/design-system`                                                                          |
+| `react-native`                       | `ui/`, features, `apps/app`, `@repo/design-system` and `@repo/app-build`                                                       |
+| `one`, `expo`, `@react-navigation/*` | `apps/app`                                                                                                                     |
+| `effect`                             | `types/`, `config/`, `repo/`, `service/`, `jobs/`, `runtime/`, `testing/`, `.server` files, tests, `packages/sync` and the API |
+| `drizzle-orm`                        | `repo/`, `service/`, `.server` files and `packages/sync`                                                                       |
 
 ## Client code
 
-Client code imports Effect and schemas as types only. Effect code loads after
-the first paint, in the sync transport. The
+Client code imports Effect only as types. Effect code loads after the first
+paint, in the sync transport. The `contract/` and `commands/` sections are public,
+so client code imports them, as plain TypeScript. `contract/` is not in the
+folders that may import `effect`, `drizzle-orm` or `react`. The
 [lint rules for client code](./setup/lint-rules.md#client-code) reject a value
 import, and `check-bundle` rejects Effect code in the first screen.
 
@@ -125,10 +128,9 @@ hold server code. The `repo-imports/server-only` rule lets only server code impo
 them. Server code is a `.server.ts` file, a file in a server section, a test,
 `tools/`, or an app with the Nx tag `platform:server`.
 
-A server change registers in `packages/<name>/runtime/handlers.server.ts`. Jobs
-and schedules register in `runtime/jobs.server.ts`, and HTTP routes in
-`runtime/routes.server.ts`. A server app loads these files through
-`apps/api/src/packages.ts`. Only an edge runs
+A server change, job and route register in `packages/<name>/runtime/server.server.ts`.
+A server app loads each package's file through `apps/api/src/packages.ts`, which
+`nx sync` writes. Only an edge runs
 an Effect: `runtime/`, an app or a test. See
 [lint rules for Effect code](./setup/lint-rules.md#effect-code).
 

@@ -7,9 +7,10 @@ import { inRepo } from '@tools/testing/in-repo';
 const project = 'shop';
 const root = JSON.stringify({ name: project });
 
-/** An app with an Nx `dev` target, and the tags that the check reads. */
-const app = (tags: Array<string> = [], dev = true) =>
+/** An app with an Nx `dev` target, and the tags and dependencies that the check reads. */
+const app = (tags: Array<string> = [], dev = true, dependencies: Record<string, string> = {}) =>
   JSON.stringify({
+    dependencies: { react: '19.2.3', ...dependencies },
     nx: {
       tags,
       targets: dev ? { dev: { executor: 'nx:run-commands', options: { command: 'one dev' } } } : {},
@@ -20,8 +21,11 @@ test('the one app under apps/ with a web entry is the web app, and servers and n
   await inRepo(
     {
       'package.json': root,
-      'apps/api/package.json': app(['platform:server']),
-      'apps/mobile/package.json': app(['platform:native']),
+      'apps/api/package.json': JSON.stringify({
+        dependencies: { effect: '4.0.7' },
+        nx: { tags: ['platform:server'], targets: { dev: { options: { command: 'one dev' } } } },
+      }),
+      'apps/mobile/package.json': app([], true, { 'react-native': '0.86.3', expo: '~57.0.30' }),
       'apps/web/package.json': app(['type:app']),
       'apps/mailbox/package.json': app([], false),
     },

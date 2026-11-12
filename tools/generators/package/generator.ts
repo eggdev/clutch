@@ -2,18 +2,13 @@ import path from 'node:path';
 
 import type { Tree } from '@nx/devkit';
 import { generateFiles, names, updateJson } from '@nx/devkit';
-import {
-  addModel,
-  addRecordSchema,
-  addTable,
-  parseGroup,
-} from '@tools/generators/model/generator.ts';
+import { addRecord, parseGroup } from '@tools/generators/record/generator.ts';
 import {
   addAppDependency,
   addDependencies,
   addPrimitive,
   afterWrite,
-  register,
+  clientAppDirectories,
   versionOf,
   writeProject,
 } from '@tools/generators/shared/workspace.ts';
@@ -21,7 +16,7 @@ import {
 export const sections = [
   'types',
   'config',
-  'models',
+  'contract',
   'commands',
   'repo',
   'service',
@@ -35,7 +30,7 @@ export type PackageOptions = {
   readonly name: string;
   readonly sections: string;
   readonly record?: string;
-  /** The sync group of the first record. Required with `record`. See the model generator. */
+  /** The sync group of the first record. Required with `record`. See the record generator. */
   readonly group?: string;
   readonly summary?: string;
 };
@@ -50,16 +45,18 @@ export function parseSections(list: string): ReadonlyArray<string> {
   if (unknown.length) {
     throw new Error(`Unknown sections: ${unknown.join(', ')}. Use: ${sections.join(', ')}.`);
   }
-  if (!wanted.includes('types')) {
-    throw new Error('A package needs `types/`. It holds the records and the interface.');
+  if (!wanted.includes('contract') && !wanted.includes('types')) {
+    throw new Error(
+      'A package needs `contract/` or `types/`: the section that says what it offers.',
+    );
   }
   return sections.filter((section) => wanted.includes(section));
 }
 
 /**
- * The repo section: drizzle-kit config, an empty migrations folder, the
- * `db-generate` target, and `runtime/migrate.server.ts`, which the server app
- * runs at start. Only drizzle-kit writes a migration.
+ * The repo section: drizzle-kit config, an empty migrations folder and the
+ * `db-generate` target. The server half in `runtime/server.server.ts` runs the
+ * migrations at start. Only drizzle-kit writes a migration.
  */
 function addRepo(tree: Tree, directory: string, name: ReturnType<typeof names>) {
   generateFiles(tree, path.join(import.meta.dirname, 'repo'), directory, {
@@ -86,31 +83,84 @@ function addRepo(tree: Tree, directory: string, name: ReturnType<typeof names>) 
       },
     },
   }));
-  register(
-    tree,
-    'apps/api/src/packages.ts',
-    `import { migrate${name.className} } from '@repo/${name.fileName}/runtime/migrate.server';`,
-    { variable: 'migrations' },
-    `migrate${name.className}`,
-  );
   addAppDependency(tree, 'apps/api/package.json', `@repo/${name.fileName}`);
+}
+
+/**
+ * The contract section: `contract/<name>.ts`, which declares the package's
+ * records, commands and loads, and the sync dependency that it needs. The
+ * runtime files of the package list it, and `nx sync` writes each app's list.
+ */
+function addContract(tree: Tree, directory: string, name: ReturnType<typeof names>, title: string) {
+  tree.write(
+    `${directory}/contract/${name.fileName}.ts`,
+    [
+      "import { defineContract } from '@repo/sync/contract/define';",
+      '',
+      '/**',
+      ` * The contract of ${title}: each record, command and load function of the`,
+      ' * package. The object pool, the server, the manifest and each tool read it.',
+      ' */',
+      `export const ${name.propertyName}Contract = defineContract('${name.fileName}', {`,
+      '  records: [],',
+      '  commands: [],',
+      '  loads: [],',
+      '  jobs: [],',
+      '  routes: [],',
+      '});',
+      '',
+    ].join('\n'),
+  );
+  addDependencies(tree, directory, { '@repo/sync': 'workspace:*' }, ['../sync']);
+  for (const app of [...clientAppDirectories(tree), 'apps/api']) {
+    addAppDependency(tree, `${app}/package.json`, `@repo/${name.fileName}`);
+  }
+}
+
+/**
+ * The runtime section: `runtime/client.ts` and `runtime/server.server.ts`, which
+ * list the package's contract with an empty list of each half. The sync
+ * generator adds the package to each app's list. A package with `repo/` runs
+ * its migrations from the server half.
+ */
+function addRuntime(
+  tree: Tree,
+  directory: string,
+  name: ReturnType<typeof names>,
+  title: string,
+  repo: boolean,
+) {
+  generateFiles(tree, path.join(import.meta.dirname, 'runtime'), `${directory}/runtime`, {
+    ...name,
+    title,
+    repo,
+  });
 }
 
 /** The problems with the chosen sections and record, before any file is written. */
 function planProblem(chosen: ReadonlyArray<string>, record: string | undefined) {
+  if (chosen.includes('runtime') && !chosen.includes('contract')) {
+    return 'A package with `runtime/` needs `contract/`: its runtime files list the contract.';
+  }
   if (chosen.includes('repo') && !chosen.includes('runtime')) {
-    return 'A package with `repo/` needs `runtime/`. Its `migrate.server.ts` runs the migrations.';
+    return 'A package with `repo/` needs `runtime/`. Its `server.server.ts` runs the migrations.';
   }
   if (chosen.includes('repo') && !record) {
     return 'A package with `repo/` owns records. Name the first one with `--record=<name>`.';
+  }
+  if (chosen.includes('commands') && !chosen.includes('contract')) {
+    return 'A package with `commands/` needs `contract/`: each command is declared there.';
+  }
+  if (record && !chosen.includes('contract')) {
+    return 'A record is declared in `contract/`. Add `contract` to the sections, or leave out `--record`.';
   }
   return null;
 }
 
 /**
- * Writes a package with only the sections it needs. With `--record`, `types/`
- * gets the record schema, `models/` its model, and `repo/` its table. Each
- * other section starts empty.
+ * Writes a package with only the sections it needs. The contract section
+ * holds the declarations. With `--record`, the contract declares the first
+ * record, and `repo/` gets its table. Each other section starts empty.
  */
 export function addPackage(tree: Tree, options: PackageOptions) {
   const name = names(options.name);
@@ -123,6 +173,9 @@ export function addPackage(tree: Tree, options: PackageOptions) {
       : null);
   if (problem) {
     throw new Error(problem);
+  }
+  if (options.group !== undefined) {
+    parseGroup(options.group);
   }
   writeProject(tree, {
     directory,
@@ -138,15 +191,15 @@ export function addPackage(tree: Tree, options: PackageOptions) {
     summary: options.summary ?? 'Say what this package owns.',
     sectionList: chosen.map((section) => `\`${section}/\``).join(', '),
   });
-  const group = options.group === undefined ? undefined : parseGroup(options.group);
-  if (options.record && group && chosen.includes('models')) {
-    addModel(tree, { package: name.fileName, name: options.record, group: options.group });
-  } else if (options.record && group) {
-    addRecordSchema(tree, name.fileName, options.record, group);
+  if (chosen.includes('contract')) {
+    addContract(tree, directory, name, title);
+    addRuntime(tree, directory, name, title, chosen.includes('repo'));
   }
-  if (chosen.includes('repo') && options.record) {
+  if (chosen.includes('repo')) {
     addRepo(tree, directory, name);
-    addTable(tree, name.fileName, options.record, group);
+  }
+  if (options.record && options.group) {
+    addRecord(tree, { package: name.fileName, name: options.record, group: options.group });
   }
   for (const section of chosen) {
     if (!tree.children(`${directory}/${section}`).length) {
@@ -164,6 +217,7 @@ export function addPackage(tree: Tree, options: PackageOptions) {
   });
 }
 
+/** Adds a package, and returns the step that installs and formats the result. */
 export function packageGenerator(tree: Tree, options: PackageOptions) {
   addPackage(tree, options);
   return afterWrite(tree, true);

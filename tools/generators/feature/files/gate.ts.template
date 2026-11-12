@@ -1,8 +1,14 @@
 /**
+ * Where the gate navigates. The router of the app types its routes, so an app
+ * with no `/<%= fileName %>` route does not compile.
+ */
+export type <%= className %>Href = `/<%= fileName %>`;
+
+/**
  * The one way into the <%= title %> feature. Settle what the feature needs
  * here, such as records or a permission, then navigate once.
  * See docs/principles/one-gate-per-feature.md.
  */
-export function open<%= className %>(navigate: (href: string) => void) {
+export function open<%= className %>(navigate: (href: <%= className %>Href) => void) {
   navigate('/<%= fileName %>');
 }

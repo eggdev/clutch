@@ -9,8 +9,8 @@ the rules that keep them from building or starting devices they do not need.
 - An agent makes a native build only when the native fingerprint changed.
 - One session at a time drives a device or makes a native build.
 
-The template has no native app. Kickoff adds one when the project picks the
-One or Expo profile. See [client](../architecture/client.md#profiles).
+The template has one native app, `apps/app`. It runs on the web and on iOS.
+Android is a kickoff choice. See [client](../architecture/client.md#profiles).
 
 ## Device host
 
@@ -28,13 +28,18 @@ defines it. A host has four calls:
 A host has no call that creates, clones, boots or erases a device. When no
 device is booted, the host stops and tells the agent to ask the owner.
 
-The `DEVICE_HOST` environment variable names the host. It is a machine
-setting, so it is not in the repository. The template ships two hosts:
+The `DEVICE_HOST` environment variable names the host. A machine sets it, and
+the native jobs of `.github/workflows/ci.yml` set it. The template ships three
+hosts:
 
-- `none` refuses each call and points to this page.
+- `none` refuses each call and points to this page. It is the host when
+  `DEVICE_HOST` is not set.
 - `ci` drives the one device that a CI job booted on its own runner. It runs
   Maestro on it, and it builds nothing. See
   [native journeys](../end-to-end-testing.md#native-journeys).
+- `local` drives the booted device of the machine that runs the command. It
+  also builds. It runs the `prebuild:native` script of the app, then compiles a
+  debug build for any simulator. A build needs no booted device.
 
 <!-- kickoff: The device host of this project: the machine that runs the simulators, how an agent session reaches it, and the DEVICE_HOST name. Add the adapter to `hosts` in tools/native/device-host.ts, with tests that use a fake. -->
 
@@ -66,13 +71,14 @@ machine.
 The native fingerprint is a hash of each input that goes into the native
 binary: the native folders, the config plugins and the native dependencies.
 A JavaScript-only change keeps the same fingerprint. The dev build on the
-device loads the new JavaScript from the dev server, so it needs no native
+device loads the JavaScript of the dev server, so it needs no native
 build.
 
 `mise exec -- bun run native:build` is the one way to make a native build:
 
 ```sh
 mise exec -- bun run native:build --platform ios
+mise exec -- bun run native:build --platform ios --install
 ```
 
 1. It finds the native app: an app in `apps/` that depends on `expo` or
@@ -84,16 +90,26 @@ mise exec -- bun run native:build --platform ios
    ship it with an update.
 5. When they differ, it lists the changed sources. Then it builds through the
    device host, while it holds the device lock.
-6. After a build passes, it writes the new fingerprint. Commit
+6. After a build passes, it writes the fingerprint of the build. Commit
    `native-fingerprint.json` with the native change that caused the build.
 
 A repository with no native app has nothing to build. The command prints
 `No native app in this repository.` and exits 0.
 
-The app loads `@expo/fingerprint` from its own dependencies. Kickoff adds the
-package to the app at an exact version. The command
-`mise exec -- bun run native:build <app> --record` records the first
-fingerprint, with no build.
+The app lists `@expo/fingerprint` in its devDependencies, at an exact version.
+The command `mise exec -- bun run native:build <app> --record` records the
+first fingerprint, with no build.
+
+`--install` puts the last build on the booted device, with no build. A build
+needs no device, so it can finish before the owner boots one. When no device
+is booted, the command says so and exits 1. The owner boots the device, then
+runs the `--install` command.
+
+`--fresh` builds without the fingerprint comparison, and it writes no record.
+A CI runner has no earlier build to compare with. The command refuses unless
+the environment variable `GITHUB_ACTIONS` is `true`, which GitHub sets on its
+runners. `CI` does not name a runner, because an agent sets it on its own
+machine too.
 
 A review flags a change to `native-fingerprint.json` that has no native change
 with it.
@@ -139,7 +155,10 @@ owner.
 ## CI
 
 The `native-ios` and `native-android` jobs in `.github/workflows/ci.yml` run
-each native journey on a simulator and an emulator. They run only when the
-repository has a native app. Each project fills their build step at kickoff.
-A CI job never calls `eas build` directly. See
+each native journey on a simulator and an emulator. `native-ios` runs when a
+native app declares an iOS app ID in its app.json. `native-android` runs when a
+native app declares an Android package. The `native-ios` job starts the dev
+servers, then runs `native:build --fresh`. The `native-android` job still has a
+placeholder build line, which fails until a project fills it at kickoff. A CI
+job never calls `eas build` directly. See
 [native journeys](../end-to-end-testing.md#native-journeys).

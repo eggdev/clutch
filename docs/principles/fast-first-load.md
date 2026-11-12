@@ -17,22 +17,25 @@ network.
   it loads after the first paint. The first screen holds no Effect code.
 - After the first load, a service worker precaches every file of the build:
   the page, each chunk and each style sheet. A warm visit reads each of them
-  from the cache, the sync chunk too.
+  from the cache, the sync chunk too. A navigation gets the cached page of its
+  path, such as `/notes.html` for `/notes`, or the home page.
 - On a warm visit, the service worker controls the page. The boot script then
-  adds a `modulepreload` for each sync chunk, from the cache. The build writes
-  the chunk names into the boot script.
-- Inline the CSS that paints the app shell. An inline script reads the last
-  shell settings from device storage, such as the theme and the sidebar width.
-  It applies them before the first paint. This boot script in the static
-  document is the one place outside `packages/sync` that reads device storage.
+  adds a `modulepreload` for each sync chunk, from the cache. The build step
+  writes the sync chunk names into the boot script of each page.
+- Inline the CSS that paints the app shell. The inline boot script sets the
+  `dark` class from the stored color scheme, or from the system scheme, before
+  the first paint. This boot script in the static document is the one place
+  outside `packages/sync` that reads device storage.
   See [single-page app](./single-page-app.md#rules).
 - The boot script marks the app start with `performance.mark('appStart')`, as
-  its first line.
+  its first line. The composition root, `apps/app/lib/boot.ts`, loads the
+  object pool before the first paint and starts sync after it.
 - Use one variable font file for each family. Preload it with
   `crossorigin="anonymous"` and declare it with `font-display: swap`.
 - [Client performance](../contributing/architecture/client-performance.md)
-  names what measures each budget. `check-bundle` enforces the first-screen
-  size in CI. Each project adds the trace and lab-run checks at kickoff.
+  names what measures each budget. `check-bundle` enforces the module count of
+  the first screen, and bars Effect code from it, in CI. Each project adds the
+  trace and lab-run checks at kickoff.
 
 ## Example
 

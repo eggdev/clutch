@@ -52,9 +52,11 @@ queries, logging or deploy configuration.
     uses `SameSite=None`. Writes go over the sync socket, so the socket upgrade
     checks the `Origin` header. The sync server answers 403 to an origin that
     `SYNC_ORIGINS` does not list. Set `SYNC_ORIGINS` in each deployed
-    environment. When it is not set, the server accepts loopback origins only,
-    for local development. A request with no `Origin` header passes, because a
-    browser always sends one. See `packages/sync/config/origins.ts`.
+    environment. The socket of a native app carries the origin of the API
+    itself. An API that serves a native app lists its own origin too, as the
+    dev command does. When it is not set, the server accepts loopback origins
+    only, for local development. A request with no `Origin` header passes,
+    because a browser always sends one. See `packages/sync/config/origins.ts`.
 13. **Account recovery revokes old access.** A password reset ends every other
     session and token for the account, and tells the owner by email.
 14. **Signup and reset do not show which emails have accounts.** Send the same

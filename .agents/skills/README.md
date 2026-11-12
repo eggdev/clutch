@@ -25,6 +25,8 @@ global skills or other repositories when maintaining this suite.
   directions in the app, let the owner pick one, build against it, then retire it.
 - [pr-recap](./pr-recap/SKILL.md): on explicit request, explain a PR diff. It adds
   no correctness gate or publication permission.
+- [move-to-contracts](./move-to-contracts/SKILL.md): move a project's packages from
+  `models/` onto contracts in one branch, with its own sync engine kept.
 - kickoff (when installed): define or resume project setup; use recorded
   decisions before asking new questions.
 

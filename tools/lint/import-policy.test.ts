@@ -77,7 +77,7 @@ test('imports go from apps to features to packages, and never back', async () =>
   expect(
     await lint({
       'features/notes/gate.ts':
-        'import "@repo/notes/models/note"; import "@features/notes/screens/list";',
+        'import "@repo/notes/contract/notes"; import "@features/notes/screens/list";',
       'apps/web/src/main.tsx':
         'import "@features/notes/gate"; import "@repo/sync/runtime/boot"; import "@/routes";',
       'packages/notes/ui/title.tsx': 'import "@repo/design-system/ui/button";',
@@ -89,7 +89,7 @@ test('a feature never imports another feature, and private sections stay in thei
   expect(
     await lint({
       'features/notes/screens/list.tsx': 'import "@features/billing/gate";',
-      'features/notes/gate.ts': 'import "@repo/notes/runtime/handlers.server";',
+      'features/notes/gate.ts': 'import "@repo/notes/runtime/server.server";',
       'packages/billing/service/charge.ts':
         'import "@repo/notes/repo/schema"; import "@repo/notes/config/keys"; import "@repo/notes/src/server";',
       'packages/notes/ui/list.tsx': 'import "@repo/notes/lib/util";',
@@ -108,8 +108,8 @@ test('a feature never imports another feature, and private sections stay in thei
       'packages/notes/service/notes.ts':
         'import "@repo/notes/repo/schema"; import "@repo/notes/config/keys"; import "@repo/identity/service/actor";',
       'apps/api/package.json': serverApp,
-      'apps/api/src/main.ts': 'import "@repo/notes/runtime/handlers.server";',
-      'packages/notes/runtime/handlers.server.ts': 'import "@repo/notes/commands/rename.server";',
+      'apps/api/src/main.ts': 'import "@repo/notes/runtime/server.server";',
+      'packages/notes/runtime/server.server.ts': 'import "@repo/notes/commands/rename.server";',
       'packages/billing/test/charge.test.ts': 'import "@repo/notes/runtime/live.server";',
       'packages/notes/testing/notes.ts':
         'import "@repo/notes/service/notes"; import "@repo/sync/repo/schema";',
@@ -138,12 +138,12 @@ test('client code never imports server code, and server code may', async () => {
       'packages/notes/commands/rename.server.ts':
         'import "@repo/notes/repo/schema"; import "@repo/notes/service/notes";',
       'packages/notes/service/notes.ts': 'import "@repo/notes/repo/schema";',
-      'packages/notes/runtime/handlers.server.ts':
+      'packages/notes/runtime/server.server.ts':
         'import "@repo/notes/commands/rename.server"; import "@repo/notes/service/notes";',
       'apps/api/package.json': serverApp,
       'apps/api/src/main.ts': 'import "@repo/notes/service/notes";',
       'packages/notes/ui/title.tsx':
-        'import "@repo/notes/commands/rename"; import "@repo/notes/models/note";',
+        'import "@repo/notes/commands/rename"; import "@repo/notes/contract/notes";',
     }),
   ).toEqual([]);
 });

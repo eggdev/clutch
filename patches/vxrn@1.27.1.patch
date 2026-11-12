@@ -1,0 +1,127 @@
+diff --git a/dist/plugins/expoManifestRequestHandlerPlugin.mjs b/dist/plugins/expoManifestRequestHandlerPlugin.mjs
+index a416ee53f940617d4d1798d23839205a71711f69..1af73d51c77d8d18fbb6f481a977671d0cb4173d 100644
+--- a/dist/plugins/expoManifestRequestHandlerPlugin.mjs
++++ b/dist/plugins/expoManifestRequestHandlerPlugin.mjs
+@@ -19,8 +19,9 @@ function expoManifestRequestHandlerPlugin(options) {
+         if (!req.headers["expo-platform"]) {
+           return next();
+         }
+-        const protocol = req.socket instanceof TLSSocket && req.socket.encrypted ? "https" : "http";
+-        const host = `${req.headers["x-forwarded-host"] || req.headers.host || "127.0.0.1"}`;
++        const origin = new URL(process.env.ONE_SERVER_URL || `${req.socket instanceof TLSSocket && req.socket.encrypted ? "https" : "http"}://${req.headers.host || "127.0.0.1"}`);
++        const protocol = origin.protocol.slice(0, -1);
++        const host = origin.host;
+         let ExpoGoManifestHandlerMiddleware;
+         let expoGoManifestHandlerMiddlewareImportError;
+         try {
+diff --git a/dist/plugins/expoManifestRequestHandlerPlugin.native.js b/dist/plugins/expoManifestRequestHandlerPlugin.native.js
+index 3be59d9b24a9504eedb7dce5eb61edede512e1be..d3e6350f8a854abacb63b3e68fbcd484d2937343 100644
+--- a/dist/plugins/expoManifestRequestHandlerPlugin.native.js
++++ b/dist/plugins/expoManifestRequestHandlerPlugin.native.js
+@@ -26,8 +26,9 @@ function expoManifestRequestHandlerPlugin(options) {
+         if (!req.headers["expo-platform"]) {
+           return next();
+         }
+-        var protocol = _instanceof(req.socket, TLSSocket) && req.socket.encrypted ? "https" : "http";
+-        var host = `${req.headers["x-forwarded-host"] || req.headers.host || "127.0.0.1"}`;
++        var origin = new URL(process.env.ONE_SERVER_URL || `${req.socket instanceof TLSSocket && req.socket.encrypted ? "https" : "http"}://${req.headers.host || "127.0.0.1"}`);
++        var protocol = origin.protocol.slice(0, -1);
++        var host = origin.host;
+         var ExpoGoManifestHandlerMiddleware;
+         var expoGoManifestHandlerMiddlewareImportError;
+         try {
+diff --git a/dist/plugins/reactNativeDevServer.mjs b/dist/plugins/reactNativeDevServer.mjs
+index 4e5b57acbe8e1fe1d81a99314d9bdd89fc9d65aa..e91478fc47f57cdcd2a27dd21fe987edc2917049 100644
+--- a/dist/plugins/reactNativeDevServer.mjs
++++ b/dist/plugins/reactNativeDevServer.mjs
+@@ -234,7 +234,7 @@ function createReactNativeDevServerPlugin(options) {
+                   port: getBoundPort(server),
+                   host: typeof host === "string" ? host : "localhost",
+                   platform,
+-                  serverUrl: `http://${typeof host === "string" && host !== "0.0.0.0" ? host : "localhost"}:${getBoundPort(server)}`,
++                  serverUrl: process.env.ONE_SERVER_URL || `http://${typeof host === "string" && host !== "0.0.0.0" ? host : "localhost"}:${getBoundPort(server)}`,
+                   onHmrUpdate: update => {
+                     const msg = JSON.stringify(update);
+                     const target = "clientId" in update ? update.clientId : void 0;
+diff --git a/dist/plugins/reactNativeDevServer.native.js b/dist/plugins/reactNativeDevServer.native.js
+index 61a8c3ba6f51dacdbbaaa70c20bfa88eb7b18e54..b1e9d2e4c96a600dd96fc444f69c3a8e9d177bcb 100644
+--- a/dist/plugins/reactNativeDevServer.native.js
++++ b/dist/plugins/reactNativeDevServer.native.js
+@@ -273,7 +273,7 @@ function createReactNativeDevServerPlugin(options) {
+                   port: getBoundPort(server),
+                   host: typeof host === "string" ? host : "localhost",
+                   platform,
+-                  serverUrl: `http://${typeof host === "string" && host !== "0.0.0.0" ? host : "localhost"}:${getBoundPort(server)}`,
++                  serverUrl: process.env.ONE_SERVER_URL || `http://${typeof host === "string" && host !== "0.0.0.0" ? host : "localhost"}:${getBoundPort(server)}`,
+                   onHmrUpdate: function (update) {
+                     var msg = JSON.stringify(update);
+                     var target = "clientId" in update ? update.clientId : void 0;
+diff --git a/dist/utils/createNativeDevEngine.mjs b/dist/utils/createNativeDevEngine.mjs
+index 52c15f2bf529315d760302b65e13eff05ab1b2d1..0689d99c0fa8936eac4649165b956e456e0daf43 100644
+--- a/dist/utils/createNativeDevEngine.mjs
++++ b/dist/utils/createNativeDevEngine.mjs
+@@ -1032,7 +1032,7 @@ async function getNativeAssetData(id, root, platform) {
+     const {
+       imageSize
+     } = await import("image-size");
+-    const dims = imageSize(files[0]);
++    const dims = imageSize(readFileSync(files[0]));
+     assetData.width = dims.width === void 0 ? void 0 : dims.width / scales[0];
+     assetData.height = dims.height === void 0 ? void 0 : dims.height / scales[0];
+   } catch {}
+diff --git a/dist/utils/createNativeDevEngine.native.js b/dist/utils/createNativeDevEngine.native.js
+index 893f4703f52357bfcbaef18c5d7a7f2244708057..235b745575b0366659eb497ff5efe756e67b1635 100644
+--- a/dist/utils/createNativeDevEngine.native.js
++++ b/dist/utils/createNativeDevEngine.native.js
+@@ -1217,7 +1217,7 @@ async function getNativeAssetData(id, root, platform) {
+     var {
+       imageSize
+     } = await import("image-size");
+-    var dims = imageSize(files[0]);
++    var dims = imageSize(readFileSync(files[0]));
+     assetData.width = dims.width === void 0 ? void 0 : dims.width / scales[0];
+     assetData.height = dims.height === void 0 ? void 0 : dims.height / scales[0];
+   } catch (unused) {}
+diff --git a/src/plugins/expoManifestRequestHandlerPlugin.ts b/src/plugins/expoManifestRequestHandlerPlugin.ts
+index d0bd53f9a28d5a4d9589dd5ec8e26b5f02e97b1e..051bb880e6aeb78ca3a4231c0feb74dea65c0b7f 100644
+--- a/src/plugins/expoManifestRequestHandlerPlugin.ts
++++ b/src/plugins/expoManifestRequestHandlerPlugin.ts
+@@ -35,9 +35,9 @@ export function expoManifestRequestHandlerPlugin(
+           return next()
+         }
+ 
+-        const protocol =
+-          req.socket instanceof TLSSocket && req.socket.encrypted ? 'https' : 'http'
+-        const host = `${req.headers['x-forwarded-host'] || req.headers.host || '127.0.0.1'}`
++        const origin = new URL(process.env.ONE_SERVER_URL || `${req.socket instanceof TLSSocket && req.socket.encrypted ? 'https' : 'http'}://${req.headers.host || '127.0.0.1'}`)
++        const protocol = origin.protocol.slice(0, -1)
++        const host = origin.host
+ 
+         // Try to dynamically import the internal Expo manifest handler from expo packages installed in the user's project.
+         let ExpoGoManifestHandlerMiddleware
+diff --git a/src/plugins/reactNativeDevServer.ts b/src/plugins/reactNativeDevServer.ts
+index 259a97c3669f78fe4ebc695918970f1cf1e5ff0c..abb34e8ff09a36eee71c5cfff6d77ce53c6f0c86 100644
+--- a/src/plugins/reactNativeDevServer.ts
++++ b/src/plugins/reactNativeDevServer.ts
+@@ -290,7 +290,7 @@ export function createReactNativeDevServerPlugin(
+                   port: getBoundPort(server),
+                   host: typeof host === 'string' ? host : 'localhost',
+                   platform,
+-                  serverUrl: `http://${typeof host === 'string' && host !== '0.0.0.0' ? host : 'localhost'}:${getBoundPort(server)}`,
++                  serverUrl: process.env.ONE_SERVER_URL || `http://${typeof host === 'string' && host !== '0.0.0.0' ? host : 'localhost'}:${getBoundPort(server)}`,
+                   onHmrUpdate: (update) => {
+                     const msg = JSON.stringify(update)
+                     // an update with no clientId is for every client on the
+diff --git a/src/utils/createNativeDevEngine.ts b/src/utils/createNativeDevEngine.ts
+index 72d774ae8b753a78fcba5c0f8b12e531913bc13c..fb75135077c935c67c64740344a9a9e9b2f5a1cd 100644
+--- a/src/utils/createNativeDevEngine.ts
++++ b/src/utils/createNativeDevEngine.ts
+@@ -1819,7 +1819,7 @@ export async function getNativeAssetData(
+   if (NATIVE_IMAGE_EXTS.has(requested.type)) {
+     try {
+       const { imageSize } = await import('image-size')
+-      const dims = imageSize(files[0])
++      const dims = imageSize(readFileSync(files[0]))
+       assetData.width = dims.width === undefined ? undefined : dims.width / scales[0]
+       assetData.height = dims.height === undefined ? undefined : dims.height / scales[0]
+     } catch {}
