@@ -71,8 +71,9 @@ that can lose data, and credentials. A change to a sensitive path merges when:
    `tools/github/weaker-journeys.ts` compares them
 
 A change reaches web when it touches the web app or anything it imports. It
-reaches native when it touches a native app, a shared runtime package or a
-sensitive path. A sensitive path reaches every platform.
+reaches native when it touches a native app, a native journey, `tools/native/`
+or a shared runtime package. A sensitive path alone reaches web only, so a
+change to the merge gate runs no native journey.
 
 The judge reads its rules from the default branch. A PR that changes the journey
 kit holds for the owner, so a PR cannot weaken what proves it. When a PR changes a journey, its own copy must pass,
