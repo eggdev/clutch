@@ -102,8 +102,8 @@ change that loosens one.
   Agent review gives a change that makes one weaker an advisory `owner` finding. A change that makes one stronger
   merges like any other. See
   [decision record 0002](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
-- The list itself, and the merge gate, are in the one-way-door tier of
-  `.clutch/risk.yaml`, so `.github/CODEOWNERS` names an owner for them.
+- The list itself is not in the one-way-door tier. A change to it merges as
+  any other change, see [decision record 0005](./decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
 - `check-guardrail-coverage` finds the tool scripts that the root targets,
   the lint config and the hook configs run. It follows their `@tools/`
   imports, and reads each file path in them. It fails when no guardrail
@@ -128,7 +128,7 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A transaction-safe service                                                                       | `primitives.yaml`, `transactionSafe`                                                           |
 | A dependency override                                                                            | `tools/dependency-overrides.yaml`                                                              |
 | Agent review of a PR that a bot opened                                                           | `agent-review.yml`, `allowed_bots`                                                             |
-| The owner's approval, which lifts an agent PR's risk tier, a weaker journey and a contract break | `clutch.yaml`, `automerge.owner`, read in `tools/github/auto-merge-rules.ts` (`ownerApproved`) |
+| The owner's approval, which lifts the tier, a weaker journey, a contract break and major changes | `clutch.yaml`, `automerge.owner`, read in `tools/github/auto-merge-rules.ts` (`ownerApproved`) |
 | A merge on the owner's word, which skips the auto-merge judge but not the checks                 | `tools/github/merge.ts`, `pr merge --owner`                                                    |
 | A bypass of the main ruleset                                                                     | `.github/rulesets/main.json`, `bypass_actors`: only the release bot's app                      |
 | Files a Clutch sync PR may change past the lineage                                               | `tools/github/bot-rule.ts`, `syncExtras`                                                       |

@@ -29,11 +29,14 @@ An `owner` finding has two causes only. Start the finding with its level, `owner
 when another rule says so.
 
 1. **Hard core.** The diff changes a path of the `one-way-door` tier of
-   [`.clutch/risk.yaml`](../../.clutch/risk.yaml). That is the merge gate, credentials, and a workflow's permissions or secrets.
-   It is also auth and access, migrations that can lose data, billing, infra and
-   deploy, and project intent. CODEOWNERS or
-   auto-merge already holds such a PR, so the finding says what the owner
-   should look at.
+   [`.clutch/risk.yaml`](../../.clutch/risk.yaml). That is a credential, and
+   auth and access until their journeys exist. It is also a migration that can
+   lose data, a workflow line that gives a grant, and the `owner:` line of
+   `clutch.yaml`.
+   It is also the billing and infra paths that a project names. The merge judge also holds a major change and a contract break, see
+   [decision record 0005](./decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
+   CODEOWNERS or auto-merge already holds such a PR, so the finding says what
+   the owner should look at.
 2. **A weaker check.** The change makes a check that gates the merge catch
    less on code that already exists. Such a check is a required status check or one of its steps, a lint rule, a budget, a ratchet or a test. Agent review itself is one too. The check is weaker when it is turned off,
    skipped, loosened or deleted, or when a budget rises. A test is weaker when

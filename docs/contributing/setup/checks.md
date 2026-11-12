@@ -265,12 +265,12 @@ The [Labels workflow](../../../.github/workflows/labels.yml) labels each PR
 `risk/low`, `risk/medium`, `risk/high` or `risk/one-way-door` from the paths it
 touches. It runs `clutch risk` from the base branch, with the rules in
 `.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk). The
-`one-way-door` tier holds only the hard core. That is the merge gate,
-credentials, auth until its journeys exist, a migration that can lose data, and
-project intent. It also holds two lists that each project fills: its billing code, and
-its infra, deploy and secrets paths.
-See
-[decision record 0002](../decisions/0002-merge-most-prs-with-no-human.md).
+`one-way-door` tier holds only what cannot be paid back. That is credentials,
+auth until its journeys exist, and a migration that can lose data. It is also a
+workflow line that gives a grant, and the `owner:` line of `clutch.yaml`. It also holds two lists that each
+project fills: its billing code, and its infra, deploy and secrets paths. The
+merge judge holds a major change and a contract break for the owner too. See
+[decision record 0005](../decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
 
 The [Labels workflow](../../../.github/workflows/labels.yml) runs `clutch labels`
 on each PR. It sets `kind/<type>` from the title and `area/<part>` for each

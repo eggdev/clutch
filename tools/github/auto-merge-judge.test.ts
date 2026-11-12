@@ -129,6 +129,20 @@ test('a named contract break holds a PR at any tier for the owner, and the owner
   ).toContain('- Contract breaks the owner agreed to: `Note.title`');
 });
 
+test('a major change holds a PR at any tier for the owner, and the owner approval lifts it', () => {
+  const why = 'its title has "!" before the colon';
+  const reason = `The change is major: ${why}. The owner signs off a major change.`;
+  for (const step of steps) {
+    const major = facts({ tier: step === 'bots' ? 'one-way-door' : 'low', major: [why] });
+    expect(blockers(major, step)).toContain(reason);
+    expect(blockers({ ...major, ownerApproved: true }, step)).toEqual([]);
+  }
+  expect(blockers(facts({ major: [] }), 'low')).toEqual([]);
+  expect(dryRunComment(facts({ major: [why], ownerApproved: true }), [], 'low')).toContain(
+    `- Major change the owner approved: ${why}`,
+  );
+});
+
 test('a failed or running native journey holds, and a skipped one does not', () => {
   expect(blockers(facts({ native: { 'native-ios': 'skipped' } }), 'medium')).toEqual([]);
   expect(blockers(facts({ native: { 'native-ios': 'failure' } }), 'medium')).toEqual([

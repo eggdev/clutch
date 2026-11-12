@@ -52,6 +52,12 @@ export type Facts = {
    * to a break, so each one holds the PR for the owner, whatever its risk tier.
    */
   breaks: Array<string>;
+  /**
+   * Why the PR is a major change, from `majorChange`: a title with `!`, or a
+   * changeset in its diff that names a major bump. The owner signs off a major
+   * change, so it holds the PR for the owner, whatever its risk tier.
+   */
+  major: Array<string>;
   /** Why a bot PR fails its bot rule: a diff that is more than a version, or a revert that may not merge. Empty for an agent PR. */
   botProblems: Array<string>;
   /** Each required check that failed on the default branch's latest commit. */
@@ -59,8 +65,8 @@ export type Facts = {
   /**
    * Whether `automerge.owner` approved the head commit, and gave no later
    * review that asks for changes. The owner's approval is the review that a
-   * one-way-door PR waits for, so it lifts the tier, a weaker journey and a
-   * contract break.
+   * one-way-door PR waits for, so it lifts the tier, a weaker journey, a
+   * contract break and a major change.
    * The checks, a draft, the base and a red main still hold the PR.
    */
   ownerApproved: boolean;
@@ -164,6 +170,11 @@ export function blockers(facts: Facts, step: Step): Array<string> {
     for (const name of facts.breaks) {
       reasons.push(`The contract snapshot names the break ${name}. The owner agrees to a break.`);
     }
+    if (facts.major.length > 0) {
+      reasons.push(
+        `The change is major: ${facts.major.join(', and ')}. The owner signs off a major change.`,
+      );
+    }
   }
   // A revert is how a red main turns green, so the red main does not hold it.
   if (botKind(pr.headRefName) !== 'revert') {
@@ -220,6 +231,9 @@ export function dryRunComment(facts: Facts, reasons: Array<string>, step: Step) 
             ? [
                 `- Contract breaks the owner agreed to: ${facts.breaks.map((name) => `\`${name}\``).join(', ')}`,
               ]
+            : []),
+          ...(facts.major.length > 0
+            ? [`- Major change the owner approved: ${facts.major.join(', and ')}`]
             : []),
         ];
   return [

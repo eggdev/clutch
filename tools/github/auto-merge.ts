@@ -23,6 +23,7 @@ import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule'
 import type { ChangedFile } from '@tools/github/bot-rule';
 import { retrying } from '@tools/github/command';
 import { contractBreaks } from '@tools/github/contract-breaks';
+import { majorChange } from '@tools/github/major-change';
 import type { Run } from '@tools/github/stack';
 
 /**
@@ -247,7 +248,7 @@ export async function runAutoMerge(
   const bot = botKind(pr.headRefName);
   const names = await requiredChecks(run, repo, defaultBranch);
   const tier = await riskTier(run, defaultBranch, pr.headRefOid);
-  // Read once: the bot rule and the contract breaks judge the same files.
+  // Read once: the bot rule, the contract breaks and the major change judge the same files.
   const changed = await changedFiles(run, repo, values.pr);
   let botProblems: Array<string> = [];
   if (bot === 'renovate') {
@@ -271,6 +272,7 @@ export async function runAutoMerge(
     checks,
     weakerJourneys: await weaker(run, defaultBranch, pr.headRefOid),
     breaks: await contractBreaks(run, repo, changed, pr.headRefOid),
+    major: await majorChange(run, repo, values.pr, changed),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
     ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),

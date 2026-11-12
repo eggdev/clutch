@@ -6,31 +6,16 @@
 # stays delegated. check-agent-hooks fails when this file drifts. Kickoff
 # replaces @eggdev with the owner of the project.
 #
-# The workflow and clutch.yaml rules of the tier match changed lines, which
-# CODEOWNERS cannot express, so they are not here. Auto-merge leaves those
-# changes for the owner by their tier. A change that weakens a check gets an
-# owner finding from agent review. See docs/contributing/review.md.
+# The migration, workflow and clutch.yaml rules of the tier match changed
+# lines, which CODEOWNERS cannot express, so they are not here. Auto-merge
+# leaves those changes for the owner by their tier. The merge judge also holds
+# a major change, a contract break and a change that weakens a journey for the
+# owner. See docs/contributing/review.md.
 
-/.github/rulesets/ @eggdev
-/.github/CODEOWNERS @eggdev
-/.clutch/risk.yaml @eggdev
-/tools/guardrail-files.json @eggdev
-/tools/codeowners.ts @eggdev
-/tools/github/auto-merge.ts @eggdev
-/tools/github/auto-merge-checks.ts @eggdev
-/tools/github/auto-merge-enable.ts @eggdev
-/tools/github/auto-merge-rules.ts @eggdev
-/tools/github/bot-rule.ts @eggdev
-/tools/github/weaker-journeys.ts @eggdev
-/.github/workflows/auto-merge.yml @eggdev
-/.github/workflows/agent-review.yml @eggdev
-/apps/cli/src/risk/tiers.ts @eggdev
-/apps/cli/src/risk-command.ts @eggdev
 /.gitleaks.toml @eggdev
 /.gitleaksignore @eggdev
 /.mcp.json @eggdev
 /.cursor/mcp.json @eggdev
-/docs/contributing/project-intent.md @eggdev
 **/auth/ @eggdev
 /packages/access/ @eggdev
 /packages/identity/ @eggdev

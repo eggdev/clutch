@@ -73,29 +73,49 @@ test('tests alone are low, and app code is medium', async () => {
   expect(code.tier).toBe('medium');
 });
 
-// One run gives the tier of each path on its own, so a path that drops a tier shows by name.
-test('the hard core is a one-way door, and policy docs are low', async () => {
-  const hardCore = [
+// One run gives the tier of each path on its own, so a path that changes tier shows by name.
+test('what cannot be paid back is a one-way door, and the merge gate and policy docs are not', async () => {
+  const hardCore = {
+    '.gitleaks.toml': 'changed\n',
+    '.gitleaksignore': 'changed\n',
+    '.mcp.json': 'changed\n',
+    '.cursor/mcp.json': 'changed\n',
+    'packages/identity/service/actors.ts': 'changed\n',
+    'packages/access/service/access.ts': 'changed\n',
+    'apps/api/src/auth/session.ts': 'changed\n',
+    'packages/access/repo/migrations/20261030000000_x/migration.sql': 'DROP TABLE "a";\n',
+  };
+  const medium = [
     '.github/rulesets/main.json',
     '.github/CODEOWNERS',
+    'tools/codeowners.ts',
     'tools/github/auto-merge.ts',
+    'tools/github/auto-merge-rules.ts',
     'tools/github/bot-rule.ts',
+    'tools/github/weaker-journeys.ts',
+    '.github/workflows/auto-merge.yml',
     '.github/workflows/agent-review.yml',
     'apps/cli/src/risk/tiers.ts',
-    'packages/identity/service/actors.ts',
-    'packages/access/service/access.ts',
-    'apps/api/src/auth/session.ts',
-    'packages/access/repo/migrations/20261030000000_x/migration.sql',
-    'docs/contributing/project-intent.md',
+    'apps/cli/src/risk-command.ts',
   ];
-  const policyDocs = [
+  const harmless = 'packages/notes/repo/migrations/20261030000000_y/migration.sql';
+  const low = [
+    'docs/contributing/project-intent.md',
     'docs/contributing/review.md',
     'docs/contributing/decisions/0001-a.md',
     'docs/principles/fail-loudly.md',
     '.clutch/PLAN.md',
   ];
-  const risk = await riskOf([...hardCore, ...policyDocs]);
-  expect(risk.files).toEqual({ ...eachAt(hardCore, 'one-way-door'), ...eachAt(policyDocs, 'low') });
+  const risk = await riskOf({
+    ...hardCore,
+    ...Object.fromEntries([...medium, ...low].map((file) => [file, 'changed\n'])),
+    [harmless]: 'ALTER TABLE "a" ADD COLUMN "b" text;\n',
+  });
+  expect(risk.files).toEqual({
+    ...eachAt(Object.keys(hardCore), 'one-way-door'),
+    ...eachAt([...medium, harmless], 'medium'),
+    ...eachAt(low, 'low'),
+  });
   expect(risk.tier).toBe('one-way-door');
 });
 
@@ -106,7 +126,6 @@ test('skills, check scripts, lint config, workflows and any unlisted path are me
     'tools/github/pr.ts',
     'oxlint.config.ts',
     'package.json',
-    'clutch.yaml',
     'apps/web/src/app.tsx',
     'packages/sync/service/push.ts',
     'bun.lock',
@@ -118,27 +137,24 @@ test('skills, check scripts, lint config, workflows and any unlisted path are me
   expect(risk.tier).toBe('medium');
 });
 
-test('a workflow permission or secret, or the automerge section, is a one-way door', async () => {
+test("a workflow line that gives a grant, and the owner's login, are a one-way door", async () => {
   const held = {
-    '.github/workflows/permissions.yml': 'permissions:\n',
+    '.github/workflows/write-all.yml': 'permissions: write-all\n',
     '.github/workflows/contents.yml': '      contents: write\n',
     '.github/workflows/environment.yml': '    environment: release\n',
     '.github/workflows/secret.yml': '        token: secrets.T\n',
     '.github/workflows/workflow-run.yml': '  workflow_run:\n',
+    'clutch.yaml': 'automerge:\n  owner: someone\n',
   };
-  const risk = await riskOf({
-    ...held,
+  const readOnly = {
     '.github/workflows/ci.yml': 'jobs:\n  a:\n    runs-on: x\n',
-    'clutch.yaml': 'capabilities:\n  ci: adopted\n',
-  });
+    '.github/workflows/read.yml': 'permissions:\n  contents: read\n',
+  };
+  const risk = await riskOf({ ...held, ...readOnly });
   expect(risk.files).toEqual({
     ...eachAt(Object.keys(held), 'one-way-door'),
-    '.github/workflows/ci.yml': 'medium',
-    'clutch.yaml': 'medium',
+    ...eachAt(Object.keys(readOnly), 'medium'),
   });
-  const automerge = await riskOf({ 'clutch.yaml': 'automerge:\n  step: medium\n' });
-  expect(automerge.files).toEqual({ 'clutch.yaml': 'one-way-door' });
-  expect(automerge.tier).toBe('one-way-door');
 });
 
 test('the text output names the files at the change tier and the pattern that set it', async () => {

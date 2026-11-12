@@ -80,23 +80,25 @@ agent PR, so the owner approves it on GitHub like any other PR from another auth
 drifts. After a change to the one-way-door tier, run
 `mise exec -- bun tools/codeowners.ts --write`.
 
-Three kinds of PR wait for the owner without a GitHub approval rule:
+Four kinds of PR wait for the owner without a GitHub approval rule:
 
-- A rule with `lines`, such as a workflow's `permissions:` or the `automerge`
-  section of `clutch.yaml`. CODEOWNERS cannot express it, so auto-merge holds
+- A rule with `lines`, such as a workflow line that gives a write grant. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
 - A PR that weakens a journey or a budget, or removes a screen or a route.
   Auto-merge holds it, by the comparison in `tools/github/weaker-journeys.ts`.
 - A PR that makes a contract break. Its diff changes `contract.json`, and the
   snapshot names the break. Auto-merge holds it, whatever its tier, and
   `pr status` names the break and reports the PR as not ready.
+- A major change. Its title has `!` before the colon, or a changeset in its
+  diff names a major bump. Auto-merge holds it, whatever its tier, and
+  `pr status` names why and reports the PR as not ready.
 
 Do not merge any of these kinds with `pr merge` until the owner says so. A model
 finding holds neither `pr status` nor `pr merge`. The session still answers it.
 
 The owner's approval is the last step. When `automerge.owner` in `clutch.yaml`
 approves the head commit, an `on` run of Auto-merge passes an agent PR at any
-tier, and lifts a weaker journey and a contract break. The bot rule still holds a bot
+tier, and lifts a weaker journey, a contract break and a major change. The bot rule still holds a bot
 PR, and a PR that a person opened is still refused. The required checks, a
 native journey job that failed or still runs, a draft, the base branch and a
 red `main` still hold any PR (`tools/github/auto-merge-rules.ts`). The
@@ -160,8 +162,7 @@ its level. A `blocking` finding must not merge until it is fixed, so only
 `fixed in <sha>` answers it. `pr findings <number> --check` exits 1 while a finding has no line,
 and `pr merge` refuses the PR until it passes. A new push can bring new
 findings, so run it again after each review. Auto-merge does not read the
-disposition yet. CL-416 adds that, and it needs the owner, since auto-merge is
-part of the merge gate.
+disposition yet. CL-416 adds that.
 
 After the owner approves a PR, do not push a fix for a new `owner` or `note`
 finding. The push dismisses the approval, as
@@ -348,6 +349,9 @@ At each step, the PR also needs all of these:
 - Its diff makes no contract break. A PR whose diff changes `contract.json`,
   and whose snapshot names a break, waits for the owner. The owner's approval
   of the head lifts this.
+- It is not a major change. A PR with `!` in its title, or with a changeset
+  that names a major bump, waits for the owner's sign-off. The owner's
+  approval of the head lifts this.
 - No native journey job failed or is running on its head.
 
 The workflow runs only from the default branch, with the default branch's

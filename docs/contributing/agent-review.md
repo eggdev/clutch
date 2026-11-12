@@ -2,9 +2,10 @@
 
 This page says how the agent review job runs and which labels each PR carries.
 The rules that agent review applies, and the levels it gives, are in
-[review](./review.md). That page is part of the merge gate, so the owner
-approves each change to it. This page only describes the job, so a PR that
-changes how the job runs updates this page and needs no approval for it.
+[review](./review.md). That page is part of the merge gate. A change to it
+merges as any other change, and agent review gives a weaker rule an `owner`
+finding. This page only describes the job, so a PR that changes how the job
+runs updates this page and needs no approval for it.
 
 ## How it runs
 

@@ -59,8 +59,8 @@ Linear holds the authoritative task, and its actual status UUIDs map to the
 execution stages. Todo authorizes build, verification and a PR. The required
 checks and [agent review](./review.md) must pass at the tested head before the
 PR is declared ready. Auto-merge then decides the merge by risk tier. The owner
-merges one-way-door PRs, PRs that weaken a journey and PRs that make a contract
-break. Each merge is a release.
+merges one-way-door PRs, PRs that weaken a journey, contract breaks and major
+changes. Each merge is a release.
 
 ## Pull requests
 

@@ -146,7 +146,33 @@ test("this repository's risk file holds only a migration that can lose data", ()
     expect(tierFor(line)).toBe('one-way-door');
   }
   expect(classify(real, ['docs/principles/x.md'])[0]?.tier).toBe('low');
-  expect(classify(real, ['docs/contributing/project-intent.md'])[0]?.tier).toBe('one-way-door');
+  expect(classify(real, ['docs/contributing/project-intent.md'])[0]?.tier).toBe('low');
+  // The command test cannot change these two: its run reads them.
+  expect(classify(real, ['.clutch/risk.yaml', 'tools/guardrail-files.json'])).toMatchObject([
+    { tier: 'medium' },
+    { tier: 'medium' },
+  ]);
+});
+
+test("this repository's risk file holds the owner's login and a workflow grant, by line", () => {
+  const file = path.join(import.meta.dir, '../../../../.clutch/risk.yaml');
+  const { config: real } = validateRiskConfig(parse(readFileSync(file, 'utf-8')));
+  if (!real) {
+    throw new Error('.clutch/risk.yaml is not valid');
+  }
+  const tierFor = (name: string, line: string) =>
+    classify(real, [name], new Map([[name, [line]]]))[0]?.tier;
+  expect(tierFor('clutch.yaml', '  owner: someone')).toBe('one-way-door');
+  for (const line of ['automerge:', '  step: medium', '  mode: on', '  ci: adopted']) {
+    expect(tierFor('clutch.yaml', line)).toBe('medium');
+  }
+  const workflow = '.github/workflows/ci.yml';
+  for (const line of ['permissions:', '  contents: read', '  pull-requests: none']) {
+    expect(tierFor(workflow, line)).toBe('medium');
+  }
+  for (const line of ['  contents: write', 'permissions: write-all', '  id-token: write']) {
+    expect(tierFor(workflow, line)).toBe('one-way-door');
+  }
 });
 
 test('a rule with journeys holds until each one exists', () => {

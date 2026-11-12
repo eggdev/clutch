@@ -32,8 +32,11 @@ The owner stops for three product reasons:
    A change that keeps a journey's outcomes ships on proof. A change that
    removes an outcome, a screen or a route, or loosens a budget, goes to the owner.
 
-The merge gate, credentials and project intent also stay with the owner, so an
-agent cannot loosen its own gate or the idea it serves. Ask before you build, never after.
+What cannot be paid back also stays with the owner. That is a credential, auth
+until its journeys exist, a workflow grant and the owner's login.
+So do a major change and a contract break. See
+[decision record 0005](../contributing/decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
+Ask before you build, never after.
 
 ## Reach the owner in a T3 thread
 
@@ -60,8 +63,7 @@ app can break sign-in as surely as a change to auth.
 A sensitive path in `.clutch/risk.yaml` can name its journeys under `journeys:`.
 When each one exists on the default branch, its path leaves the owner's hold and
 CODEOWNERS. Sensitive paths include auth, billing, roles and access, a migration
-that can lose data, credentials and the merge gate. A change to a sensitive path
-merges when:
+that can lose data, and credentials. A change to a sensitive path merges when:
 
 1. each journey that its paths name passes on the PR head, on each platform
    that the change reaches

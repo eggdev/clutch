@@ -5,6 +5,7 @@ import { marker } from '@tools/github/auto-merge-rules';
 import { contractBreaks } from '@tools/github/contract-breaks';
 import { must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
+import { majorChange } from '@tools/github/major-change';
 import { ownerCount } from '@tools/github/owner-reviews';
 import type { Run } from '@tools/github/stack';
 
@@ -231,7 +232,8 @@ export async function prStatus(run: Run, number: string) {
   // What the merge judge holds for the owner, as auto-merge reads it. The owner's approval of the head lifts it.
   const changed = await changedFiles(run, '{owner}/{repo}', number);
   const breaks = await contractBreaks(run, '{owner}/{repo}', changed, pr.headRefOid);
-  const holds = [...breaks];
+  const major = await majorChange(run, '{owner}/{repo}', number, changed);
+  const holds = [...breaks, ...major];
   const lifted =
     holds.length === 0 ||
     (await ownerApproved(run, '{owner}/{repo}', number, pr.headRefOid, await ownerLogin()));
@@ -259,6 +261,7 @@ export async function prStatus(run: Run, number: string) {
     agentReview: { posted: reviewComment !== undefined, blocking, owner },
     review: review || 'none required',
     contractBreaks: breaks,
+    major,
     dryRun: dryRun ? verdict(dryRun.body) : null,
     ready,
   };
@@ -290,6 +293,9 @@ export function renderStatus(status: PrStatus) {
     `Agent review: ${reviewLine(status.agentReview)}. Review decision: ${status.review}.`,
     ...(status.contractBreaks.length > 0
       ? [`Contract breaks: ${status.contractBreaks.join(', ')}. The owner agrees to a break.`]
+      : []),
+    ...(status.major.length > 0
+      ? [`Major change: ${status.major.join(', and ')}. The owner signs off a major change.`]
       : []),
     `Dry run: ${status.dryRun ? `${status.dryRun} auto-merge at ${status.head.slice(0, 7)}` : 'no verdict for this head'}`,
     `Ready to merge: ${status.ready ? 'yes' : 'no'}`,
