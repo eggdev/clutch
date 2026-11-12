@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 (2026-11-12)
+
+### Features
+
+- feat(review): list the owner findings of merged pull requests in the weekly digest (CL-472)
+
 ## 1.6.0 (2026-11-12)
 
 ### Features
