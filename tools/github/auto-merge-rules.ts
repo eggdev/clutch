@@ -17,27 +17,6 @@ export type Mode = (typeof modes)[number];
 export const steps = ['bots', 'low', 'medium'] as const;
 export type Step = (typeof steps)[number];
 
-/**
- * The revert brake: auto-merge steps down one step while reverts pass
- * `maxRevertRate` of the PRs merged in `window`, once there are `minMerged`.
- * Decision 0002 sets the 2% that tightens it on evidence.
- */
-export const brake = { window: '30d', minMerged: 20, maxRevertRate: 0.02 };
-
-/** The step that the brake gives: one step lower while the revert rate passes the limit. */
-export function brakedStep(step: Step, merged: number, reverts: number): Step {
-  if (merged < brake.minMerged || reverts / merged <= brake.maxRevertRate) {
-    return step;
-  }
-  return steps[Math.max(steps.indexOf(step) - 1, 0)];
-}
-
-/** The sentence that the verdict gives when the brake steps down. */
-export function brakeReason(merged: number, reverts: number, from: Step, to: Step) {
-  const rate = ((reverts / merged) * 100).toFixed(1);
-  return `Reverts are ${reverts} of ${merged} merged PRs in the last ${brake.window}, ${rate}%, over the ${brake.maxRevertRate * 100}% brake, so the step drops from ${from} to ${to}.`;
-}
-
 /** The step after `step`, which an `on` run calibrates. The last step calibrates itself. */
 export const nextStep = (step: Step): Step => steps[Math.min(steps.indexOf(step) + 1, 2)];
 

@@ -33,7 +33,6 @@ rules:
       # Each auto-merge file that decides or makes a merge. Its tests and the
       # fake are not held. Name a new auto-merge source file here.
       - tools/github/auto-merge.ts
-      - tools/github/auto-merge-brake.ts
       - tools/github/auto-merge-checks.ts
       - tools/github/auto-merge-enable.ts
       - tools/github/auto-merge-rules.ts

@@ -68,6 +68,9 @@ Run every command through `mise exec --`.
 9. **Merge** when the PR is ready: `bun run pr merge <n>`. See
    [merge](#merge).
 
+An item that you leave out stays open for the next round, and no owner stop
+follows from it.
+
 The answers file holds one item for each thread (`ref` is its id), each
 comment (`ref` is its id as a string) and each failed check (`ref` is its
 name):
