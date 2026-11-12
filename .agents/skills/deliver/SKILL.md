@@ -111,7 +111,9 @@ procedure to test a usage sketch or prototype before committing to it. A
 settled direction proceeds to implementation without another planning gate.
 
 Build your pick of a new visible feature. Do not wait for a design choice.
-State `hand_test:` in the issue, and the owner looks after it deploys. Use a
+State `hand_test:` in the issue, and the owner looks after it deploys. After
+kickoff, a new feature folder also needs a `goal:` in the issue that names a
+user goal of [project intent](../../../docs/contributing/project-intent.md). Use a
 [design proposal](../design-proposal/SKILL.md) only when the owner asks for options.
 
 ## Verify and finalize

@@ -39,6 +39,9 @@ owner: agent # agent | brendan | <agent name>
 `hand_test: yes` or `hand_test: no` is the one optional key. It says whether the
 owner tests the work by hand after it deploys. A PR that adds a screen must state it.
 
+`goal:` is optional too. It names a user goal from project intent. A PR that adds
+a feature must state it, after kickoff.
+
 The body follows the frontmatter: `# CL-NNN: <title>`, then Goal, Context, Steps, Files, Acceptance criteria, Verify, and Gate for gate issues. Add `## Notes` and `## Blocked` sections at the end as needed.
 
 ## Status values

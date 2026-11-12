@@ -57,6 +57,9 @@ test('a change over the limit fails, and excluded files do not count', async () 
 });
 
 test('a new screen needs an issue that states hand_test', async () => {
+  await write('KICKOFF.md', '# Kickoff\n');
+  git('add', '-A');
+  git('commit', '-qm', 'kickoff');
   await write('features/a/screens/x.tsx', 'x\n');
   git('add', '-A');
   expect(checkScope(root, 'HEAD', limits)[0]).toContain('hand_test');
@@ -65,7 +68,28 @@ test('a new screen needs an issue that states hand_test', async () => {
   expect(checkScope(root, 'HEAD', limits)).toEqual([]);
 });
 
+test('after kickoff, a new feature needs an issue with a goal from project intent', async () => {
+  await write(
+    'docs/contributing/project-intent.md',
+    '| Teams | Share notes with a client |\nPlain prose here.\n',
+  );
+  git('add', '-A');
+  git('commit', '-qm', 'intent');
+  await write('features/b/x.ts', 'x\n');
+  git('add', '-A');
+  expect(checkScope(root, 'HEAD', limits)[0]).toContain('goal:');
+  await write('.clutch/issues/CL-2.md', '---\ngoal: Share notes with a client\n---\n');
+  git('add', '-A');
+  expect(checkScope(root, 'HEAD', limits)).toEqual([]);
+  await write('.clutch/issues/CL-2.md', '---\ngoal: Win a prize\n---\n');
+  git('add', '-A');
+  expect(checkScope(root, 'HEAD', limits)[0]).toContain('goal:');
+});
+
 test('a hand_test line in the body of an issue does not count', async () => {
+  await write('KICKOFF.md', '# Kickoff\n');
+  git('add', '-A');
+  git('commit', '-qm', 'kickoff');
   await write('features/a/screens/x.tsx', 'x\n');
   await write('.clutch/issues/CL-1.md', '---\nid: CL-1\n---\n\nhand_test: yes\n');
   git('add', '-A');

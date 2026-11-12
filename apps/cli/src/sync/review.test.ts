@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, readlink, symlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -46,12 +46,19 @@ async function source() {
   return repo;
 }
 
+// The tests that only read the checkout share one. A test that commits to it builds its own.
+let shared: Awaited<ReturnType<typeof source>>;
+beforeAll(async () => {
+  shared = await source();
+});
+afterAll(() => shared[Symbol.asyncDispose]());
+
 // These tests commit to the fixture checkout and sync each new commit, so they pass --to HEAD.
 const review = (root: string, template: string, check?: boolean) =>
   runSync({ root, template, to: 'HEAD', only: 'review', check });
 
 test('sync --only review distributes shared tooling, preserves project verify and repeats without changes', async () => {
-  await using template = await source();
+  const template = shared;
   await using project = await gitRepo({
     'package.json': '{"name":"shop"}',
     '.agents/skills/verify/SKILL.md': 'Shop assertions\n',
@@ -83,7 +90,7 @@ test('sync --only review distributes shared tooling, preserves project verify an
 });
 
 test('customized shared files stop the whole sync before writing any other files', async () => {
-  await using template = await source();
+  const template = shared;
   await using project = await gitRepo({
     'package.json': '{}',
     '.agents/skills/deliver/SKILL.md': 'Project-specific changes\n',
@@ -99,7 +106,7 @@ test('customized shared files stop the whole sync before writing any other files
 });
 
 test('known unchanged older copies can migrate and retired skills are removed safely', async () => {
-  await using template = await source();
+  const template = shared;
   await using project = await gitRepo({
     'package.json': '{}',
     '.agents/skills/deliver/SKILL.md': 'old shared delivery\n',
@@ -138,7 +145,7 @@ test('recorded checksums permit updates but protect later project customization'
 });
 
 test('check is read-only and a real sync refuses dirty review tooling', async () => {
-  await using template = await source();
+  const template = shared;
   await using project = await gitRepo({ 'package.json': '{}' });
   await project.write({ 'tools/verification/verify.py': 'print("fixture runner")\n' });
   const checked = await review(project.root, template.root, true);
@@ -148,7 +155,7 @@ test('check is read-only and a real sync refuses dirty review tooling', async ()
 });
 
 test('a sync leaves unrelated dirty work in place', async () => {
-  await using template = await source();
+  const template = shared;
   await using project = await gitRepo({ 'package.json': '{}', 'app.ts': 'committed\n' });
   await project.write({ 'app.ts': 'active work\n', 'notes.txt': 'untracked work\n' });
   const result = await review(project.root, template.root);
@@ -158,7 +165,7 @@ test('a sync leaves unrelated dirty work in place', async () => {
 });
 
 test('symlinked target directories cannot redirect writes outside the project', async () => {
-  await using template = await source();
+  const template = shared;
   await using project = await gitRepo({ 'package.json': '{}' });
   await mkdir(path.join(project.parent, 'foreign'));
   await symlink(path.join(project.parent, 'foreign'), path.join(project.root, '.clutch'));
@@ -167,7 +174,7 @@ test('symlinked target directories cannot redirect writes outside the project', 
 });
 
 test('a partially copied generation converges and custom retired skills remain untouched', async () => {
-  await using template = await source();
+  const template = shared;
   await using project = await gitRepo({
     'package.json': '{}',
     '.agents/skills/deliver/SKILL.md': 'new shared delivery\n',
@@ -190,7 +197,7 @@ test('an overbroad source list cannot distribute the template-specific verify', 
 });
 
 test('a sync removes the old .review/tooling.json once the lineage holds its record', async () => {
-  await using template = await source();
+  const template = shared;
   await using project = await gitRepo({
     'package.json': '{}',
     '.review/tooling.json': JSON.stringify({ schemaVersion: 1, templateCommit: '', files: {} }),

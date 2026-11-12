@@ -90,7 +90,11 @@ export function parseIssue(
   }
   const errors: Array<IssueError> = [];
   for (const field of Object.keys(data)) {
-    if (field === 'hand_test') {
+    if (field === 'goal') {
+      if (typeof data[field] !== 'string' || !data[field].trim()) {
+        errors.push({ file, field, message: 'Expected a user goal from project intent.' });
+      }
+    } else if (field === 'hand_test') {
       if (data[field] !== 'yes' && data[field] !== 'no') {
         errors.push({ file, field, message: `Expected yes or no. Got ${show(data[field])}.` });
       }

@@ -20,6 +20,10 @@ const journeyKit = /^(?:packages\/journeys\/testing|tools\/journeys)\//u;
 
 const journeyFile = /^features\/[^/]+\/journeys\/.+\.(?:pw\.ts|maestro\.yaml)$/u;
 
+/** A file that users reach: a feature's screen, or a route of an app. */
+const userFacing =
+  /^(?:features\/[^/]+\/screens\/(?!\.gitkeep$).+|apps\/[^/]+\/app\/(?!.*_layout).+\.tsx?)$/u;
+
 type Shape = { outcomes: Map<string, string>; assertions: number };
 
 function webShape(body: string): Shape {
@@ -136,7 +140,12 @@ export async function weakerJourneys(run: Run, defaultBranch: string, sha: strin
     if (journeyKit.test(before) || journeyKit.test(after)) {
       reasons.push(`${after}: the PR changes the journey kit that proves every journey.`);
     }
-    if (status === 'D' && journeyFile.test(before)) {
+    if (status === 'D' && userFacing.test(before)) {
+      // The file routing of an app makes each file under `app/` a route, so a
+      // deleted file there is a deleted route, whatever it holds.
+      const what = before.startsWith('features/') ? 'screen' : "file of the app's routes";
+      reasons.push(`${before}: the PR removes this ${what}, with no rename.`);
+    } else if (status === 'D' && journeyFile.test(before)) {
       reasons.push(`${before}: the PR deletes this journey.`);
     } else if (status !== 'A' && status !== 'D' && journeyFile.test(before)) {
       reasons.push(...weakerJourney(after, await show(base, before), await show(sha, after)));

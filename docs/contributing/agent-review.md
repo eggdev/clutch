@@ -35,7 +35,7 @@ heads' comments fails the job, so a re-run lists them again.
 Model findings are advisory. The job reports each finding, and no finding holds
 the merge. The job warns when the agent returns no result. The session
 still answers each finding. `tools/github/weaker-journeys.ts` holds a PR that
-weakens a journey or a budget, by comparing the two copies. See
+weakens a journey or a budget, or removes a screen or route, by comparing the two copies. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
 
 The agent runs on the cheapest Claude model, `claude-haiku-5-5`. To choose

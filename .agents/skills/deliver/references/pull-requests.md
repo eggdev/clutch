@@ -85,8 +85,8 @@ Two kinds of PR wait for the owner without a GitHub approval rule:
 - A rule with `lines`, such as a workflow's `permissions:` or the `automerge`
   section of `clutch.yaml`. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
-- A PR that weakens a journey or a budget. Auto-merge holds it, by the
-  comparison in `tools/github/weaker-journeys.ts`.
+- A PR that weakens a journey or a budget, or removes a screen or a route.
+  Auto-merge holds it, by the comparison in `tools/github/weaker-journeys.ts`.
 
 Do not merge either kind with `pr merge` until the owner says so. A model
 finding holds neither `pr status` nor `pr merge`. The session still answers it.
@@ -339,8 +339,9 @@ At each step, the PR also needs all of these:
   from another app or token counts for nothing.
 - No required check is red on the default branch's latest commit. A red
   `main` stops every auto-merge until it is green again, except a revert PR.
-- The PR weakens no journey or budget, by the comparison in
-  `tools/github/weaker-journeys.ts`. The owner's approval of the head lifts this.
+- The PR weakens no journey or budget, and removes no screen or route, by the
+  comparison in `tools/github/weaker-journeys.ts`. The owner's approval of the
+  head lifts this.
 - No native journey job failed or is running on its head.
 
 The workflow runs only from the default branch, with the default branch's
