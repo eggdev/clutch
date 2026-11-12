@@ -64,8 +64,8 @@ credentials and the merge gate. A change to a sensitive path merges when:
 
 1. each journey that its paths name passes on the PR head, on each platform
    that the change reaches
-2. the PR weakens no journey or budget, as `tools/github/weaker-journeys.ts`
-   compares them
+2. the PR weakens no journey or budget, and removes no screen or route, as
+   `tools/github/weaker-journeys.ts` compares them
 
 A change reaches web when it touches the web app or anything it imports. It
 reaches native when it touches a native app, a shared runtime package or a
@@ -75,7 +75,8 @@ The judge reads its rules from the default branch. A PR that changes the journey
 kit holds for the owner, so a PR cannot weaken what proves it. When a PR changes a journey, its own copy must pass,
 and a check compares the named outcomes of the two copies. A renamed button
 or a moved field passes that check. A removed or changed outcome, or a looser
-budget, entry or platform, is a weaker journey, and it goes to the owner. So a PR cannot weaken the proof or the gate
+budget, entry or platform, is a weaker journey, and it goes to the owner. A
+PR that removes a screen or a route goes to the owner too. So a PR cannot weaken the proof or the gate
 that judges it. A path stays held for the owner until its journeys exist. The required
 `journeys` check proves them on each PR.
 

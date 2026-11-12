@@ -49,7 +49,9 @@ and a recurring failure into a check or tool. Keep investigations in the task.
   filling in the implementation. Use installed `codebase-design` guidance.
   Check the interface's invariants, failure behavior and ownership.
 - **New visible feature or material UI change:** build your pick, and state
-  `hand_test:` in the issue. Use the
+  `hand_test:` in the issue. After kickoff, a new feature folder also needs a
+  `goal:` in the issue that names a user goal of
+  [project intent](../../../../docs/contributing/project-intent.md). Use the
   [design-proposal](../../design-proposal/SKILL.md) skill only when the owner asks
   for options.
 - **Unsettled visible interaction:** use installed `emil-prototype` guidance.

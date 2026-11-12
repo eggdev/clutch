@@ -124,8 +124,8 @@ test('a removed screen or route holds, and a renamed one does not', async () => 
     ],
   ]);
   expect(await weakerJourneys(gh.run, 'main', 'h3ad')).toEqual([
-    'features/a/screens/x.tsx: the PR removes this screen or route, with no rename.',
-    'apps/web/app/pay.tsx: the PR removes this screen or route, with no rename.',
+    'features/a/screens/x.tsx: the PR removes this screen, with no rename.',
+    "apps/web/app/pay.tsx: the PR removes this file of the app's routes, with no rename.",
   ]);
 });
 

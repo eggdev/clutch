@@ -141,7 +141,10 @@ export async function weakerJourneys(run: Run, defaultBranch: string, sha: strin
       reasons.push(`${after}: the PR changes the journey kit that proves every journey.`);
     }
     if (status === 'D' && userFacing.test(before)) {
-      reasons.push(`${before}: the PR removes this screen or route, with no rename.`);
+      // The file routing of an app makes each file under `app/` a route, so a
+      // deleted file there is a deleted route, whatever it holds.
+      const what = before.startsWith('features/') ? 'screen' : "file of the app's routes";
+      reasons.push(`${before}: the PR removes this ${what}, with no rename.`);
     } else if (status === 'D' && journeyFile.test(before)) {
       reasons.push(`${before}: the PR deletes this journey.`);
     } else if (status !== 'A' && status !== 'D' && journeyFile.test(before)) {
