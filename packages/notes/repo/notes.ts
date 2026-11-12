@@ -1,10 +1,10 @@
-import { noteModel } from '@repo/notes/models/note';
+import { noteRecord } from '@repo/notes/contract/notes';
+import type { Note } from '@repo/notes/contract/notes';
 import { notes } from '@repo/notes/repo/schema';
 import type { NoteRow } from '@repo/notes/repo/schema';
-import type { Note } from '@repo/notes/types/note';
-import { upsertChange } from '@repo/sync/models/change';
+import { upsertChange } from '@repo/sync/contract/change';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { Effect } from 'effect';
 
 /** The public record of a row. The table shape stays inside this package. */
@@ -31,7 +31,7 @@ export function toRow(note: Note, organizationId: string): NoteRow {
 
 /** The change that tells each member of the note's space about a row. */
 export function toChange(row: NoteRow) {
-  return upsertChange(noteModel, toRecord(row), { organizationId: row.organizationId });
+  return upsertChange(noteRecord, toRecord(row), { organizationId: row.organizationId });
 }
 
 export function findNote(db: DrizzleDatabase, organizationId: string, id: string) {
@@ -40,6 +40,15 @@ export function findNote(db: DrizzleDatabase, organizationId: string, id: string
     .from(notes)
     .where(and(eq(notes.id, id), eq(notes.organizationId, organizationId)))
     .pipe(Effect.map((rows) => rows[0]));
+}
+
+/** The notes of an organization, newest first. */
+export function listNotes(db: DrizzleDatabase, organizationId: string) {
+  return db
+    .select()
+    .from(notes)
+    .where(eq(notes.organizationId, organizationId))
+    .orderBy(desc(notes.createdAt));
 }
 
 export function insertNote(db: DrizzleDatabase, row: NoteRow) {

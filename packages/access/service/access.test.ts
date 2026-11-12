@@ -55,8 +55,8 @@ test('no one can leave the general space, and only a member can leave a space', 
     }).pipe(Effect.provide(AccessTest())),
   );
   expect(reasons).toMatchObject([
-    { reason: 'No one can leave the general space.' },
-    { reason: 'You are not a member of this space.' },
+    { code: 'general-space', reason: 'No one can leave the general space.' },
+    { code: 'not-a-member', reason: 'You are not a member of this space.' },
   ]);
 });
 

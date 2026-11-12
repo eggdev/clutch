@@ -26,7 +26,7 @@
       "options": { "targetName": "lint" }
     }
   ],
-  "sync": { "applyChanges": true },
+  "sync": { "applyChanges": true, "globalGenerators": ["@tools/generators:packages"] },
   "targetDefaults": {
     "typecheck": { "cache": true },
     "lint": {

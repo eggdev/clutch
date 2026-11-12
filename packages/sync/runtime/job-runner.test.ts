@@ -1,43 +1,72 @@
 import { expect, test } from 'bun:test';
 
+import { defineContract } from '@repo/sync/contract/define';
+import { organizationGroup } from '@repo/sync/contract/engine-groups';
+import { job as declareJob } from '@repo/sync/contract/job';
+import { record } from '@repo/sync/contract/record';
 import { jobsNamed } from '@repo/sync/repo/jobs';
 import { syncEvents } from '@repo/sync/repo/schema';
-import { askForScheduledJobs, retryWait, runDueJobs } from '@repo/sync/runtime/job-runner.server';
+import {
+  askForScheduledJobs,
+  JobRunner,
+  retryWait,
+  runDueJobs,
+} from '@repo/sync/runtime/job-runner.server';
 import { Database } from '@repo/sync/service/database';
-import { EventLog, EventLogLive } from '@repo/sync/service/event-log';
+import { EventLog, eventLog } from '@repo/sync/service/event-log';
 import { defineJob, defineSchedule, Outbox, OutboxLive } from '@repo/sync/service/jobs';
 import { DatabaseTest } from '@repo/sync/testing/database';
 import type { Change } from '@repo/sync/types/protocol';
 import { eq } from 'drizzle-orm';
-import { Effect, Layer, Schema } from 'effect';
+import { Cause, Effect, Exit, Layer } from 'effect';
+
+/** A card of the organization, which the job writes. */
+const cardRecord = record('Card', {
+  fields: { id: 'string', title: 'string' },
+  groups: [organizationGroup.ofScope],
+});
 
 const change = (id: string): Change => ({
   model: 'Card',
   id,
   action: 'upsert',
-  data: { title: id },
+  data: { id, title: id },
   groups: ['org:org-a'],
 });
 
 let runs = 0;
-const card = defineJob({
-  name: 'test/card',
-  payload: Schema.Struct({ id: Schema.String }),
-  run: ({ id }, { commit }) =>
-    Effect.gen(function* () {
-      runs += 1;
-      yield* commit(() => Effect.succeed([change(id)]));
-    }),
+const cardDeclaration = declareJob('test/card', { payload: { id: 'string' } });
+const card = defineJob(cardDeclaration, ({ id }, { commit }) =>
+  Effect.gen(function* () {
+    runs += 1;
+    yield* commit(() => Effect.succeed([change(id)]));
+  }),
+);
+const cardContract = defineContract('test', {
+  records: [cardRecord],
+  commands: [],
+  loads: [],
+  jobs: [cardDeclaration],
 });
-const broken = defineJob({
-  name: 'test/broken',
-  payload: Schema.Struct({}),
-  run: () => Effect.fail(new Error('The vendor is down.')),
-});
+const broken = defineJob(declareJob('test/broken', { payload: {} }), () =>
+  Effect.fail(new Error('The vendor is down.')),
+);
+
+const services = Layer.mergeAll(eventLog([cardContract]), OutboxLive).pipe(
+  Layer.provideMerge(DatabaseTest()),
+);
 
 function run<A, E>(program: Effect.Effect<A, E, Database | EventLog | Outbox>) {
-  const layer = Layer.mergeAll(EventLogLive, OutboxLive).pipe(Layer.provideMerge(DatabaseTest()));
-  return Effect.runPromise(program.pipe(Effect.provide(layer)));
+  return Effect.runPromise(program.pipe(Effect.provide(services)));
+}
+
+/** Starts the job runner in a scope, then ends the scope. The exit says whether it started. */
+function startRunner(runner: Layer.Layer<never, unknown, Database | EventLog>) {
+  return Effect.runPromiseExit(Effect.scoped(Layer.build(runner)).pipe(Effect.provide(services)));
+}
+
+function causeOf(exit: Exit.Exit<unknown, unknown>) {
+  return Exit.isFailure(exit) ? Cause.pretty(exit.cause) : '';
 }
 
 test('a job exists only when the transaction that asked for it commits', async () => {
@@ -132,4 +161,22 @@ test('a schedule asks for one job each interval, and a job with no runner fails'
   expect(jobs).toHaveLength(1);
   expect(jobs[0]?.id).toStartWith('schedule:test/hourly:');
   expect(jobs[0]?.lastError).toBe('This server has no job named test/card.');
+});
+
+test('a job that a contract declares and no runner lists stops the runner at its start', async () => {
+  const exit = await startRunner(JobRunner([], [], [cardContract], '1 hour'));
+  expect(exit._tag).toBe('Failure');
+  expect(causeOf(exit)).toContain(
+    'The server app passes no job runner for: test/card. Add the jobs of each contract to the `jobs` list of the server app.',
+  );
+});
+
+test('the same runner starts when it lists the declared job', async () => {
+  const exit = await startRunner(JobRunner([card], [], [cardContract], '1 hour'));
+  expect(exit._tag).toBe('Success');
+});
+
+test('a job that no contract declares does not stop the runner', async () => {
+  const exit = await startRunner(JobRunner([card], [], [], '1 hour'));
+  expect(exit._tag).toBe('Success');
 });

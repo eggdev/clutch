@@ -8,6 +8,8 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 
+import { isServerApp } from '@tools/apps';
+
 /**
  * The one way to start the dev servers: `mise exec -- bun run dev`. Each app
  * with an Nx `dev` target runs through portless, at a stable name such as
@@ -51,7 +53,7 @@ export function devApps(root: string): Array<DevApp> {
       if (!command) {
         return [];
       }
-      const server = (manifest.nx?.tags ?? []).includes('platform:server');
+      const server = isServerApp(manifest);
       return [
         {
           folder: `apps/${entry.name}`,
@@ -257,11 +259,15 @@ async function main(root: string, check: boolean): Promise<number> {
         console.log(`reused   ${url}  (${app.folder})`);
         continue;
       }
-      // The web app proxies the sync socket to the API, and the API accepts
-      // the web app's origin.
+      // Each client app proxies the sync socket to the API, and the API accepts
+      // the origin of each client app.
+      const clients = apps
+        .filter((other) => other.health === '/')
+        .map((other) => urls.get(other.name))
+        .join(',');
       const links = pick(
-        { DEV_API_URL: urlFor('apps/api'), SYNC_ORIGINS: urlFor('apps/web') },
-        app.folder === 'apps/web' ? ['DEV_API_URL'] : ['SYNC_ORIGINS'],
+        { DEV_API_URL: urlFor('apps/api'), SYNC_ORIGINS: clients },
+        app.folder === 'apps/api' ? ['SYNC_ORIGINS'] : ['DEV_API_URL'],
       );
       const child = Bun.spawn([portless(root), 'run', '--name', app.name, ...app.command], {
         cwd: path.join(root, app.folder),

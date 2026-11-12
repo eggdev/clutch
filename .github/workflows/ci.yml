@@ -123,9 +123,10 @@ jobs:
       - name: Install the Chromium system libraries
         if: steps.browsers.outputs.cache-hit == 'true'
         run: bunx playwright install-deps chromium
-      # The page script of the journey test, in a real Chromium. Validate has no browser.
-      - name: Test the journey kit in a browser
-        run: bun test ./packages/journeys/testing/measure.browser.test.ts
+      # Each test that needs a real Chromium: the page scripts of the journey kit, and each
+      # local database of the object pool that the project has. Validate has no browser.
+      - name: Run the browser tests
+        run: git ls-files -- 'packages/*.browser.test.ts' | sed 's#^#./#' | xargs bun test
       - run: bun run journey --all
       - name: Keep the traces of a failed journey
         if: failure()
@@ -159,14 +160,16 @@ jobs:
 
   # Which platforms the change reaches, by the reach rule in
   # tools/journeys/reach.ts. Native journeys run on a PR that touches a native
-  # app, shared runtime code or a sensitive path, and on each push to main,
-  # when the repository has a native app. See
+  # app, shared runtime code or a sensitive path, and on each push to main.
+  # A platform's lane runs only when a native app declares its app ID. See
   # docs/contributing/end-to-end-testing.md#native-journeys.
   reach:
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       native: ${{ steps.reach.outputs.native }}
+      ios: ${{ steps.reach.outputs.ios }}
+      android: ${{ steps.reach.outputs.android }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -187,14 +190,14 @@ jobs:
           fi
 
   # Each native journey on an iPhone 16 simulator. CI boots the device on its
-  # own runner. The ci device host finds it and runs Maestro on it.
+  # own runner. The local device host finds it, and installs the build on it.
   native-ios:
     needs: reach
-    if: needs.reach.outputs.native == 'true'
+    if: needs.reach.outputs.ios == 'true'
     runs-on: macos-15
     timeout-minutes: 25
     env:
-      DEVICE_HOST: ci
+      DEVICE_HOST: local
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -205,13 +208,20 @@ jobs:
         run: mise install maestro@cli-2.12.1
       - name: Boot the iPhone 16 simulator
         run: xcrun simctl boot "iPhone 16" && xcrun simctl bootstatus "iPhone 16"
-      # Each project fills this step at kickoff, so it builds the app for the
-      # simulator and installs it. Until then a project with a native app fails
-      # here, so no native lane passes with nothing tested.
-      - name: Build the app and install it on the simulator
+      - name: Start the dev servers
         run: |
-          echo "::error title=No native build::Fill the build step of the native-ios job in .github/workflows/ci.yml. See docs/contributing/end-to-end-testing.md#native-journeys."
-          exit 1
+          mise exec -- bun run dev &
+          end=$((SECONDS + 120))
+          until mise exec -- bun run dev --check; do
+            if [ "$SECONDS" -ge "$end" ]; then
+              echo "::error title=Dev servers did not start::bun run dev --check failed for 120 s. Read the dev server output above."
+              exit 1
+            fi
+            sleep 2
+          done
+      # A debug build loads its JavaScript from the dev server, so the servers start first.
+      - name: Build the app and install it on the simulator
+        run: mise exec -- bun run native:build --platform ios --fresh
       - name: Run the native journeys
         run: mise exec maestro@cli-2.12.1 -- bun run journey --native ios
       - name: Keep the measures
@@ -227,7 +237,7 @@ jobs:
   # emulator fast enough to run inside the time limit.
   native-android:
     needs: reach
-    if: needs.reach.outputs.native == 'true'
+    if: needs.reach.outputs.android == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 25
     env:

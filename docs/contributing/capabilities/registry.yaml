@@ -553,9 +553,13 @@ capabilities:
     effort: S
     doc: docs/contributing/capabilities/a11y-checks.md
     detect:
-      - grep:
-          files: features/*/journeys/*.pw.ts
-          pattern: '@repo/journeys/testing/a11y'
+      - any:
+          - grep:
+              files: features/*/journeys/*.pw.ts
+              pattern: '@repo/journeys/testing/a11y'
+          - grep:
+              files: features/*/journeys/*.journey.ts
+              pattern: '\baccessible\('
   - id: flake_hunter
     name: Flake hunters / test audit loops
     category: Scale loops

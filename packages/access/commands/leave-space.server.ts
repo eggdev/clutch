@@ -1,23 +1,18 @@
-import { leaveSpace } from '@repo/access/commands/leave-space';
-import { generalSpaceId } from '@repo/access/models/space';
+import { generalSpaceId, leaveSpace } from '@repo/access/contract/access';
 import { deleteMembership, findMembership, leftChange } from '@repo/access/repo/membership';
-import { LeaveSpaceInput } from '@repo/access/types/leave-space';
-import { defineServerChange } from '@repo/sync/commands/define.server';
-import { CommandRejected } from '@repo/sync/types/command-rejected';
+import { serverChange } from '@repo/sync/commands/server-change.server';
 import { Effect } from 'effect';
 
 /** Ends the actor's membership of a space. The general space cannot be left. */
-export const leaveSpaceServer = defineServerChange(leaveSpace, {
-  input: LeaveSpaceInput,
-  access: 'organization',
-  run: (input, { db, actor }) =>
+export const leaveSpaceServer = serverChange(leaveSpace, {
+  run: (input, { db, actor, refuse }) =>
     Effect.gen(function* () {
       if (input.spaceId === generalSpaceId) {
-        return yield* new CommandRejected({ reason: 'No one can leave the general space.' });
+        return yield* refuse('general-space', 'No one can leave the general space.');
       }
       const member = yield* findMembership(db, actor.organizationId, input.spaceId, actor.userId);
       if (!member) {
-        return yield* new CommandRejected({ reason: 'You are not a member of this space.' });
+        return yield* refuse('not-a-member', 'You are not a member of this space.');
       }
       yield* deleteMembership(db, member);
       return [leftChange(member)];

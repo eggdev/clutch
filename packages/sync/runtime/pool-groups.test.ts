@@ -1,15 +1,16 @@
 import { expect, test } from 'bun:test';
 
-import { defineModel } from '@repo/sync/models/define';
+import { defineGroup } from '@repo/sync/contract/groups';
+import { record } from '@repo/sync/contract/record';
 import { createPool } from '@repo/sync/runtime/pool';
 import { memoryLocalDatabase } from '@repo/sync/testing/local-database';
 import type { Change } from '@repo/sync/types/protocol';
 
-type Card = { readonly id: string; readonly title: string; readonly space: string };
-const card = defineModel<Card>('Card', {
+const card = record('Card', {
   fields: { id: 'string', title: 'string', space: 'string' },
-  groupsOf: (row) => [`space:${row.space}`],
+  groups: [defineGroup('space').by('space')],
 });
+const declared = { records: [card], commands: [] };
 
 const put = (id: string, groups: ReadonlyArray<string>, title = id): Change => ({
   model: 'Card',
@@ -20,7 +21,7 @@ const put = (id: string, groups: ReadonlyArray<string>, title = id): Change => (
 });
 
 function loadedPool() {
-  const pool = createPool([]);
+  const pool = createPool([], declared);
   pool.applyGroups(['org:a', 'space:x', 'space:y'], []);
   pool.applyDeltas([
     {
@@ -56,7 +57,7 @@ test('the purge reaches the local database through the next save', async () => {
 });
 
 test('a backfill adds the past records of a new group, and never undoes a later change', () => {
-  const pool = createPool([]);
+  const pool = createPool([], declared);
   pool.applyGroups(['org:a', 'space:x'], []);
   pool.applyDeltas([
     { syncId: 5, transactionId: null, changes: [put('both', ['space:x', 'space:y'], 'New')] },
@@ -74,7 +75,7 @@ test('a backfill adds the past records of a new group, and never undoes a later 
 });
 
 test('a gate waits for a group until the engine loads it, and a loaded group resolves at once', async () => {
-  const pool = createPool([]);
+  const pool = createPool([], declared);
   pool.applyGroups(['org:a'], []);
   const asked: Array<string> = [];
   pool.onLoadRequest((group) => asked.push(group));
@@ -97,11 +98,25 @@ test('a gate waits for a group until the engine loads it, and a loaded group res
   await waiting;
   expect(pool.get(card, 'a')).toBeDefined();
   expect(pool.requestedGroups()).toEqual([]);
-  await pool.loadGroup('space:x');
+  expect(await pool.loadGroup('space:x')).toBe(true);
 });
 
-test('a state saved before records had groups loads as an empty pool', () => {
-  const pool = createPool([]);
+test('a refused group ends each gate that waits for it, and the engine does not ask again', async () => {
+  const lines: Array<string> = [];
+  const pool = createPool([], declared, { report: (line) => lines.push(line) });
+  const gates = [pool.loadGroup('space:x'), pool.loadGroup('space:x')];
+  pool.refuseGroup('space:x');
+  expect(await Promise.all(gates)).toEqual([false, false]);
+  expect(pool.requestedGroups()).toEqual([]);
+  expect(lines).toHaveLength(1);
+});
+
+test('a saved copy that names no group for its records is dropped, and the pool says so', () => {
+  const lines: Array<string> = [];
+  const pool = createPool([], declared, { report: (line) => lines.push(line) });
   pool.load({ lastSyncId: 9, tables: { Card: [] }, pending: [] } as never);
   expect(pool.lastSyncId()).toBe(0);
+  expect(lines).toEqual([
+    'The saved copy names no group for its records, so this build cannot read it. Its records were dropped, and the pool loads again from the server.',
+  ]);
 });

@@ -1,0 +1,6 @@
+import { <%= className %>Screen } from '@features/<%= fileName %>/screens/<%= fileName %>-screen';
+
+/** The <%= title %> screen. Only its gate, `open<%= className %>`, navigates here. */
+export default function <%= className %>Route() {
+  return <<%= className %>Screen />;
+}

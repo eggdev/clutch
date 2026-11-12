@@ -1,8 +1,16 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { DeviceHostError, deviceHost, lockFile, withLock } from '@tools/native/device-host';
+import { nativeApps } from '@tools/apps';
+import {
+  DeviceHostError,
+  builtApp,
+  deviceHost,
+  lockFile,
+  withDevice,
+  withLock,
+} from '@tools/native/device-host';
 import type { DeviceHost, Platform } from '@tools/native/device-host';
 
 /**
@@ -29,31 +37,31 @@ type Recorded = Partial<Record<Platform, Fingerprint>>;
 
 const platforms: ReadonlyArray<Platform> = ['ios', 'android'];
 
-/** An app under `apps/` is native when it depends on `expo` or `react-native`. */
-export function nativeApps(root: string): Array<string> {
-  const apps = path.join(root, 'apps');
-  if (!existsSync(apps)) {
-    return [];
+/**
+ * The app ID that one native app declares in its app.json: `expo.ios.bundleIdentifier`
+ * for iOS, or `expo.android.package` for Android. It is undefined when the app
+ * declares none. The reach rule and the native journeys both read it here.
+ */
+export function appIdOfApp(root: string, app: string, platform: Platform): string | undefined {
+  const config = path.join(root, 'apps', app, 'app.json');
+  if (!existsSync(config)) {
+    return undefined;
   }
-  return readdirSync(apps)
-    .filter((name) => {
-      const manifest = path.join(apps, name, 'package.json');
-      if (!existsSync(manifest)) {
-        return false;
-      }
-      const { dependencies = {}, devDependencies = {} } = JSON.parse(
-        readFileSync(manifest, 'utf-8'),
-      );
-      return ['expo', 'react-native'].some(
-        (dependency) => dependency in { ...dependencies, ...devDependencies },
-      );
-    })
-    .toSorted();
+  const { expo } = JSON.parse(readFileSync(config, 'utf-8')) as {
+    expo?: { ios?: { bundleIdentifier?: string }; android?: { package?: string } };
+  };
+  const id = platform === 'ios' ? expo?.ios?.bundleIdentifier : expo?.android?.package;
+  return id || undefined;
+}
+
+/** Whether at least one native app declares an app ID for the platform. */
+export function declaresAppId(root: string, platform: Platform): boolean {
+  return nativeApps(root).some((app) => Boolean(appIdOfApp(root, app, platform)));
 }
 
 /**
- * Loads `@expo/fingerprint` from the native app. The template has no native
- * app, so the package is not a root dependency. Kickoff adds it to the app.
+ * Loads `@expo/fingerprint` from the native app. The template's app lists it in
+ * its devDependencies, so the lookup starts from that app's folder.
  */
 export async function expoFingerprint(appRoot: string): Promise<FingerprintTool> {
   let entry: string;
@@ -93,18 +101,31 @@ export type BuildOptions = {
   readonly tool?: (appRoot: string) => Promise<FingerprintTool>;
   readonly lock?: string;
   readonly log?: (line: string) => void;
+  readonly env?: NodeJS.ProcessEnv;
 };
 
-const usage = 'Usage: mise exec -- bun run native:build [app] --platform <ios|android> [--record]';
+const usage =
+  'Usage: mise exec -- bun run native:build [app] --platform <ios|android> [--record | --install | --fresh]';
 
-type Target = { app: string; platforms: Array<Platform>; record: boolean };
+type Target = {
+  app: string;
+  platforms: Array<Platform>;
+  record: boolean;
+  install: boolean;
+  fresh: boolean;
+};
 
 /** The app and platforms that the arguments name, or a refusal to log. */
 function targetOf(root: string, args: Array<string>): Target | string {
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,
-    options: { platform: { type: 'string' }, record: { type: 'boolean', default: false } },
+    options: {
+      platform: { type: 'string' },
+      record: { type: 'boolean', default: false },
+      install: { type: 'boolean', default: false },
+      fresh: { type: 'boolean', default: false },
+    },
   });
   const apps = nativeApps(root);
   const app = positionals[0] ?? (apps.length === 1 ? apps[0] : undefined);
@@ -115,7 +136,35 @@ function targetOf(root: string, args: Array<string>): Target | string {
   if (chosen.length === 0 || (!values.record && chosen.length !== 1)) {
     return `Pass --platform ios or --platform android. ${usage}`;
   }
-  return { app, platforms: chosen, record: values.record };
+  return {
+    app,
+    platforms: chosen,
+    record: values.record,
+    install: values.install,
+    fresh: values.fresh,
+  };
+}
+
+/**
+ * `--fresh` builds without the fingerprint comparison and writes no record. A
+ * CI runner has no earlier build, so the comparison has nothing to compare with.
+ */
+async function buildFresh(
+  target: Target,
+  appRoot: string,
+  builder: DeviceHost,
+  lock: string,
+  log: (line: string) => void,
+): Promise<number> {
+  const [platform] = target.platforms;
+  const result = await withLock(lock, () => builder.build(appRoot, platform));
+  log(result.output);
+  if (result.exitCode !== 0) {
+    log(`The ${platform} build failed.`);
+    return result.exitCode;
+  }
+  log(`Built the ${platform} app. No fingerprint record is written.`);
+  return 0;
 }
 
 type Run = {
@@ -174,6 +223,33 @@ async function buildChanged(run: Run, host: () => DeviceHost, lock: string): Pro
 }
 
 /**
+ * `--install` puts the last build on the booted device, with no build. A build
+ * needs no device, so it can finish before the owner boots one.
+ */
+async function installLast(run: Run, host: () => DeviceHost, lock: string): Promise<number> {
+  const [platform] = run.target.platforms;
+  const app = builtApp(run.appRoot, platform);
+  if (!app) {
+    run.log(
+      `${run.target.app} has no ${platform} build to install. Build it: \`mise exec -- bun run native:build ${run.target.app} --platform ${platform}\`.`,
+    );
+    return 1;
+  }
+  const installer = host();
+  const name = await withDevice(
+    installer,
+    platform,
+    async (device) => {
+      await installer.install(device, app);
+      return device.name;
+    },
+    lock,
+  );
+  run.log(`Installed the ${platform} build of ${run.target.app} on ${name}.`);
+  return 0;
+}
+
+/**
  * Runs `native:build` and returns the exit code. A repository with no native
  * app exits 0: there is nothing to build, so a CI step that calls it passes.
  */
@@ -188,9 +264,20 @@ export async function nativeBuild(options: BuildOptions): Promise<number> {
     log(target);
     return 1;
   }
+  const env = options.env ?? process.env;
+  if (target.fresh && env.CI !== 'true') {
+    log(
+      `--fresh is for a CI runner, where CI is \`true\`. On this machine, run \`mise exec -- bun run native:build --platform <platform>\`.`,
+    );
+    return 1;
+  }
   const appRoot = path.join(options.root, 'apps', target.app);
   const recordFile = path.join(appRoot, recordName);
   try {
+    if (target.fresh) {
+      const builder = options.host ?? deviceHost(env);
+      return await buildFresh(target, appRoot, builder, options.lock ?? lockFile(), log);
+    }
     const run: Run = {
       target,
       appRoot,
@@ -200,9 +287,14 @@ export async function nativeBuild(options: BuildOptions): Promise<number> {
       save: (next) => writeFileSync(recordFile, `${JSON.stringify(next, null, 2)}\n`),
       log,
     };
-    return target.record
-      ? await record(run)
-      : await buildChanged(run, () => options.host ?? deviceHost(), options.lock ?? lockFile());
+    const host = () => options.host ?? deviceHost(env);
+    const lock = options.lock ?? lockFile();
+    if (target.record) {
+      return await record(run);
+    }
+    return target.install
+      ? await installLast(run, host, lock)
+      : await buildChanged(run, host, lock);
   } catch (error) {
     if (!(error instanceof DeviceHostError)) {
       throw error;

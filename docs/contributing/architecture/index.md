@@ -59,18 +59,18 @@ system, or the `ui/` of the package that owns the records.
 A package has no `src/` folder. It has only the sections that it needs. Each
 section is a folder, never a single file.
 
-| Section     | Access     | Holds                                                        |
-| ----------- | ---------- | ------------------------------------------------------------ |
-| `types/`    | Public     | Effect Schemas for records, IDs, command inputs and errors   |
-| `config/`   | Private    | Environment keys, read through Effect `Config`               |
-| `models/`   | Public     | Models: the kinds of record that the object pool holds       |
-| `commands/` | Public     | Commands, as `<name>.ts` and `<name>.server.ts` files        |
-| `repo/`     | Private    | Drizzle tables, queries and `migrations/`                    |
-| `service/`  | Public     | Effect services: invariants, access checks and the event log |
-| `jobs/`     | Public     | Jobs that run after a commit, for slow or outside work       |
-| `runtime/`  | Apps only  | Live Layers, registrations and client boot code              |
-| `ui/`       | Public     | Hooks and components                                         |
-| `testing/`  | Tests only | Fakes and Test Layers                                        |
+| Section     | Access     | Holds                                                                      |
+| ----------- | ---------- | -------------------------------------------------------------------------- |
+| `contract/` | Public     | The contract of the package, and plain values that client and server share |
+| `types/`    | Public     | Effect Schemas, such as tagged errors and service results                  |
+| `config/`   | Private    | Environment keys, read through Effect `Config`                             |
+| `commands/` | Public     | Local changes (`<name>.ts`) and server changes (`<name>.server.ts`)        |
+| `repo/`     | Private    | Drizzle tables, queries and `migrations/`                                  |
+| `service/`  | Public     | Effect services: invariants, access checks and the event log               |
+| `jobs/`     | Public     | Jobs that run after a commit, for slow or outside work                     |
+| `runtime/`  | Apps only  | Live Layers, registrations and client boot code                            |
+| `ui/`       | Public     | Hooks and components                                                       |
+| `testing/`  | Tests only | Fakes and Test Layers                                                      |
 
 - **Public** sections are the interface of the package. Any code may import
   them, subject to the server rule below.
@@ -95,13 +95,13 @@ feature folder with other parts. The
 
 ## Source of truth in code
 
-| File                       | Starts                                                              |
-| -------------------------- | ------------------------------------------------------------------- |
-| `apps/web/src/main.tsx`    | The web composition root: local database, object pool, render, sync |
-| `apps/web/src/router.ts`   | The TanStack Router route tree                                      |
-| `apps/web/src/commands.ts` | The client half of each command that the web app runs               |
-| `apps/api/src/main.ts`     | The API composition root: database driver, actor, HTTP server       |
-| `apps/api/src/packages.ts` | The server change and migrations of each package                    |
+| File                           | Starts                                                          |
+| ------------------------------ | --------------------------------------------------------------- |
+| `apps/app/lib/boot.ts`         | The composition root: local database, object pool, render, sync |
+| `apps/app/app/_layout+ssg.tsx` | The root layout and the web document                            |
+| `apps/app/lib/packages.ts`     | The client half of each package, written by `nx sync`           |
+| `apps/api/src/main.ts`         | The API composition root: database driver, actor, HTTP server   |
+| `apps/api/src/packages.ts`     | The server half of each package, written by `nx sync`           |
 
 <!-- kickoff: One line for each other entry point, router and composition root: the file and what it starts. -->
 
@@ -111,6 +111,8 @@ feature folder with other parts. The
   event log
 - [Client](./client.md): the React core, the router, the effect-hook ban and
   the stack profiles
+- [Contract](./contract.md): the records, commands and load functions of each
+  package, the manifest, the digest and the check of the snapshot
 - [Local-first sync](./local-first-sync.md): the object pool, the transaction
   queue, events, deltas and the commands that wait for the server
 - [Request context](./request-context.md): how a request becomes a tenant and

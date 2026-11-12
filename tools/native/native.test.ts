@@ -32,6 +32,7 @@ function fakeHost(exitCode = 0, booted = true) {
     bootedDevice: (platform: Platform) =>
       Promise.resolve(booted ? { platform, id: 'booted-1', name: 'iPhone' } : null),
     install: () => Promise.resolve(),
+    checkFlow: () => Promise.resolve({ exitCode: 0, output: 'OK' }),
     runFlow: () => Promise.resolve({ exitCode: 0, output: 'flow passed' }),
     build: (appRoot, platform) => {
       builds.push(`${path.basename(appRoot)} ${platform}`);
@@ -111,6 +112,55 @@ test('no recorded fingerprint asks for the first record, and --record writes it 
   expect(first.exitCode).toBe(0);
   expect([first.record.ios.hash, first.record.android.hash]).toEqual(['a', 'a']);
   expect(builds).toEqual([]);
+});
+
+test('--install puts the last build on the booted device with no build, and refuses when there is none', async () => {
+  const product =
+    'apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/Mobile.app/Info.plist';
+  const { builds, host } = fakeHost();
+  const options = { host, tool: tool(print('a')) };
+  const installed = await runBuild(
+    { ...mobile, [product]: '' },
+    ['--platform', 'ios', '--install'],
+    options,
+  );
+  expect(installed.exitCode).toBe(0);
+  expect(installed.log).toContain('Installed the ios build of mobile on iPhone.');
+  const none = await runBuild(mobile, ['--platform', 'ios', '--install'], options);
+  expect(none.exitCode).toBe(1);
+  expect(none.log).toContain('has no ios build to install');
+  const unbooted = await runBuild(
+    { ...mobile, [product]: '' },
+    ['--platform', 'ios', '--install'],
+    {
+      host: fakeHost(0, false).host,
+      tool: tool(print('a')),
+    },
+  );
+  expect(unbooted.exitCode).toBe(1);
+  expect(unbooted.log).toContain('Ask the owner to boot one');
+  expect(builds).toEqual([]);
+});
+
+test('--fresh builds on a CI runner with no fingerprint record, and is refused anywhere else', async () => {
+  const { builds, host } = fakeHost();
+  const fresh = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
+    host,
+    env: { CI: 'true' },
+    tool: tool(print('a')),
+  });
+  expect(fresh.exitCode).toBe(0);
+  expect(builds).toEqual(['mobile ios']);
+  expect(fresh.record).toBeNull();
+  const refused = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
+    host,
+    env: {},
+    tool: tool(print('a')),
+  });
+  expect(refused.exitCode).toBe(1);
+  expect(refused.log).toContain('for a CI runner');
+  expect(refused.log).toContain('mise exec -- bun run native:build --platform <platform>');
+  expect(builds).toEqual(['mobile ios']);
 });
 
 test('the none host refuses a build, and names the kickoff setup', async () => {

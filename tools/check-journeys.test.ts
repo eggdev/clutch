@@ -6,11 +6,24 @@ import { checkJourneys } from '@tools/check-journeys';
 import { coreJourneys, verificationFile } from '@tools/journeys/journeys';
 import { inRepo } from '@tools/testing/in-repo';
 
-const app = (features: Array<string>, tags: Array<string> = []) =>
+/** An app that depends on React, with the features it ships, and the extra dependencies and scripts it names. */
+const app = (
+  features: Array<string>,
+  options: { dependencies?: Record<string, string>; scripts?: Record<string, string> } = {},
+) =>
   JSON.stringify({
-    dependencies: Object.fromEntries(features.map((name) => [`@features/${name}`, 'workspace:*'])),
-    nx: { tags },
+    dependencies: {
+      react: '19.2.3',
+      ...Object.fromEntries(features.map((name) => [`@features/${name}`, 'workspace:*'])),
+      ...options.dependencies,
+    },
+    scripts: options.scripts ?? {},
   });
+
+/** A native app that ships billing: it depends on React Native, and it has no web build. */
+const nativeApp = JSON.stringify({
+  dependencies: { 'react-native': '0.86.3', '@features/billing': 'workspace:*' },
+});
 
 const header = (id: string) =>
   `/**\n * ${id}: A member pays an invoice.\n * Contract: docs/a.md\n * Entry: the home page\n * Isolation and cleanup: a unique invoice\n */\n`;
@@ -27,8 +40,8 @@ test('a shipped feature with a registered journey for each platform passes', asy
   expect(
     await inRepo(
       {
-        'apps/web/package.json': app(['billing']),
-        'apps/mobile/package.json': app(['billing'], ['platform:native']),
+        'apps/app/package.json': app(['billing']),
+        'apps/mobile/package.json': nativeApp,
         'features/billing/screens/billing-screen.tsx': '',
         'features/billing/journeys/pay-invoice.pw.ts': `${header('pay-invoice')}${kit}`,
         'features/billing/journeys/pay-on-phone.maestro.yaml':
@@ -51,7 +64,7 @@ test('a shipped feature with no journey, a bare journey, and an unregistered or 
   expect(
     await inRepo(
       {
-        'apps/web/package.json': app(['billing', 'notes']),
+        'apps/app/package.json': app(['billing', 'notes']),
         'features/billing/screens/billing-screen.tsx': '',
         'features/notes/screens/notes-screen.tsx': '',
         'features/notes/journeys/notes-sync.pw.ts': "import { test } from '@playwright/test';\n",
@@ -68,6 +81,27 @@ test('a shipped feature with no journey, a bare journey, and an unregistered or 
     'features/notes/journeys/notes-sync.pw.ts: the header has no `Entry:` line. Add it.',
     'features/notes/journeys/notes-sync.pw.ts: the header has no `Isolation and cleanup:` line. Add it.',
     'features/notes/journeys/notes-sync.pw.ts: the header starts with `notes-sync: <user goal>`. Write the goal on the first header line.',
+  ]);
+});
+
+test('a universal app ships its features on native and on web, so each needs both journeys', async () => {
+  expect(
+    await inRepo(
+      {
+        'apps/app/package.json': app(['billing'], {
+          dependencies: { expo: '~57.0.30' },
+          scripts: { 'build:web': 'one build' },
+        }),
+        'features/billing/screens/billing-screen.tsx': '',
+        'features/billing/journeys/pay-invoice.pw.ts': `${header('pay-invoice')}${kit}`,
+        [verificationFile]: JSON.stringify({
+          flows: { 'pay-invoice': flow('pay-invoice') },
+        }),
+      },
+      checkJourneys,
+    ),
+  ).toEqual([
+    'features/billing: the native app ships it, but it has no native journey. Add features/billing/journeys/<id>.maestro.yaml with the spec header from .agents/skills/setup-verification/references/journey-specification.md.',
   ]);
 });
 
@@ -125,4 +159,36 @@ test('the core journey list matches the headings of the catalog', () => {
   );
   const names = [...catalog.matchAll(/^## .+ \(`([a-z-]+)`\)$/gmu)].map((match) => match[1]);
   expect(names).toEqual([...coreJourneys]);
+});
+
+/** A data journey: one file that imports `journey`, with its header and an optional extra header line. */
+const dataJourney = (id: string, extra = '') =>
+  `/**\n * ${id}: A member pays an invoice.\n * Contract: docs/a.md\n * Entry: the home page\n * Isolation and cleanup: a unique invoice\n${extra} */\nimport { journey } from '@repo/journeys/testing/journey';\nexport const pay = journey('pays', []);\n`;
+
+test('a data journey is one file with a web flow, and a Core journey in data form fails', async () => {
+  expect(
+    await inRepo(
+      {
+        'apps/app/package.json': app(['billing'], {
+          dependencies: { expo: '~57.0.30' },
+          scripts: { 'build:web': 'one build' },
+        }),
+        'features/billing/screens/billing-screen.tsx': '',
+        'features/billing/journeys/pay-invoice.journey.ts': dataJourney('pay-invoice'),
+        'features/billing/journeys/pay-core.journey.ts': dataJourney(
+          'pay-core',
+          ' * Core: sign-in\n',
+        ),
+        [verificationFile]: JSON.stringify({
+          flows: {
+            'pay-invoice': flow('pay-invoice'),
+            'pay-core': flow('pay-core'),
+          },
+        }),
+      },
+      checkJourneys,
+    ),
+  ).toEqual([
+    'features/billing/journeys/pay-core.journey.ts: a `Core:` journey stays in the script form, since the core journey rules read the Playwright source. Write it as features/<feature>/journeys/<id>.pw.ts.',
+  ]);
 });

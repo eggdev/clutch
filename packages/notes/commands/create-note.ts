@@ -1,18 +1,13 @@
-import { noteModel } from '@repo/notes/models/note';
-import type { CreateNoteInput } from '@repo/notes/types/note';
-import { defineCommand } from '@repo/sync/commands/define';
+import { createNote, noteRecord } from '@repo/notes/contract/notes';
+import { localChange } from '@repo/sync/contract/command';
 
-/** Creates a note in a space. The note shows at once; the server confirms it later. */
-export const createNote = defineCommand<CreateNoteInput>({
-  name: 'notes/create',
-  waits: 'local',
-  input: { id: 'string', spaceId: 'string', title: 'string', at: 'string' },
-  apply: (draft, input) =>
-    draft.put(noteModel, {
-      id: input.id,
-      spaceId: input.spaceId,
-      title: input.title,
-      createdAt: input.at,
-      updatedAt: input.at,
-    }),
-});
+/** The local change of `notes/create`: the note shows in its space at once. */
+export const createNoteLocal = localChange(createNote, (draft, input) =>
+  draft.put(noteRecord, {
+    id: input.id,
+    spaceId: input.spaceId,
+    title: input.title,
+    createdAt: input.at,
+    updatedAt: input.at,
+  }),
+);

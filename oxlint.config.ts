@@ -9,12 +9,14 @@ import react from 'ultracite/oxlint/react';
  * docs/contributing/import-boundaries.md#client-code.
  */
 const client = [
+  '**/apps/app/**/*.{ts,tsx}',
+  // This config ships to each project, and a project may name its client app apps/web.
   '**/apps/web/**/*.{ts,tsx}',
   '**/features/**/*.{ts,tsx}',
   '**/packages/*/ui/**/*.{ts,tsx}',
 ];
-/** Client code that is plain TypeScript: models and the client half of commands. */
-const portable = ['**/packages/*/models/**/*.ts', '**/packages/*/commands/**/*.ts'];
+/** Client code that is plain TypeScript: the contract and the local change of each command. */
+const portable = ['**/packages/*/contract/**/*.ts', '**/packages/*/commands/**/*.ts'];
 
 /** Effects belong to the sync hooks. Everything else derives in render or runs in a handler. */
 const effectHooks = {
@@ -39,7 +41,7 @@ const noEffectValues = {
       group: ['effect/*', '@repo/*/types/*'],
       allowTypeImports: true,
       message:
-        'Client code imports schema types only (`import type`). A value that UI needs, such as a limit, lives in plain TypeScript in `models/`, and `types/` builds its schema from it. See docs/contributing/architecture/client-performance.md.',
+        'Client code imports schema types only (`import type`). A value that UI needs, such as a limit, lives in plain TypeScript in `contract/`, and `types/` builds its schema from it. See docs/contributing/architecture/client-performance.md.',
     },
   ],
 };
@@ -83,6 +85,8 @@ export default defineConfig({
     '.claude/**',
     '.codex/**',
     '.cursor/**',
+    // `one generate-routes` writes this file, and its own disable comment is not ours.
+    'apps/app/app/routes.d.ts',
   ],
   jsPlugins: [
     // Only the rules turned on below. The rest of the anti-slop preset stays off.
@@ -93,6 +97,7 @@ export default defineConfig({
     { name: 'repo-effect', specifier: './tools/lint/effect-policy.mjs' },
     { name: 'repo-tests', specifier: './tools/lint/test-policy.mjs' },
     { name: 'repo-components', specifier: './tools/lint/component-policy.mjs' },
+    { name: 'repo-determinism', specifier: './tools/lint/determinism-policy.mjs' },
   ],
   rules: {
     // Function declarations read as the module's API and hoist. Arrow
@@ -159,6 +164,11 @@ export default defineConfig({
     // Effect import ban to this list.
     'no-restricted-imports': ['error', { paths: [effectHooks] }],
 
+    // Only the object pool reads the clock and makes IDs on the client, so a
+    // test or a driver that pins them gets the same records on every run.
+    // The rule itself names the client code that it covers.
+    'repo-determinism/no-ambient-time': 'error',
+
     'repo-effect/run-at-edges': 'error',
     'repo-effect/tagged-errors': 'error',
     'repo-effect/no-react-effects': 'error',
@@ -186,13 +196,15 @@ export default defineConfig({
           'error',
           { namedComponents: 'function-declaration', unnamedComponents: 'arrow-function' },
         ],
+        // React Native has no DOM tags, so a component names its role with `role`. This rule asks for DOM tags, and oxlint checks custom components too, so each correct role would fail. The other jsx-a11y rules stay on: they check `aria-*` props, which React Native supports.
+        'jsx-a11y/prefer-tag-over-role': 'off',
         'no-restricted-imports': ['error', noEffectValues],
         'no-restricted-globals': ['error', ...networkGlobals],
         'no-restricted-properties': ['error', ...networkProperties],
       },
     },
     {
-      // Models and the client half of commands run on the client too.
+      // The contract and the local change of each command run on the client too.
       files: portable,
       rules: {
         'no-restricted-imports': ['error', noEffectValues],
@@ -202,7 +214,7 @@ export default defineConfig({
     },
     {
       // The server half of a command runs on the server.
-      files: ['**/packages/*/commands/**/*.server.ts'],
+      files: ['**/packages/*/commands/**/*.server.ts', '**/packages/*/contract/**/*.server.ts'],
       rules: {
         'no-restricted-imports': ['error', { paths: [effectHooks] }],
         'no-restricted-globals': 'error',
@@ -239,11 +251,13 @@ export default defineConfig({
     {
       // A type assertion tells the compiler to trust a value, so a wrong
       // shape gets through. Product code narrows instead: a schema at the
-      // boundary, a model's or command's field shape in the object pool, or a
-      // typed source. See docs/contributing/setup/lint-rules.md#escape-hatches.
+      // boundary, the fields of a record or a command in the object pool, or
+      // a typed source. See docs/contributing/setup/lint-rules.md#escape-hatches.
       files: [
-        '**/apps/web/**/*.{ts,tsx}',
         '**/apps/api/**/*.{ts,tsx}',
+        '**/apps/app/**/*.{ts,tsx}',
+        // A project may name its client app apps/web. See the `client` list above.
+        '**/apps/web/**/*.{ts,tsx}',
         '**/features/*/**/*.{ts,tsx}',
         '**/packages/*/**/*.{ts,tsx}',
       ],
@@ -253,7 +267,7 @@ export default defineConfig({
       // A test proves behavior that a user or a caller sees: it runs every
       // time, asserts a value, and does not only snapshot an output or check
       // that something exists. See docs/contributing/testing.md#test-rules.
-      files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/*.pw.ts'],
+      files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/*.pw.ts', '**/*.journey.ts'],
       rules: {
         'repo-tests/no-hidden-tests': 'error',
         'repo-tests/no-snapshots': 'error',
@@ -268,6 +282,7 @@ export default defineConfig({
         '**/packages/*/testing/**/*.{ts,tsx}',
         '**/*.test.{ts,tsx}',
         '**/*.pw.ts',
+        '**/*.journey.ts',
       ],
       rules: { 'typescript/consistent-type-assertions': 'off' },
     },
@@ -293,7 +308,7 @@ export default defineConfig({
           'error',
           {
             gates: {
-              '/notes': { gate: 'features/notes/gate.ts', routes: 'apps/web/src/routes/notes' },
+              '/notes': { gate: 'features/notes/gate.ts', routes: 'apps/app/app/notes.tsx' },
             },
           },
         ],
@@ -310,14 +325,20 @@ export default defineConfig({
         'tools/lint/effect-policy.mjs',
         'tools/lint/test-policy.mjs',
         'tools/lint/component-policy.mjs',
+        'tools/lint/determinism-policy.mjs',
       ],
       rules: { 'import/no-default-export': 'off' },
     },
     {
-      // TanStack Router registers its router by module augmentation, which
-      // needs an `interface`.
-      files: ['**/apps/web/src/router.ts'],
-      rules: { 'typescript/consistent-type-definitions': 'off' },
+      // One loads each route file through its default export, so the screens of
+      // apps/app keep one for their component. Other files stay named.
+      files: ['**/apps/*/app/**/*.{ts,tsx}'],
+      rules: { 'import/no-default-export': 'off' },
+    },
+    {
+      // Hermes lacks the ES2023 array methods that return a copy. This file adds each missing one to the prototype, from the method that changes the array.
+      files: ['apps/app/lib/hermes.native.ts'],
+      rules: { 'no-extend-native': 'off', 'unicorn/no-array-sort': 'off' },
     },
     {
       // The Workers runtime loads a worker entry through its default export.

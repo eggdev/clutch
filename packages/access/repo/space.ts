@@ -1,8 +1,8 @@
-import { spaceModel } from '@repo/access/models/space';
+import { spaceRecord } from '@repo/access/contract/access';
+import type { Space } from '@repo/access/contract/access';
 import { spaces } from '@repo/access/repo/schema';
 import type { SpaceRow } from '@repo/access/repo/schema';
-import type { Space } from '@repo/access/types/space';
-import { upsertChange } from '@repo/sync/models/change';
+import { upsertChange } from '@repo/sync/contract/change';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { and, eq } from 'drizzle-orm';
 import { Effect } from 'effect';
@@ -30,7 +30,7 @@ export function toRow(record: Space, organizationId: string): SpaceRow {
 
 /** The change that tells each client in the organization about a space. */
 export function spaceChange(row: SpaceRow) {
-  return upsertChange(spaceModel, toRecord(row), { organizationId: row.organizationId });
+  return upsertChange(spaceRecord, toRecord(row), { organizationId: row.organizationId });
 }
 
 export function findSpace(db: DrizzleDatabase, organizationId: string, id: string) {

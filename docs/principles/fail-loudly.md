@@ -17,13 +17,15 @@ back to a fresh read from the owner, never to a guess. See
 
 ```ts
 if (!note) {
-  return yield * new CommandRejected({ reason: 'This note does not exist.' }); // before the write
+  return yield * refuse('not-found', 'This note does not exist.'); // before the write
 }
 ```
 
-The server change refuses the write with a tagged error and names the missing
-fact. The client drops its local change and shows the reason. Server code never
-throws. See [server](../contributing/architecture/server.md#edges-and-errors).
+The server change refuses the write with a code and names the missing fact.
+A refusal code is one that the command declares in `refuses`, or a built-in
+code in `builtInRefusals`, in `packages/sync/contract/command.ts`. The client
+drops its local change and shows the reason. Server code never throws. See
+[server](../contributing/architecture/server.md#edges-and-errors).
 
 ## Related
 

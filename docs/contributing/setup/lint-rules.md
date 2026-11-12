@@ -160,9 +160,11 @@ name that does not navigate passes.
 
 ## Client code
 
-Client code runs in the browser or on a device. It is `apps/web`, `features/`
-and the `ui/` of each package. The `models/` and `commands/` of a package run
-there too. `oxlint.config.ts` applies these rules to client code:
+Client code runs in the browser or on a device. It is `apps/app`, `features/`
+and the `ui/` of each package. The `contract/` and the client `commands/` of a
+package run there too. `oxlint.config.ts` applies these rules to client code.
+The import and network rows also apply to `contract/` and `commands/`, through
+the `portable` files in `oxlint.config.ts`:
 
 | Rule                                                   | Rejects                                                                                                                         |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -185,7 +187,8 @@ casts in apps, features and packages. `as const` stays allowed.
   assert a type. A repo maps database rows to records, and a test builds
   what it needs.
 - Product code narrows instead. It decodes with a schema at the boundary, or
-  checks a record against its model's `fields`, or types the source.
+  checks a record with the `is` check of its record in `contract/`, or types
+  the source.
 - Each other escape hatch lives in a guardrail file. Agent review gives a new
   hatch an `owner` finding, so the owner decides. See
   [guardrail files](../harness-engineering.md#guardrail-files).
@@ -212,6 +215,33 @@ passes and code that fails.
 
 A `type:tool` package, such as `packages/runtime`, is exempt from
 `tagged-errors`.
+
+## Determinism
+
+The `repo-determinism` plugin,
+[`tools/lint/determinism-policy.mjs`](../../../tools/lint/determinism-policy.mjs),
+has one rule. [`tools/lint/determinism-policy.test.ts`](../../../tools/lint/determinism-policy.test.ts)
+proves it with code that passes and code that fails.
+
+| Rule              | Rejects                                                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `no-ambient-time` | `Date.now()`, `new Date()` with no argument, `Math.random()`, `crypto.randomUUID()`, `crypto.getRandomValues()` and `performance.now()` in client code |
+
+Client code here is an app that ships to a device, a feature, and the `ui/`,
+`contract/` and `commands/` of a package. The object pool in `packages/sync`,
+server files, tests and `testing/` are exempt. A command declares a `now` or
+`new-id` stamp in its input, and the object pool fills it. See
+[local-first sync](../architecture/local-first-sync.md).
+
+A project that takes this rule with old call sites ratchets them, as it does
+for [the design-system rule](#ratchet-a-rule). The rule skips each file that
+the `no-ambient-time` ratchet counts.
+
+```sh
+mise exec -- bun run clutch ratchet add no-ambient-time \
+  --command 'bun tools/lint/lint-counts.ts repo-determinism/no-ambient-time' \
+  --files '{apps,features,packages}/**/*.{ts,tsx}'
+```
 
 ## Formatting
 

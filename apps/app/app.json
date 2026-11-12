@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Clutch",
+    "slug": "clutch",
+    "version": "0.1.0",
+    "scheme": "clutch",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios"],
+    "plugins": ["one/expo-plugin"],
+    "ios": {
+      "bundleIdentifier": "dev.clutch.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true,
+          "NSExceptionDomains": {
+            "localhost": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionAllowsInsecureHTTPLoads": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

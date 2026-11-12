@@ -1,0 +1,45 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "out-tsc/lib",
+    "tsBuildInfoFile": "out-tsc/lib/tsconfig.lib.tsbuildinfo",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "noImplicitAny": false,
+    "preserveSymlinks": true,
+    "types": ["node", "react", "vite/client", "react-native-css/types"],
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "test/**",
+    "out-tsc/**",
+    "node_modules/**",
+    "dist/**",
+    ".expo/**"
+  ],
+  "references": [
+    {
+      "path": "../../packages/app-build/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/notes/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/access/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/design-system/tsconfig.lib.json"
+    },
+    {
+      "path": "../../features/notes/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/sync/tsconfig.lib.json"
+    }
+  ]
+}
