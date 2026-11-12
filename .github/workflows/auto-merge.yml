@@ -176,7 +176,7 @@ jobs:
       pull-requests: read
       actions: write
     steps:
-      - name: Dispatch Auto-merge for each approved agent PR
+      - name: Dispatch Auto-merge for each open agent PR
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

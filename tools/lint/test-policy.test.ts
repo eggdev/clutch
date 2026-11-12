@@ -63,6 +63,7 @@ test('a test that asserts a value, through expect or a named helper, passes', as
           "test('c', async () => { await expectRejected(run(), 'not_member'); });",
           "test.each([1, 2])('d %d', (n) => { expect(double(n)).toBe(n * 2); });",
           "describe('e', () => { test('f', () => { expect(1 + 1).toBe(2); }); });",
+          "test('g', async () => { await outcome('signed-in', { url: '/home' }); });",
         ].join('\n')}\n`,
         'packages/notes/ui/notes.ts': 'export const skip = { only: () => 1 };\nskip.only();\n',
       },
