@@ -42,9 +42,10 @@ function expandBraces(glob: string): Array<string> {
 /**
  * The journeys on this checkout: each file's id, and the core journey that its
  * `Core:` line names. The CLI reads them the same way. A project has no CLI
- * source, so this file keeps its own copy.
+ * source, so this file keeps its own copy. The tests of both copies read
+ * tools/testing/journeys-present-fixture.json and expect its names.
  */
-function journeysPresent(root: string) {
+export function journeysPresent(root: string) {
   const names = new Set<string>();
   for (const file of new Bun.Glob('features/*/journeys/*.{pw.ts,maestro.yaml}').scanSync(root)) {
     names.add(path.basename(file).replace(/\.(?:pw\.ts|maestro\.yaml)$/u, ''));
