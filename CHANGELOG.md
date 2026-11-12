@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2 (2026-11-12)
+
+### Fixes and maintenance
+
+- fix(journeys): start the native lanes only for a change that can reach the app (CL-474)
+
 ## 1.0.1 (2026-11-12)
 
 ### Fixes and maintenance
