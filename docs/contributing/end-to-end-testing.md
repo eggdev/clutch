@@ -275,11 +275,11 @@ The native jobs run on a PR that reaches native, and on each push to `main`.
 
 - Every change reaches web.
 - A change reaches native when it touches a native app, a native journey,
-  `tools/native/`, a shared runtime package or a sensitive path.
+  `tools/native/` or a shared runtime package.
 - A shared runtime package is a `type:package` package, or a feature that a
   native app depends on.
-- A sensitive path is a file with the tier `one-way-door` in
-  `.clutch/risk.yaml`.
+- A sensitive path alone reaches web only. A sensitive path is a file with the
+  tier `one-way-door` in `.clutch/risk.yaml`.
 
 A repository with no native app runs no native job. CI starts a platform's
 lane only when a native app declares that platform's app ID. The ID is

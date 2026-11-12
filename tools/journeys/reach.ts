@@ -12,17 +12,18 @@ import { declaresAppId } from '@tools/native/build';
  * which platforms a PR must pass on.
  *
  * - Every change reaches web. The web journeys run on every PR.
- * - A change reaches native when it touches a native app, a native journey,
- *   the native tooling in `tools/native/`, a shared runtime package or a
- *   sensitive path. A shared runtime package is a `type:package` package
- *   under `packages/`, or a feature that a native app depends on. A sensitive
- *   path is a file whose tier in `.clutch/risk.yaml` is `one-way-door`.
+ * - A change reaches native when it touches a native app, a native journey
+ *   (`*.maestro.yaml` or `*.journey.ts`), the native tooling in
+ *   `tools/native/` or a shared runtime package. A shared runtime package is
+ *   a `type:package` package under `packages/`, or a feature that a native
+ *   app depends on.
+ * - A sensitive path alone does not reach native. Its risk tier decides who
+ *   approves it, not which platforms its journeys run on. So a change to the
+ *   merge gate or to `.clutch/risk.yaml` runs the web journeys only.
  * - A push to the default branch reaches every platform.
  *
  * See docs/principles/proof-gates-code.md#proof-decides-the-rest.
  */
-
-export type Change = { readonly path: string; readonly tier: string };
 
 export type Reach = { web: boolean; native: boolean; why: Array<string> };
 
@@ -54,17 +55,14 @@ export function nativeFolders(root: string): Array<string> {
 }
 
 /** The platforms that the changed files reach, and why native is reached. */
-export function reachOf(root: string, changes: ReadonlyArray<Change>): Reach {
+export function reachOf(root: string, files: ReadonlyArray<string>): Reach {
   const folders = nativeFolders(root);
-  const why = changes.flatMap((change) => {
-    if (change.tier === 'one-way-door') {
-      return [`${change.path} is a sensitive path`];
+  const why = files.flatMap((file) => {
+    if (file.endsWith('.maestro.yaml') || file.endsWith('.journey.ts')) {
+      return [`${file} is a native journey`];
     }
-    if (change.path.endsWith('.maestro.yaml') || change.path.endsWith('.journey.ts')) {
-      return [`${change.path} is a native journey`];
-    }
-    const folder = folders.find((item) => change.path.startsWith(`${item}/`));
-    return folder ? [`${change.path} is in ${folder}`] : [];
+    const folder = folders.find((item) => file.startsWith(`${item}/`));
+    return folder ? [`${file} is in ${folder}`] : [];
   });
   return { web: true, native: why.length > 0, why };
 }
@@ -85,8 +83,8 @@ export function outputsOf(root: string, reach: Reach): Outputs {
   };
 }
 
-/** The changed files and their tiers, from `clutch risk`. */
-async function changesOf(root: string, base: string, head: string): Promise<Array<Change>> {
+/** The changed files, from `clutch risk`. */
+async function changesOf(root: string, base: string, head: string): Promise<Array<string>> {
   const proc = Bun.spawn(
     [process.execPath, 'tools/clutch.ts', 'risk', '--base', base, '--head', head, '--json'],
     { cwd: root, stdout: 'pipe', stderr: 'inherit' },
@@ -95,7 +93,7 @@ async function changesOf(root: string, base: string, head: string): Promise<Arra
   if (code !== 0) {
     throw new Error(`clutch risk failed (exit ${code}). Read its output above.`);
   }
-  return (JSON.parse(out) as { files: Array<Change> }).files;
+  return (JSON.parse(out) as { files: Array<{ path: string }> }).files.map((file) => file.path);
 }
 
 /**
@@ -129,9 +127,7 @@ async function main(args: Array<string>, root = process.cwd()) {
   const hasApp = nativeApps(root).length > 0;
   console.log(`Web: reached. Every PR runs the web journeys.`);
   if (!reach.native) {
-    console.log(
-      'Native: not reached. No changed file is native code, shared runtime code or a sensitive path.',
-    );
+    console.log('Native: not reached. No changed file is native code or shared runtime code.');
   } else if (hasApp) {
     console.log(`Native: reached, because ${reach.why.slice(0, 5).join('; ')}.`);
     console.log(
