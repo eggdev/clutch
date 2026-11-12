@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -41,6 +41,13 @@ async function clutch() {
   return repo;
 }
 
+// The tests only read the checkout, so they share one.
+let shared: Awaited<ReturnType<typeof clutch>>;
+beforeAll(async () => {
+  shared = await clutch();
+});
+afterAll(() => shared[Symbol.asyncDispose]());
+
 /** A project with its own seed pages. It is not synced yet. */
 function project() {
   return gitRepo({
@@ -58,7 +65,7 @@ async function commitAll(root: string) {
 }
 
 test('a sync lists the seed pages that Clutch changed, and not the others', async () => {
-  await using template = await clutch();
+  const template = shared;
   await using target = await project();
   expect(await runSync({ root: target.root, template: template.root, to: 'v1.0.0' })).toMatchObject(
     { status: 'synced', seedChanges: [], seedChangesNote: null },
@@ -85,7 +92,7 @@ test('a sync lists the seed pages that Clutch changed, and not the others', asyn
 });
 
 test('a sync lists the changed seed pages, and leaves the project copies as they are', async () => {
-  await using template = await clutch();
+  const template = shared;
   await using target = await project();
   await runSync({ root: target.root, template: template.root, to: 'v1.0.0' });
   await commitAll(target.root);
@@ -105,7 +112,7 @@ test('a sync lists the changed seed pages, and leaves the project copies as they
 });
 
 test('a sync that cannot read its last release lists nothing, and says why', async () => {
-  await using template = await clutch();
+  const template = shared;
   await using target = await project();
   await runSync({ root: target.root, template: template.root, to: 'v1.0.0' });
   await commitAll(target.root);
