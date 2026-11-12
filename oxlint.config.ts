@@ -282,7 +282,6 @@ export default defineConfig({
         '**/packages/*/testing/**/*.{ts,tsx}',
         '**/*.test.{ts,tsx}',
         '**/*.pw.ts',
-        '**/*.journey.ts',
       ],
       rules: { 'typescript/consistent-type-assertions': 'off' },
     },

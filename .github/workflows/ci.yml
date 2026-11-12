@@ -208,13 +208,21 @@ jobs:
         run: mise install maestro@cli-2.12.1
       - name: Boot the iPhone 16 simulator
         run: xcrun simctl boot "iPhone 16" && xcrun simctl bootstatus "iPhone 16"
+      # macOS 15 does not resolve a name under `localhost`, and the simulator
+      # uses the resolver of its host. The dev command prints each server name.
+      - name: Make the dev server names resolve
+        run: |
+          names="$(mise exec -- bun run dev --check | sed -nE 's#.*https?://([^:/ ]+).*#\1#p' | sort -u | tr '\n' ' ')"
+          echo "127.0.0.1 $names" | sudo tee -a /etc/hosts
       - name: Start the dev servers
         run: |
           mise exec -- bun run dev &
-          end=$((SECONDS + 120))
+          dev=$!
+          # The dev command gives each server its own time to answer, and stops
+          # when one does not. So this step waits for the servers or for that stop.
           until mise exec -- bun run dev --check; do
-            if [ "$SECONDS" -ge "$end" ]; then
-              echo "::error title=Dev servers did not start::bun run dev --check failed for 120 s. Read the dev server output above."
+            if ! kill -0 "$dev" 2>/dev/null; then
+              echo "::error title=Dev servers did not start::bun run dev stopped before each server answered. Read its output above."
               exit 1
             fi
             sleep 2

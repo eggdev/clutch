@@ -258,6 +258,10 @@ does not reformat the repository.
 | `package.json`    | Sorted     | The same, for a file that many changes touch                     |
 | Markdown wrapping | `preserve` | The formatter keeps the line breaks that a writer chose          |
 
+The formatter leaves out `native-fingerprint.json`. The command `native:build`
+writes that file, and it does not write the form of the formatter. Without that
+entry, `format-check` fails after each native build.
+
 ## Run it
 
 ```sh
