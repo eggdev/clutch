@@ -71,15 +71,11 @@ automerge:
 # code scanning takes results and Semgrep elsewhere. This repository is public, so auto runs
 # CodeQL. Kickoff asks each project. See docs/contributing/capabilities/codeql-sast.md.
 sast: auto
-# When clutch labels warns about a large PR. Size never fails one (CL-401).
+# When clutch labels warns about a large PR, and when a PR must split (tools/check-scope.ts).
 pr_size:
   warn: 300
+  max: 1000
   exclude: []
-# agent-review is a required check here, so a run without the Anthropic credential fails it
-# (decision 5 in .clutch/PLAN.md). A project keeps notice, the default, until it adopts the
-# check. See docs/contributing/review.md.
-agentReview:
-  missingCredential: fail
 # clutch worktree new --check runs check in the new checkout after the setup.
 worktree:
   root: ../clutch.worktrees

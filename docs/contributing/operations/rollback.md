@@ -161,7 +161,7 @@ rehearsal.
 
 To rehearse a revert, add the `drill` label to the merged PR before you add
 `revert`. The revert PR gets `drill` too, and no `risk-tighten` issue is filed.
-A drill does not count toward the revert brake or the revert metric.
+A drill does not count toward the revert metric.
 
 ## Related
 

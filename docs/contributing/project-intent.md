@@ -67,8 +67,8 @@ Each hard invariant has one journey that proves it. See
 ## Agent guidance
 
 - Read this file before you add a screen, field, role or flow.
-- Name the user. Each feature serves a goal from this page. If you cannot name
-  one, ask the [owner](#owner) before you build.
+- Name the user. Each feature serves a goal from this page, and its issue states
+  it in `goal:`. If you cannot name one, ask the [owner](#owner) before you build.
 - Check each change against the hard invariants. Prove a change that touches
   one with its journey. Ask the owner only to change what an invariant says.
 - Use the present tense only for behavior that exists in the repository. Keep

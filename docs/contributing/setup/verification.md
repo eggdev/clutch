@@ -183,6 +183,10 @@ says so. It gives a `No journey ran` warning in the run, and a line in the step
 summary. The check passes so a
 project before its first journey can merge, but it tests nothing.
 
+`--production <url>` runs only the core journeys, against that URL. `tools/deploy.ts`
+calls it after each deploy. With no core journey it fails, since production then
+has no proof.
+
 A web journey shares the dev database. It writes records with unique names, so
 runs do not collide. Delete `.data/` to reset the dev database.
 

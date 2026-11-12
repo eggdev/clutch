@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { fake, findingsOn } from '@tools/github/fake-run';
+import { fake, findingsOn, repoOwner } from '@tools/github/fake-run';
 import type { Result } from '@tools/github/stack';
 import { blockingCount, prStatus, renderStatus } from '@tools/github/status';
 
@@ -243,9 +243,7 @@ test('the owner count is the findings of the head review, not the nine annotatio
   ]);
   const status = await prStatus(gh.run, '7');
   expect(status.agentReview).toEqual({ posted: true, blocking: 0, owner: 3 });
-  expect(renderStatus(status)).toContain(
-    'Agent review: 0 blocking, 3 owner (the owner approves and merges it).',
-  );
+  expect(renderStatus(status)).toContain('Agent review: 0 blocking, 3 owner (advisory).');
 });
 
 test('owner findings without inline comments on the head count as the annotations do', async () => {
@@ -327,8 +325,9 @@ test('a summary posted after the run on this head started counts', async () => {
   });
 });
 
-test('a PR that names a contract break is not ready, and pr status names the break', async () => {
-  const gh = fake([
+/** A PR 7 whose diff changes contract.json and whose snapshot names Note.title, with the owner's reviews `reviews`. */
+const broken = (reviews: string) =>
+  fake([
     [
       'gh pr view 7',
       view(head170, [check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]),
@@ -341,11 +340,27 @@ test('a PR that names a contract break is not ready, and pr status names the bre
       { out: JSON.stringify({ filename: 'contract.json', patch: '' }) },
     ],
     ['gh api repos/{owner}/{repo}/contents/contract.json', { out: '{"breaks":["Note.title"]}' }],
-    reviews170,
+    ['gh api --paginate repos/{owner}/{repo}/pulls/7/reviews', { out: reviews }],
   ]);
+
+test('a PR that names a contract break is not ready, and pr status names the break', async () => {
+  const gh = broken('');
   const status = await prStatus(gh.run, '7');
   expect(status).toMatchObject({ contractBreaks: ['Note.title'], ready: false });
   expect(renderStatus(status)).toContain(
     'Contract breaks: Note.title. The owner agrees to a break.',
   );
+  expect(gh.calls.find((call) => call.includes('/pulls/7/reviews'))).toContain(
+    `select(.user.login == "${await repoOwner()}"`,
+  );
+});
+
+test("the owner's approval of the head makes a PR with a contract break ready", async () => {
+  expect(await prStatus(broken(`APPROVED\t${head170}`).run, '7')).toMatchObject({
+    contractBreaks: ['Note.title'],
+    ready: true,
+  });
+  expect(await prStatus(broken(`APPROVED\t${headOld170}`).run, '7')).toMatchObject({
+    ready: false,
+  });
 });

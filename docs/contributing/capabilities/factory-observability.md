@@ -48,7 +48,7 @@ clutch metrics --repo eggdev/neighborhood --since 14d --json | jq .factory
 
 - **Autonomy** (`factory.autonomy`): the share of merged PRs with no human code push before the merge. `humanPushed` lists the PRs with a push.
 - **Cycle time** (`factory.cycleTimeHours`): p50 and p90 of the hours from the lane start to 3 events. They are the PR (`toPr`), the first review (`toFirstReview`) and the merge (`toMerge`). `count` is the number of PRs in each. A PR with no review is left out of `toFirstReview`.
-- **Reverts** (`factory.reverts`): the share of merged PRs that a later merged PR reverts. `pulls` lists the reverted PRs. `overBrake` is true when the rate is more than the 2% brake of D-004.
+- **Reverts** (`factory.reverts`): the share of merged PRs that a later merged PR reverts. `pulls` lists the reverted PRs. `overBrake` is true when the rate is more than 2%. No gate reads it.
 
 `factory.pulls` has one row for each PR. A row gives the lane start, the time the PR opened, its first review and its merge. It also says whether the PR had a human push and whether a later PR reverted it. A reader can check each number from these rows, or put its own lane start in their place.
 

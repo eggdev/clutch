@@ -21,8 +21,7 @@ draft. It runs the Claude Code GitHub Action with [review](./review.md) as its r
 5. It returns the number of blocking findings and each `owner` finding to the
    workflow.
 
-Each inline comment opens a review thread. The main ruleset requires every
-thread to be resolved before a merge. The
+Each inline comment opens a review thread. An open thread does not hold a merge. The
 [babysitter](../../.agents/skills/babysit-pr/SKILL.md) answers each one: it
 fixes it, or replies with the reason and resolves it, or leaves it open for
 the owner. The owner's approval of the head resolves the owner's threads.
@@ -33,14 +32,11 @@ short structured answer alone cannot let a PR through. A failed listing of
 this head's comments is reported as a warning. A failed listing of the earlier
 heads' comments fails the job, so a re-run lists them again.
 
-The job fails when the agent returns one or more blocking findings. The job
-also fails when the agent returns no result. An `owner` finding passes the
-job, so the owner can still merge the PR. The job writes an "Owner review
-needed" annotation for it. Auto-merge reads that annotation on the head and
-leaves the PR for the owner. See
+Model findings are advisory. The job reports each finding, and no finding holds
+the merge. The job warns when the agent returns no result. The session
+still answers each finding. `tools/github/weaker-journeys.ts` holds a PR that
+weakens a journey or a budget, or removes a screen or route, by comparing the two copies. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
-
-An owner finding carries over to each new head until the diff removes its cause and the review says so. A silent drop still holds the PR.
 
 The agent runs on the cheapest Claude model, `claude-haiku-5-5`. To choose
 another model, set the `CLUTCH_AGENT_MODEL` repository variable to its id. The
@@ -48,17 +44,10 @@ gardening workflow reads the same variable.
 
 When the repository has no `ANTHROPIC_API_KEY` secret and no
 `CLAUDE_CODE_OAUTH_TOKEN` secret, the job writes a notice and passes. A pull
-request from a fork gets no secrets, so the same notice applies. Set
-`agentReview.missingCredential: fail` in `clutch.yaml` to fail the job
-instead, so a green `agent-review` check proves that a review ran. The job
-reads the setting from the base branch, so a pull request cannot change it.
-Clutch sets `fail`. A fork pull request then fails agent review, and the owner
-reviews it.
+request from a fork gets no secrets, so the same notice applies.
 
-The main ruleset in `.github/rulesets/main.json` makes `agent-review` a
-required status check, so a blocking finding blocks the merge. A project that
-has not set up the credential keeps the default, `notice`, and the check
-passes with a notice until the project adopts it.
+Agent review is advice, so no ruleset requires it. A project with no credential
+gets a notice, and the check passes.
 
 ## Visual review
 
@@ -74,12 +63,12 @@ screenshot baseline (a PNG in a `__screenshots__/` folder, see
    missing content, poor contrast, a scheme mix-up or an unstyled element. Set
    the `CLUTCH_VISUAL_MODEL` repository variable to use another model.
 3. The script posts one comment with the before and after pictures and the
-   verdicts. A new head edits that comment. The job fails when a pair is
-   unexplained or broken, or has no verdict.
+   verdicts. A new head edits that comment. The job warns when a pair is
+   unexplained or broken, or has no verdict, and it holds no merge.
 
 A PR that changes no baseline skips these steps, with no install and no API
 call. A PR that changes a baseline on purpose and says why in its body passes,
-so it can still merge with no person. To clear a block, fix the screen, or say
+so it can still merge with no person. To clear a warning, fix the screen, or say
 what changed and why in the PR body. Then re-run the `agent-review` job.
 
 The job runs the default branch's copy of the script, so a PR cannot change
@@ -106,7 +95,7 @@ Each PR carries labels that tools and people route on:
 | `risk/<tier>`    | The [Labels workflow](../../.github/workflows/labels.yml)  | The paths in `.clutch/risk.yaml`. See [risk](../../apps/cli/README.md#risk).                                          |
 | `one-way-door`   | A person                                                   | The change is one-way. See [two-way and one-way doors](../principles/two-way-doors.md).                               |
 | `revert`         | A person, or auto-revert                                   | Adding it to a merged PR starts its [revert](./operations/rollback.md#revert-a-merged-pull-request).                  |
-| `drill`          | A person                                                   | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the brake or the metric. |
+| `drill`          | A person                                                   | Add it to a merged PR before `revert` to rehearse a revert. The revert does not count toward the revert metric.       |
 | `needs-owner`    | `bun run pr ask`                                           | An issue waits for the owner, when no T3 thread can reach them. The issue holds the question in the fixed form.       |
 | `babysit:stuck`  | The [babysitter](../../.agents/skills/babysit-pr/SKILL.md) | A cap or a conflict stopped it. Its `## Babysit log` comment says why, and the session tells the owner in its thread. |
 | `babysit:off`    | A person                                                   | The babysitter leaves the PR alone.                                                                                   |

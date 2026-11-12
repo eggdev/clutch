@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -49,6 +49,13 @@ async function clutch() {
   return repo;
 }
 
+// The tests only read the checkout, so they share one.
+let shared: Awaited<ReturnType<typeof clutch>>;
+beforeAll(async () => {
+  shared = await clutch();
+});
+afterAll(() => shared[Symbol.asyncDispose]());
+
 const project = () => gitRepo({ 'package.json': JSON.stringify({ name: 'shop' }) });
 
 async function commitAll(root: string) {
@@ -59,7 +66,7 @@ async function commitAll(root: string) {
 const read = (root: string, file: string) => readFile(path.join(root, file), 'utf-8');
 
 test('a sync adds the new files of an add_on_sync seed entry once, and no other seed file', async () => {
-  await using template = await clutch();
+  const template = shared;
   await using target = await project();
   await runSync({ root: target.root, template: template.root, to: 'v1.0.0' });
   await commitAll(target.root);
@@ -102,7 +109,7 @@ test('a sync adds the new files of an add_on_sync seed entry once, and no other 
 });
 
 test('a sync keeps a file that the project wrote at a path that Clutch adds', async () => {
-  await using template = await clutch();
+  const template = shared;
   await using target = await project();
   await runSync({ root: target.root, template: template.root, to: 'v1.0.0' });
   await target.write({ 'factory/models.yaml': 'project models\n' });
@@ -117,7 +124,7 @@ test('a sync keeps a file that the project wrote at a path that Clutch adds', as
 });
 
 test('a sync adds the files that an older sync skipped, since the lineage does not list them', async () => {
-  await using template = await clutch();
+  const template = shared;
   await using target = await project();
   await runSync({ root: target.root, template: template.root, to: 'v1.0.0' });
   await commitAll(target.root);

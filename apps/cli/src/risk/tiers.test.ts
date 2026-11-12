@@ -1,6 +1,12 @@
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
-import { changeTier, classify, validateRiskConfig } from '@/risk/tiers';
+import { parse } from 'yaml';
+
+import { changeTier, classify, heldRules, journeysPresent, validateRiskConfig } from '@/risk/tiers';
 import type { RiskConfig } from '@/risk/tiers';
 
 const config: RiskConfig = {
@@ -103,4 +109,84 @@ test('lines must be a list of valid regular expressions', () => {
     { path: 'rules.0.lines', message: 'Expected a list of regular expressions.' },
   ]);
   expect(validateRiskConfig(linesRule(['^a'])).config?.rules[0].lines).toEqual(['^a']);
+});
+
+test("this repository's risk file holds only a migration that can lose data", () => {
+  const file = path.join(import.meta.dir, '../../../../.clutch/risk.yaml');
+  const { config: real } = validateRiskConfig(parse(readFileSync(file, 'utf-8')));
+  if (!real) {
+    throw new Error('.clutch/risk.yaml is not valid');
+  }
+  const migration = 'packages/notes/migrations/0007_x.sql';
+  const tierFor = (line: string) =>
+    classify(real, [migration], new Map([[migration, [line]]]))[0]?.tier;
+  for (const line of [
+    'ALTER TABLE "a" ADD COLUMN "b" text;',
+    'CREATE TABLE "a" ("b" text);',
+    'ALTER TABLE "a" DROP CONSTRAINT "b";',
+    'ALTER TABLE "a" ALTER COLUMN "b" DROP NOT NULL;',
+    '  DROP CONSTRAINT "b";',
+    'DROP INDEX "b";',
+  ]) {
+    expect(tierFor(line)).toBe('medium');
+  }
+  for (const line of [
+    'DROP TABLE "a";',
+    'drop table "a";',
+    'ALTER TABLE "a" DROP COLUMN "b";',
+    'ALTER TABLE "a" DROP "b";',
+    'TRUNCATE "a";',
+    'UPDATE "a" SET "b" = NULL;',
+    'DELETE FROM "a";',
+    'ALTER TABLE "a" ALTER COLUMN "b" SET DATA TYPE integer;',
+    'ALTER TABLE "a" ALTER COLUMN "b" TYPE integer;',
+    'ALTER TABLE "a" ALTER "b" TYPE integer;',
+    '  DROP "b";',
+  ]) {
+    expect(tierFor(line)).toBe('one-way-door');
+  }
+  expect(classify(real, ['docs/principles/x.md'])[0]?.tier).toBe('low');
+  expect(classify(real, ['docs/contributing/project-intent.md'])[0]?.tier).toBe('one-way-door');
+});
+
+test('a rule with journeys holds until each one exists', () => {
+  const rule = { journeys: ['sign-in', 'sign-up'] };
+  const plain = {};
+  expect(heldRules([rule, plain], new Set(['sign-in']))).toEqual([rule, plain]);
+  expect(heldRules([rule, plain], new Set(['sign-in', 'sign-up']))).toEqual([plain]);
+});
+
+test('journeysPresent names each file and its Core line', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'risk-journeys-'));
+  try {
+    await mkdir(path.join(root, 'features/a/journeys'), { recursive: true });
+    await writeFile(
+      path.join(root, 'features/a/journeys/first-visit.pw.ts'),
+      '/**\n * Core: sign-up\n */\n',
+    );
+    expect([...journeysPresent(root)].toSorted()).toEqual(['first-visit', 'sign-up']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// tools/codeowners.ts keeps a copy of journeysPresent, since a project has no
+// CLI source. Its test reads the same fixture and expects the same names.
+test('journeysPresent gives the names of the shared fixture', async () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      path.join(import.meta.dir, '../../../../tools/testing/journeys-present-fixture.json'),
+      'utf-8',
+    ),
+  ) as { files: Record<string, string>; expected: Array<string> };
+  const root = await mkdtemp(path.join(tmpdir(), 'risk-journeys-fixture-'));
+  try {
+    for (const [name, content] of Object.entries(fixture.files)) {
+      await mkdir(path.join(root, path.dirname(name)), { recursive: true });
+      await writeFile(path.join(root, name), content);
+    }
+    expect([...journeysPresent(root)].toSorted()).toEqual(fixture.expected);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
