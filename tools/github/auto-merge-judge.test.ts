@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 
 import { app, comments, decide, facts, fake, head, merges } from '@tools/github/auto-merge-fake';
-import { blockers } from '@tools/github/auto-merge-rules';
+import { blockers, dryRunComment, steps } from '@tools/github/auto-merge-rules';
 import type { Result } from '@tools/github/stack';
 
 test('a person-opened PR on a feature branch is refused and never commented', async () => {
@@ -111,6 +111,22 @@ test('a high gardening PR is refused, as not low or medium', async () => {
     "Would not auto-merge at the step bots:\n- The gardening PR's risk tier is high, not low or medium.",
   ]);
   expect(merges(gh.calls)).toEqual([]);
+});
+
+test('a named contract break holds a PR at any tier for the owner, and the owner approval lifts it', () => {
+  const reason = 'The contract snapshot names the break Note.title. The owner agrees to a break.';
+  for (const step of steps) {
+    const broken = facts({
+      tier: step === 'bots' ? 'one-way-door' : 'low',
+      breaks: ['Note.title'],
+    });
+    expect(blockers(broken, step)).toContain(reason);
+    expect(blockers({ ...broken, ownerApproved: true }, step)).toEqual([]);
+  }
+  expect(blockers(facts({ breaks: [] }), 'low')).toEqual([]);
+  expect(
+    dryRunComment(facts({ breaks: ['Note.title'], ownerApproved: true }), [], 'low'),
+  ).toContain('- Contract breaks the owner agreed to: `Note.title`');
 });
 
 test('a failed or running native journey holds, and a skipped one does not', () => {

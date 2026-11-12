@@ -46,6 +46,12 @@ export type Facts = {
   native: Record<string, string>;
   /** Why the PR weakens a journey or a budget, from `weakerJourneys`. */
   weakerJourneys: Array<string>;
+  /**
+   * Each one-way change that the contract snapshot of the head names under
+   * `breaks`, when the PR's own diff changes `contract.json`. The owner agrees
+   * to a break, so each one holds the PR for the owner, whatever its risk tier.
+   */
+  breaks: Array<string>;
   /** Why a bot PR fails its bot rule: a diff that is more than a version, or a revert that may not merge. Empty for an agent PR. */
   botProblems: Array<string>;
   /** Each required check that failed on the default branch's latest commit. */
@@ -53,7 +59,8 @@ export type Facts = {
   /**
    * Whether `automerge.owner` approved the head commit, and gave no later
    * review that asks for changes. The owner's approval is the review that a
-   * one-way-door PR waits for, so it lifts the tier and the owner findings.
+   * one-way-door PR waits for, so it lifts the tier, a weaker journey and a
+   * contract break.
    * The checks, a draft, the base and a red main still hold the PR.
    */
   ownerApproved: boolean;
@@ -154,6 +161,9 @@ export function blockers(facts: Facts, step: Step): Array<string> {
     for (const reason of facts.weakerJourneys) {
       reasons.push(`A journey gets weaker, so the owner decides: ${reason}`);
     }
+    for (const name of facts.breaks) {
+      reasons.push(`The contract snapshot names the break ${name}. The owner agrees to a break.`);
+    }
   }
   // A revert is how a red main turns green, so the red main does not hold it.
   if (botKind(pr.headRefName) !== 'revert') {
@@ -206,6 +216,11 @@ export function dryRunComment(facts: Facts, reasons: Array<string>, step: Step) 
           `- Required checks green: ${Object.keys(facts.checks)
             .map((name) => `\`${name}\``)
             .join(', ')}`,
+          ...(facts.breaks.length > 0
+            ? [
+                `- Contract breaks the owner agreed to: ${facts.breaks.map((name) => `\`${name}\``).join(', ')}`,
+              ]
+            : []),
         ];
   return [
     marker(facts.pr.headRefOid),

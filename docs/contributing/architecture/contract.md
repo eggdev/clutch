@@ -298,7 +298,7 @@ snapshot, and `breaks`, the IDs of the one-way changes that the owner accepted.
 
 `mise exec -- bun tools/check-contract.ts --write` writes the snapshot. It
 prints each change as two-way or one-way. A one-way change needs
-`--write --accept-breaks`, and only after the owner agrees.
+`--write --accept-breaks`, and only after the owner agrees. The merge judge holds that: a pull request whose snapshot names a break waits for the owner's approval, whatever its risk tier. See `blockers` in `tools/github/auto-merge-rules.ts`. A break counts only in the pull request whose diff changes `contract.json`.
 
 ## Two-way and one-way changes
 

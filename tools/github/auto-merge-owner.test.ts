@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import { ownerApproved } from '@tools/github/auto-merge';
 import { decide, facts, fake, head, merges } from '@tools/github/auto-merge-fake';
 import { blockers, verdictText } from '@tools/github/auto-merge-rules';
+import type { Result } from '@tools/github/stack';
 
 const reviews = 'gh api --paginate repos/eggdev/clutch/pulls/7/reviews';
 const oneWayDoor: [string, { out: string }] = [
@@ -81,4 +82,41 @@ test("the owner's approval never lifts the bot rule", () => {
     { headRefName: 'renovate/all-minor', author: { login: 'app/renovate', is_bot: true } },
   );
   expect(blockers(renovate, 'medium')).toEqual(['tools/x.ts is not a dependency file.']);
+});
+
+const contract = 'gh api repos/eggdev/clutch/contents/contract.json';
+
+/** The files of pull request 7, as `gh api repos/<repo>/pulls/7/files` lists them. */
+const files = (...names: Array<string>): [string, Partial<Result>] => [
+  'gh api --paginate repos/eggdev/clutch/pulls/7/files',
+  { out: names.map((filename) => JSON.stringify({ filename, patch: '' })).join('\n') },
+];
+
+/** A snapshot of the head that names `breaks`. */
+const snapshot = (breaks: unknown): [string, Partial<Result>] => [
+  contract,
+  { out: JSON.stringify({ breaks }) },
+];
+
+test('on holds a low-risk PR whose diff makes a contract break, until the owner approves its head', async () => {
+  const config = { mode: 'on', step: 'medium', owner: 'eggdev' } as const;
+  const waiting = fake([files('contract.json'), snapshot(['Note.title'])]);
+  const [before] = await decide(waiting, config);
+  expect(before).toContain(
+    'The contract snapshot names the break Note.title. The owner agrees to a break.',
+  );
+  expect(merges(waiting.calls)).toEqual([]);
+  expect(waiting.calls.filter((call) => call.includes('/pulls/7/files'))).toHaveLength(1);
+  const approvedHead = fake([
+    files('contract.json'),
+    snapshot(['Note.title']),
+    [reviews, { out: `APPROVED\t${head}` }],
+  ]);
+  expect(await decide(approvedHead, config)).toEqual([
+    'Would auto-merge at the step medium. The owner approved this head.\nQueued the merge.',
+  ]);
+  const untouched = fake([files('docs/x.md'), snapshot(['Note.title'])]);
+  expect(await decide(untouched, config)).toEqual([
+    'Would auto-merge at the step medium.\nQueued the merge.',
+  ]);
 });

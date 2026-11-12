@@ -22,6 +22,7 @@ import { autoMerged } from '@tools/github/auto-revert';
 import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
 import type { ChangedFile } from '@tools/github/bot-rule';
 import { retrying } from '@tools/github/command';
+import { contractBreaks } from '@tools/github/contract-breaks';
 import type { Run } from '@tools/github/stack';
 
 /**
@@ -33,8 +34,8 @@ import type { Run } from '@tools/github/stack';
  * check is red on the default branch, except for a revert. `dry-run` and `on`
  * comment a verdict once for each head commit of an agent PR, so the owner can
  * grade it: at the step for `dry-run`, and at the next step for `on`. `off` only
- * prints. The approval of `automerge.owner` on the head lifts the tier and the
- * owner findings, so a PR that waits for the owner merges once they approve. The Auto-merge workflow runs it from the base branch, so a pull request
+ * prints. The approval of `automerge.owner` on the head lifts the tier, a weaker
+ * journey and a contract break, so a PR that waits for the owner merges once they approve. The Auto-merge workflow runs it from the base branch, so a pull request
  * cannot change the rules that judge it. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 const usage = [
@@ -152,7 +153,11 @@ async function riskTier(run: Run, defaultBranch: string, sha: string) {
 }
 
 /** The changed files of a pull request, with their diffs. */
-async function changedFiles(run: Run, repo: string, pr: string): Promise<Array<ChangedFile>> {
+export async function changedFiles(
+  run: Run,
+  repo: string,
+  pr: string,
+): Promise<Array<ChangedFile>> {
   const out = await gh(
     run,
     'api',
@@ -242,14 +247,13 @@ export async function runAutoMerge(
   const bot = botKind(pr.headRefName);
   const names = await requiredChecks(run, repo, defaultBranch);
   const tier = await riskTier(run, defaultBranch, pr.headRefOid);
+  // Read once: the bot rule and the contract breaks judge the same files.
+  const changed = await changedFiles(run, repo, values.pr);
   let botProblems: Array<string> = [];
   if (bot === 'renovate') {
-    botProblems = renovateProblems(await changedFiles(run, repo, values.pr));
+    botProblems = renovateProblems(changed);
   } else if (bot === 'clutch-sync') {
-    botProblems = syncProblems(
-      await changedFiles(run, repo, values.pr),
-      await syncedFiles(run, pr.headRefOid),
-    );
+    botProblems = syncProblems(changed, await syncedFiles(run, pr.headRefOid));
   } else if (bot === 'gardening' && !['low', 'medium'].includes(tier)) {
     botProblems = [`The gardening PR's risk tier is ${tier}, not low or medium.`];
   } else if (bot === 'revert') {
@@ -266,6 +270,7 @@ export async function runAutoMerge(
     tier,
     checks,
     weakerJourneys: await weaker(run, defaultBranch, pr.headRefOid),
+    breaks: await contractBreaks(run, repo, changed, pr.headRefOid),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
     ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),

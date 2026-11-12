@@ -113,9 +113,9 @@ missing platform does not prevent work that does not depend on it.
   Exercise duplicate and stale events, claims, resume and failure reporting.
   Verify signed ingress, the evidence receipt and the required checks before
   enabling the route. A prepared or disabled route is not live dispatch.
-- **Merge or release:** Auto-merge merges an agent PR when its risk tier allows
-  and agent review leaves no owner finding. The owner merges one-way-door PRs and
-  PRs with an owner finding. Each merge to `main` is a release, and the release
+- **Merge or release:** Auto-merge merges an agent PR when its risk tier allows.
+  The owner merges one-way-door PRs, PRs that weaken a journey and PRs that make
+  a contract break. Each merge to `main` is a release, and the release
   follows it. Independent review must actually complete on the relevant
   revision; requesting a review is not a passing result.
 

@@ -192,3 +192,42 @@ test('merge of a PR that the owner approval already merged goes on to the releas
   expect(gh.calls.some((call) => call.startsWith('gh workflow run auto-merge.yml'))).toBe(false);
   expect(gh.calls.some((call) => call.startsWith('gh run list --workflow ci.yml'))).toBe(true);
 });
+
+test('merge prints the verdict and exits 3 when the judge holds a PR for a contract break', async () => {
+  const verdict = [
+    'Would not auto-merge at the step medium:',
+    '- The contract snapshot names the break Note.title. The owner agrees to a break.',
+  ];
+  const decided = JSON.stringify([
+    {
+      databaseId: 8,
+      displayTitle: 'Auto-merge #17',
+      status: 'completed',
+      conclusion: 'success',
+      createdAt: '2026-11-06T10:00:00Z',
+      url: 'https://github.com/o/r/actions/runs/8',
+    },
+  ]);
+  const gh = mergingWithFinding('h3ad', [], '', [
+    ['gh run list --workflow auto-merge.yml', [{ out: '[]' }, { out: decided }]],
+    [
+      'gh pr view 17 --json state,autoMergeRequest,mergeCommit',
+      { out: JSON.stringify({ state: 'OPEN', autoMergeRequest: null, mergeCommit: null }) },
+    ],
+    [
+      'gh run view 8 --log',
+      { out: verdict.map((line) => `decide\tDecide\t2026-11-06T10:00:02Z ${line}`).join('\n') },
+    ],
+  ]);
+  const printed: Array<string> = [];
+  const { log } = console;
+  console.log = (line: string) => printed.push(line);
+  try {
+    expect(await runPr(['merge', '17'], gh.run, noWrite, fakeClock())).toBe(3);
+  } finally {
+    console.log = log;
+  }
+  expect(printed).toContain(verdict.join('\n'));
+  expect(gh.calls).toContain('gh workflow run auto-merge.yml --ref main -f pr=17');
+  expect(gh.calls.some((call) => call.startsWith('gh pr merge'))).toBe(false);
+});
