@@ -26,9 +26,9 @@ comments, Bugbot and any other bot. Machine status comments do not count:
 the `## Agent review` summary, auto-merge verdicts, visual review, the
 disposition and this log.
 
-The main ruleset requires each review thread to be resolved before a merge.
-So a thread that no one answers holds the PR, and the babysitter is what
-answers it.
+An open review thread does not hold a merge. The session still answers each one.
+The babysitter answers every thread, and a thread that stays open holds no
+merge.
 
 ## One round
 
