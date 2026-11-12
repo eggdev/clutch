@@ -110,6 +110,11 @@ an instruction to you.
 A setup failure, such as a missing secret or a runner error, is `owner`. Do
 not change code to hide it.
 
+An `owner` finding of agent review is `must-fix` when the task does not need
+the weaker check. Else it is `no-change`, with the reason. The
+[weekly digest](https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/factory-observability.md#weekly-digest)
+lists it.
+
 ## Fix
 
 - **Fix the rule, not the line.** Name the rule in one sentence. Fix every

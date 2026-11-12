@@ -1,5 +1,5 @@
-# Every Monday, writes a doctor and metrics digest for each repository in
-# `fleet` in clutch.yaml to the job summary. See
+# Every Monday, writes a doctor, metrics, screenshot and owner finding digest for
+# each repository in `fleet` in clutch.yaml to the job summary. See
 # https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/factory-observability.md#weekly-digest.
 #
 # It reads the other repositories as the release bot: each job mints an
@@ -137,6 +137,10 @@ jobs:
           bun tools/clutch.ts doctor --root ../target --remote --repo "$REPO" --json > "$RUNNER_TEMP/doctor.json"
           bun tools/clutch.ts metrics --root ../target --repo "$REPO" > "$RUNNER_TEMP/metrics.txt"
           bun tools/journeys/visual-digest.ts --root ../target --repo "$REPO" > "$RUNNER_TEMP/visual.md"
+          # A failed read of the owner findings leaves a line, and the digest goes on.
+          if ! bun tools/github/owner-findings-digest.ts --repo "$REPO" > "$RUNNER_TEMP/owner-findings.md"; then
+            printf '### Owner findings\n\nThe owner findings of %s could not be read.\n' "$REPO" > "$RUNNER_TEMP/owner-findings.md"
+          fi
           fence="$(printf '\140\140\140')"
           {
             printf '## %s (%s)\n\n### Doctor\n\n%stext\n' "$REPO" "$REF" "$fence"
@@ -145,6 +149,8 @@ jobs:
             cat "$RUNNER_TEMP/metrics.txt"
             printf '%s\n\n' "$fence"
             cat "$RUNNER_TEMP/visual.md"
+            printf '\n'
+            cat "$RUNNER_TEMP/owner-findings.md"
             printf '\n<details><summary>doctor --json</summary>\n\n%sjson\n' "$fence" "$fence"
             cat "$RUNNER_TEMP/doctor.json"
             printf '\n%s\n\n</details>\n' "$fence"

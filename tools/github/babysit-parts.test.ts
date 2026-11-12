@@ -52,7 +52,35 @@ test('a cancelled check is not red, and the log is found among the oldest commen
               },
             ],
           },
-          reviewThreads: { nodes: [] },
+          reviewThreads: {
+            nodes: [
+              {
+                id: 'T1',
+                isResolved: false,
+                isOutdated: false,
+                path: 'a.ts',
+                line: 1,
+                comments: {
+                  nodes: [
+                    {
+                      databaseId: 2,
+                      author: { login: 'github-actions', __typename: 'Bot' },
+                      body: 'owner: weaker check',
+                      createdAt: 'x',
+                      url: '',
+                    },
+                    {
+                      databaseId: 3,
+                      author: { login: 'eggdev', __typename: 'User' },
+                      body: 'Why?',
+                      createdAt: 'x',
+                      url: '',
+                    },
+                  ],
+                },
+              },
+            ],
+          },
           oldest: {
             nodes: [
               { databaseId: 1, author: { login: 'app/bot' }, body: log, createdAt: 'x', url: '' },
@@ -78,6 +106,8 @@ test('a cancelled check is not red, and the log is found among the oldest commen
   expect(read.logId).toBe(1);
   expect(read.log.answered).toEqual([5]);
   expect(read.comments.length).toBe(1);
+  // GitHub's GraphQL API gives a bot's login with no "[bot]", so the read adds it, as the REST API writes it.
+  expect(read.threads[0]?.comments.map((c) => c.author)).toEqual(['github-actions[bot]', 'eggdev']);
 });
 
 test('the owner is asked only when nothing but the approval is left', () => {

@@ -169,7 +169,8 @@ finding. The push dismisses the approval, as
 [one approval round per batch](#one-approval-round-per-batch) says. Answer the
 finding as `not fixed: after the owner's approval`, and file the fix as an
 issue. Only a `blocking` finding or a `DIRTY` merge state justifies a push and
-a new approval.
+a new approval. The [weekly digest](https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/factory-observability.md#weekly-digest)
+lists each `owner` finding of a merged pull request.
 
 ## Stack a pull request on another one
 

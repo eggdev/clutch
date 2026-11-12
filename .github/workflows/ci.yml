@@ -162,7 +162,8 @@ jobs:
 
   # Which platforms the change reaches, by the reach rule in
   # tools/journeys/reach.ts. Native journeys run on a PR that touches a native
-  # app, shared runtime code or a sensitive path, and on each push to main.
+  # app, a native journey, the native tooling or shared runtime code, and on
+  # each push to main. A sensitive path alone reaches web only.
   # A platform's lane runs only when a native app declares its app ID. See
   # docs/contributing/end-to-end-testing.md#native-journeys.
   reach:

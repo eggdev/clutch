@@ -99,7 +99,8 @@ agent hook. A loosened guardrail lets drift in, so a person reviews each
 change that loosens one.
 
 - [`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them.
-  Agent review gives a change that makes one weaker an advisory `owner` finding. A change that makes one stronger
+  Agent review gives a change that makes one weaker an advisory `owner` finding.
+  The [weekly digest](https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/factory-observability.md#weekly-digest) lists each `owner` finding of a merged pull request. A change that makes one stronger
   merges like any other. See
   [decision record 0002](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
 - The list itself is not in the one-way-door tier. A change to it merges as

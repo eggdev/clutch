@@ -62,15 +62,15 @@ const query = `query($owner: String!, $name: String!, $number: Int!) {
       ... on StatusContext { context state targetUrl }
     } } } } } }
     reviewThreads(first: 100) { nodes { id isResolved isOutdated path line
-      comments(first: 50) { nodes { databaseId author { login } body createdAt url } } } }
-    oldest: comments(first: 20) { nodes { databaseId author { login } body createdAt url } }
-    comments(last: 100) { nodes { databaseId author { login } body createdAt url } }
+      comments(first: 50) { nodes { databaseId author { login __typename } body createdAt url } } } }
+    oldest: comments(first: 20) { nodes { databaseId author { login __typename } body createdAt url } }
+    comments(last: 100) { nodes { databaseId author { login __typename } body createdAt url } }
     reviews(last: 50) { nodes { databaseId author { login } state body submittedAt url commit { oid } } }
   } } }`;
 
 type Node = {
   databaseId: number;
-  author: { login: string } | null;
+  author: { login: string; __typename?: string } | null;
   body: string;
   createdAt: string;
   url: string;
@@ -123,9 +123,23 @@ type PrNode = {
   comments: { nodes: Array<Node> };
   reviews: { nodes: Array<ReviewNode> };
 };
+/**
+ * GitHub's GraphQL API gives a bot's login with no `[bot]`, such as
+ * `github-actions`. The read adds it, as the REST API writes it, so a rule can
+ * tell a bot's comment from a person's.
+ */
+const login = (author: Node['author']) => {
+  if (!author) {
+    return 'ghost';
+  }
+  return author.__typename === 'Bot' && !author.login.endsWith('[bot]')
+    ? `${author.login}[bot]`
+    : author.login;
+};
+
 const comment = (node: Node): Comment => ({
   id: node.databaseId,
-  author: node.author?.login ?? 'ghost',
+  author: login(node.author),
   body: node.body,
   at: node.createdAt,
   url: node.url,
@@ -181,7 +195,8 @@ export async function readPr(
       at: r.submittedAt,
       url: r.url,
     }));
-  // The rule of waitsForOwner in status.ts: the owner's latest review, in any state, approves this head.
+  // The owner's latest review, in any state, must approve this head. A later
+  // comment-only review undoes it, which `ownerApproved` in auto-merge.ts skips.
   const ownerReview = pr.reviews.nodes.findLast((r) => r.author?.login === owner);
   const compare = await run([
     'gh',

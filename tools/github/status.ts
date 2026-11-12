@@ -277,7 +277,9 @@ function reviewLine(review: { posted: boolean; blocking: number | null; owner: n
     review.blocking === null
       ? 'posted, but its blocking count is unreadable'
       : `${review.blocking} blocking`;
-  return review.owner > 0 ? `${blocking}, ${review.owner} owner (advisory)` : blocking;
+  return review.owner > 0
+    ? `${blocking}, ${review.owner} owner (the weekly digest lists them)`
+    : blocking;
 }
 
 /** The status as a short block. */
