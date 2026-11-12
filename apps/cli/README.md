@@ -410,7 +410,7 @@ mise exec -- bun run clutch labels --base origin/main --head HEAD --title "docs:
 It also gives `size/S` (up to 100 changed lines), `size/M` (300), `size/L`
 (800) or `size/XL`. Lockfiles, snapshots, `.clutch/` and the globs in
 `pr_size.exclude` do not count. Above `pr_size.warn` (300 by default) it
-prints a warning. It never fails.
+prints a warning. `tools/check-scope.ts` fails a PR above `pr_size.max`.
 
 `--json` adds the color and description of each label, the label prefixes
 that the command owns, and the person labels `one-way-door`, `revert` and
@@ -456,6 +456,8 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
   tier of its files, and a change with no files is `low`.
 - A rule with `guardrails: tools/guardrail-files.json` adds every pattern in
   that list to its paths, so the two cannot drift.
+- A rule with `journeys` holds nothing once each named journey exists on the
+  default branch. `tools/codeowners.ts` then leaves it out of CODEOWNERS too.
 - A rule with `lines` matches a file only when one of its added or removed
   lines matches one of those regular expressions, in upper or lower case. `tools/codeowners.ts` leaves
   such a rule out of CODEOWNERS, which cannot express it.
@@ -472,14 +474,14 @@ Clutch's own rules follow
 `one-way-door` holds only the hard core:
 
 - The merge gate: `.github/rulesets`, CODEOWNERS, `.clutch/risk.yaml`, the
-  guardrail list, the auto-merge script and workflow, agent review and
-  `review.md`, and the code that computes a tier.
+  guardrail list, the auto-merge script and workflow, agent review, and the
+  code that computes a tier.
 - Credentials: secret scanning and the MCP configs. A workflow change to
   `permissions:`, an environment, a secret, an app token's permissions or a
-  privileged trigger. The `automerge` and `agentReview` sections of
-  `clutch.yaml`.
-- Auth (`packages/access`, `packages/identity` and any `auth` folder), and a
-  migration whose SQL can lose data.
+  privileged trigger. The `automerge` section of `clutch.yaml`.
+- Auth (`packages/access`, `packages/identity` and any `auth` folder), until
+  its journeys exist.
+- A migration whose SQL can lose data.
 - A billing rule and an infra, deploy and secrets rule, both empty until a
   project names its paths.
 - Project intent.
@@ -517,16 +519,18 @@ automerge: # optional
   mode: dry-run # off (the default), dry-run or on
   step: low # bots (the default), low or medium: how far auto-merge reaches
   owner: eggdev # optional: the login whose reactions grade the dry-run verdicts
+deploy: # optional: the production deploy and the URL that proves it
+  command: [bun, run, deploy]
+  url: https://example.com
 autoRevert: # optional
   watch: [production] # checks or jobs that also count as required for auto-revert only
 pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 sast: auto # optional: auto (the default), codeql or semgrep
 pr_size: # optional
-  warn: 300 # the default: clutch labels warns above it, and never fails
+  warn: 300 # the default: clutch labels warns above it
+  max: 1000 # a PR above it fails check-scope and splits
   exclude: [] # globs whose lines do not count, such as generated code
-agentReview: # optional
-  missingCredential: notice # notice (the default) or fail
 factory: # optional
   root: factory # the default: the folder of the factory tree. . is the project root
 journeys: # optional: set webApp, inbox or both
@@ -561,10 +565,6 @@ a failed health check still reverts the PR that broke it. The default is an
 empty list. Auto-merge and the red-main metric judge main by the required checks
 alone. See [rollback](../../docs/contributing/operations/rollback.md#auto-revert).
 
-`agentReview.missingCredential` tells `agent-review.yml` what to do without an
-Anthropic credential: pass with a notice, or fail. Set `fail` once
-`agent-review` is a required check. See [agent review](../../docs/contributing/agent-review.md).
-
 `journeys.webApp` names the app that `bun run journey` drives in a browser. Set
 it when a repository has more than one app with a web entry, which is an Nx
 `dev` target that is not tagged `platform:server` or `platform:native`. Without
@@ -590,8 +590,7 @@ Semgrep even on a public repository. See
 The loader rejects unknown keys. Each error names its YAML path, such as
 `template.mode` or `capabilities.codeql_sast.reason`. An older `clutch.yaml`
 has `template.commit`. The loader accepts it and reads nothing from it, and
-the next sync removes it. Its `automerge` and
-`agentReview` sections are in the one-way-door tier. For the rest of the
+the next sync removes it. Its `automerge` section is in the one-way-door tier. For the rest of the
 file, agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
 
 ## Init

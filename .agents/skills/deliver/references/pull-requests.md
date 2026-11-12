@@ -85,20 +85,21 @@ Two kinds of PR wait for the owner without a GitHub approval rule:
 - A rule with `lines`, such as a workflow's `permissions:` or the `automerge`
   section of `clutch.yaml`. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
-- A PR with an `owner` finding from agent review. Auto-merge holds it, except
-  a pure Clutch sync whose findings are approved upstream (see
-  [Auto-merge](#auto-merge)).
+- A PR that weakens a journey or a budget, or removes a screen or a route.
+  Auto-merge holds it, by the comparison in `tools/github/weaker-journeys.ts`.
 
-Do not merge either kind with `pr merge` until the owner says so. `pr status` counts the `owner` findings and reports such a PR as not ready. `pr merge` refuses it until the owner approves it.
+Do not merge either kind with `pr merge` until the owner says so. A model
+finding holds neither `pr status` nor `pr merge`. The session still answers it.
 
 The owner's approval is the last step. When `automerge.owner` in `clutch.yaml`
 approves the head commit, an `on` run of Auto-merge passes an agent PR at any
-tier, and drops agent review's `owner` findings. The bot rule still holds a bot
+tier, and lifts a weaker journey. The bot rule still holds a bot
 PR, and a PR that a person opened is still refused. The required checks, a
-draft, the base branch and a red `main` still hold any PR. The session that
-watches the PR sees the approval and runs `bun run pr merge` again. A later
-push needs a new approval, and a later "Request changes" from the owner
-cancels it.
+native journey job that failed or still runs, a draft, the base branch and a
+red `main` still hold any PR (`tools/github/auto-merge-rules.ts`). The
+session that watches the PR sees the approval and runs `bun run pr merge`
+again. A later push needs a new approval, and a later "Request changes" from
+the owner cancels it.
 
 ## Follow a pull request to green
 
@@ -106,7 +107,7 @@ Between open and merge, the session that opened the PR stays with it and runs
 the [babysit-pr](../../babysit-pr/SKILL.md) skill. Each round syncs the PR with
 its base by merge, answers every review thread and comment, fixes what needs a
 fix, resolves each answered thread and keeps a `## Babysit log` comment. The
-main ruleset requires each review thread to be resolved before a merge. No
+open review thread does not hold a merge. No
 workflow or schedule does this for the session. In T3, the session watches the
 PR, and each change to its checks or reviews starts the next round. Elsewhere,
 `pr wait` blocks until the checks finish.
@@ -245,8 +246,7 @@ it. The check gives the message that names the reviewer.
 line in its `## Review disposition` comment. See
 [answer each finding](#answer-each-finding).
 
-`merge` accepts the owner's approval of the current head as the answer to the
-owner findings. The owner is `automerge.owner` in `clutch.yaml`, else the
+The owner is `automerge.owner` in `clutch.yaml`, else the
 default owner in `.github/CODEOWNERS`. A dismissed approval, or one on an older
 commit, does not count, and neither does another login's approval.
 
@@ -284,11 +284,10 @@ merge, set its task back to `todo` in the next branch.
 The Auto-merge workflow (`.github/workflows/auto-merge.yml`) judges one pull
 request of this repository, never a fork's. No schedule starts it. It runs
 when `pr merge` dispatches it, when the owner approves a head, and when CI or
-agent review completes on a PR that no session owns: a `revert/` PR or a bot's
-`renovate/`, `gardening/` or `clutch-sync/` PR. An agent's `clutch/` PR merges
-only when its session runs `pr merge`, or after the owner approves it. Its CI
-event judges it only once the owner approved it. When CI turns green on the
-default branch, each approved agent PR is judged again, since a red `main` may
+agent review completes on an agent's `clutch/` PR, a `revert/` PR or a bot's
+`renovate/`, `gardening/` or `clutch-sync/` PR. A green agent PR merges with no
+session. A session that is still working keeps its PR a draft. When CI turns
+green on the default branch, each open agent PR is judged again, since a red `main` may
 have held it. An agent PR is one that the release
 bot opens, so its author is a bot. The workflow also judges a PR on a
 `clutch/cl-NNN-<slug>` branch, which an agent makes, as a fallback for a project
@@ -304,7 +303,7 @@ takes the PRs of the steps before it:
 | -------- | --------------------------------------------------------------------------------------------- |
 | `bots`   | Bot PRs that pass the bot rule, and the revert PRs below.                                     |
 | `low`    | Also agent PRs that `clutch risk` gives `low`.                                                |
-| `medium` | Also agent PRs that it gives `medium`. Agent review passed, so they have 0 blocking findings. |
+| `medium` | Also agent PRs that it gives `medium`. |
 
 The revert rule: a `revert/<number>` PR, which the Revert workflow opens, merges
 at every step. It merges when auto-merge merged PR `<number>` and the revert's
@@ -312,19 +311,7 @@ own `clutch risk` tier is `low` or `medium`. It may merge while `main` is red,
 because it is the fix. A revert of a PR that a person merged waits for a person.
 See [auto-revert](../../../../docs/contributing/operations/rollback.md#auto-revert).
 
-The revert brake: the step steps down by itself. Each run counts the PRs that
-merged in the last 30 days, and how many of them have a head branch that starts
-with `revert/` and no `drill` label. A drill is a rehearsal, so it counts in the
-merges but not in the reverts. When there are at least 20 merges and reverts
-pass 2% of them, the run judges at the step below the configured one: `medium`
-acts as `low`,
-and `low` acts as `bots`. The verdict names the rate and the step. The brake
-lifts by itself when the rate falls back to 2% or less. The limits are `brake`
-in `tools/github/auto-merge-rules.ts`, and they come from
-[decision 0002](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
-Revert PRs merge at every step, so the brake does not hold them. When the count
-fails, the run uses the configured step and logs a warning. A person still
-tightens a path from its `risk-tighten` issue.
+A person tightens a path from its `risk-tighten` issue.
 
 The bot rule:
 
@@ -342,25 +329,20 @@ The bot rule:
   `add_on_sync` entry, such as the factory tree. The bot rule does not accept
   that file yet (CL-518), so a person merges that PR. The `clutch / doctor` check, which the project's CI
   runs and no ruleset requires, proves that the managed files match the release.
-  When it succeeds on the head, its `owner` findings are approved upstream and
-  hold nothing, as [decision 0003](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md)
-  records. The verdict still lists them.
 
 At each step, the PR also needs all of these:
 
 - It is open, not a draft, and its base is the default branch. A stacked PR
   waits.
-- The latest run of each required check of the default branch, and of
-  `agent-review`, succeeded on its head commit. Only runs that the GitHub
+- The latest run of each required check of the default branch succeeded on its head commit. Only runs that the GitHub
   Actions app reported count, as in the main ruleset. A run with the same name
   from another app or token counts for nothing.
 - No required check is red on the default branch's latest commit. A red
   `main` stops every auto-merge until it is green again, except a revert PR.
-- Agent review left no `owner` finding on its head, unless the PR is a pure
-  Clutch sync, as above. A change to the hard core gets one, and so does a
-  change that weakens a check that gates the merge, whatever its path. See
-  [owner findings](../../../../docs/contributing/review.md#owner-findings). The
-  owner merges such a PR.
+- The PR weakens no journey or budget, and removes no screen or route, by the
+  comparison in `tools/github/weaker-journeys.ts`. The owner's approval of the
+  head lifts this.
+- No native journey job failed or is running on its head.
 
 The workflow runs only from the default branch, with the default branch's
 rules, so a PR cannot change the rules that judge it. It refuses a fork's PR,

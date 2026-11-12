@@ -2,8 +2,8 @@
 # whose globs match it, and a change the highest tier of its files. A file that
 # no rule matches gets `unmatched`. A file that matches a rule's `except`
 # does not match that rule. A rule with `lines` matches a file only when one of
-# its added or removed lines matches, in upper or lower case. Auto-merge reads the tier, so this file
-# is part of the merge gate. See apps/cli/README.md#risk.
+# its added or removed lines matches, in upper or lower case. Auto-merge reads
+# the tier, so this file is part of the merge gate. See apps/cli/README.md#risk.
 #   low:          docs, tests and tracker files.
 #   medium:       everything else: product code, docs that state no rule,
 #                 agent skills, check scripts, lint config and workflows.
@@ -33,11 +33,11 @@ rules:
       # Each auto-merge file that decides or makes a merge. Its tests and the
       # fake are not held. Name a new auto-merge source file here.
       - tools/github/auto-merge.ts
-      - tools/github/auto-merge-brake.ts
       - tools/github/auto-merge-checks.ts
       - tools/github/auto-merge-enable.ts
       - tools/github/auto-merge-rules.ts
       - tools/github/bot-rule.ts
+      - tools/github/weaker-journeys.ts
       - .github/workflows/auto-merge.yml
       - .github/workflows/agent-review.yml
       - apps/cli/src/risk/tiers.ts
@@ -48,10 +48,6 @@ rules:
       - .gitleaksignore
       - .mcp.json
       - .cursor/mcp.json
-      # Auth and access: who an actor is and what it may see.
-      - '**/auth/**'
-      - packages/access/**
-      - packages/identity/**
       # What the product is for. It is what stops the project drifting.
       - docs/contributing/project-intent.md
   - tier: one-way-door
@@ -72,6 +68,14 @@ rules:
       - '\balter\s+(column\s+)?\S+\s+(set\s+data\s+)?type\b'
       - '^\s*drop\s+(?!constraint\b|default\b|not\s+null\b|index\b)'
   - tier: one-way-door
+    # Auth and access: who an actor is and what it may see. When each journey
+    # exists on the default branch, proof holds these paths and the owner does not.
+    paths:
+      - '**/auth/**'
+      - packages/access/**
+      - packages/identity/**
+    journeys: [sign-up, sign-in, roles-and-access, account-security]
+  - tier: one-way-door
     # Credentials and permissions in a workflow: its token permissions, an
     # environment, a secret, an app token's permissions, or a trigger that runs
     # with this repository's secrets. Any other workflow change is medium.
@@ -85,13 +89,12 @@ rules:
       - '^\s*permission-[a-z-]+:'
       - '^\s*(pull_request_target|workflow_run):'
   - tier: one-way-door
-    # The automerge and agentReview sections of clutch.yaml. The rest of the
+    # The automerge section of clutch.yaml. The rest of the
     # file, such as capabilities, is medium.
     paths:
       - clutch.yaml
     lines:
       - '^automerge:'
-      - '^agentReview:'
       - '^\s+(step|owner|missingCredential):'
       - '^\s+mode:\s*(on|off|dry-run)\b'
   - tier: one-way-door

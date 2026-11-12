@@ -1,13 +1,12 @@
 import path from 'node:path';
 
-import { ownerFindings } from '@tools/github/auto-merge';
 import { readWatch } from '@tools/github/auto-revert';
 import { prFindings, unanswered } from '@tools/github/findings';
 import { defaultBranch, must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import { autoMerge, watchMain } from '@tools/github/main-watch';
 import type { Run } from '@tools/github/stack';
-import { waitForChecks, waitsForOwner } from '@tools/github/status';
+import { waitForChecks } from '@tools/github/status';
 
 const root = path.resolve(import.meta.dir, '../..');
 
@@ -180,13 +179,6 @@ async function mergeOpen(
   const link = pr.url ? ` The approve link: ${pr.url}/files` : '';
   if (problem) {
     throw new Error(`${problem}${link}`);
-  }
-  const findings = await ownerFindings(run, '{owner}/{repo}', pr.headRefOid);
-  const owner = findings.length;
-  if (await waitsForOwner(run, number, pr, owner)) {
-    throw new Error(
-      `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. Ask the owner in this session's thread.${link}`,
-    );
   }
   // Each finding of every head has a fix or a reason, so none drops out unseen.
   const open = unanswered(await prFindings(run, number));

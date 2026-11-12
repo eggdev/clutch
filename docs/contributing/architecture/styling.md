@@ -106,7 +106,7 @@ rules.
 
 ## Design proposals
 
-A new screen or a material UI change starts as a design proposal. It shows
+A design proposal is for when the owner asks for options. It shows
 today's screen next to 2 or 3 directions, built from the components and roles
 on this page. It renders in the app at phone and desktop widths. The owner
 picks one direction, and the build PRs follow it. See the

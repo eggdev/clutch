@@ -2,7 +2,6 @@ import { appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { judgeAtStep } from '@tools/github/auto-merge-brake';
 import { actionsApp, checkConclusions } from '@tools/github/auto-merge-checks';
 import { enableAutoMerge, gh, hasMarker, must } from '@tools/github/auto-merge-enable';
 import {
@@ -16,6 +15,7 @@ import {
   noVerdictYet,
   revertProblems,
   steps,
+  verdictText,
 } from '@tools/github/auto-merge-rules';
 import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rules';
 import { autoMerged } from '@tools/github/auto-revert';
@@ -47,9 +47,6 @@ const root = path.resolve(import.meta.dir, '../..');
 /** The check that agent review reports. It joins the required checks of the default branch. */
 const agentReview = 'agent-review';
 
-/** The check that a project's CI runs for Clutch: `clutch doctor --check`. No ruleset requires it, so the rule reads it. */
-const doctorCheck = 'clutch / doctor';
-
 /** `automerge` in clutch.yaml. A project without it is `off`, and the step defaults to `bots`. */
 export async function readConfig(): Promise<Config> {
   const file = Bun.file(path.join(root, 'clutch.yaml'));
@@ -79,7 +76,7 @@ async function requiredChecks(run: Run, repo: string, branch: string) {
     '--jq',
     '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]',
   );
-  return [...new Set([...(JSON.parse(out) as Array<string>), agentReview])];
+  return [...new Set(JSON.parse(out) as Array<string>)];
 }
 
 /**
@@ -258,26 +255,29 @@ export async function runAutoMerge(
   } else if (bot === 'revert') {
     botProblems = await revertProblems(pr.headRefName, tier, (n) => autoMerged(run, repo, n));
   }
-  const conclusions = await checkConclusions(run, repo, pr.headRefOid, [...names, doctorCheck]);
-  const { [doctorCheck]: doctor, ...checks } = conclusions;
+  const checks = await checkConclusions(run, repo, pr.headRefOid, names);
+  // Loaded here because `pr status` imports this file, and a project's `pr` runs without TypeScript.
+  const { weakerJourneys: weaker } = await import('@tools/github/weaker-journeys');
+  const native = await checkConclusions(run, repo, pr.headRefOid, ['native-ios', 'native-android']);
   const facts: Facts = {
+    native,
     pr,
     defaultBranch,
     tier,
     checks,
-    doctor,
-    ownerFindings: await ownerFindings(run, repo, pr.headRefOid),
+    weakerJourneys: await weaker(run, defaultBranch, pr.headRefOid),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
     ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),
   };
-  const { effective, reasons, verdict } = await judgeAtStep(run, facts, step, log);
+  const reasons = blockers(facts, step);
+  const verdict = verdictText(reasons, step, facts.ownerApproved);
   if (mode === 'on' && reasons.length === 0) {
     if (handoff) {
-      await handoff(effective);
+      await handoff(step);
       log(`${verdict}\nHanded the merge to the merge job.`);
     } else {
-      await enableAutoMerge(run, repo, values.pr, pr.headRefOid, effective);
+      await enableAutoMerge(run, repo, values.pr, pr.headRefOid, step);
       log(`${verdict}\nQueued the merge.`);
     }
     return 0;
@@ -286,11 +286,11 @@ export async function runAutoMerge(
     log(verdict);
     return 0;
   }
-  if (lastStepOn(mode, effective)) {
-    log(`${verdict}\nNo dry-run comment: the step ${effective} is the last.`);
+  if (lastStepOn(mode, step)) {
+    log(`${verdict}\nNo dry-run comment: the step ${step} is the last.`);
     return 0;
   }
-  const calibrate = mode === 'on' ? nextStep(effective) : effective;
+  const calibrate = mode === 'on' ? nextStep(step) : step;
   const graded = blockers(facts, calibrate);
   const wait = noVerdictYet(facts);
   if (wait) {

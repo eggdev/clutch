@@ -28,13 +28,13 @@ permissive and tighten only on evidence. Only this hard core needs Brendan:
 - Decision records and policy docs: this folder, `docs/principles`, project
   intent and `.clutch/PLAN.md`.
 
-Everything else merges at the step `medium` once every check passes and agent
-review has 0 blocking findings. That covers product code, docs, agent skills,
+Everything else merges at the step `medium` once every check passes. A
+model's finding holds no merge. That covers product code, docs, agent skills,
 check scripts, lint config and other workflows. Two guards make it safe:
 
-- Agent review gives an `owner` finding to a change that weakens a check, a
-  lint rule, a budget or a test, whatever its path. Auto-merge leaves that PR
-  for Brendan. It is the one guard for a weaker or deleted test.
+- A deterministic check, [weaker-journeys.ts](../../../tools/github/weaker-journeys.ts),
+  finds a change that weakens a journey or a budget, whatever its path.
+  Auto-merge leaves that PR for Brendan.
 - When `main` turns red after an auto-merged PR, the Auto-revert workflow opens
   its revert PR. Each revert of an auto-merged PR files a `risk-tighten` issue
   that proposes to tighten its path. `clutch metrics` watches the share with
@@ -42,19 +42,19 @@ check scripts, lint config and other workflows. Two guards make it safe:
 
 This amends [0001](./0001-allow-shrink-only-ratchets.md): the ratchet
 baseline stays a guardrail file, and `check-ratchets` fails any count that
-rises. A person sees a change to it only when agent review finds it weaker.
+rises. That check, not a person, guards the baseline against a weaker count.
 
 ## Consequences
 
 Agents ship most work without waiting for Brendan, and he reviews the hard
-core and the owner findings. The guard against a weaker check now rests on
-agent review, which can miss one. The revert and the tighten issue catch what
-it misses, after the merge. CODEOWNERS cannot express the line rules on
-workflows and `clutch.yaml`, so for those auto-merge holds the PR, and GitHub
-does not require an approval.
+core and the PRs that weaken a journey or a budget. The guard against a weaker
+check rests on that deterministic check, which covers only journeys and
+budgets. The revert and the tighten issue catch what it misses, after the
+merge. CODEOWNERS cannot express the line rules on workflows and
+`clutch.yaml`, so for those auto-merge holds the PR, and GitHub does not
+require an approval.
 
 **Revisit if:** reverts pass 2% of merged PRs in a 30-day window, or a
 `risk-tighten` issue names the same path twice. Tighten that path, or the
-rule, first. Auto-merge now steps down by itself when reverts pass 2%, see the
-[revert brake](../../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
-A person still tightens the path from the `risk-tighten` issue.
+rule, first. The revert brake that stepped auto-merge down is gone: the owner removed it on
+2026-11-08 (CL-454). A person still tightens the path from the `risk-tighten` issue.

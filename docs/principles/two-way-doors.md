@@ -25,9 +25,10 @@ Before a one-way change merges:
    that exists before you write a new one. See
    [proof gates code](./proof-gates-code.md).
    A path in the `one-way-door` tier of `.clutch/risk.yaml` still needs the
-   owner's approval until its journeys exist and pass. A migration that can
-   lose data always needs the owner: one that drops, empties, deletes or
-   retypes stored data. A migration also needs its rehearsal, as the [rules for stored shapes](#rules-for-stored-shapes)
+   owner's approval until its journeys exist. A migration that can lose data
+   always needs the owner: one that drops, empties, deletes or retypes stored
+   data. A migration also needs its rehearsal, as the
+   [rules for stored shapes](#rules-for-stored-shapes)
    say.
 2. Add a PR section that lists each copy that outlives the deploy and its
    recovery path.

@@ -1,6 +1,14 @@
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
-import { codeownersText, currentOwners, oneWayDoorGlobs, ownerPatterns } from '@tools/codeowners';
+import {
+  codeownersText,
+  currentOwners,
+  journeysPresent,
+  oneWayDoorGlobs,
+  ownerPatterns,
+} from '@tools/codeowners';
 import { inRepo } from '@tools/testing/in-repo';
 
 test('a risk glob becomes CODEOWNERS patterns', () => {
@@ -57,4 +65,14 @@ test('the file keeps its owners and lists each pattern once', () => {
     '/nx.json @a @org/team',
     '/tools/lint/ @a @org/team',
   ]);
+});
+
+// apps/cli/src/risk/tiers.ts holds the other copy of journeysPresent. Its test
+// reads the same fixture and expects the same names, so the copies cannot drift.
+test('journeysPresent gives the names of the shared fixture', async () => {
+  const fixture = JSON.parse(
+    readFileSync(path.join(import.meta.dir, 'testing/journeys-present-fixture.json'), 'utf-8'),
+  ) as { files: Record<string, string>; expected: Array<string> };
+  const names = await inRepo(fixture.files, (root) => [...journeysPresent(root)].toSorted());
+  expect(names).toEqual(fixture.expected);
 });

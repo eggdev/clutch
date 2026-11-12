@@ -24,8 +24,8 @@ the issue below and the repository. You write only to the issue file.
    [`docs/contributing/architecture/index.md`](../../../docs/contributing/architecture/index.md) maps them. Follow the research and
    design reference of the deliver skill,
    [`.agents/skills/deliver/references/research-and-design.md`](../../../.agents/skills/deliver/references/research-and-design.md). For a new
-   visible feature, follow the design-proposal skill,
-   `.agents/skills/design-proposal/SKILL.md`.
+   visible feature, build your pick. Use the design-proposal skill,
+   `.agents/skills/design-proposal/SKILL.md`, only when the owner asks for options.
 3. Run a small experiment when a fact decides the plan. Do not build the
    change.
 

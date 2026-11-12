@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -10,6 +10,10 @@ async function writeFiles(root: string, files: Record<string, string>) {
     await writeFile(path.join(root, name), content);
   }
 }
+
+/** The repo's own identity and no commit signing, as `git config` writes them. */
+const localConfig =
+  '[user]\n\tname = Test\n\temail = test@example.com\n[commit]\n\tgpgsign = false\n';
 
 /**
  * Makes a temporary folder that holds a git repo with one commit of `files` on
@@ -27,9 +31,8 @@ export async function gitRepo(
   await writeFiles(root, files);
   if (options.git !== false) {
     await gitOrThrow(root, 'init', '--quiet', '--initial-branch=main');
-    await gitOrThrow(root, 'config', 'user.name', 'Test');
-    await gitOrThrow(root, 'config', 'user.email', 'test@example.com');
-    await gitOrThrow(root, 'config', 'commit.gpgsign', 'false');
+    // One write in place of three `git config` processes.
+    await appendFile(path.join(root, '.git/config'), localConfig);
     await gitOrThrow(root, 'add', '--all');
     await gitOrThrow(root, 'commit', '--quiet', '--allow-empty', '--message', 'Initial commit');
   }
