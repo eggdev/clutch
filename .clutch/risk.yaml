@@ -81,13 +81,12 @@ rules:
       - '^\s*permission-[a-z-]+:'
       - '^\s*(pull_request_target|workflow_run):'
   - tier: one-way-door
-    # The automerge and agentReview sections of clutch.yaml. The rest of the
+    # The automerge section of clutch.yaml. The rest of the
     # file, such as capabilities, is medium.
     paths:
       - clutch.yaml
     lines:
       - '^automerge:'
-      - '^agentReview:'
       - '^\s+(step|owner|missingCredential):'
       - '^\s+mode:\s*(on|off|dry-run)\b'
   - tier: one-way-door

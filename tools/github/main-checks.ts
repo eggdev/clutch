@@ -29,7 +29,7 @@ async function gh(run: Run, ...args: Array<string>) {
   return result.out.trim();
 }
 
-/** The required status checks of `branch`, plus agent review. */
+/** The required status checks of `branch`. */
 export async function requiredChecks(run: Run, repo: string, branch: string) {
   const out = await gh(
     run,
