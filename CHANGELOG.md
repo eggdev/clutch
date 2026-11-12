@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.3.0 (2026-11-12)
+
+### Features
+
+- Hold a PR that removes a screen or route, and tie a new feature to a user goal from project intent.
+
+## 1.2.0 (2026-11-12)
+
+### Features
+
+- Deploy each green main, prove the core journeys on production, and fail a project that ships with no deploy.
+- feat(deploy): deploy green main and prove it on production
+
+## 1.1.0 (2026-11-12)
+
+### Features
+
+- Take agent review and the visual verdict out of the merge decision.
+- Replace the design stop with a hand-test marker, and fail a pull request over its scope limit.
+
+## 1.0.2 (2026-11-12)
+
+### Fixes and maintenance
+
+- fix(journeys): start the native lanes only for a change that can reach the app (CL-474)
+
+## 1.0.1 (2026-11-12)
+
+### Fixes and maintenance
+
+- chore(clutch): file the findings of the council review
+
 ## 1.0.0 (2026-11-12)
 
 ### Breaking changes
