@@ -55,10 +55,6 @@ export type ClutchConfig = {
   sast?: (typeof sastEngines)[number];
   /** When `clutch labels` warns about a large PR, and when a PR must split. */
   pr_size?: { warn: number; max?: number; exclude: Array<string> };
-  /**
-   * What agent-review.yml does without an Anthropic credential: pass with a
-   * notice (the default), or fail, once agent review is a required check.
-   */
   /** Whether the project has each core journey. See docs/contributing/journeys/core.md. */
   coreJourneys?: Record<CoreJourney, CoreDecision>;
   /** The quality budgets of the core journeys, which kickoff fills. */
