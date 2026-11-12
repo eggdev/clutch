@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.66.0 (2026-11-12)
+
+### Features
+
+- Hold a PR that weakens a journey or budget, by a deterministic comparison, and make model review findings advisory.
+
 ## 0.65.0 (2026-11-12)
 
 ### Features
