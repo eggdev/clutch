@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 (2026-11-12)
+
+### Features
+
+- Deploy each green main, prove the core journeys on production, and fail a project that ships with no deploy.
+- feat(deploy): deploy green main and prove it on production
+
 ## 1.1.0 (2026-11-12)
 
 ### Features
