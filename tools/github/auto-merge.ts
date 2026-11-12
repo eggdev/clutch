@@ -140,20 +140,6 @@ export async function ownerFindings(run: Run, repo: string, sha: string) {
   return out.split('\n').filter(Boolean);
 }
 
-async function riskTier(run: Run, defaultBranch: string, sha: string) {
-  const out = await must(run, [
-    'bun',
-    'tools/clutch.ts',
-    'risk',
-    '--base',
-    `origin/${defaultBranch}`,
-    '--head',
-    sha,
-    '--json',
-  ]);
-  return (JSON.parse(out) as { tier: string }).tier;
-}
-
 /** The changed files of a pull request, with their diffs. */
 async function changedFiles(run: Run, repo: string, pr: string): Promise<Array<ChangedFile>> {
   const out = await gh(
@@ -168,6 +154,57 @@ async function changedFiles(run: Run, repo: string, pr: string): Promise<Array<C
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line) as ChangedFile);
+}
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+/**
+ * The one-way changes that the contract snapshot at `sha` names under `breaks`,
+ * when pull request `pr` changes `contract.json`. A pull request that leaves the
+ * file alone has none, so a break counts only in the pull request that makes it.
+ * A snapshot whose `breaks` is not a list of strings is refused, as is any other
+ * failure of the read.
+ */
+export async function contractBreaks(run: Run, repo: string, pr: string, sha: string) {
+  const changed = await changedFiles(run, repo, pr);
+  if (!changed.some((file) => file.filename === 'contract.json')) {
+    return [];
+  }
+  const endpoint = `repos/${repo}/contents/contract.json?ref=${sha}`;
+  const result = await run(['gh', 'api', endpoint, '--jq', '.content | @base64d']);
+  if (!result.ok) {
+    if (/HTTP 404/u.test(result.err)) {
+      return [];
+    }
+    throw new Error(`gh api ${endpoint} failed: ${result.err || result.out}`);
+  }
+  const snapshot: unknown = JSON.parse(result.out);
+  const breaks =
+    typeof snapshot === 'object' && snapshot !== null && 'breaks' in snapshot
+      ? snapshot.breaks
+      : undefined;
+  if (!Array.isArray(breaks)) {
+    throw new TypeError(`contract.json at ${sha}: \`breaks\` is not a list of strings.`);
+  }
+  const names = breaks.filter(isString);
+  if (names.length !== breaks.length) {
+    throw new TypeError(`contract.json at ${sha}: \`breaks\` is not a list of strings.`);
+  }
+  return names;
+}
+
+async function riskTier(run: Run, defaultBranch: string, sha: string) {
+  const out = await must(run, [
+    'bun',
+    'tools/clutch.ts',
+    'risk',
+    '--base',
+    `origin/${defaultBranch}`,
+    '--head',
+    sha,
+    '--json',
+  ]);
+  return (JSON.parse(out) as { tier: string }).tier;
 }
 
 /** The managed files that `.clutch/lineage.json` lists at `sha`, from the checkout. None without one. */
@@ -267,6 +304,7 @@ export async function runAutoMerge(
     checks,
     doctor,
     ownerFindings: await ownerFindings(run, repo, pr.headRefOid),
+    breaks: await contractBreaks(run, repo, values.pr, pr.headRefOid),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
     ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),

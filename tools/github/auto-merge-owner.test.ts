@@ -1,8 +1,9 @@
 import { expect, test } from 'bun:test';
 
-import { ownerApproved } from '@tools/github/auto-merge';
+import { contractBreaks, ownerApproved } from '@tools/github/auto-merge';
 import { decide, facts, fake, head, merges } from '@tools/github/auto-merge-fake';
 import { blockers, verdictText } from '@tools/github/auto-merge-rules';
+import type { Result } from '@tools/github/stack';
 
 const reviews = 'gh api --paginate repos/eggdev/clutch/pulls/7/reviews';
 const oneWayDoor: [string, { out: string }] = [
@@ -78,4 +79,57 @@ test("the owner's approval never lifts the bot rule", () => {
     { headRefName: 'renovate/all-minor', author: { login: 'app/renovate', is_bot: true } },
   );
   expect(blockers(renovate, 'medium')).toEqual(['tools/x.ts is not a dependency file.']);
+});
+
+const contract = 'gh api repos/eggdev/clutch/contents/contract.json';
+
+/** The files of pull request 7, as `gh api repos/<repo>/pulls/7/files` lists them. */
+const files = (...names: Array<string>): [string, Partial<Result>] => [
+  'gh api --paginate repos/eggdev/clutch/pulls/7/files',
+  { out: names.map((filename) => JSON.stringify({ filename, patch: '' })).join('\n') },
+];
+
+test('contractBreaks gives each name the snapshot of the head names under breaks', async () => {
+  const two = fake([
+    files('contract.json'),
+    [contract, { out: JSON.stringify({ breaks: ['A.one', 'B.two'] }) }],
+  ]);
+  expect(await contractBreaks(two.run, 'eggdev/clutch', '7', head)).toEqual(['A.one', 'B.two']);
+  expect(two.calls.find((call) => call.startsWith(contract))).toContain(`?ref=${head}`);
+  const none = fake([files('contract.json'), [contract, { out: JSON.stringify({ breaks: [] }) }]]);
+  expect(await contractBreaks(none.run, 'eggdev/clutch', '7', head)).toEqual([]);
+});
+
+test('contractBreaks has no breaks when the head has no contract snapshot', async () => {
+  const missing = fake([
+    files('contract.json'),
+    [contract, { ok: false, err: 'gh: Not Found (HTTP 404)' }],
+  ]);
+  expect(await contractBreaks(missing.run, 'eggdev/clutch', '7', head)).toEqual([]);
+});
+
+test('contractBreaks refuses a snapshot whose breaks is not a list of strings', async () => {
+  const bad = fake([
+    files('contract.json'),
+    [contract, { out: JSON.stringify({ breaks: 'Note.title' }) }],
+  ]);
+  await expect(contractBreaks(bad.run, 'eggdev/clutch', '7', head)).rejects.toThrow(
+    `contract.json at ${head}: \`breaks\` is not a list of strings.`,
+  );
+  const mixed = fake([
+    files('contract.json'),
+    [contract, { out: JSON.stringify({ breaks: ['A', 1] }) }],
+  ]);
+  await expect(contractBreaks(mixed.run, 'eggdev/clutch', '7', head)).rejects.toThrow(
+    `contract.json at ${head}`,
+  );
+});
+
+test('a pull request that does not change contract.json has no breaks, also when the snapshot of its head names one', async () => {
+  const gh = fake([
+    files('bun.lock'),
+    [contract, { out: JSON.stringify({ breaks: ['Note.title'] }) }],
+  ]);
+  expect(await contractBreaks(gh.run, 'eggdev/clutch', '7', head)).toEqual([]);
+  expect(gh.calls.some((call) => call.startsWith(contract))).toBe(false);
 });

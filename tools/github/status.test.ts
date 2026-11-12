@@ -326,3 +326,26 @@ test('a summary posted after the run on this head started counts', async () => {
     ready: true,
   });
 });
+
+test('a PR that names a contract break is not ready, and pr status names the break', async () => {
+  const gh = fake([
+    [
+      'gh pr view 7',
+      view(head170, [check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]),
+    ],
+    rules,
+    comments(summary170),
+    ...findingsOn(head170, []),
+    [
+      'gh api --paginate repos/{owner}/{repo}/pulls/7/files',
+      { out: JSON.stringify({ filename: 'contract.json', patch: '' }) },
+    ],
+    ['gh api repos/{owner}/{repo}/contents/contract.json', { out: '{"breaks":["Note.title"]}' }],
+    reviews170,
+  ]);
+  const status = await prStatus(gh.run, '7');
+  expect(status).toMatchObject({ contractBreaks: ['Note.title'], ready: false });
+  expect(renderStatus(status)).toContain(
+    'Contract breaks: Note.title. The owner agrees to a break.',
+  );
+});

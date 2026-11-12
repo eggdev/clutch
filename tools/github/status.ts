@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { ownerFindings } from '@tools/github/auto-merge';
+import { contractBreaks, ownerFindings } from '@tools/github/auto-merge';
 import { marker } from '@tools/github/auto-merge-rules';
 import { must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
@@ -249,6 +249,8 @@ export async function prStatus(run: Run, number: string) {
   // The annotations of the latest agent-review run on the head decide whether an owner finding exists, as auto-merge reads them.
   const findings = await ownerFindings(run, '{owner}/{repo}', pr.headRefOid);
   const owner = await ownerCount(run, number, pr.headRefOid, findings.length);
+  // The one-way changes that the snapshot of the head names, which the owner agrees to.
+  const breaks = await contractBreaks(run, '{owner}/{repo}', number, pr.headRefOid);
   // A repository without agent review has no review to wait for.
   const reviewed =
     blocking === 0 || (blocking === null && !all.some((check) => check.name === 'agent-review'));
@@ -258,7 +260,8 @@ export async function prStatus(run: Run, number: string) {
   const review =
     pr.reviewDecision || (pr.mergeStateStatus === 'BLOCKED' ? 'BLOCKED by a rule' : '');
   const approved =
-    !(await waitsForOwner(run, number, pr, owner)) && (review === '' || review === 'APPROVED');
+    !(await waitsForOwner(run, number, pr, owner + breaks.length)) &&
+    (review === '' || review === 'APPROVED');
   const ready =
     pr.state === 'OPEN' &&
     pr.mergeable === 'MERGEABLE' &&
@@ -280,6 +283,7 @@ export async function prStatus(run: Run, number: string) {
     checks: all,
     counts: { pass: count('pass'), fail: count('fail'), pending: count('pending') },
     agentReview: { posted: reviewComment !== undefined, blocking, owner },
+    contractBreaks: breaks,
     review: review || 'none required',
     dryRun: dryRun ? verdict(dryRun.body) : null,
     ready,
@@ -312,6 +316,9 @@ export function renderStatus(status: PrStatus) {
     `Required: ${status.required.map((check) => `${check.name} ${check.state}`).join(', ') || 'none'}`,
     `Checks: ${status.counts.pass} pass, ${status.counts.fail} fail, ${status.counts.pending} pending${failing.length > 0 ? ` (failed: ${failing.join(', ')})` : ''}`,
     `Agent review: ${reviewLine(status.agentReview)}. Review decision: ${status.review}.`,
+    ...(status.contractBreaks.length > 0
+      ? [`Contract breaks: ${status.contractBreaks.join(', ')}. The owner agrees to a break.`]
+      : []),
     `Dry run: ${status.dryRun ? `${status.dryRun} auto-merge at ${status.head.slice(0, 7)}` : 'no verdict for this head'}`,
     `Ready to merge: ${status.ready ? 'yes' : 'no'}`,
   ].join('\n');

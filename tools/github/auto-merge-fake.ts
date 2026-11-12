@@ -25,6 +25,7 @@ export const facts = (fields: Partial<Facts> = {}, pr: Partial<Facts['pr']> = {}
   checks: { validate: 'success', 'agent-review': 'success' },
   doctor: 'missing',
   ownerFindings: [],
+  breaks: [],
   botProblems: [],
   mainRed: [],
   ownerApproved: false,

@@ -259,3 +259,35 @@ test('the judged path refuses an owner finding without the approval, and dispatc
   expect(judged.calls).toContain('gh workflow run auto-merge.yml --ref main -f pr=17');
   expect(judged.calls.some((call) => call.startsWith('gh pr merge 17'))).toBe(false);
 });
+
+test('merge refuses a PR that names a contract break, and names it, until the owner approves', async () => {
+  const gh = fake([
+    trunk,
+    ['gh pr view 17 --json mergeCommit', { out: 'm3rge' }],
+    [
+      'gh pr view 17',
+      {
+        out: JSON.stringify({
+          baseRefName: 'main',
+          headRefName: 'cl-027',
+          headRefOid: 'h3ad',
+          reviewDecision: '',
+          mergeStateStatus: 'CLEAN',
+          reviewRequests: [],
+          latestReviews: [],
+        }),
+      },
+    ],
+    [
+      'gh api --paginate repos/{owner}/{repo}/pulls/17/files',
+      { out: JSON.stringify({ filename: 'contract.json', patch: '' }) },
+    ],
+    ['gh api repos/{owner}/{repo}/contents/contract.json', { out: '{"breaks":["Note.title"]}' }],
+    ...findingsOn('h3ad', []),
+    reviewsOf('17'),
+  ]);
+  await expect(runPr(['merge', '17'], gh.run, noWrite, fakeClock())).rejects.toThrow(
+    "#17 waits for the owner, who agrees to the contract break(s) Note.title. Ask the owner in this session's thread.",
+  );
+  expect(gh.calls.some((call) => call.startsWith('gh pr merge'))).toBe(false);
+});

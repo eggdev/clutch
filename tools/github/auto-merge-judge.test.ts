@@ -212,6 +212,15 @@ test('brakedStep keeps the step under the rate or the minimum', () => {
   }
 });
 
+test('a named contract break holds a low-risk PR for the owner, and the owner approval lifts it', () => {
+  const broken = facts({ breaks: ['Note.title'] });
+  expect(blockers(broken, 'low')).toEqual([
+    'The contract snapshot names the break Note.title. The owner agrees to a break.',
+  ]);
+  expect(blockers({ ...broken, ownerApproved: true }, 'low')).toEqual([]);
+  expect(blockers(facts({ breaks: [] }), 'low')).toEqual([]);
+});
+
 test('brakeReason names the rate, the counts and the step', () => {
   expect(brakeReason(40, 3, 'medium', 'low')).toBe(
     'Reverts are 3 of 40 merged PRs in the last 30d, 7.5%, over the 2% brake, so the step drops from medium to low.',

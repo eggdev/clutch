@@ -71,6 +71,12 @@ export type Facts = {
    * the findings of a pure Clutch sync, see `approvedUpstream`.
    */
   ownerFindings: Array<string>;
+  /**
+   * Each one-way change that the contract snapshot of the head names under
+   * `breaks`, when the PR's own diff changes `contract.json`. The owner agrees
+   * to a break, so each one leaves the PR for the owner, whatever its risk tier.
+   */
+  breaks: Array<string>;
   /** Why a bot PR fails its bot rule: a diff that is more than a version, or a revert that may not merge. Empty for an agent PR. */
   botProblems: Array<string>;
   /** Each required check that failed on the default branch's latest commit. */
@@ -153,10 +159,11 @@ export function upstreamFindings(facts: Facts) {
 
 /**
  * The holds that the owner's approval of the head lifts, decided in one place:
- * the step and risk tier of an agent PR, and agent review's `owner` findings.
- * The kind of PR, the bot rule, the checks, a draft, the base and a red main
- * still hold it. A pure Clutch sync also takes its findings as approved
- * upstream, see `approvedUpstream`.
+ * the step and risk tier of an agent PR, agent review's `owner` findings, and
+ * the contract breaks that the snapshot of the head names. The kind of PR, the
+ * bot rule, the checks, a draft, the base and a red main still hold it. A pure
+ * Clutch sync also takes its findings as approved upstream, see
+ * `approvedUpstream`.
  */
 function ownerLifts(facts: Facts) {
   return { reach: facts.ownerApproved, findings: facts.ownerApproved || approvedUpstream(facts) };
@@ -196,6 +203,11 @@ export function blockers(facts: Facts, step: Step): Array<string> {
     reasons.push(kind);
   } else {
     reasons.push(...stepProblems(facts, step));
+  }
+  if (!ownerLifts(facts).reach) {
+    for (const name of facts.breaks) {
+      reasons.push(`The contract snapshot names the break ${name}. The owner agrees to a break.`);
+    }
   }
   for (const [name, conclusion] of Object.entries(checks)) {
     if (conclusion !== 'success') {
@@ -268,6 +280,11 @@ export function dryRunComment(facts: Facts, reasons: Array<string>, step: Step) 
           `- Required checks green: ${Object.keys(facts.checks)
             .map((name) => `\`${name}\``)
             .join(', ')}`,
+          ...(facts.breaks.length > 0
+            ? [
+                `- Contract breaks the owner agreed to: ${facts.breaks.map((name) => `\`${name}\``).join(', ')}`,
+              ]
+            : []),
         ];
   return [
     marker(facts.pr.headRefOid),

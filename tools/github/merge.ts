@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { ownerFindings } from '@tools/github/auto-merge';
+import { contractBreaks, ownerFindings } from '@tools/github/auto-merge';
 import { readWatch } from '@tools/github/auto-revert';
 import { prFindings, unanswered } from '@tools/github/findings';
 import { defaultBranch, must } from '@tools/github/github';
@@ -188,6 +188,12 @@ async function mergeOpen(
       `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. Ask the owner in this session's thread.${link}`,
     );
   }
+  const breaks = await contractBreaks(run, '{owner}/{repo}', number, pr.headRefOid);
+  if (await waitsForOwner(run, number, pr, breaks.length)) {
+    throw new Error(
+      `#${number} waits for the owner, who agrees to the contract break(s) ${breaks.join(', ')}. Ask the owner in this session's thread.${link}`,
+    );
+  }
   // Each finding of every head has a fix or a reason, so none drops out unseen.
   const open = unanswered(await prFindings(run, number));
   if (open.length > 0) {
@@ -237,7 +243,7 @@ async function mergeOpen(
  * Then it waits for the release and for CI on the default branch at the merge
  * commit, and starts the revert when that CI fails twice. It refuses while
  * GitHub reports that the PR needs a review, and while agent review's owner
- * findings wait for the owner's approval.
+ * findings or a contract break wait for the owner's approval.
  */
 export async function merge(
   run: Run,
