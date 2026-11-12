@@ -265,9 +265,11 @@ export async function nativeBuild(options: BuildOptions): Promise<number> {
     return 1;
   }
   const env = options.env ?? process.env;
-  if (target.fresh && env.CI !== 'true') {
+  // GitHub sets GITHUB_ACTIONS on its runners. CI does not name a runner: the
+  // workflow sets it to 1, and an agent sets it on its own machine too.
+  if (target.fresh && env.GITHUB_ACTIONS !== 'true') {
     log(
-      `--fresh is for a CI runner, where CI is \`true\`. On this machine, run \`mise exec -- bun run native:build --platform <platform>\`.`,
+      `--fresh is for a CI runner, where GITHUB_ACTIONS is \`true\`. On this machine, run \`mise exec -- bun run native:build --platform <platform>\`.`,
     );
     return 1;
   }

@@ -20,7 +20,9 @@ is in the same file. See [import boundaries](../import-boundaries.md).
    a rule that it turns on late: old violations stay counted per file, and the
    count may only go down. See
    [decision 0001](../decisions/0001-allow-shrink-only-ratchets.md). The `check-suppressions` target
-   rejects each lint and type suppression comment, `@ts-expect-error` too.
+   rejects each lint and type suppression comment, `@ts-expect-error` too. It
+   reads the files that git tracks or would track, so it leaves out a folder
+   that git ignores, such as a generated native project.
 4. **An Ultracite upgrade is a reviewed change.** Read the preset diff. Run the
    lint, and decide each new rule that fires, as in step 2.
 

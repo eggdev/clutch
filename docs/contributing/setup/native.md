@@ -107,7 +107,9 @@ runs the `--install` command.
 
 `--fresh` builds without the fingerprint comparison, and it writes no record.
 A CI runner has no earlier build to compare with. The command refuses unless
-the environment variable `CI` is `true`.
+the environment variable `GITHUB_ACTIONS` is `true`, which GitHub sets on its
+runners. `CI` does not name a runner, because an agent sets it on its own
+machine too.
 
 A review flags a change to `native-fingerprint.json` that has no native change
 with it.

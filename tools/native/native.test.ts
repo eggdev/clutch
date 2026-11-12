@@ -146,15 +146,16 @@ test('--fresh builds on a CI runner with no fingerprint record, and is refused a
   const { builds, host } = fakeHost();
   const fresh = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
     host,
-    env: { CI: 'true' },
+    env: { GITHUB_ACTIONS: 'true', CI: '1' },
     tool: tool(print('a')),
   });
   expect(fresh.exitCode).toBe(0);
   expect(builds).toEqual(['mobile ios']);
   expect(fresh.record).toBeNull();
+  // An agent sets CI on its own machine, so CI alone names no runner.
   const refused = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
     host,
-    env: {},
+    env: { CI: '1' },
     tool: tool(print('a')),
   });
   expect(refused.exitCode).toBe(1);
