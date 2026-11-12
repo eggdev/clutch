@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.69.0 (2026-11-12)
+
+### Features
+
+- Take agent review and the visual verdict out of the merge decision.
+
 ## 0.68.0 (2026-11-12)
 
 ### Features
