@@ -476,8 +476,7 @@ Clutch's own rules follow
   `review.md`, and the code that computes a tier.
 - Credentials: secret scanning and the MCP configs. A workflow change to
   `permissions:`, an environment, a secret, an app token's permissions or a
-  privileged trigger. The `automerge` and `agentReview` sections of
-  `clutch.yaml`.
+  privileged trigger. The `automerge` section of `clutch.yaml`.
 - Auth (`packages/access`, `packages/identity` and any `auth` folder) and
   migrations.
 - A billing rule and an infra, deploy and secrets rule, both empty until a
