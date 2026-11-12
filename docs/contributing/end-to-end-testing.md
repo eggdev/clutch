@@ -215,11 +215,12 @@ Each native journey runs with Maestro on the booted device of the device host:
 mise exec -- bun run journey --native ios
 ```
 
-CI runs it on an iPhone 16 simulator on a `macos-15` runner. The Android job
-boots a Pixel 7 emulator with API 35, on an `ubuntu` runner with KVM. That job
-runs only for a repository with an Android app, and it fails until the project
-fills its build line. Each job has a limit of
-25 minutes. The iOS job sets `DEVICE_HOST=local`, which finds the simulator
+CI runs it on an iPhone 16 simulator on a `macos-15` runner, with Xcode 26.3.
+The default Xcode of that runner has an older Swift than the native modules of
+Expo 57 need. The Android job boots a Pixel 7 emulator with API 35, on an
+`ubuntu` runner with KVM. That job runs only for a repository with an Android
+app, and it fails until the project fills its build line. Each job has a limit
+of 25 minutes. The iOS job sets `DEVICE_HOST=local`, which finds the simulator
 that the job booted. The Android job sets `DEVICE_HOST=ci`, which finds the
 emulator that the job booted. A native run with no native journey fails.
 

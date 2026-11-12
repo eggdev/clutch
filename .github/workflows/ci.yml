@@ -198,6 +198,9 @@ jobs:
     timeout-minutes: 25
     env:
       DEVICE_HOST: local
+      # The default Xcode of the runner has Swift 6.1, and the native modules
+      # of Expo 57 need Swift 6.2. The runner image also holds Xcode 26.3.
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -45,7 +45,9 @@ The sync server asks the `Actors` service in `packages/identity` for the actor
 of each socket and each call. It passes the request headers of the socket.
 
 - In local development, `runtime/dev.server.ts` reads the `x-dev-user-id` and
-  `x-dev-organization-id` headers. Without them, it uses `DEV_USER_ID` and
+  `x-dev-organization-id` headers. A browser cannot set a header on its sync
+  socket, so the Layer also reads the cookies `dev-user-id` and
+  `dev-organization-id`. Without a header or a cookie, it uses `DEV_USER_ID` and
   `DEV_ORGANIZATION_ID`.
 - Any client can claim any actor with the development Layer. A project replaces
   it with a Live Layer for its sign-in vendor.
