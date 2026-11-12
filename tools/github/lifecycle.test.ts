@@ -2,8 +2,7 @@ import { expect, test } from 'bun:test';
 
 import { marker } from '@tools/github/auto-merge-rules';
 import { readJobLog } from '@tools/github/failures';
-import { fake, fakeClock, findingsOn, noWrite, repoOwner, reviewsOf } from '@tools/github/fake-run';
-import type { Reviewed } from '@tools/github/fake-run';
+import { fake, fakeClock, findingsOn, noWrite } from '@tools/github/fake-run';
 import { runPr } from '@tools/github/pr';
 import type { Result } from '@tools/github/stack';
 import { blockingCount, prStatus } from '@tools/github/status';
@@ -303,40 +302,8 @@ test('status counts the owner findings from the annotations, whatever the commen
   ]);
   expect(await prStatus(gh.run, '7')).toMatchObject({
     agentReview: { blocking: 0, owner: 2 },
-    ready: false,
+    ready: true,
   });
-});
-
-test('an owner finding keeps a green PR from ready until the owner approves the head', async () => {
-  const me = await repoOwner();
-  const green = JSON.parse(
-    view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out,
-  );
-  const readyWith = async (reviews: Array<Reviewed>, reviewDecision = '') => {
-    const status = await prStatus(
-      fake([
-        ['gh pr view 7', { out: JSON.stringify({ ...green, reviewDecision }) }],
-        rules,
-        comments('## Agent review\n\nNo `blocking` findings.'),
-        ...findingsOn(head, ['**owner**: weaker check.']),
-        reviewsOf('7', ...reviews),
-      ]).run,
-      '7',
-    );
-    return status.ready;
-  };
-  expect(await readyWith([{ login: me, state: 'APPROVED', commit: head }])).toBe(true);
-  // A dismissed approval, one on an older commit, or another login's approval does not count.
-  expect(
-    await Promise.all([
-      readyWith([]),
-      readyWith([{ login: me, state: 'DISMISSED', commit: head }]),
-      readyWith([{ login: me, state: 'APPROVED', commit: 'old0000' }]),
-      readyWith([{ login: 'someone', state: 'APPROVED', commit: head }]),
-      // GitHub's approval decision alone does not answer the owner's finding.
-      readyWith([], 'APPROVED'),
-    ]),
-  ).toEqual([false, false, false, false, false]);
 });
 
 test('a merge state that a rule blocks keeps a green PR from ready', async () => {

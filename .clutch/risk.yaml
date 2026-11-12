@@ -37,6 +37,7 @@ rules:
       - tools/github/auto-merge-enable.ts
       - tools/github/auto-merge-rules.ts
       - tools/github/bot-rule.ts
+      - tools/github/weaker-journeys.ts
       - .github/workflows/auto-merge.yml
       - .github/workflows/agent-review.yml
       - docs/contributing/review.md

@@ -243,9 +243,7 @@ test('the owner count is the findings of the head review, not the nine annotatio
   ]);
   const status = await prStatus(gh.run, '7');
   expect(status.agentReview).toEqual({ posted: true, blocking: 0, owner: 3 });
-  expect(renderStatus(status)).toContain(
-    'Agent review: 0 blocking, 3 owner (the owner approves and merges it).',
-  );
+  expect(renderStatus(status)).toContain('Agent review: 0 blocking, 3 owner (advisory).');
 });
 
 test('owner findings without inline comments on the head count as the annotations do', async () => {

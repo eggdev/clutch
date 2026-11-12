@@ -33,14 +33,11 @@ short structured answer alone cannot let a PR through. A failed listing of
 this head's comments is reported as a warning. A failed listing of the earlier
 heads' comments fails the job, so a re-run lists them again.
 
-The job fails when the agent returns one or more blocking findings. The job
-also fails when the agent returns no result. An `owner` finding passes the
-job, so the owner can still merge the PR. The job writes an "Owner review
-needed" annotation for it. Auto-merge reads that annotation on the head and
-leaves the PR for the owner. See
+Model findings are advisory. The job reports each finding, and no finding holds
+the merge. The job fails only when the agent returns no result. The session
+still answers each finding. `tools/github/weaker-journeys.ts` holds a PR that
+weakens a journey or a budget, by comparing the two copies. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
-
-An owner finding carries over to each new head until the diff removes its cause and the review says so. A silent drop still holds the PR.
 
 The agent runs on the cheapest Claude model, `claude-haiku-5-5`. To choose
 another model, set the `CLUTCH_AGENT_MODEL` repository variable to its id. The
@@ -56,7 +53,7 @@ Clutch sets `fail`. A fork pull request then fails agent review, and the owner
 reviews it.
 
 The main ruleset in `.github/rulesets/main.json` makes `agent-review` a
-required status check, so a blocking finding blocks the merge. A project that
+required status check, so the review must run on each head. A project that
 has not set up the credential keeps the default, `notice`, and the check
 passes with a notice until the project adopts it.
 

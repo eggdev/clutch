@@ -73,10 +73,10 @@ test('a revert skips the red-main reason but keeps its other reasons', () => {
   expect(blockers(facts({ mainRed: ['validate'] }, reverting), 'bots')).toEqual([]);
   expect(
     blockers(
-      facts({ mainRed: ['validate'], ownerFindings: ['It lowers a budget.'] }, reverting),
+      facts({ mainRed: ['validate'], weakerJourneys: ['It lowers a budget.'] }, reverting),
       'bots',
     ),
-  ).toEqual(['Agent review asks the owner: It lowers a budget.']);
+  ).toEqual(['A journey gets weaker, so the owner decides: It lowers a budget.']);
   expect(
     blockers(facts({ mainRed: ['validate'], checks: { validate: 'pending' } }, reverting), 'bots'),
   ).toEqual(['The required check validate is pending.']);
