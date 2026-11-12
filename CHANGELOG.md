@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0 (2026-11-12)
+
+### Features
+
+- feat(pr): hold a pull request that makes a contract break (CL-464)
+
 ## 1.4.0 (2026-11-12)
 
 ### Features
