@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.65.0 (2026-11-12)
+
+### Features
+
+- Remove the revert brake, and stop sending an unanswered PR comment to the owner.
+
+## 0.64.1 (2026-11-12)
+
+### Fixes and maintenance
+
+- fix(lint): count outcome as an assertion in a core journey
+
 ## 0.64.0 (2026-11-08)
 
 ### Features

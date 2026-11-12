@@ -56,11 +56,14 @@ function assertionOf(node) {
   return { matcher: names[0], negated: names.includes('not') };
 }
 
-/** A call that asserts through a helper, by name: `expectProblem(...)`, `assertSynced(...)`. */
+/**
+ * A call that asserts through a helper, by name: `expectProblem(...)`,
+ * `assertSynced(...)`, or `outcome(...)`, the one assertion of a core journey.
+ */
 const isAssertionHelper = (callee) =>
   callee?.type === 'Identifier' &&
-  /^(?:expect|assert)[A-Z]/u.test(callee.name) &&
-  callee.name !== 'expect';
+  (callee.name === 'outcome' ||
+    (/^(?:expect|assert)[A-Z]/u.test(callee.name) && callee.name !== 'expect'));
 
 /** A test declaration with its body: `test('name', () => ...)`, at its outermost call. */
 const isTest = (node) =>
