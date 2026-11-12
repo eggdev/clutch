@@ -53,61 +53,70 @@ async function riskOf(files: Array<string> | Record<string, string>) {
   };
 }
 
-async function tierOf(files: Array<string> | Record<string, string>) {
-  const risk = await riskOf(files);
-  return risk.tier;
-}
-
 /** Each path with one tier, as `riskOf` lists the files of a change. */
 const eachAt = (paths: ReadonlyArray<string>, tier: string) =>
   Object.fromEntries(paths.map((file) => [file, tier]));
 
 test('a docs-only change is low', async () => {
-  expect(
-    await tierOf([
-      'docs/contributing/review-notes.md',
-      '.changeset/quiet-fox.md',
-      'apps/cli/README.md',
-    ]),
-  ).toBe('low');
+  const risk = await riskOf([
+    'docs/contributing/review-notes.md',
+    '.changeset/quiet-fox.md',
+    'apps/cli/README.md',
+  ]);
+  expect(risk.tier).toBe('low');
 });
 
 test('tests alone are low, and app code is medium', async () => {
-  expect(await tierOf(['apps/cli/src/risk/tiers.test.ts'])).toBe('low');
-  expect(await tierOf(['apps/cli/src/worktree/new.ts', 'docs/a.md'])).toBe('medium');
+  const tests = await riskOf(['apps/cli/src/risk/tiers.test.ts']);
+  expect(tests.tier).toBe('low');
+  const code = await riskOf(['apps/cli/src/worktree/new.ts', 'docs/a.md']);
+  expect(code.tier).toBe('medium');
 });
 
-test('the hard core is a one-way door: auth, access, identity and migrations', async () => {
-  const hardCore = [
-    'packages/identity/service/actors.ts',
-    'packages/access/service/access.ts',
-    'apps/api/src/auth/session.ts',
-    'packages/access/repo/migrations/20261030000000_x/migration.sql',
-  ];
-  // One run gives the tier of each path on its own, so a path that drops a tier shows by name.
-  const risk = await riskOf([...hardCore, 'docs/a.md']);
-  expect(risk.files).toEqual({ ...eachAt(hardCore, 'one-way-door'), 'docs/a.md': 'low' });
-  expect(risk.tier).toBe('one-way-door');
-  // One hard-core path beside a docs file is enough to make the change a one-way door.
-  expect(await tierOf(['packages/access/service/access.ts', 'docs/a.md'])).toBe('one-way-door');
-});
-
-test('the merge gate, the policy docs and the decision records merge like every other change', async () => {
-  const merged = {
-    '.github/rulesets/main.json': 'medium',
-    '.github/CODEOWNERS': 'medium',
-    'tools/github/auto-merge.ts': 'medium',
-    'tools/github/bot-rule.ts': 'medium',
-    '.github/workflows/agent-review.yml': 'medium',
-    'docs/contributing/review.md': 'low',
-    'apps/cli/src/risk/tiers.ts': 'medium',
-    'docs/contributing/decisions/0001-a.md': 'low',
-    'docs/principles/fail-loudly.md': 'low',
-    '.clutch/PLAN.md': 'low',
+// One run gives the tier of each path on its own, so a path that changes tier shows by name.
+test('what cannot be paid back is a one-way door, and the merge gate and policy docs are not', async () => {
+  const hardCore = {
+    '.gitleaks.toml': 'changed\n',
+    '.gitleaksignore': 'changed\n',
+    '.mcp.json': 'changed\n',
+    '.cursor/mcp.json': 'changed\n',
+    'packages/identity/service/actors.ts': 'changed\n',
+    'packages/access/service/access.ts': 'changed\n',
+    'apps/api/src/auth/session.ts': 'changed\n',
+    'packages/access/repo/migrations/20261030000000_x/migration.sql': 'DROP TABLE "a";\n',
   };
-  const risk = await riskOf(Object.keys(merged));
-  expect(risk.files).toEqual(merged);
-  expect(risk.tier).toBe('medium');
+  const medium = [
+    '.github/rulesets/main.json',
+    '.github/CODEOWNERS',
+    'tools/codeowners.ts',
+    'tools/github/auto-merge.ts',
+    'tools/github/auto-merge-rules.ts',
+    'tools/github/bot-rule.ts',
+    'tools/github/weaker-journeys.ts',
+    '.github/workflows/auto-merge.yml',
+    '.github/workflows/agent-review.yml',
+    'apps/cli/src/risk/tiers.ts',
+    'apps/cli/src/risk-command.ts',
+  ];
+  const harmless = 'packages/notes/repo/migrations/20261030000000_y/migration.sql';
+  const low = [
+    'docs/contributing/project-intent.md',
+    'docs/contributing/review.md',
+    'docs/contributing/decisions/0001-a.md',
+    'docs/principles/fail-loudly.md',
+    '.clutch/PLAN.md',
+  ];
+  const risk = await riskOf({
+    ...hardCore,
+    ...Object.fromEntries([...medium, ...low].map((file) => [file, 'changed\n'])),
+    [harmless]: 'ALTER TABLE "a" ADD COLUMN "b" text;\n',
+  });
+  expect(risk.files).toEqual({
+    ...eachAt(Object.keys(hardCore), 'one-way-door'),
+    ...eachAt([...medium, harmless], 'medium'),
+    ...eachAt(low, 'low'),
+  });
+  expect(risk.tier).toBe('one-way-door');
 });
 
 test('skills, check scripts, lint config, workflows and any unlisted path are medium or low', async () => {
@@ -117,39 +126,35 @@ test('skills, check scripts, lint config, workflows and any unlisted path are me
     'tools/github/pr.ts',
     'oxlint.config.ts',
     'package.json',
-    'clutch.yaml',
     'apps/web/src/app.tsx',
     'packages/sync/service/push.ts',
     'bun.lock',
     'vite.config.ts',
   ];
-  const risk = await riskOf([...medium, 'docs/a.md']);
-  expect(risk.files).toEqual({ ...eachAt(medium, 'medium'), 'docs/a.md': 'low' });
+  const low = ['docs/a.md', 'AGENTS.md', '.agents/skills/deliver/SKILL.md'];
+  const risk = await riskOf([...medium, ...low]);
+  expect(risk.files).toEqual({ ...eachAt(medium, 'medium'), ...eachAt(low, 'low') });
   expect(risk.tier).toBe('medium');
-  expect(await tierOf(['AGENTS.md', '.agents/skills/deliver/SKILL.md'])).toBe('low');
 });
 
-test('a workflow line that gives a grant, a secret or a trigger is a one-way door', async () => {
-  const lines = [
-    'permissions: write-all',
-    '      contents: write',
-    '    environment: release',
-    '        token: secrets.T',
-    '  workflow_run:',
-  ];
-  // Each workflow file holds one line, so one run shows which line sets the tier of its file.
-  const guarded = lines.map((_line, index) => `.github/workflows/guarded-${index}.yml`);
-  const plain = '.github/workflows/ci.yml';
-  const risk = await riskOf({
-    [plain]: 'jobs:\n  a:\n    runs-on: x\n',
-    ...Object.fromEntries(guarded.map((file, index) => [file, `${lines[index] ?? ''}\n`])),
+test("a workflow line that gives a grant, and the owner's login, are a one-way door", async () => {
+  const held = {
+    '.github/workflows/write-all.yml': 'permissions: write-all\n',
+    '.github/workflows/contents.yml': '      contents: write\n',
+    '.github/workflows/environment.yml': '    environment: release\n',
+    '.github/workflows/secret.yml': '        token: secrets.T\n',
+    '.github/workflows/workflow-run.yml': '  workflow_run:\n',
+    'clutch.yaml': 'automerge:\n  owner: someone\n',
+  };
+  const readOnly = {
+    '.github/workflows/ci.yml': 'jobs:\n  a:\n    runs-on: x\n',
+    '.github/workflows/read.yml': 'permissions:\n  contents: read\n',
+  };
+  const risk = await riskOf({ ...held, ...readOnly });
+  expect(risk.files).toEqual({
+    ...eachAt(Object.keys(held), 'one-way-door'),
+    ...eachAt(Object.keys(readOnly), 'medium'),
   });
-  expect(risk.files).toEqual({ [plain]: 'medium', ...eachAt(guarded, 'one-way-door') });
-  expect(await tierOf({ [plain]: 'jobs:\n  a:\n    runs-on: x\n' })).toBe('medium');
-  // A read-only grant is not held.
-  expect(await tierOf({ [plain]: 'permissions:\n  contents: read\n' })).toBe('medium');
-  expect(await tierOf({ 'clutch.yaml': 'capabilities:\n  ci: adopted\n' })).toBe('medium');
-  expect(await tierOf({ 'clutch.yaml': 'automerge:\n  step: medium\n' })).toBe('medium');
 });
 
 test('the text output names the files at the change tier and the pattern that set it', async () => {

@@ -12,11 +12,45 @@ import {
 import { actionOf, afterApproval, resolves } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, outcomeOf } from '@tools/github/babysit-apply';
-import { emptyGraph, now, state, thread } from '@tools/github/babysit-fake';
-import { roundsToday } from '@tools/github/babysit-log';
+import { emptyLog, roundsToday } from '@tools/github/babysit-log';
 import type { Round } from '@tools/github/babysit-log';
-import type { Thread } from '@tools/github/babysit-read';
+import type { PrState, Thread } from '@tools/github/babysit-read';
 import { fake } from '@tools/github/fake-run';
+
+const now = '2026-11-04T12:00:00Z';
+
+const thread = (id: string, last = 'note: rename this'): Thread => ({
+  id,
+  path: 'tools/x.ts',
+  line: 3,
+  outdated: false,
+  commentId: 11,
+  comments: [{ id: 11, author: 'github-actions', body: last, at: now, url: 'https://x/c11' }],
+});
+
+const state = (fields: Partial<PrState> = {}): PrState => ({
+  number: 7,
+  url: 'https://github.com/acme/shop/pull/7',
+  draft: false,
+  open: true,
+  fork: false,
+  author: 'app/eggdev-clutch-bot',
+  authorIsBot: true,
+  head: 'abc1234def',
+  headRef: 'clutch/cl-420-babysit',
+  base: 'main',
+  labels: [],
+  mergeable: 'MERGEABLE',
+  behindBy: 0,
+  failed: [],
+  pending: 0,
+  threads: [],
+  comments: [],
+  approved: false,
+  log: emptyLog(),
+  logId: null,
+  ...fields,
+});
 
 const round = (fields: Partial<Round> = {}): Round => ({
   at: now,
@@ -161,9 +195,7 @@ test('only a pushed fix or a no-change resolves a thread', () => {
   expect(resolves('must-fix', null)).toBe(false);
   expect(resolves('no-change', null)).toBe(true);
   expect(resolves('owner', 'abc')).toBe(false);
-  expect(resolves('recorded', null)).toBe(true);
   expect(actionOf('cheap-fix', 'abcdef123')).toBe('fixed in abcdef1');
-  expect(actionOf('recorded', null)).toBe('recorded for the weekly digest');
 });
 
 test('after the approval a cheap fix waits, and a must-fix still pushes', () => {
@@ -190,11 +222,6 @@ test('an owner item leaves the round waiting for the owner', () => {
   };
   expect(outcomeOf([{ ...item, decision: 'owner' }], null, 'none').outcome).toBe('waiting-owner');
   expect(outcomeOf([{ ...item, decision: 'no-change' }], null, 'none').outcome).toBe('done');
-  // A recorded owner finding is resolved, and the weekly digest lists it.
-  expect(outcomeOf([{ ...item, decision: 'recorded', resolved: true }], null, 'none')).toEqual({
-    outcome: 'done',
-    note: '',
-  });
   expect(outcomeOf([], null, 'conflict-stuck').outcome).toBe('stuck');
   // A fix that did not pass validate pushes nothing, and the round is stuck, not done.
   expect(outcomeOf([{ ...item, decision: 'must-fix' }], null, 'none').outcome).toBe('stuck');
@@ -202,8 +229,32 @@ test('an owner item leaves the round waiting for the owner', () => {
 });
 
 test('apply replies in each thread, resolves the answered ones, reruns a flaky check and writes the log', async () => {
+  const graph = JSON.stringify({
+    data: {
+      repository: {
+        pullRequest: {
+          number: 7,
+          url: 'u',
+          isDraft: false,
+          state: 'OPEN',
+          isCrossRepository: false,
+          headRefOid: 'abc1234def',
+          headRefName: 'clutch/cl-1-x',
+          baseRefName: 'main',
+          mergeable: 'MERGEABLE',
+          author: { login: 'app/bot' },
+          labels: { nodes: [] },
+          commits: { nodes: [] },
+          reviewThreads: { nodes: [] },
+          oldest: { nodes: [] },
+          comments: { nodes: [] },
+          reviews: { nodes: [] },
+        },
+      },
+    },
+  });
   const { run, calls } = fake([
-    ['gh api graphql -F', { out: emptyGraph }],
+    ['gh api graphql -F', { out: graph }],
     ['gh api repos/acme/shop/compare', { out: '0' }],
   ]);
   const next = plan(

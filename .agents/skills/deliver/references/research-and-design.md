@@ -48,10 +48,12 @@ and a recurring failure into a check or tool. Keep investigations in the task.
 - **New shared module:** write a caller example and the core types before
   filling in the implementation. Use installed `codebase-design` guidance.
   Check the interface's invariants, failure behavior and ownership.
-- **New visible feature or material UI change:** propose before building,
-  with the [design-proposal](../../design-proposal/SKILL.md) skill. Show
-  today next to 2 or 3 directions in the app, and let the owner pick one. Build
-  against the adopted proposal. Skip it for a routine change, as its table says.
+- **New visible feature or material UI change:** build your pick, and state
+  `hand_test:` in the issue. After kickoff, a new feature folder also needs a
+  `goal:` in the issue that names a user goal of
+  [project intent](../../../../docs/contributing/project-intent.md). Use the
+  [design-proposal](../../design-proposal/SKILL.md) skill only when the owner asks
+  for options.
 - **Unsettled visible interaction:** use installed `emil-prototype` guidance.
   Compare options through the project's runtime and retain action/result
   evidence so the owner can judge behavior as well as appearance. When the

@@ -18,7 +18,7 @@ import { changesetDir, changesetText, packageName } from '@tools/release/changes
  * token, because the release bot has no Issues permission.
  *
  * With `--drill`, the reverted PR was a rehearsal. The revert PR carries the
- * `drill` label, so it does not count toward the revert brake or metric, and
+ * `drill` label, so it does not count toward the revert metric, and
  * no risk-tighten issue is filed.
  */
 const usage =
@@ -171,7 +171,7 @@ export async function runRevert(
       : 'origin';
   await must(run, ['git', 'push', remote, `HEAD:refs/heads/${branch}`]);
   const drillNote = drill
-    ? ' This is a rehearsal: the original PR carries `drill`, so this revert does not count toward the revert brake or metric, and no risk-tighten issue is filed.'
+    ? ' This is a rehearsal: the original PR carries `drill`, so this revert does not count toward the revert metric, and no risk-tighten issue is filed.'
     : '';
   const url = await must(run, [
     'gh',

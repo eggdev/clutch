@@ -1,6 +1,7 @@
 {
-  "description": "Files that configure a check, a lint rule, a budget, a test rule or an agent hook. After kickoff, an agent edit to one of them needs a person's approval in the session. Agent review flags a PR that makes one weaker as an owner finding, and auto-merge leaves it for the owner. This list itself is not held: a change to it merges as any other change, see decision record 0005. check-guardrail-coverage fails when a file that a check, a lint plugin or a hook reads matches no pattern here. `exempt` lists files that tooling reads but that set no rule. See docs/contributing/harness-engineering.md#guardrail-files.",
+  "description": "Files that configure a check, a lint rule, a budget, a test rule or an agent hook. After kickoff, an agent edit to one of them needs a person's approval in the session. Agent review flags a PR that makes one weaker as an owner finding, which reports and holds nothing. This list itself is not held: a change to it merges as any other change, see decision record 0005. check-guardrail-coverage fails when a file that a check, a lint plugin or a hook reads matches no pattern here. `exempt` lists files that tooling reads but that set no rule. See docs/contributing/harness-engineering.md#guardrail-files.",
   "patterns": [
+    "tools/deploy.ts",
     "oxlint.config.ts",
     "stylelint.config.ts",
     ".oxfmtrc.json",
@@ -77,6 +78,7 @@
   ],
   "exempt": {
     "AGENTS.md": "check-file-size measures the length of each AGENTS.md file, check-structure allows one in a package, and the doc checks read it as a doc. It sets no rule.",
+    "docs/contributing/project-intent.md": "tools/check-scope.ts reads its user goals. The hard core in .clutch/risk.yaml holds this path by name, so the owner still reviews it.",
     "CLAUDE.md": "It holds one line that includes AGENTS.md. check-structure allows it in a package. It sets no rule.",
     "README.md": "check-structure allows it in a package, and the doc checks read it as a doc. It sets no rule.",
     "docs/contributing/documentation.md": "check-docs-temporal skips it because it quotes the changelog phrases. It sets no rule.",

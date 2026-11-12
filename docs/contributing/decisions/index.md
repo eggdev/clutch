@@ -55,10 +55,10 @@ A record amended more than once lists each amending record:
 <!-- kickoff: One line for each record that kickoff wrote: the number as a link, then the no in one sentence. -->
 
 - [0001](./0001-allow-shrink-only-ratchets.md): a repository may keep a shrink-only ratchet baseline for a rule it adopts. No other baseline of old violations.
-- [0002](./0002-merge-most-prs-with-no-human.md): 80% of PRs merge with no human. No person reviews a change outside the hard core unless agent review finds a weaker check.
+- [0002](./0002-merge-most-prs-with-no-human.md): 80% of PRs merge with no human. No person reviews a change outside the hard core unless a deterministic check finds a weaker journey or budget.
 - [0004](./0004-no-design-canvas-tool-for-proposals.md): no design canvas tool, such as Pencil or Paper. Design proposals render in the app, on the real design system.
-- [0005](./0005-the-owner-signs-off-what-cannot-be-paid-back.md): the owner signs off a major change, a credential, auth, access, identity and a migration. Other changes merge on proof, and the owner pays a problem back.
+- [0005](./0005-the-owner-signs-off-what-cannot-be-paid-back.md): the owner signs off a major change, a contract break, a credential, auth, access, identity and a migration that can lose data. Other changes merge on proof, and the owner pays a problem back.
 
 ## Historical
 
-- [0003](./0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md): a pure Clutch sync's owner findings held no PR. Record 0005 supersedes it: no owner finding holds a PR now.
+- [0003](./0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md): a pure Clutch sync's owner findings held no PR. Record 0005 supersedes it, and no model finding holds a merge.

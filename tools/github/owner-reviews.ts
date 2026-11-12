@@ -7,7 +7,7 @@ type Review = { id: number; login: string; state: string; commit: string };
  * The reviews on PR `number`, oldest first. The REST list gives each review's
  * commit: `gh pr view --json latestReviews` leaves it empty.
  */
-export async function reviews(run: Run, number: string): Promise<Array<Review>> {
+async function reviews(run: Run, number: string): Promise<Array<Review>> {
   const out = await must(run, [
     'gh',
     'api',

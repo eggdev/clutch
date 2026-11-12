@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { blockingGuard, recordedGuard } from '@tools/github/babysit-answer';
+import { answerComments, blockingGuard } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import type { Item } from '@tools/github/babysit-log';
 import { decisionsNow, onlyOwnerLeft, ownerAsk } from '@tools/github/babysit-owner';
@@ -150,42 +150,6 @@ test('only a fix closes a blocking finding; any other answer leaves it for the o
   expect(blockingGuard(undefined, 'blocking: x')).toBeUndefined();
 });
 
-test("recorded closes only a bot's owner finding; any other item becomes owner", () => {
-  const answer: Answer = {
-    kind: 'thread',
-    ref: 'T1',
-    decision: 'recorded',
-    reason: 'the task needs the lower budget',
-    reply: 'Recorded for the weekly digest.',
-  };
-  const bot = 'github-actions[bot]';
-  const changed = {
-    decision: 'owner',
-    reason:
-      'only an owner finding of agent review is recorded; the triage said recorded: the task needs the lower budget',
-  };
-  expect(recordedGuard(answer, bot, '\n**owner** (A weaker check): x')).toEqual(answer);
-  expect(recordedGuard(answer, bot, 'owner: weaker check')).toEqual(answer);
-  // A person's thread, even one that starts with "owner".
-  expect(recordedGuard(answer, 'eggdev', 'owner: weaker check')).toMatchObject(changed);
-  // A bot's thread that is not an owner finding.
-  expect(recordedGuard(answer, bot, 'note: rename')).toMatchObject(changed);
-  expect(recordedGuard(answer, bot, 'ownership moves here')).toMatchObject(changed);
-  // A comment or a check has no thread to resolve.
-  expect(recordedGuard({ ...answer, kind: 'comment' })).toMatchObject(changed);
-  expect(recordedGuard({ ...answer, kind: 'check' })).toMatchObject(changed);
-  // Other decisions pass through.
-  const noChange = { ...answer, decision: 'no-change' as const };
-  expect(recordedGuard(noChange, 'eggdev', 'note: x')).toEqual(noChange);
-  expect(recordedGuard(undefined, bot, 'owner: x')).toBeUndefined();
-  // blockingGuard runs first and wins for a blocking finding.
-  const blocking = recordedGuard(blockingGuard(answer, 'blocking: docs'), bot, 'blocking: docs');
-  expect(blocking?.decision).toBe('owner');
-  expect(blocking?.reason).toBe(
-    'a blocking finding closes only with a fix; the triage said recorded: the task needs the lower budget',
-  );
-});
-
 const item = (fields: Partial<Item>): Item => ({
   kind: 'thread',
   ref: 'T1',
@@ -206,15 +170,6 @@ test('a failed check or an unfixed blocking finding left for the owner needs the
   ).toEqual([check, blocking]);
 });
 
-test('a recorded item needs no owner now, and leaves no round waiting for the owner', () => {
-  const recorded = item({
-    decision: 'recorded',
-    resolved: true,
-    action: 'recorded for the weekly digest',
-  });
-  expect(decisionsNow([recorded, item({ ...recorded, kind: 'check' })])).toEqual([]);
-});
-
 test('an unanswered item does not stop the owner', () => {
   expect(decisionsNow([item({ kind: 'check', reason: 'the agent gave no decision' })])).toEqual([]);
 });
@@ -225,4 +180,29 @@ test('the ask names what the owner must do', () => {
   expect(ownerAsk({ ...base, stuck: true })).toContain('fixed form');
   expect(ownerAsk({ ...base, left: true })).toContain('https://github.com/a/b/pull/7/files');
   expect(ownerAsk({ ...base, now: [{ ref: 'deploy' }] })).toContain('deploy need the owner now');
+});
+
+test('a comment with no answer gets no reply, and does not go to the owner', async () => {
+  const gh = fake([]);
+  const items = await answerComments({
+    run: gh.run,
+    repo: 'a/b',
+    answers: [],
+    pushed: null,
+    plan: {
+      number: 7,
+      head: 'h3adbeef',
+      approved: false,
+      triggers: [],
+      sync: 'none',
+      failed: [],
+      threads: [],
+      comments: [{ id: 3, author: 'bot', body: 'A thought.', at: '', url: '' }],
+      approvedThreads: [],
+      skip: null,
+      stuck: false,
+    },
+  });
+  expect(items).toEqual([]);
+  expect(gh.calls).toEqual([]);
 });

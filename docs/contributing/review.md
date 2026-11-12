@@ -10,29 +10,31 @@ runs, and the labels each PR carries, are in [agent review](./agent-review.md).
 
 Each finding has one level:
 
-| Level      | Means                                                                    |
-| ---------- | ------------------------------------------------------------------------ |
-| `blocking` | The change must not merge until the author fixes it.                     |
-| `owner`    | The change can merge. The weekly digest lists the finding for the owner. |
-| `note`     | The author reads it and decides. The change can merge as is.             |
+| Level      | Means                                                        |
+| ---------- | ------------------------------------------------------------ |
+| `blocking` | The author fixes it or answers why not. It holds no merge.   |
+| `owner`    | The author weighs it with the owner. It holds no merge.      |
+| `note`     | The author reads it and decides. The change can merge as is. |
 
 A rule below says which level it gives. When a rule does not say, the level is
 `note`.
 
 ## Owner findings
 
-An `owner` finding does not hold the PR. The weekly digest lists it, so the
-owner reads it after the merge and asks for a fix where it is wrong. See
-[the weekly digest](./capabilities/factory-observability.md#weekly-digest).
-
-An `owner` finding has two causes only. Start the finding with its level,
-`owner`, then name its cause, `hard core` or `weaker check`. Any other concern
-is a `note`, or `blocking` when another rule says so.
+An `owner` finding tells the session to weigh a concern with the owner. It does
+not hold the merge, and neither does a `blocking` finding. A deterministic check
+holds a weaker journey: see [proof gates code](../principles/proof-gates-code.md).
+The [weekly digest](./capabilities/factory-observability.md#weekly-digest) lists each `owner` finding of a merged pull request.
+An `owner` finding has two causes only. Start the finding with its level, `owner`, then name its cause,
+`hard core` or `weaker check`. Any other concern is a `note`, or `blocking`
+when another rule says so.
 
 1. **Hard core.** The diff changes a path of the `one-way-door` tier of
-   [`.clutch/risk.yaml`](../../.clutch/risk.yaml). That is a credential, a
-   workflow's permissions or secrets, auth and access, and a migration. The
-   merge judge also holds a major change and a contract break, see
+   [`.clutch/risk.yaml`](../../.clutch/risk.yaml). That is a credential, and
+   auth and access until their journeys exist. It is also a migration that can
+   lose data, a workflow line that gives a grant, and the `owner:` line of
+   `clutch.yaml`.
+   It is also the billing and infra paths that a project names. The merge judge also holds a major change and a contract break, see
    [decision record 0005](./decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
    CODEOWNERS or auto-merge already holds such a PR, so the finding says what
    the owner should look at.
@@ -62,7 +64,7 @@ These are not `owner`:
 
 Flag these on each pull request, also when a check passes. A check can pass
 while its rules get weaker. Most PRs merge with no person, so these findings
-are how a weaker check reaches the owner in the weekly digest.
+are how a weaker check reaches the owner.
 
 - **A weaker check**, as [owner findings](#owner-findings) defines it, is
   `owner`. A stronger check is a `note`.

@@ -2,7 +2,6 @@ import { appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { judgeAtStep } from '@tools/github/auto-merge-brake';
 import { actionsApp, checkConclusions } from '@tools/github/auto-merge-checks';
 import { enableAutoMerge, gh, hasMarker, must } from '@tools/github/auto-merge-enable';
 import {
@@ -16,12 +15,15 @@ import {
   noVerdictYet,
   revertProblems,
   steps,
+  verdictText,
 } from '@tools/github/auto-merge-rules';
 import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rules';
 import { autoMerged } from '@tools/github/auto-revert';
 import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
+import type { ChangedFile } from '@tools/github/bot-rule';
 import { retrying } from '@tools/github/command';
-import { changedFiles, majorChange } from '@tools/github/major-change';
+import { contractBreaks } from '@tools/github/contract-breaks';
+import { majorChange } from '@tools/github/major-change';
 import type { Run } from '@tools/github/stack';
 
 /**
@@ -33,10 +35,8 @@ import type { Run } from '@tools/github/stack';
  * check is red on the default branch, except for a revert. `dry-run` and `on`
  * comment a verdict once for each head commit of an agent PR, so the owner can
  * grade it: at the step for `dry-run`, and at the next step for `on`. `off` only
- * prints. Agent review's owner findings hold nothing: the verdict lists them
- * for the weekly digest. The approval of `automerge.owner` on the head lifts
- * the tier, a contract break and a major change, so a PR that waits for the
- * owner merges once they approve. The Auto-merge workflow runs it from the base branch, so a pull request
+ * prints. The approval of `automerge.owner` on the head lifts the tier, a weaker
+ * journey and a contract break, so a PR that waits for the owner merges once they approve. The Auto-merge workflow runs it from the base branch, so a pull request
  * cannot change the rules that judge it. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 const usage = [
@@ -78,7 +78,7 @@ async function requiredChecks(run: Run, repo: string, branch: string) {
     '--jq',
     '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]',
   );
-  return [...new Set([...(JSON.parse(out) as Array<string>), agentReview])];
+  return [...new Set(JSON.parse(out) as Array<string>)];
 }
 
 /**
@@ -139,43 +139,6 @@ export async function ownerFindings(run: Run, repo: string, sha: string) {
   return out.split('\n').filter(Boolean);
 }
 
-const isString = (value: unknown): value is string => typeof value === 'string';
-
-/**
- * The one-way changes that the contract snapshot at `sha` names under `breaks`,
- * when pull request `pr` changes `contract.json`. A pull request that leaves the
- * file alone has none, so a break counts only in the pull request that makes it.
- * A snapshot whose `breaks` is not a list of strings is refused, as is any other
- * failure of the read.
- */
-export async function contractBreaks(run: Run, repo: string, pr: string, sha: string) {
-  const changed = await changedFiles(run, repo, pr);
-  if (!changed.some((file) => file.filename === 'contract.json')) {
-    return [];
-  }
-  const endpoint = `repos/${repo}/contents/contract.json?ref=${sha}`;
-  const result = await run(['gh', 'api', endpoint, '--jq', '.content | @base64d']);
-  if (!result.ok) {
-    if (/HTTP 404/u.test(result.err)) {
-      return [];
-    }
-    throw new Error(`gh api ${endpoint} failed: ${result.err || result.out}`);
-  }
-  const snapshot: unknown = JSON.parse(result.out);
-  const breaks =
-    typeof snapshot === 'object' && snapshot !== null && 'breaks' in snapshot
-      ? snapshot.breaks
-      : undefined;
-  if (!Array.isArray(breaks)) {
-    throw new TypeError(`contract.json at ${sha}: \`breaks\` is not a list of strings.`);
-  }
-  const names = breaks.filter(isString);
-  if (names.length !== breaks.length) {
-    throw new TypeError(`contract.json at ${sha}: \`breaks\` is not a list of strings.`);
-  }
-  return names;
-}
-
 async function riskTier(run: Run, defaultBranch: string, sha: string) {
   const out = await must(run, [
     'bun',
@@ -188,6 +151,26 @@ async function riskTier(run: Run, defaultBranch: string, sha: string) {
     '--json',
   ]);
   return (JSON.parse(out) as { tier: string }).tier;
+}
+
+/** The changed files of a pull request, with their diffs. */
+export async function changedFiles(
+  run: Run,
+  repo: string,
+  pr: string,
+): Promise<Array<ChangedFile>> {
+  const out = await gh(
+    run,
+    'api',
+    '--paginate',
+    `repos/${repo}/pulls/${pr}/files?per_page=100`,
+    '--jq',
+    '.[] | {filename, patch}',
+  );
+  return out
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as ChangedFile);
 }
 
 /** The managed files that `.clutch/lineage.json` lists at `sha`, from the checkout. None without one. */
@@ -265,39 +248,43 @@ export async function runAutoMerge(
   const bot = botKind(pr.headRefName);
   const names = await requiredChecks(run, repo, defaultBranch);
   const tier = await riskTier(run, defaultBranch, pr.headRefOid);
+  // Read once: the bot rule, the contract breaks and the major change judge the same files.
+  const changed = await changedFiles(run, repo, values.pr);
   let botProblems: Array<string> = [];
   if (bot === 'renovate') {
-    botProblems = renovateProblems(await changedFiles(run, repo, values.pr));
+    botProblems = renovateProblems(changed);
   } else if (bot === 'clutch-sync') {
-    botProblems = syncProblems(
-      await changedFiles(run, repo, values.pr),
-      await syncedFiles(run, pr.headRefOid),
-    );
+    botProblems = syncProblems(changed, await syncedFiles(run, pr.headRefOid));
   } else if (bot === 'gardening' && !['low', 'medium'].includes(tier)) {
     botProblems = [`The gardening PR's risk tier is ${tier}, not low or medium.`];
   } else if (bot === 'revert') {
     botProblems = await revertProblems(pr.headRefName, tier, (n) => autoMerged(run, repo, n));
   }
   const checks = await checkConclusions(run, repo, pr.headRefOid, names);
+  // Loaded here because `pr status` imports this file, and a project's `pr` runs without TypeScript.
+  const { weakerJourneys: weaker } = await import('@tools/github/weaker-journeys');
+  const native = await checkConclusions(run, repo, pr.headRefOid, ['native-ios', 'native-android']);
   const facts: Facts = {
+    native,
     pr,
     defaultBranch,
     tier,
     checks,
-    ownerFindings: await ownerFindings(run, repo, pr.headRefOid),
-    breaks: await contractBreaks(run, repo, values.pr, pr.headRefOid),
-    major: await majorChange(run, repo, values.pr),
+    weakerJourneys: await weaker(run, defaultBranch, pr.headRefOid),
+    breaks: await contractBreaks(run, repo, changed, pr.headRefOid),
+    major: await majorChange(run, repo, values.pr, changed),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
     ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),
   };
-  const { effective, reasons, verdict } = await judgeAtStep(run, facts, step, log);
+  const reasons = blockers(facts, step);
+  const verdict = verdictText(reasons, step, facts.ownerApproved);
   if (mode === 'on' && reasons.length === 0) {
     if (handoff) {
-      await handoff(effective);
+      await handoff(step);
       log(`${verdict}\nHanded the merge to the merge job.`);
     } else {
-      await enableAutoMerge(run, repo, values.pr, pr.headRefOid, effective);
+      await enableAutoMerge(run, repo, values.pr, pr.headRefOid, step);
       log(`${verdict}\nQueued the merge.`);
     }
     return 0;
@@ -306,11 +293,11 @@ export async function runAutoMerge(
     log(verdict);
     return 0;
   }
-  if (lastStepOn(mode, effective)) {
-    log(`${verdict}\nNo dry-run comment: the step ${effective} is the last.`);
+  if (lastStepOn(mode, step)) {
+    log(`${verdict}\nNo dry-run comment: the step ${step} is the last.`);
     return 0;
   }
-  const calibrate = mode === 'on' ? nextStep(effective) : effective;
+  const calibrate = mode === 'on' ? nextStep(step) : step;
   const graded = blockers(facts, calibrate);
   const wait = noVerdictYet(facts);
   if (wait) {

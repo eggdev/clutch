@@ -195,7 +195,8 @@ export async function readPr(
       at: r.submittedAt,
       url: r.url,
     }));
-  // The rule of waitsForOwner in status.ts: the owner's latest review, in any state, approves this head.
+  // The owner's latest review, in any state, must approve this head. A later
+  // comment-only review undoes it, which `ownerApproved` in auto-merge.ts skips.
   const ownerReview = pr.reviews.nodes.findLast((r) => r.author?.login === owner);
   const compare = await run([
     'gh',

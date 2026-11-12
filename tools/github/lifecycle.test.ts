@@ -2,8 +2,7 @@ import { expect, test } from 'bun:test';
 
 import { marker } from '@tools/github/auto-merge-rules';
 import { readJobLog } from '@tools/github/failures';
-import { fake, fakeClock, findingsOn, noWrite, repoOwner, reviewsOf } from '@tools/github/fake-run';
-import type { Reviewed } from '@tools/github/fake-run';
+import { fake, fakeClock, findingsOn, noWrite } from '@tools/github/fake-run';
 import { runPr } from '@tools/github/pr';
 import type { Result } from '@tools/github/stack';
 import { blockingCount, prStatus } from '@tools/github/status';
@@ -305,44 +304,6 @@ test('status counts the owner findings from the annotations, whatever the commen
     agentReview: { blocking: 0, owner: 2 },
     ready: true,
   });
-});
-
-test('an owner finding never keeps a green PR from ready; a major change waits until the owner approves the head', async () => {
-  const me = await repoOwner();
-  const green = JSON.parse(
-    view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out,
-  );
-  const readyWith = async (reviews: Array<Reviewed>, reviewDecision = '', title = 'fix: x') => {
-    const status = await prStatus(
-      fake([
-        ['gh pr view 7', { out: JSON.stringify({ ...green, reviewDecision }) }],
-        rules,
-        comments('## Agent review\n\nNo `blocking` findings.'),
-        ...findingsOn(head, ['**owner**: weaker check.']),
-        ['gh api repos/{owner}/{repo}/pulls/7 --jq .title', { out: `${title}\n` }],
-        reviewsOf('7', ...reviews),
-      ]).run,
-      '7',
-    );
-    return status.ready;
-  };
-  const cases: Array<[Array<Reviewed>, string]> = [
-    [[], ''],
-    [[{ login: me, state: 'DISMISSED', commit: head }], ''],
-    [[{ login: me, state: 'APPROVED', commit: 'old0000' }], ''],
-    [[{ login: 'someone', state: 'APPROVED', commit: head }], ''],
-    [[], 'APPROVED'],
-  ];
-  // The owner finding alone holds nothing: the weekly digest lists it.
-  expect(
-    await Promise.all(cases.map(([reviews, decision]) => readyWith(reviews, decision))),
-  ).toEqual([true, true, true, true, true]);
-  const major = 'feat!: drop the old flag';
-  expect(await readyWith([{ login: me, state: 'APPROVED', commit: head }], '', major)).toBe(true);
-  // A dismissed approval, one on an older commit, another login's approval, or GitHub's approval decision alone does not count.
-  expect(
-    await Promise.all(cases.map(([reviews, decision]) => readyWith(reviews, decision, major))),
-  ).toEqual([false, false, false, false, false]);
 });
 
 test('a merge state that a rule blocks keeps a green PR from ready', async () => {

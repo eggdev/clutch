@@ -224,34 +224,19 @@ test('on at the step low queues a low-risk agent PR, and medium takes a medium o
   ]);
 });
 
-test("agent review's owner finding holds no green PR at any step, and the verdict records it", async () => {
-  for (const step of ['low', 'medium'] as const) {
-    const gh = fake([
-      [
-        `gh api repos/eggdev/clutch/commits/${head}/check-runs?check_name=agent-review`,
-        { out: '3\n9\n' },
-      ],
-      [
-        'gh api repos/eggdev/clutch/check-runs/9/annotations',
-        { out: 'It lowers the file-size budget of a.ts.\n' },
-      ],
-    ]);
-    expect(await decide(gh, { mode: 'on', step })).toEqual([
-      `Would auto-merge at the step ${step}.\nOwner findings, recorded for the weekly digest:\n- It lowers the file-size budget of a.ts.\nQueued the merge.`,
-    ]);
-    expect(merges(gh.calls)).toEqual([`gh pr merge 7 --auto --merge --match-head-commit ${head}`]);
-  }
-});
-
-test('the dry-run comment lists the owner findings after its details, would or would not', () => {
-  const flagged = facts({ ownerFindings: ['It lowers a budget.'] });
-  const list = '\n\nOwner findings, recorded for the weekly digest:\n- It lowers a budget.\n\n';
-  const would = dryRunComment(flagged, [], 'low');
-  expect(would).toContain(`- Required checks green: \`validate\`, \`agent-review\`${list}`);
-  expect(would.split('\n').at(-1)).toBe(reactionRequest);
-  const wouldNot = dryRunComment(flagged, ['The risk tier is medium, not low.'], 'low');
-  expect(wouldNot).toContain(`- The risk tier is medium, not low.${list}`);
-  expect(dryRunComment(facts(), [], 'low')).not.toContain('Owner findings');
+test('a deleted journey holds a green PR, and a model finding does not', async () => {
+  const held = fake([
+    ['git merge-base', { out: 'b4se\n' }],
+    ['git diff --name-status', { out: 'D\tfeatures/a/journeys/b.pw.ts\n' }],
+  ]);
+  const lines = await decide(held, { mode: 'on', step: 'medium' });
+  expect(merges(held.calls)).toEqual([]);
+  expect(lines[0]).toContain('A journey gets weaker, so the owner decides');
+  const flagged = fake([
+    ['gh api repos/eggdev/clutch/check-runs/9/annotations', { out: 'It lowers a budget.\n' }],
+  ]);
+  await decide(flagged, { mode: 'on', step: 'medium' });
+  expect(merges(flagged.calls)).toHaveLength(1);
 });
 
 test('dry-run comments the verdict at its step, once per head, and merges nothing', async () => {
@@ -329,7 +314,7 @@ test('no dry-run comment while a required check is still running', async () => {
   ]);
   const [line] = await decide(running, { mode: 'dry-run', step: 'low' });
   expect(line).toContain('- The required check validate is pending.');
-  expect(line).toEndWith('No dry-run comment: Waiting for validate, agent-review to finish.');
+  expect(line).toEndWith('No dry-run comment: Waiting for validate to finish.');
   expect([...merges(running.calls), ...comments(running.calls)]).toEqual([]);
 });
 

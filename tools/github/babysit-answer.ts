@@ -3,7 +3,6 @@ import type { Plan } from '@tools/github/babysit';
 import type { Decision, Item } from '@tools/github/babysit-log';
 import { isBlocking } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
-import { firstLine as openingLine, ownerLine } from '@tools/github/owner-reviews';
 import type { Run } from '@tools/github/stack';
 
 /**
@@ -24,16 +23,12 @@ export type Answer = {
 /** A fix answers a thread only when this round pushed it. */
 export const fixes = new Set<Decision>(['must-fix', 'cheap-fix']);
 
-/**
- * Whether a thread with this decision is resolved after the reply. An owner
- * item stays open, so the merge waits. A recorded owner finding is resolved,
- * and the weekly digest lists it.
- */
+/** Whether a thread with this decision is resolved after the reply. An owner item stays open, so the merge waits. */
 export function resolves(decision: Decision, pushed: string | null) {
   if (fixes.has(decision)) {
     return pushed !== null;
   }
-  return decision === 'no-change' || decision === 'after-approval' || decision === 'recorded';
+  return decision === 'no-change' || decision === 'after-approval';
 }
 
 /** What the reply says it did. */
@@ -46,7 +41,6 @@ export function actionOf(decision: Decision, pushed: string | null) {
     owner: 'left for the owner',
     flaky: 'reran the failed jobs',
     'after-approval': 'not fixed: after the owner approved this head',
-    recorded: 'recorded for the weekly digest',
   };
   return actions[decision] ?? decision;
 }
@@ -91,44 +85,13 @@ export function blockingGuard(answer: Answer | undefined, finding: string): Answ
   };
 }
 
-/** How the reason of an item that the triage wrongly answered `recorded` starts. */
-const recordedOnlyOwnerFinding = 'only an owner finding of agent review is recorded';
-
-/**
- * Only an owner finding of agent review may be `recorded`: a thread whose first
- * comment is a bot's and opens with `owner`. Any other item answered that way,
- * a person's thread, a comment or a check, stays for the owner.
- */
-export function recordedGuard(
-  answer: Answer | undefined,
-  author = '',
-  body = '',
-): Answer | undefined {
-  if (
-    answer?.decision !== 'recorded' ||
-    (answer.kind === 'thread' && author.endsWith('[bot]') && ownerLine(openingLine(body)))
-  ) {
-    return answer;
-  }
-  return {
-    ...answer,
-    decision: 'owner',
-    reason: `${recordedOnlyOwnerFinding}; the triage said recorded: ${answer.reason}`,
-  };
-}
-
 export async function answerThreads({ run, repo, plan, answers, pushed }: Context) {
   const items: Array<Item> = [];
   for (const thread of plan.threads) {
     const first = thread.comments[0];
-    // blockingGuard runs first, so a blocking finding keeps its own reason.
-    const answer = recordedGuard(
-      blockingGuard(
-        answers.find((a) => a.kind === 'thread' && a.ref === thread.id),
-        firstLine(first?.body),
-      ),
-      first?.author,
-      first?.body,
+    const answer = blockingGuard(
+      answers.find((a) => a.kind === 'thread' && a.ref === thread.id),
+      firstLine(first?.body),
     );
     const base = {
       kind: 'thread' as const,
@@ -218,13 +181,15 @@ export async function answerComments({ run, repo, plan, answers, pushed }: Conte
   const items: Array<Item> = [];
   const lines: Array<string> = [];
   for (const comment of plan.comments) {
-    const answer = recordedGuard(
-      answers.find((a) => a.kind === 'comment' && a.ref === String(comment.id)),
-    );
-    const decision = answer?.decision ?? 'owner';
+    const answer = answers.find((a) => a.kind === 'comment' && a.ref === String(comment.id));
+    // A comment with no answer is the session's gap: it stays open for the next round.
+    if (!answer) {
+      continue;
+    }
+    const { decision } = answer;
     const action = actionOf(decision, pushed);
     const quote = comment.body.trim().split('\n')[0]?.slice(0, 140) ?? '';
-    const reply = answer?.reply.trim() ?? 'No decision yet. The owner decides.';
+    const reply = answer.reply.trim();
     lines.push(
       `- [${comment.author}](${comment.url}): > ${quote}\n  ${reply} _${decision}: ${action}._`,
     );
@@ -234,7 +199,7 @@ export async function answerComments({ run, repo, plan, answers, pushed }: Conte
       url: comment.url,
       author: comment.author,
       decision,
-      reason: answer?.reason ?? unanswered,
+      reason: answer.reason,
       action,
       resolved: false,
     });
@@ -250,7 +215,7 @@ export async function answerComments({ run, repo, plan, answers, pushed }: Conte
 export async function answerChecks({ run, repo, plan, answers, pushed }: Context) {
   const items: Array<Item> = [];
   for (const check of plan.failed) {
-    const answer = recordedGuard(answers.find((a) => a.kind === 'check' && a.ref === check.name));
+    const answer = answers.find((a) => a.kind === 'check' && a.ref === check.name);
     const decision = answer?.decision ?? 'owner';
     const runId = /\/runs\/(\d+)/u.exec(check.url)?.[1];
     if (decision === 'flaky' && runId) {

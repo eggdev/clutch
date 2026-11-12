@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -45,6 +45,13 @@ async function clutch() {
   return { repo, first, second };
 }
 
+// The tests that only read the template share one. A test that tags it builds its own.
+let shared: Awaited<ReturnType<typeof clutch>>;
+beforeAll(async () => {
+  shared = await clutch();
+});
+afterAll(() => shared.repo[Symbol.asyncDispose]());
+
 function project(files: Record<string, string> = {}) {
   return gitRepo({
     'package.json': JSON.stringify({ name: 'shop', scripts: { dev: 'vite' } }),
@@ -58,8 +65,7 @@ const commitAll = async (root: string) => {
 };
 
 test('a sync writes managed files, merges package.json and skips seed files, then --check is clean', async () => {
-  const { repo, first } = await clutch();
-  await using template = repo;
+  const { repo: template, first } = shared;
   await using target = await project();
   const synced = await runSync({ root: target.root, template: template.root, to: first });
   expect(synced.status).toBe('synced');
@@ -80,8 +86,7 @@ test('a sync writes managed files, merges package.json and skips seed files, the
 });
 
 test('the next commit updates, adds and retires managed files', async () => {
-  const { repo, first, second } = await clutch();
-  await using template = repo;
+  const { repo: template, first, second } = shared;
   await using target = await project();
   await runSync({ root: target.root, template: template.root, to: first });
   await commitAll(target.root);
@@ -104,8 +109,7 @@ test('the next commit updates, adds and retires managed files', async () => {
 });
 
 test('a managed file that the project edited needs a decision, and nothing changes', async () => {
-  const { repo, first, second } = await clutch();
-  await using template = repo;
+  const { repo: template, first, second } = shared;
   await using target = await project();
   await runSync({ root: target.root, template: template.root, to: first });
   await target.write({ 'tools/check.ts': 'my own check\n' });
@@ -116,8 +120,7 @@ test('a managed file that the project edited needs a decision, and nothing chang
 });
 
 test('a project with only review tooling starts from .review/tooling.json', async () => {
-  const { repo, first, second } = await clutch();
-  await using template = repo;
+  const { repo: template, first, second } = shared;
   await using target = await project();
   await runSync({ root: target.root, template: template.root, to: first });
   const { files } = JSON.parse(await readFile(path.join(target.root, lineagePath), 'utf-8'));
@@ -137,8 +140,7 @@ test('a project with only review tooling starts from .review/tooling.json', asyn
 });
 
 test('sync --check exits 0 when clean, 2 with changes or decisions, and 1 on an error', async () => {
-  const { repo, first, second } = await clutch();
-  await using template = repo;
+  const { repo: template, first, second } = shared;
   await using target = await project();
   const sync = (...args: Array<string>) =>
     syncCommand(['--root', target.root, '--json', ...args], target.root, template.root);
@@ -240,8 +242,7 @@ test('a decision that a new release brings only warns, and one at the same relea
 });
 
 test('without a release tag, a sync without --to stops and says how to fix it', async () => {
-  const { repo } = await clutch();
-  await using template = repo;
+  const { repo: template } = shared;
   await using target = await project();
   await expect(runSync({ root: target.root, template: template.root })).rejects.toThrow(
     'has no Clutch release tag',

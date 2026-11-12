@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 /** The risk tiers, lowest first. A higher tier needs more human review before a merge. */
 const tiers = ['low', 'medium', 'high', 'one-way-door'] as const;
 
@@ -15,6 +18,8 @@ type Rule = {
   except: Array<string>;
   guardrails?: string;
   lines?: Array<string>;
+  /** The journeys that prove these paths. When each exists, the rule holds nothing. */
+  journeys?: Array<string>;
 };
 
 export type RiskConfig = { unmatched: Tier; rules: Array<Rule> };
@@ -48,17 +53,29 @@ function isRegex(value: unknown) {
   }
 }
 
+/** Sets `journeys` on `rule` when `value` is a good list, and records an error when it is not. */
+function readJourneys(value: unknown, at: string, errors: Array<RiskError>, rule: Partial<Rule>) {
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value) || value.length === 0 || !value.every((j) => typeof j === 'string')) {
+    errors.push({ path: `${at}.journeys`, message: 'Expected a list of journey names.' });
+    return;
+  }
+  rule.journeys = value as Array<string>;
+}
+
 function readRule(value: unknown, at: string, errors: Array<RiskError>): Rule | undefined {
   if (!isObject(value)) {
     errors.push({ path: at, message: 'Expected a map with tier and paths.' });
     return undefined;
   }
   for (const key of Object.keys(value)) {
-    if (!['tier', 'paths', 'except', 'guardrails', 'lines'].includes(key)) {
+    if (!['tier', 'paths', 'except', 'guardrails', 'lines', 'journeys'].includes(key)) {
       errors.push({ path: `${at}.${key}`, message: 'Unknown key.' });
     }
   }
-  const { tier, paths = [], except = [], guardrails, lines } = value;
+  const { tier, paths = [], except = [], guardrails, lines, journeys } = value;
   const before = errors.length;
   if (!isTier(tier)) {
     errors.push({ path: `${at}.tier`, message: tierMessage });
@@ -94,6 +111,7 @@ function readRule(value: unknown, at: string, errors: Array<RiskError>): Rule | 
   if (lines !== undefined) {
     rule.lines = lines as Array<string>;
   }
+  readJourneys(journeys, at, errors, rule);
   return rule;
 }
 
@@ -147,7 +165,7 @@ export function classify(
 ): Array<FileTier> {
   const globs = config.rules.flatMap((rule) => {
     const except = rule.except.map((pattern) => new Bun.Glob(pattern));
-    const lines = rule.lines?.map((source) => new RegExp(source, 'u'));
+    const lines = rule.lines?.map((source) => new RegExp(source, 'iu'));
     return rule.paths.map((pattern) => ({
       tier: rule.tier,
       pattern,
@@ -190,4 +208,31 @@ export function changeTier(files: Array<FileTier>) {
     tier = higher(tier, file.tier);
   }
   return tier;
+}
+
+/**
+ * The names of the journeys on this checkout: each file's id, and the core
+ * journey that its `Core:` line names. The judge runs from the default branch,
+ * so a PR cannot add the journey that frees its own path.
+ */
+export function journeysPresent(root: string) {
+  const names = new Set<string>();
+  for (const file of new Bun.Glob('features/*/journeys/*.{pw.ts,maestro.yaml}').scanSync(root)) {
+    names.add(path.basename(file).replace(/\.(?:pw\.ts|maestro\.yaml)$/u, ''));
+    const core = /^\s*(?:\*|#)\s*Core:\s*(\S+)/mu.exec(
+      readFileSync(path.join(root, file), 'utf-8'),
+    );
+    if (core?.[1]) {
+      names.add(core[1]);
+    }
+  }
+  return names;
+}
+
+/** The rules that still hold their paths: a rule with `journeys` stops when each one exists. */
+export function heldRules<T extends { journeys?: Array<string> }>(
+  rules: Array<T>,
+  present: ReadonlySet<string>,
+) {
+  return rules.filter((rule) => !rule.journeys?.every((name) => present.has(name)));
 }

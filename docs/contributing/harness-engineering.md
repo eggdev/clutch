@@ -77,8 +77,8 @@ The guard starts when kickoff deletes `KICKOFF.md`.
 - Codex cannot ask from a hook. `guard-guardrails` refuses the edit, and the
   agent asks the user.
 - A shell command that writes a file does not trigger the guard. Agent review
-  is the control that holds. A change that weakens a guardrail file gets an
-  `owner` finding, and the weekly digest lists it for the owner.
+  is the control that reports it. A change that weakens a guardrail file gets an
+  advisory `owner` finding, and the session must answer it.
 
 The end-of-turn hook prints nothing when the checks pass. On a failure, the
 agent continues and fixes it. A turn that the hook already continued ends,
@@ -99,12 +99,12 @@ agent hook. A loosened guardrail lets drift in, so a person reviews each
 change that loosens one.
 
 - [`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them.
-  Agent review gives a change that makes one weaker an `owner` finding, and
-  the weekly digest lists it for the owner. A change that makes one stronger
+  Agent review gives a change that makes one weaker an advisory `owner` finding.
+  The [weekly digest](./capabilities/factory-observability.md#weekly-digest) lists each `owner` finding of a merged pull request. A change that makes one stronger
   merges like any other. See
   [decision record 0002](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
 - The list itself is not in the one-way-door tier. A change to it merges as
-  any other change, see [decision record 0005](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
+  any other change, see [decision record 0005](./decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
 - `check-guardrail-coverage` finds the tool scripts that the root targets,
   the lint config and the hook configs run. It follows their `@tools/`
   imports, and reads each file path in them. It fails when no guardrail
@@ -114,38 +114,41 @@ change that loosens one.
 
 Each escape hatch lives in a guardrail file, so the review sees it:
 
-| Escape hatch                                                                                   | Where it lives                                                                                                      |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| An override that turns a lint rule off                                                         | `oxlint.config.ts`                                                                                                  |
-| A raised file-size budget                                                                      | `tools/file-size-budgets.json`                                                                                      |
-| A screenshot baseline replaced with CI's shot                                                  | `bun run visual pull`, which rewrites `__screenshots__/*.png`; the PR body gives the reason                         |
-| Pixel noise a screenshot may show without a baseline change                                    | `maxDiffPixelRatio` in `packages/journeys/testing/visual.ts`: 0.1% of the pixels                                    |
-| A core journey failure state that the product does not have                                    | `clutch.yaml`, `coreJourneys.<name>.without`, with a reason for each one                                            |
-| A knip ignore or entry                                                                         | `knip.jsonc`                                                                                                        |
-| An import exception                                                                            | `primitives.yaml`, `exceptions`                                                                                     |
-| A transaction-safe service                                                                     | `primitives.yaml`, `transactionSafe`                                                                                |
-| A dependency override                                                                          | `tools/dependency-overrides.yaml`                                                                                   |
-| Agent review of a PR that a bot opened                                                         | `agent-review.yml`, `allowed_bots`                                                                                  |
-| The owner's approval, which lifts an agent PR's risk tier, a contract break and a major change | `clutch.yaml`, `automerge.owner`, read in `tools/github/auto-merge-rules.ts` (`ownerLifts`)                         |
-| A merge on the owner's word, which skips the auto-merge judge but not the checks               | `tools/github/merge.ts`, `pr merge --owner`                                                                         |
-| A bypass of the main ruleset                                                                   | `.github/rulesets/main.json`, `bypass_actors`: only the release bot's app                                           |
-| Files a Clutch sync PR may change past the lineage                                             | `tools/github/bot-rule.ts`, `syncExtras`                                                                            |
-| Days a project may stay behind a Clutch release                                                | `clutch.yaml`, `template.grace_days`                                                                                |
-| Files whose change alone skips the SAST scan                                                   | `.github/workflows/sast.yml`, the Skip a docs-only pull request step                                                |
-| A path kept out of a risk tier                                                                 | `.clutch/risk.yaml`, a rule's `except`                                                                              |
-| A zizmor finding the owner accepted                                                            | `# zizmor: ignore[<audit>]` in the workflow                                                                         |
-| A file whose old lint violations a ratchet holds                                               | `.clutch/ratchets.json`: a ratchet that a lint rule reads, such as `design-system-only`                             |
-| A flaky test or journey screenshot kept out of the blocking runs                               | `tools/flaky-tests.json`, with an issue and an expiry                                                               |
-| A Semgrep false positive                                                                       | `nosemgrep: rule-id -- reason` on the line, which `check-suppressions` enforces                                     |
-| A Semgrep rule off for the whole repository                                                    | `sast.yml`, `--exclude-rule`                                                                                        |
-| A file that tooling reads but sets no rule                                                     | `tools/guardrail-files.json`, `exempt`                                                                              |
-| A release range that needs no changeset                                                        | `tools/check-changeset.ts`, `onlyReleases`                                                                          |
-| A changeset written for a Renovate PR                                                          | `renovate.json`, `postUpgradeTasks`                                                                                 |
-| A fleet repository that the release bot cannot read                                            | `weekly-digest.yml`, `continue-on-error` on the token step, then a notice                                           |
-| Files kept out of the PR size count                                                            | `clutch.yaml`, `pr_size.exclude`                                                                                    |
-| Which app a web journey drives, with several web apps                                          | `clutch.yaml`, `journeys.webApp`                                                                                    |
-| Lockfiles, snapshots and `.clutch/` out of the size count                                      | `apps/cli/src/labels/compute.ts`, `sizeExcluded` (a guardrail file)                                                 |
-| A revert rehearsal kept out of the brake, the revert metric and the tighten issue              | The `drill` label on the reverted PR, in its timeline; `tools/github/auto-merge-brake.ts`, `tools/github/revert.ts` |
+| Escape hatch                                                                                     | Where it lives                                                                                 |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| An override that turns a lint rule off                                                           | `oxlint.config.ts`                                                                             |
+| A raised file-size budget                                                                        | `tools/file-size-budgets.json`                                                                 |
+| A screenshot baseline replaced with CI's shot                                                    | `bun run visual pull`, which rewrites `__screenshots__/*.png`; the PR body gives the reason    |
+| Pixel noise a screenshot may show without a baseline change                                      | `maxDiffPixelRatio` in `packages/journeys/testing/visual.ts`: 0.1% of the pixels               |
+| A core journey failure state that the product does not have                                      | `clutch.yaml`, `coreJourneys.<name>.without`, with a reason for each one                       |
+| A sensitive path that its journeys prove                                                         | `.clutch/risk.yaml`, `journeys:` on the rule                                                   |
+| A migration line that loses no data: `DROP CONSTRAINT`, `DEFAULT`, `NOT NULL`, `INDEX`           | `.clutch/risk.yaml`, the migration `lines` rule                                                |
+| A file that the PR size limit does not count: the tracker, lockfiles, screenshots                | `tools/check-scope.ts`, `alwaysExcluded`                                                       |
+| A knip ignore or entry                                                                           | `knip.jsonc`                                                                                   |
+| An import exception                                                                              | `primitives.yaml`, `exceptions`                                                                |
+| A transaction-safe service                                                                       | `primitives.yaml`, `transactionSafe`                                                           |
+| A dependency override                                                                            | `tools/dependency-overrides.yaml`                                                              |
+| Agent review of a PR that a bot opened                                                           | `agent-review.yml`, `allowed_bots`                                                             |
+| The owner's approval, which lifts the tier, a weaker journey, a contract break and major changes | `clutch.yaml`, `automerge.owner`, read in `tools/github/auto-merge-rules.ts` (`ownerApproved`) |
+| A merge on the owner's word, which skips the auto-merge judge but not the checks                 | `tools/github/merge.ts`, `pr merge --owner`                                                    |
+| A bypass of the main ruleset                                                                     | `.github/rulesets/main.json`, `bypass_actors`: only the release bot's app                      |
+| Files a Clutch sync PR may change past the lineage                                               | `tools/github/bot-rule.ts`, `syncExtras`                                                       |
+| Days a project may stay behind a Clutch release                                                  | `clutch.yaml`, `template.grace_days`                                                           |
+| Files whose change alone skips the SAST scan                                                     | `.github/workflows/sast.yml`, the Skip a docs-only pull request step                           |
+| A path kept out of a risk tier                                                                   | `.clutch/risk.yaml`, a rule's `except`                                                         |
+| A zizmor finding the owner accepted                                                              | `# zizmor: ignore[<audit>]` in the workflow                                                    |
+| A file whose old lint violations a ratchet holds                                                 | `.clutch/ratchets.json`: a ratchet that a lint rule reads, such as `design-system-only`        |
+| A flaky test or journey screenshot kept out of the blocking runs                                 | `tools/flaky-tests.json`, with an issue and an expiry                                          |
+| A Semgrep false positive                                                                         | `nosemgrep: rule-id -- reason` on the line, which `check-suppressions` enforces                |
+| A Semgrep rule off for the whole repository                                                      | `sast.yml`, `--exclude-rule`                                                                   |
+| A file that tooling reads but sets no rule                                                       | `tools/guardrail-files.json`, `exempt`                                                         |
+| A release range that needs no changeset                                                          | `tools/check-changeset.ts`, `onlyReleases`                                                     |
+| A changeset written for a Renovate PR                                                            | `renovate.json`, `postUpgradeTasks`                                                            |
+| A fleet repository that the release bot cannot read                                              | `weekly-digest.yml`, `continue-on-error` on the token step, then a notice                      |
+| Files kept out of the PR size count                                                              | `clutch.yaml`, `pr_size.exclude`                                                               |
+| Which app a web journey drives, with several web apps                                            | `clutch.yaml`, `journeys.webApp`                                                               |
+| Lockfiles, snapshots and `.clutch/` out of the size count                                        | `apps/cli/src/labels/compute.ts`, `sizeExcluded` (a guardrail file)                            |
+| A revert rehearsal kept out of the revert metric and the tighten issue                           | The `drill` label on the reverted PR, in its timeline; `tools/github/revert.ts`                |
 
 <!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS; tools/codeowners.ts keeps it when it regenerates the file. -->
 

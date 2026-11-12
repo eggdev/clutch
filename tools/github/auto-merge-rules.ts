@@ -17,27 +17,6 @@ export type Mode = (typeof modes)[number];
 export const steps = ['bots', 'low', 'medium'] as const;
 export type Step = (typeof steps)[number];
 
-/**
- * The revert brake: auto-merge steps down one step while reverts pass
- * `maxRevertRate` of the PRs merged in `window`, once there are `minMerged`.
- * Decision 0002 sets the 2% that tightens it on evidence.
- */
-export const brake = { window: '30d', minMerged: 20, maxRevertRate: 0.02 };
-
-/** The step that the brake gives: one step lower while the revert rate passes the limit. */
-export function brakedStep(step: Step, merged: number, reverts: number): Step {
-  if (merged < brake.minMerged || reverts / merged <= brake.maxRevertRate) {
-    return step;
-  }
-  return steps[Math.max(steps.indexOf(step) - 1, 0)];
-}
-
-/** The sentence that the verdict gives when the brake steps down. */
-export function brakeReason(merged: number, reverts: number, from: Step, to: Step) {
-  const rate = ((reverts / merged) * 100).toFixed(1);
-  return `Reverts are ${reverts} of ${merged} merged PRs in the last ${brake.window}, ${rate}%, over the ${brake.maxRevertRate * 100}% brake, so the step drops from ${from} to ${to}.`;
-}
-
 /** The step after `step`, which an `on` run calibrates. The last step calibrates itself. */
 export const nextStep = (step: Step): Step => steps[Math.min(steps.indexOf(step) + 1, 2)];
 
@@ -63,19 +42,21 @@ export type Facts = {
   tier: string;
   /** Each required check, with the conclusion of its latest run, `pending` or `missing`. */
   checks: Record<string, string>;
-  /**
-   * Agent review's `owner` findings on the head: the change weakens a check, a
-   * lint rule, a budget or a test. They hold nothing. The verdict lists them,
-   * and the weekly digest records them for the owner.
-   */
-  ownerFindings: Array<string>;
+  /** The conclusions of the native journey jobs that ran on the head. */
+  native: Record<string, string>;
+  /** Why the PR weakens a journey or a budget, from `weakerJourneys`. */
+  weakerJourneys: Array<string>;
   /**
    * Each one-way change that the contract snapshot of the head names under
    * `breaks`, when the PR's own diff changes `contract.json`. The owner agrees
-   * to a break, so each one leaves the PR for the owner, whatever its risk tier.
+   * to a break, so each one holds the PR for the owner, whatever its risk tier.
    */
   breaks: Array<string>;
-  /** Why the PR is a major change, or nothing: a title with `!`, or a changeset in its diff that names a major bump. The owner signs off a major change, whatever its risk tier. */
+  /**
+   * Why the PR is a major change, from `majorChange`: a title with `!`, or a
+   * changeset in its diff that names a major bump. The owner signs off a major
+   * change, so it holds the PR for the owner, whatever its risk tier.
+   */
   major: Array<string>;
   /** Why a bot PR fails its bot rule: a diff that is more than a version, or a revert that may not merge. Empty for an agent PR. */
   botProblems: Array<string>;
@@ -84,8 +65,8 @@ export type Facts = {
   /**
    * Whether `automerge.owner` approved the head commit, and gave no later
    * review that asks for changes. The owner's approval is the review that a
-   * one-way-door PR waits for, so it lifts the tier, a contract break and a
-   * major change.
+   * one-way-door PR waits for, so it lifts the tier, a weaker journey, a
+   * contract break and a major change.
    * The checks, a draft, the base and a red main still hold the PR.
    */
   ownerApproved: boolean;
@@ -172,8 +153,20 @@ export function blockers(facts: Facts, step: Step): Array<string> {
   } else {
     reasons.push(...stepProblems(facts, step));
   }
-  // The owner's approval of the head lifts the tier, a break and a major change.
+  for (const [name, conclusion] of Object.entries(checks)) {
+    if (conclusion !== 'success') {
+      reasons.push(`The required check ${name} is ${conclusion}.`);
+    }
+  }
+  for (const [name, conclusion] of Object.entries(facts.native)) {
+    if (!['success', 'skipped', 'missing'].includes(conclusion)) {
+      reasons.push(`The native journey ${name} is ${conclusion}.`);
+    }
+  }
   if (!facts.ownerApproved) {
+    for (const reason of facts.weakerJourneys) {
+      reasons.push(`A journey gets weaker, so the owner decides: ${reason}`);
+    }
     for (const name of facts.breaks) {
       reasons.push(`The contract snapshot names the break ${name}. The owner agrees to a break.`);
     }
@@ -181,11 +174,6 @@ export function blockers(facts: Facts, step: Step): Array<string> {
       reasons.push(
         `The change is major: ${facts.major.join(', and ')}. The owner signs off a major change.`,
       );
-    }
-  }
-  for (const [name, conclusion] of Object.entries(checks)) {
-    if (conclusion !== 'success') {
-      reasons.push(`The required check ${name} is ${conclusion}.`);
     }
   }
   // A revert is how a red main turns green, so the red main does not hold it.
@@ -199,28 +187,15 @@ export function blockers(facts: Facts, step: Step): Array<string> {
   return reasons;
 }
 
-/** The heading of the owner findings in a verdict and a dry-run comment. They hold nothing. */
-const recordedHeading = 'Owner findings, recorded for the weekly digest:';
-
 /**
- * The verdict that a run prints: whether the PR would auto-merge at `step`, the
- * reasons when it would not, and agent review's owner findings, which hold
- * nothing but stay visible for the weekly digest.
+ * The verdict that a run prints: whether the PR would auto-merge at `step`, and
+ * the reasons when it would not.
  */
-export function verdictText(
-  reasons: Array<string>,
-  step: Step,
-  findings: Array<string>,
-  ownerApproved = false,
-) {
+export function verdictText(reasons: Array<string>, step: Step, ownerApproved = false) {
   const approved = ownerApproved ? ' The owner approved this head.' : '';
-  const verdict =
-    reasons.length > 0
-      ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
-      : `Would auto-merge at the step ${step}.${approved}`;
-  return findings.length > 0
-    ? `${verdict}\n${recordedHeading}\n${findings.map((finding) => `- ${finding}`).join('\n')}`
-    : verdict;
+  return reasons.length > 0
+    ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
+    : `Would auto-merge at the step ${step}.${approved}`;
 }
 
 /** Marks the dry-run comment for one head commit, so a rerun does not repeat it. */
@@ -238,8 +213,8 @@ export const enabledMarker = (step: Step, sha: string) =>
 export const reactionRequest = 'Owner: react 👍 if you agree with this verdict, or 👎 if not.';
 
 /**
- * The dry-run comment: the verdict, the facts or the reasons behind it, the
- * owner findings that it records, and the reaction request. `reasons` is empty when the PR would auto-merge.
+ * The dry-run comment: the verdict, the facts or the reasons behind it, and
+ * the reaction request. `reasons` is empty when the PR would auto-merge.
  */
 export function dryRunComment(facts: Facts, reasons: Array<string>, step: Step) {
   const sha = facts.pr.headRefOid.slice(0, 7);
@@ -268,9 +243,6 @@ export function dryRunComment(facts: Facts, reasons: Array<string>, step: Step) 
     `At the step \`${step}\`:`,
     '',
     ...details,
-    ...(facts.ownerFindings.length > 0
-      ? ['', recordedHeading, ...facts.ownerFindings.map((finding) => `- ${finding}`)]
-      : []),
     '',
     reactionRequest,
   ].join('\n');

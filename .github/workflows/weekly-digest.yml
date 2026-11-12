@@ -137,7 +137,10 @@ jobs:
           bun tools/clutch.ts doctor --root ../target --remote --repo "$REPO" --json > "$RUNNER_TEMP/doctor.json"
           bun tools/clutch.ts metrics --root ../target --repo "$REPO" > "$RUNNER_TEMP/metrics.txt"
           bun tools/journeys/visual-digest.ts --root ../target --repo "$REPO" > "$RUNNER_TEMP/visual.md"
-          bun tools/github/owner-findings-digest.ts --repo "$REPO" > "$RUNNER_TEMP/owner-findings.md"
+          # A failed read of the owner findings leaves a line, and the digest goes on.
+          if ! bun tools/github/owner-findings-digest.ts --repo "$REPO" > "$RUNNER_TEMP/owner-findings.md"; then
+            printf '### Owner findings\n\nThe owner findings of %s could not be read.\n' "$REPO" > "$RUNNER_TEMP/owner-findings.md"
+          fi
           fence="$(printf '\140\140\140')"
           {
             printf '## %s (%s)\n\n### Doctor\n\n%stext\n' "$REPO" "$REF" "$fence"

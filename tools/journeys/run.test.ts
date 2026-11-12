@@ -1,8 +1,9 @@
 import { expect, test } from 'bun:test';
 import path from 'node:path';
 
+import { unprovenCore } from '@tools/journeys/core-proof';
 import type { DeviceRun } from '@tools/journeys/measures';
-import { main, unprovenCore } from '@tools/journeys/run';
+import { main } from '@tools/journeys/run';
 import type { Sink } from '@tools/journeys/run';
 import { inRepo } from '@tools/testing/in-repo';
 
@@ -48,6 +49,25 @@ test('with no web journey, --all exits 0 and warns, and the step summary names t
       expect(await Bun.file(summary).text()).toContain(
         `Add a web journey at \`features/<feature>/journeys/<id>.pw.ts\`. See [end-to-end testing](${link}).`,
       );
+    },
+  );
+});
+
+test('production with no URL fails', async () => {
+  await inRepo({ 'package.json': JSON.stringify({ name: 'shop' }) }, async (root) => {
+    const { sink, lines } = capture({});
+    expect(await main(root, '--production', sink)).toBe(1);
+    expect(lines.join('\n')).toContain('needs the URL');
+  });
+});
+
+test('production with no core journey fails, since it has no proof', async () => {
+  await inRepo(
+    { 'package.json': JSON.stringify({ name: 'shop' }), 'apps/web/package.json': app },
+    async (root) => {
+      const { sink, lines } = capture({});
+      expect(await main(root, '--production', sink, undefined, 'https://x.test')).toBe(1);
+      expect(lines.join('\n')).toContain('No core journey exists');
     },
   );
 });

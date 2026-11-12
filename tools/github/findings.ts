@@ -168,15 +168,6 @@ export const unanswered = (findings: ReadonlyArray<Finding>) =>
   findings.filter((finding) => finding.disposition === null);
 
 /** The findings as a list, and a disposition template for the ones with none. */
-/** The dispositions that the template offers for a finding of `level`. Only an owner finding can be recorded. */
-function choices(level: Level) {
-  if (level === 'blocking') {
-    return 'fixed in <sha>';
-  }
-  const recorded = level === 'owner' ? ' | recorded for the weekly digest: <reason>' : '';
-  return `fixed in <sha> | not fixed: <reason>${recorded} | waits for the owner: <what they decide>`;
-}
-
 export function renderFindings(findings: ReadonlyArray<Finding>) {
   if (findings.length === 0) {
     return 'Agent review left no finding on this PR.';
@@ -203,7 +194,7 @@ export function renderFindings(findings: ReadonlyArray<Finding>) {
           '',
           ...missing.map(
             (finding) =>
-              `- ${finding.level} \`${finding.path}\` (${finding.ids.join(', ')}): ${choices(finding.level)}`,
+              `- ${finding.level} \`${finding.path}\` (${finding.ids.join(', ')}): ${finding.level === 'blocking' ? 'fixed in <sha>' : 'fixed in <sha> | not fixed: <reason> | waits for the owner: <what they decide>'}`,
           ),
         ];
   return [...lines, ...template].join('\n');

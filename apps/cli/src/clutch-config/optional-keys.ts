@@ -4,6 +4,25 @@ import { readIntake } from '@/clutch-config/intake';
 
 /** Readers for the newest optional top-level keys of `clutch.yaml`, which schema.ts calls. */
 
+export function readDeploy(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'deploy', message: 'Expected a map with command and url.' });
+    return;
+  }
+  unknownKeys(value, ['command', 'url'], 'deploy', errors);
+  const { command, url } = value;
+  const before = errors.length;
+  if (!isStringList(command) || command.length === 0) {
+    errors.push({ path: 'deploy.command', message: 'Expected the command as a list of words.' });
+  }
+  if (typeof url !== 'string' || !url.startsWith('https://')) {
+    errors.push({ path: 'deploy.url', message: 'Expected an https URL.' });
+  }
+  return errors.length === before
+    ? { command: command as Array<string>, url: url as string }
+    : undefined;
+}
+
 export function readAutoRevert(value: unknown, errors: Errors) {
   if (!isObject(value)) {
     errors.push({ path: 'autoRevert', message: 'Expected a map with watch.' });

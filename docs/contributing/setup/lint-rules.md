@@ -192,7 +192,7 @@ casts in apps, features and packages. `as const` stays allowed.
   checks a record with the `is` check of its record in `contract/`, or types
   the source.
 - Each other escape hatch lives in a guardrail file. Agent review gives a new
-  hatch an `owner` finding, and the weekly digest lists it for the owner. See
+  hatch an `owner` finding, so the owner decides. See
   [guardrail files](../harness-engineering.md#guardrail-files).
 
 ## Test files
