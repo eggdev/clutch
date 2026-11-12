@@ -8,17 +8,16 @@ Rank 62 of the researched practices. About one in seven of the leading repositor
 
 ## Detection
 
-`clutch doctor` reports this capability as present when two rules pass. A workflow file with `review` in its name reads the `.blocking` result of the review. The `required_check:agent-review` remote probe passes. Doctor checks the remote probe on GitHub only with `--remote`. Without that flag, the probe is unknown, so a repository with only the workflow reports as unknown. With `--remote`, a probe that fails makes it partial. See the `ai_review_blocking` entry in [the registry](./registry.yaml).
+`clutch doctor` reports this capability as present when one rule passes: a workflow file with `review` in its name reads the `.blocking` result of the review. See the `ai_review_blocking` entry in [the registry](./registry.yaml).
 
 ## Adopt
 
 1. Define the finding levels in the review rules. See [finding levels](../review.md#finding-levels).
-2. Make the review job fail when the agent returns a blocking finding. See [`.github/workflows/agent-review.yml`](../../../.github/workflows/agent-review.yml).
+2. Make the review job report each finding. No finding fails it. See [`.github/workflows/agent-review.yml`](../../../.github/workflows/agent-review.yml).
 3. Confirm that the review passed on several recent pull requests.
-4. Set `agentReview.missingCredential: fail` in `clutch.yaml`, so a run without the credential fails instead of passing with a notice.
-5. Make `agent-review` a required status check. The main ruleset in `.github/rulesets/main.json` requires it; run `mise exec -- bun run clutch ruleset --apply` to send it to GitHub.
-6. Run `mise exec -- bun run clutch doctor --remote` to confirm the result.
-7. Set `ai_review_blocking` to `adopted` in `clutch.yaml`.
+4. Keep `agent-review` out of the required status checks, so a model outage holds no merge.
+5. Run `mise exec -- bun run clutch doctor --remote` to confirm the result.
+6. Set `ai_review_blocking` to `adopted` in `clutch.yaml`.
 
 ## Waive
 

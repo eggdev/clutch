@@ -17,11 +17,11 @@
 /tools/guardrail-files.json @eggdev
 /tools/codeowners.ts @eggdev
 /tools/github/auto-merge.ts @eggdev
-/tools/github/auto-merge-brake.ts @eggdev
 /tools/github/auto-merge-checks.ts @eggdev
 /tools/github/auto-merge-enable.ts @eggdev
 /tools/github/auto-merge-rules.ts @eggdev
 /tools/github/bot-rule.ts @eggdev
+/tools/github/weaker-journeys.ts @eggdev
 /.github/workflows/auto-merge.yml @eggdev
 /.github/workflows/agent-review.yml @eggdev
 /docs/contributing/review.md @eggdev
@@ -31,9 +31,6 @@
 /.gitleaksignore @eggdev
 /.mcp.json @eggdev
 /.cursor/mcp.json @eggdev
-**/auth/ @eggdev
-/packages/access/ @eggdev
-/packages/identity/ @eggdev
 /apps/**/migrations/ @eggdev
 /features/**/migrations/ @eggdev
 /packages/**/migrations/ @eggdev
@@ -41,3 +38,6 @@
 /docs/principles/ @eggdev
 /docs/contributing/project-intent.md @eggdev
 /.clutch/PLAN.md @eggdev
+**/auth/ @eggdev
+/packages/access/ @eggdev
+/packages/identity/ @eggdev

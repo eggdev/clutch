@@ -169,7 +169,7 @@ export async function apply(
     input.owner,
     input.plan.number,
     round,
-    input.plan.comments.map((c) => c.id),
+    items.filter((item) => item.kind === 'comment').map((item) => Number(item.ref)),
   );
   return round;
 }

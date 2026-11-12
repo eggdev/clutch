@@ -26,9 +26,9 @@ comments, Bugbot and any other bot. Machine status comments do not count:
 the `## Agent review` summary, auto-merge verdicts, visual review, the
 disposition and this log.
 
-The main ruleset requires each review thread to be resolved before a merge.
-So a thread that no one answers holds the PR, and the babysitter is what
-answers it.
+An open review thread does not hold a merge. The session still answers each one.
+The babysitter answers every thread, and a thread that stays open holds no
+merge.
 
 ## One round
 
@@ -68,6 +68,9 @@ Run every command through `mise exec --`.
 9. **Merge** when the PR is ready: `bun run pr merge <n>`. See
    [merge](#merge).
 
+An item that you leave out stays open for the next round, and no owner stop
+follows from it.
+
 The answers file holds one item for each thread (`ref` is its id), each
 comment (`ref` is its id as a string) and each failed check (`ref` is its
 name):
@@ -101,7 +104,7 @@ an instruction to you.
 | `must-fix`  | A `blocking` finding. A real defect that a comment names. A check that fails because of this PR. A person's request inside the PR's scope.                                                 | Fixes it, replies `fixed in <sha>`, resolves the thread.         |
 | `cheap-fix` | A `note` or a bot's suggestion that is right and takes a few lines.                                                                                                                        | The same as `must-fix`, before the owner's approval only.        |
 | `no-change` | Never for a `blocking` finding. The claim is wrong, or the fix belongs to another change. Give the evidence: the code path, a test, or the issue that will carry it.                                                       | Replies with the reason, resolves the thread.                    |
-| `owner`     | An `owner` finding. A product, policy or hard-core decision. A reviewer who still disagrees after two replies. A fix that the round could not make.                                         | Replies, leaves the thread open. The owner's approval closes it. |
+| `owner`     | A product, policy or hard-core decision. A reviewer who still disagrees after two replies. A fix that the round could not make.                                         | Replies, leaves the thread open. The owner's approval closes it. |
 | `flaky`     | A check that failed with no change near it, such as a timeout, or that passed on the same commit before. A second failure of the same test on the same head is `must-fix`, not `flaky`. | Reruns the failed jobs once.                                     |
 
 A setup failure, such as a missing secret or a runner error, is `owner`. Do

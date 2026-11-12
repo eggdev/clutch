@@ -10,6 +10,8 @@ global skills or other repositories when maintaining this suite.
   command for each step.
 - [deliver-linear](./deliver-linear/SKILL.md): claim and dispatch a Linear issue,
   then apply its status and review gates around deliver.
+- [system-review](./system-review/SKILL.md): score how well the project ships with
+  its owner hands off, and pick the next changes.
 - [setup-verification](./setup-verification/SKILL.md): create or maintain the one
   committed verify executor and its journeys. This is the only authoring entry point.
 - verify: execute this project's existing proof and cleanup. The project generates

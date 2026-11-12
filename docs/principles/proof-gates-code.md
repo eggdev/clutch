@@ -1,10 +1,10 @@
 # Proof gates code, and the owner gates the product
 
 Agents drive the project. The [owner](../contributing/project-intent.md#owner)
-sets the big picture and decides what the product does. Proof decides whether
-a change ships. The owner does not review diffs. A sensitive path waits for the
-owner's approval only until its journeys exist, as
-[proof decides the rest](#proof-decides-the-rest) says.
+sets the big picture and protects the core idea of the product. Proof decides
+whether a change ships. The goal is that scoped work reaches production with no
+person seeing it. A sensitive path waits for the owner's approval only until
+its journeys exist, as [proof decides the rest](#proof-decides-the-rest) says.
 
 An owner who reviews diffs becomes the slowest step, and does not catch what
 breaks users. A broken sign-in looks like a small cache change in a diff. Only a
@@ -19,14 +19,21 @@ already written down.
 
 ## The owner decides
 
-Contact the owner only for a decision that nothing written answers:
+The owner stops for three product reasons:
 
-- what a [core journey](#core-journeys) or a product journey must do
-- pricing and plans
-- a design direction, through a design proposal
-- a change that removes a journey, or weakens a check, a test or a budget
+1. **Hand testing.** A new feature or screen that the issue marks with
+   `Hand test: yes` at scoping. The owner tests it after it deploys, so the
+   merge does not wait.
+2. **A destructive migration.** SQL that drops, empties, deletes or retypes
+   stored data, or a move to a new system that the issue names at scoping.
+   A migration that only tweaks a file merges on proof.
+3. **A change to a critical experience.** The critical experiences are the
+   [core journeys](#core-journeys) and the hard invariants in project intent.
+   A change that keeps a journey's outcomes ships on proof. A change that
+   removes an outcome, or loosens a budget, goes to the owner.
 
-Ask before you build, never after.
+The merge gate, credentials and project intent also stay with the owner, so an
+agent cannot loosen its own gate or the idea it serves. Ask before you build, never after.
 
 ## Reach the owner in a T3 thread
 
@@ -50,25 +57,27 @@ times a day, so a question that can wait goes into the next stop.
 Every PR runs the core journeys, whatever its risk tier. A cache change in an
 app can break sign-in as surely as a change to auth.
 
-Each sensitive path in `.clutch/risk.yaml` also names the journeys that prove
-it. Sensitive paths include auth, billing, roles and access, migrations,
+A sensitive path in `.clutch/risk.yaml` can name its journeys under `journeys:`.
+When each one exists on the default branch, its path leaves the owner's hold and
+CODEOWNERS. Sensitive paths include auth, billing, roles and access, migrations,
 credentials and the merge gate. A change to a sensitive path merges when:
 
 1. each journey that its paths name passes on the PR head, on each platform
    that the change reaches
-2. agent review has 0 blocking findings
+2. the PR weakens no journey or budget, as `tools/github/weaker-journeys.ts`
+   compares them
 
 A change reaches web when it touches the web app or anything it imports. It
 reaches native when it touches a native app, a shared runtime package or a
 sensitive path. A sensitive path reaches every platform.
 
-The judge reads its rules from the default branch, and the journeys run from
-the default branch too. When a PR changes a journey, its own copy must pass,
+The judge reads its rules from the default branch. A PR that changes the journey
+kit holds for the owner, so a PR cannot weaken what proves it. When a PR changes a journey, its own copy must pass,
 and a check compares the named outcomes of the two copies. A renamed button
 or a moved field passes that check. A removed or changed outcome, or a looser
 budget, entry or platform, is a weaker journey, and it goes to the owner. So a PR cannot weaken the proof or the gate
-that judges it. A path stays held for the owner until its journeys exist and
-pass.
+that judges it. A path stays held for the owner until its journeys exist. The required
+`journeys` check proves them on each PR.
 
 A migration also needs its rehearsal on a branch of the production database.
 A journey cannot show that a copy survives or rolls back. See
@@ -120,8 +129,9 @@ Each journey proves its outcome as the weakest real user meets it:
 
 ## A gate with no proof fails
 
-- A `journeys` check that runs no journey fails.
-- A PR that says `unverified` does not merge.
+- A `journeys` check that runs no journey fails when a feature ships a screen.
+- A model's review finding is advice. The session answers it, and it holds no
+  merge.
 - A skipped deploy is red.
 - The core journeys run on production after each deploy. A red run marks the
   deploy red, and opens a T3 thread for the owner that names the deploy's PRs.

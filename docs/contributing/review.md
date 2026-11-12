@@ -12,8 +12,8 @@ Each finding has one level:
 
 | Level      | Means                                                        |
 | ---------- | ------------------------------------------------------------ |
-| `blocking` | The change must not merge until the author fixes it.         |
-| `owner`    | The change may merge only when the owner merges it.          |
+| `blocking` | The author fixes it or answers why not. It holds no merge.   |
+| `owner`    | The author weighs it with the owner. It holds no merge.      |
 | `note`     | The author reads it and decides. The change can merge as is. |
 
 A rule below says which level it gives. When a rule does not say, the level is
@@ -21,8 +21,10 @@ A rule below says which level it gives. When a rule does not say, the level is
 
 ## Owner findings
 
-An `owner` finding holds the PR until the owner approves it, so it has two
-causes only. Start the finding with its level, `owner`, then name its cause,
+An `owner` finding tells the session to weigh a concern with the owner. It does
+not hold the merge, and neither does a `blocking` finding. A deterministic check
+holds a weaker journey: see [proof gates code](../principles/proof-gates-code.md).
+An `owner` finding has two causes only. Start the finding with its level, `owner`, then name its cause,
 `hard core` or `weaker check`. Any other concern is a `note`, or `blocking`
 when another rule says so.
 
