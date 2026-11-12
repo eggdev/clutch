@@ -112,3 +112,10 @@ test('a high gardening PR is refused, as not low or medium', async () => {
   ]);
   expect(merges(gh.calls)).toEqual([]);
 });
+
+test('a failed or running native journey holds, and a skipped one does not', () => {
+  expect(blockers(facts({ native: { 'native-ios': 'skipped' } }), 'medium')).toEqual([]);
+  expect(blockers(facts({ native: { 'native-ios': 'failure' } }), 'medium')).toEqual([
+    'The native journey native-ios is failure.',
+  ]);
+});

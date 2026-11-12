@@ -57,8 +57,9 @@ times a day, so a question that can wait goes into the next stop.
 Every PR runs the core journeys, whatever its risk tier. A cache change in an
 app can break sign-in as surely as a change to auth.
 
-Each sensitive path in `.clutch/risk.yaml` also names the journeys that prove
-it. Sensitive paths include auth, billing, roles and access, migrations,
+A sensitive path in `.clutch/risk.yaml` can name its journeys under `journeys:`.
+When each one exists on the default branch, its path leaves the owner's hold and
+CODEOWNERS. Sensitive paths include auth, billing, roles and access, migrations,
 credentials and the merge gate. A change to a sensitive path merges when:
 
 1. each journey that its paths name passes on the PR head, on each platform
@@ -75,8 +76,8 @@ kit holds for the owner, so a PR cannot weaken what proves it. When a PR changes
 and a check compares the named outcomes of the two copies. A renamed button
 or a moved field passes that check. A removed or changed outcome, or a looser
 budget, entry or platform, is a weaker journey, and it goes to the owner. So a PR cannot weaken the proof or the gate
-that judges it. A path stays held for the owner until its journeys exist and
-pass.
+that judges it. A path stays held for the owner until its journeys exist. The required
+`journeys` check proves them on each PR.
 
 A migration also needs its rehearsal on a branch of the production database.
 A journey cannot show that a copy survives or rolls back. See
@@ -131,7 +132,6 @@ Each journey proves its outcome as the weakest real user meets it:
 - A `journeys` check that runs no journey fails when a feature ships a screen.
 - A model's review finding is advice. The session answers it, and it holds no
   merge.
-- A PR that says `unverified` does not merge.
 - A skipped deploy is red.
 - The core journeys run on production after each deploy. A red run marks the
   deploy red, and opens a T3 thread for the owner that names the deploy's PRs.

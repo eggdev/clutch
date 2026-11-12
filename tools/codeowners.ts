@@ -23,6 +23,7 @@ type Rule = {
   guardrails?: string;
   except?: Array<string>;
   lines?: Array<string>;
+  journeys?: Array<string>;
 };
 
 /** `{a,b}/x` becomes `a/x` and `b/x`. CODEOWNERS has no braces. */
@@ -36,6 +37,26 @@ function expandBraces(glob: string): Array<string> {
     .flatMap((part) =>
       expandBraces(glob.slice(0, match.index) + part + glob.slice(match.index + match[0].length)),
     );
+}
+
+/**
+ * The journeys on this checkout: each file's id, and the core journey that its
+ * `Core:` line names. The CLI reads them the same way. A project has no CLI
+ * source, so this file keeps its own copy. The tests of both copies read
+ * tools/testing/journeys-present-fixture.json and expect its names.
+ */
+export function journeysPresent(root: string) {
+  const names = new Set<string>();
+  for (const file of new Bun.Glob('features/*/journeys/*.{pw.ts,maestro.yaml}').scanSync(root)) {
+    names.add(path.basename(file).replace(/\.(?:pw\.ts|maestro\.yaml)$/u, ''));
+    const core = /^\s*(?:\*|#)\s*Core:\s*(\S+)/mu.exec(
+      readFileSync(path.join(root, file), 'utf-8'),
+    );
+    if (core?.[1]) {
+      names.add(core[1]);
+    }
+  }
+  return names;
 }
 
 /**
@@ -61,24 +82,27 @@ export function oneWayDoorGlobs(root: string) {
   if (!existsSync(file)) {
     return guardrailPatterns(root);
   }
+  const present = journeysPresent(root);
   const rules = (
     (parse(readFileSync(file, 'utf-8')) as { rules?: Array<Rule> }).rules ?? []
   ).filter((rule) => rule.tier === 'one-way-door' && !rule.lines);
-  return rules.flatMap((rule) => {
-    if (rule.except?.length) {
-      throw new Error(
-        `${riskFile}: a one-way-door rule has \`except\`, which CODEOWNERS cannot express. Narrow its paths instead.`,
-      );
-    }
-    const listed = rule.guardrails
-      ? (
-          JSON.parse(readFileSync(path.join(root, rule.guardrails), 'utf-8')) as {
-            patterns: Array<string>;
-          }
-        ).patterns
-      : [];
-    return [...listed, ...(rule.paths ?? [])];
-  });
+  return rules
+    .filter((rule) => !rule.journeys?.every((name) => present.has(name)))
+    .flatMap((rule) => {
+      if (rule.except?.length) {
+        throw new Error(
+          `${riskFile}: a one-way-door rule has \`except\`, which CODEOWNERS cannot express. Narrow its paths instead.`,
+        );
+      }
+      const listed = rule.guardrails
+        ? (
+            JSON.parse(readFileSync(path.join(root, rule.guardrails), 'utf-8')) as {
+              patterns: Array<string>;
+            }
+          ).patterns
+        : [];
+      return [...listed, ...(rule.paths ?? [])];
+    });
 }
 
 /** The owners on the first rule line of the current file, such as `@eggdev`. */

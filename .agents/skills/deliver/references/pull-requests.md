@@ -95,10 +95,11 @@ The owner's approval is the last step. When `automerge.owner` in `clutch.yaml`
 approves the head commit, an `on` run of Auto-merge passes an agent PR at any
 tier, and lifts a weaker journey. The bot rule still holds a bot
 PR, and a PR that a person opened is still refused. The required checks, a
-draft, the base branch and a red `main` still hold any PR. The session that
-watches the PR sees the approval and runs `bun run pr merge` again. A later
-push needs a new approval, and a later "Request changes" from the owner
-cancels it.
+native journey job that failed or still runs, a draft, the base branch and a
+red `main` still hold any PR (`tools/github/auto-merge-rules.ts`). The
+session that watches the PR sees the approval and runs `bun run pr merge`
+again. A later push needs a new approval, and a later "Request changes" from
+the owner cancels it.
 
 ## Follow a pull request to green
 
@@ -340,6 +341,7 @@ At each step, the PR also needs all of these:
   `main` stops every auto-merge until it is green again, except a revert PR.
 - The PR weakens no journey or budget, by the comparison in
   `tools/github/weaker-journeys.ts`. The owner's approval of the head lifts this.
+- No native journey job failed or is running on its head.
 
 The workflow runs only from the default branch, with the default branch's
 rules, so a PR cannot change the rules that judge it. It refuses a fork's PR,

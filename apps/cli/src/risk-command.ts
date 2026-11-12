@@ -5,7 +5,14 @@ import { parseArgs } from 'node:util';
 import { parse } from 'yaml';
 
 import { git, gitOrThrow } from '@/git';
-import { changeTier, classify, needsLines, validateRiskConfig } from '@/risk/tiers';
+import {
+  changeTier,
+  classify,
+  heldRules,
+  journeysPresent,
+  needsLines,
+  validateRiskConfig,
+} from '@/risk/tiers';
 import type { RiskConfig } from '@/risk/tiers';
 
 const riskFile = '.clutch/risk.yaml';
@@ -94,7 +101,8 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
     },
   });
   const root = await repoRoot(cwd);
-  const config = await loadRiskConfig(root);
+  const loaded = await loadRiskConfig(root);
+  const config = { ...loaded, rules: heldRules(loaded.rules, journeysPresent(root)) };
   const base = values.base ?? (await defaultBase(root));
   const paths = await changedFiles(root, base, values.head);
   const range = `${base}...${values.head}`;
