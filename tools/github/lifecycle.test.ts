@@ -303,39 +303,45 @@ test('status counts the owner findings from the annotations, whatever the commen
   ]);
   expect(await prStatus(gh.run, '7')).toMatchObject({
     agentReview: { blocking: 0, owner: 2 },
-    ready: false,
+    ready: true,
   });
 });
 
-test('an owner finding keeps a green PR from ready until the owner approves the head', async () => {
+test('an owner finding never keeps a green PR from ready; a major change waits until the owner approves the head', async () => {
   const me = await repoOwner();
   const green = JSON.parse(
     view([check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]).out,
   );
-  const readyWith = async (reviews: Array<Reviewed>, reviewDecision = '') => {
+  const readyWith = async (reviews: Array<Reviewed>, reviewDecision = '', title = 'fix: x') => {
     const status = await prStatus(
       fake([
         ['gh pr view 7', { out: JSON.stringify({ ...green, reviewDecision }) }],
         rules,
         comments('## Agent review\n\nNo `blocking` findings.'),
         ...findingsOn(head, ['**owner**: weaker check.']),
+        ['gh api repos/{owner}/{repo}/pulls/7 --jq .title', { out: `${title}\n` }],
         reviewsOf('7', ...reviews),
       ]).run,
       '7',
     );
     return status.ready;
   };
-  expect(await readyWith([{ login: me, state: 'APPROVED', commit: head }])).toBe(true);
-  // A dismissed approval, one on an older commit, or another login's approval does not count.
+  const cases: Array<[Array<Reviewed>, string]> = [
+    [[], ''],
+    [[{ login: me, state: 'DISMISSED', commit: head }], ''],
+    [[{ login: me, state: 'APPROVED', commit: 'old0000' }], ''],
+    [[{ login: 'someone', state: 'APPROVED', commit: head }], ''],
+    [[], 'APPROVED'],
+  ];
+  // The owner finding alone holds nothing: the weekly digest lists it.
   expect(
-    await Promise.all([
-      readyWith([]),
-      readyWith([{ login: me, state: 'DISMISSED', commit: head }]),
-      readyWith([{ login: me, state: 'APPROVED', commit: 'old0000' }]),
-      readyWith([{ login: 'someone', state: 'APPROVED', commit: head }]),
-      // GitHub's approval decision alone does not answer the owner's finding.
-      readyWith([], 'APPROVED'),
-    ]),
+    await Promise.all(cases.map(([reviews, decision]) => readyWith(reviews, decision))),
+  ).toEqual([true, true, true, true, true]);
+  const major = 'feat!: drop the old flag';
+  expect(await readyWith([{ login: me, state: 'APPROVED', commit: head }], '', major)).toBe(true);
+  // A dismissed approval, one on an older commit, another login's approval, or GitHub's approval decision alone does not count.
+  expect(
+    await Promise.all(cases.map(([reviews, decision]) => readyWith(reviews, decision, major))),
   ).toEqual([false, false, false, false, false]);
 });
 

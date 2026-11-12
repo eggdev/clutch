@@ -79,6 +79,14 @@ test('the disposition answers each agent review finding the log answered, latest
           resolved: false,
         }),
         item({ commentId: 14, finding: 'Why this name?' }),
+        item({
+          commentId: 15,
+          finding: '**owner** (A weaker check): the budget drops',
+          decision: 'recorded',
+          reason: 'the task needs it',
+          action: 'recorded for the weekly digest',
+          resolved: true,
+        }),
       ],
     }),
     [],
@@ -90,6 +98,7 @@ test('the disposition answers each agent review finding the log answered, latest
       '- note `tools/x.ts` (11): not fixed: the caller checks it',
       '- blocking `tools/x.ts` (12): fixed in abc1234',
       '- owner `tools/x.ts` (13): waits for the owner: the owner decides',
+      '- owner `tools/x.ts` (15): recorded for the weekly digest: the task needs it',
       '',
     ].join('\n'),
   );

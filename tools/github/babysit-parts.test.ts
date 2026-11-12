@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { blockingGuard } from '@tools/github/babysit-answer';
+import { blockingGuard, recordedGuard } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import type { Item } from '@tools/github/babysit-log';
 import { decisionsNow, onlyOwnerLeft, ownerAsk } from '@tools/github/babysit-owner';
@@ -52,7 +52,35 @@ test('a cancelled check is not red, and the log is found among the oldest commen
               },
             ],
           },
-          reviewThreads: { nodes: [] },
+          reviewThreads: {
+            nodes: [
+              {
+                id: 'T1',
+                isResolved: false,
+                isOutdated: false,
+                path: 'a.ts',
+                line: 1,
+                comments: {
+                  nodes: [
+                    {
+                      databaseId: 2,
+                      author: { login: 'github-actions', __typename: 'Bot' },
+                      body: 'owner: weaker check',
+                      createdAt: 'x',
+                      url: '',
+                    },
+                    {
+                      databaseId: 3,
+                      author: { login: 'eggdev', __typename: 'User' },
+                      body: 'Why?',
+                      createdAt: 'x',
+                      url: '',
+                    },
+                  ],
+                },
+              },
+            ],
+          },
           oldest: {
             nodes: [
               { databaseId: 1, author: { login: 'app/bot' }, body: log, createdAt: 'x', url: '' },
@@ -78,6 +106,8 @@ test('a cancelled check is not red, and the log is found among the oldest commen
   expect(read.logId).toBe(1);
   expect(read.log.answered).toEqual([5]);
   expect(read.comments.length).toBe(1);
+  // GitHub's GraphQL API gives a bot's login with no "[bot]", so the read adds it, as the REST API writes it.
+  expect(read.threads[0]?.comments.map((c) => c.author)).toEqual(['github-actions[bot]', 'eggdev']);
 });
 
 test('the owner is asked only when nothing but the approval is left', () => {
@@ -120,6 +150,42 @@ test('only a fix closes a blocking finding; any other answer leaves it for the o
   expect(blockingGuard(undefined, 'blocking: x')).toBeUndefined();
 });
 
+test("recorded closes only a bot's owner finding; any other item becomes owner", () => {
+  const answer: Answer = {
+    kind: 'thread',
+    ref: 'T1',
+    decision: 'recorded',
+    reason: 'the task needs the lower budget',
+    reply: 'Recorded for the weekly digest.',
+  };
+  const bot = 'github-actions[bot]';
+  const changed = {
+    decision: 'owner',
+    reason:
+      'only an owner finding of agent review is recorded; the triage said recorded: the task needs the lower budget',
+  };
+  expect(recordedGuard(answer, bot, '\n**owner** (A weaker check): x')).toEqual(answer);
+  expect(recordedGuard(answer, bot, 'owner: weaker check')).toEqual(answer);
+  // A person's thread, even one that starts with "owner".
+  expect(recordedGuard(answer, 'eggdev', 'owner: weaker check')).toMatchObject(changed);
+  // A bot's thread that is not an owner finding.
+  expect(recordedGuard(answer, bot, 'note: rename')).toMatchObject(changed);
+  expect(recordedGuard(answer, bot, 'ownership moves here')).toMatchObject(changed);
+  // A comment or a check has no thread to resolve.
+  expect(recordedGuard({ ...answer, kind: 'comment' })).toMatchObject(changed);
+  expect(recordedGuard({ ...answer, kind: 'check' })).toMatchObject(changed);
+  // Other decisions pass through.
+  const noChange = { ...answer, decision: 'no-change' as const };
+  expect(recordedGuard(noChange, 'eggdev', 'note: x')).toEqual(noChange);
+  expect(recordedGuard(undefined, bot, 'owner: x')).toBeUndefined();
+  // blockingGuard runs first and wins for a blocking finding.
+  const blocking = recordedGuard(blockingGuard(answer, 'blocking: docs'), bot, 'blocking: docs');
+  expect(blocking?.decision).toBe('owner');
+  expect(blocking?.reason).toBe(
+    'a blocking finding closes only with a fix; the triage said recorded: the task needs the lower budget',
+  );
+});
+
 const item = (fields: Partial<Item>): Item => ({
   kind: 'thread',
   ref: 'T1',
@@ -138,6 +204,15 @@ test('a failed check or an unfixed blocking finding left for the owner needs the
   expect(
     decisionsNow([item({}), check, blocking, item({ decision: 'no-change', kind: 'check' })]),
   ).toEqual([check, blocking]);
+});
+
+test('a recorded item needs no owner now, and leaves no round waiting for the owner', () => {
+  const recorded = item({
+    decision: 'recorded',
+    resolved: true,
+    action: 'recorded for the weekly digest',
+  });
+  expect(decisionsNow([recorded, item({ ...recorded, kind: 'check' })])).toEqual([]);
 });
 
 test('an unanswered item does not stop the owner', () => {

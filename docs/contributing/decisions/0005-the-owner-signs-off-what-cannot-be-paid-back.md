@@ -24,7 +24,7 @@ The code and the rules of the merge gate, the decision records and the policy do
 
 ## Consequences
 
-An agent can change a check, a lint rule or this policy with no person. The owner accepts that risk, and reads such changes after the fact. CL-472 moves the `owner` findings of agent review into the weekly digest for that purpose.
+An agent can change a check, a lint rule or this policy with no person. The owner accepts that risk, and reads such changes after the fact. The weekly digest lists the `owner` findings of agent review for that purpose (CL-472).
 
 On the same 100 PRs, the rule holds 16. Fifteen of them are workflow lines that give a grant. The owner may drop that hold. A leaked credential is the reason that it stays.
 

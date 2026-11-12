@@ -33,8 +33,10 @@ import type { Run } from '@tools/github/stack';
  * check is red on the default branch, except for a revert. `dry-run` and `on`
  * comment a verdict once for each head commit of an agent PR, so the owner can
  * grade it: at the step for `dry-run`, and at the next step for `on`. `off` only
- * prints. The approval of `automerge.owner` on the head lifts the tier and the
- * owner findings, so a PR that waits for the owner merges once they approve. The Auto-merge workflow runs it from the base branch, so a pull request
+ * prints. Agent review's owner findings hold nothing: the verdict lists them
+ * for the weekly digest. The approval of `automerge.owner` on the head lifts
+ * the tier, a contract break and a major change, so a PR that waits for the
+ * owner merges once they approve. The Auto-merge workflow runs it from the base branch, so a pull request
  * cannot change the rules that judge it. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 const usage = [
@@ -46,9 +48,6 @@ const root = path.resolve(import.meta.dir, '../..');
 
 /** The check that agent review reports. It joins the required checks of the default branch. */
 const agentReview = 'agent-review';
-
-/** The check that a project's CI runs for Clutch: `clutch doctor --check`. No ruleset requires it, so the rule reads it. */
-const doctorCheck = 'clutch / doctor';
 
 /** `automerge` in clutch.yaml. A project without it is `off`, and the step defaults to `bots`. */
 export async function readConfig(): Promise<Config> {
@@ -279,14 +278,12 @@ export async function runAutoMerge(
   } else if (bot === 'revert') {
     botProblems = await revertProblems(pr.headRefName, tier, (n) => autoMerged(run, repo, n));
   }
-  const conclusions = await checkConclusions(run, repo, pr.headRefOid, [...names, doctorCheck]);
-  const { [doctorCheck]: doctor, ...checks } = conclusions;
+  const checks = await checkConclusions(run, repo, pr.headRefOid, names);
   const facts: Facts = {
     pr,
     defaultBranch,
     tier,
     checks,
-    doctor,
     ownerFindings: await ownerFindings(run, repo, pr.headRefOid),
     breaks: await contractBreaks(run, repo, values.pr, pr.headRefOid),
     major: await majorChange(run, repo, values.pr),

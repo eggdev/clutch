@@ -1,7 +1,8 @@
 # 0003: A pure Clutch sync takes owner findings as approved upstream
 
-- **Status:** accepted
+- **Status:** superseded by [0005](./0005-the-owner-signs-off-what-cannot-be-paid-back.md)
 - **Date:** 2026-11-03
+- Since CL-472 no `owner` finding holds a PR, so this exception has nothing left to lift.
 
 ## Context
 

@@ -182,11 +182,11 @@ async function mergeOpen(
   if (problem) {
     throw new Error(`${problem}${link}`);
   }
+  // Owner findings hold nothing: the weekly digest lists them for the owner.
   const findings = await ownerFindings(run, '{owner}/{repo}', pr.headRefOid);
-  const owner = findings.length;
-  if (await waitsForOwner(run, number, pr, owner)) {
-    throw new Error(
-      `#${number} has ${owner} owner finding(s) from agent review, such as a weaker check. Ask the owner in this session's thread.${link}`,
+  if (findings.length > 0) {
+    console.log(
+      `#${number} has ${findings.length} owner finding(s) from agent review. The weekly digest lists them.`,
     );
   }
   const breaks = await contractBreaks(run, '{owner}/{repo}', number, pr.headRefOid);
@@ -249,8 +249,9 @@ async function mergeOpen(
  * plain merge that GitHub refuses for its stack retries through the stack.
  * Then it waits for the release and for CI on the default branch at the merge
  * commit, and starts the revert when that CI fails twice. It refuses while
- * GitHub reports that the PR needs a review, and while agent review's owner
- * findings, a contract break or a major change wait for the owner's approval.
+ * GitHub reports that the PR needs a review, and while a contract break or a
+ * major change waits for the owner's approval. Agent review's owner findings
+ * hold nothing: it prints their count, and the weekly digest lists them.
  */
 export async function merge(
   run: Run,

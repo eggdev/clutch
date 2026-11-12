@@ -244,8 +244,31 @@ test('the owner count is the findings of the head review, not the nine annotatio
   const status = await prStatus(gh.run, '7');
   expect(status.agentReview).toEqual({ posted: true, blocking: 0, owner: 3 });
   expect(renderStatus(status)).toContain(
-    'Agent review: 0 blocking, 3 owner (the owner approves and merges it).',
+    'Agent review: 0 blocking, 3 owner (recorded for the weekly digest).',
   );
+});
+
+test('a PR whose only open matter is owner findings is ready, with no approval from the owner', async () => {
+  const gh = fake([
+    [
+      'gh pr view 7',
+      view(head170, [check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]),
+    ],
+    rules,
+    comments(summary170),
+    ...findingsOn(head170, owner170),
+    reviews170,
+    inlineComments(...inline170),
+  ]);
+  const status = await prStatus(gh.run, '7');
+  expect(status).toMatchObject({
+    agentReview: { owner: 3 },
+    contractBreaks: [],
+    major: [],
+    review: 'none required',
+    ready: true,
+  });
+  expect(renderStatus(status)).toContain('3 owner (recorded for the weekly digest)');
 });
 
 test('owner findings without inline comments on the head count as the annotations do', async () => {

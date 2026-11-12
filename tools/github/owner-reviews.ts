@@ -47,10 +47,10 @@ async function inlineComments(run: Run, number: string): Promise<Array<Inline>> 
 }
 
 /** The first line of a comment, after the blank lines that the agent puts before it. */
-const firstLine = (body: string) => body.trimStart().split('\n')[0] ?? '';
+export const firstLine = (body: string) => body.trimStart().split('\n')[0] ?? '';
 
 /** Whether a first line opens an owner finding, as the workflow's "Count every owner finding" step reads it. */
-const ownerLine = (line: string) => /^[^A-Za-z0-9]*owner(?![A-Za-z0-9])/iu.test(line);
+export const ownerLine = (line: string) => /^[^A-Za-z0-9]*owner(?![A-Za-z0-9])/iu.test(line);
 
 /**
  * The owner findings of the head, each counted once: the inline owner comments

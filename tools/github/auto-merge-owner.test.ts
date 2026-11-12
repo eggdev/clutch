@@ -11,12 +11,9 @@ const oneWayDoor: [string, { out: string }] = [
   { out: '{"tier":"one-way-door"}' },
 ];
 
-test("the owner's approval of the head lifts the tier and the owner findings, and nothing else", () => {
+test("the owner's approval of the head lifts the tier, and nothing else", () => {
   const held = facts({ tier: 'one-way-door', ownerFindings: ['It adds a migration.'] });
-  expect(blockers(held, 'medium')).toEqual([
-    'The risk tier is one-way-door, not low or medium.',
-    'Agent review asks the owner: It adds a migration.',
-  ]);
+  expect(blockers(held, 'medium')).toEqual(['The risk tier is one-way-door, not low or medium.']);
   expect(blockers({ ...held, ownerApproved: true }, 'bots')).toEqual([]);
   expect(
     blockers(
@@ -38,6 +35,9 @@ test("the owner's approval of the head lifts the tier and the owner findings, an
   ]);
   expect(verdictText([], 'medium', [], true)).toBe(
     'Would auto-merge at the step medium. The owner approved this head.',
+  );
+  expect(verdictText([], 'medium', held.ownerFindings, true)).toBe(
+    'Would auto-merge at the step medium. The owner approved this head.\nOwner findings, recorded for the weekly digest:\n- It adds a migration.',
   );
 });
 

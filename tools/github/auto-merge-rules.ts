@@ -63,12 +63,10 @@ export type Facts = {
   tier: string;
   /** Each required check, with the conclusion of its latest run, `pending` or `missing`. */
   checks: Record<string, string>;
-  /** The conclusion of the `clutch / doctor` check on the head, which no ruleset requires: `success`, `pending`, `missing` or a failure. */
-  doctor: string;
   /**
    * Agent review's `owner` findings on the head: the change weakens a check, a
-   * lint rule, a budget or a test. Each one leaves the PR for the owner, except
-   * the findings of a pure Clutch sync, see `approvedUpstream`.
+   * lint rule, a budget or a test. They hold nothing. The verdict lists them,
+   * and the weekly digest records them for the owner.
    */
   ownerFindings: Array<string>;
   /**
@@ -86,7 +84,8 @@ export type Facts = {
   /**
    * Whether `automerge.owner` approved the head commit, and gave no later
    * review that asks for changes. The owner's approval is the review that a
-   * one-way-door PR waits for, so it lifts the tier and the owner findings.
+   * one-way-door PR waits for, so it lifts the tier, a contract break and a
+   * major change.
    * The checks, a draft, the base and a red main still hold the PR.
    */
   ownerApproved: boolean;
@@ -138,47 +137,13 @@ export async function revertProblems(
   return problems;
 }
 
-/**
- * Whether the PR's owner findings were approved upstream, so they hold nothing.
- * A pure Clutch sync is the release bot's sync PR whose diff passes the sync
- * rule, and whose `clutch / doctor` check succeeded on its head. Clutch's
- * owner already approved the gate changes it carries, so agent review's
- * findings on them repeat that approval. See decision 0003.
- */
-function approvedUpstream(facts: Facts) {
-  return (
-    botKind(facts.pr.headRefName) === 'clutch-sync' &&
-    kindProblem(facts.pr) === null &&
-    facts.botProblems.length === 0 &&
-    facts.doctor === 'success'
-  );
-}
-
-/** The owner findings that `approvedUpstream` takes as approved upstream. The verdict lists them. */
-export function upstreamFindings(facts: Facts) {
-  return approvedUpstream(facts) ? facts.ownerFindings : [];
-}
-
-/**
- * The holds that the owner's approval of the head lifts, decided in one place:
- * the step and risk tier of an agent PR, agent review's `owner` findings, and
- * the contract breaks that the snapshot of the head names, and a major change.
- * The kind of PR, the
- * bot rule, the checks, a draft, the base and a red main still hold it. A pure
- * Clutch sync also takes its findings as approved upstream, see
- * `approvedUpstream`.
- */
-function ownerLifts(facts: Facts) {
-  return { reach: facts.ownerApproved, findings: facts.ownerApproved || approvedUpstream(facts) };
-}
-
 /** Why the PR's kind and tier are not in reach at `step`. */
 function stepProblems(facts: Facts, step: Step): Array<string> {
   const { pr, tier, botProblems } = facts;
   if (!isAgentPr(pr)) {
     return botProblems;
   }
-  if (ownerLifts(facts).reach) {
+  if (facts.ownerApproved) {
     return [];
   }
   if (step === 'bots') {
@@ -207,7 +172,8 @@ export function blockers(facts: Facts, step: Step): Array<string> {
   } else {
     reasons.push(...stepProblems(facts, step));
   }
-  if (!ownerLifts(facts).reach) {
+  // The owner's approval of the head lifts the tier, a break and a major change.
+  if (!facts.ownerApproved) {
     for (const name of facts.breaks) {
       reasons.push(`The contract snapshot names the break ${name}. The owner agrees to a break.`);
     }
@@ -222,11 +188,6 @@ export function blockers(facts: Facts, step: Step): Array<string> {
       reasons.push(`The required check ${name} is ${conclusion}.`);
     }
   }
-  if (!ownerLifts(facts).findings) {
-    for (const finding of facts.ownerFindings) {
-      reasons.push(`Agent review asks the owner: ${finding}`);
-    }
-  }
   // A revert is how a red main turns green, so the red main does not hold it.
   if (botKind(pr.headRefName) !== 'revert') {
     for (const name of mainRed) {
@@ -238,15 +199,18 @@ export function blockers(facts: Facts, step: Step): Array<string> {
   return reasons;
 }
 
+/** The heading of the owner findings in a verdict and a dry-run comment. They hold nothing. */
+const recordedHeading = 'Owner findings, recorded for the weekly digest:';
+
 /**
  * The verdict that a run prints: whether the PR would auto-merge at `step`, the
- * reasons when it would not, and the owner findings that a pure sync takes as
- * approved upstream, so that they stay visible.
+ * reasons when it would not, and agent review's owner findings, which hold
+ * nothing but stay visible for the weekly digest.
  */
 export function verdictText(
   reasons: Array<string>,
   step: Step,
-  upstream: Array<string>,
+  findings: Array<string>,
   ownerApproved = false,
 ) {
   const approved = ownerApproved ? ' The owner approved this head.' : '';
@@ -254,8 +218,8 @@ export function verdictText(
     reasons.length > 0
       ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
       : `Would auto-merge at the step ${step}.${approved}`;
-  return upstream.length > 0
-    ? `${verdict}\nOwner findings, approved upstream in Clutch:\n${upstream.map((finding) => `- ${finding}`).join('\n')}`
+  return findings.length > 0
+    ? `${verdict}\n${recordedHeading}\n${findings.map((finding) => `- ${finding}`).join('\n')}`
     : verdict;
 }
 
@@ -274,8 +238,8 @@ export const enabledMarker = (step: Step, sha: string) =>
 export const reactionRequest = 'Owner: react 👍 if you agree with this verdict, or 👎 if not.';
 
 /**
- * The dry-run comment: the verdict, the facts or the reasons behind it, and
- * the reaction request. `reasons` is empty when the PR would auto-merge.
+ * The dry-run comment: the verdict, the facts or the reasons behind it, the
+ * owner findings that it records, and the reaction request. `reasons` is empty when the PR would auto-merge.
  */
 export function dryRunComment(facts: Facts, reasons: Array<string>, step: Step) {
   const sha = facts.pr.headRefOid.slice(0, 7);
@@ -304,6 +268,9 @@ export function dryRunComment(facts: Facts, reasons: Array<string>, step: Step) 
     `At the step \`${step}\`:`,
     '',
     ...details,
+    ...(facts.ownerFindings.length > 0
+      ? ['', recordedHeading, ...facts.ownerFindings.map((finding) => `- ${finding}`)]
+      : []),
     '',
     reactionRequest,
   ].join('\n');

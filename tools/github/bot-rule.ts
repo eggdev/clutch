@@ -4,10 +4,7 @@
  * dependency versions, lockfiles and changesets. Renovate already waits out
  * the 3-day release age (`minimumReleaseAge` in renovate.json). A gardening
  * PR may when its risk tier is low. A Clutch sync PR may when it changes only
- * what `clutch sync` writes. Its `clutch / doctor` check, which no ruleset
- * requires, proves that the managed files match the release, and when it
- * succeeds the PR's owner findings count as approved upstream (decision 0003).
- * A revert PR is judged in auto-merge.ts,
+ * what `clutch sync` writes. A revert PR is judged in auto-merge.ts,
  * since it needs the reverted PR. See
  * .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */

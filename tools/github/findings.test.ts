@@ -92,6 +92,12 @@ test('only a fix answers a blocking finding', () => {
     findingsOf(inline, 'h3ad000', `${dispositionHeading}\n- 2: waits for the owner`)[1]
       ?.disposition,
   ).toBe('- 2: waits for the owner');
+  // A recorded owner finding counts as answered, and a blocking finding is never recorded.
+  const recorded = '- owner `tools/x.ts` (2, 3): recorded for the weekly digest: the task needs it';
+  const found = findingsOf(inline, 'h3ad000', `${dispositionHeading}\n${recorded}`);
+  expect(found[1]?.disposition).toBe(recorded);
+  expect(unanswered(found).map((finding) => finding.level)).toEqual(['blocking', 'note']);
+  expect(answered('- 1: recorded for the weekly digest: it is fine')).toBeNull();
 });
 
 test('the report names each finding, and gives a template for the unanswered ones', () => {
@@ -101,7 +107,9 @@ test('the report names each finding, and gives a template for the unanswered one
   expect(text).toContain('NO DISPOSITION');
   expect(text).toContain('- blocking `docs/a.md` (1): fixed in <sha>\n');
   expect(text).toContain('3 finding(s) have no disposition.');
-  expect(text).toContain('- owner `tools/x.ts` (2, 3): fixed in <sha>');
+  expect(text).toContain(
+    '- owner `tools/x.ts` (2, 3): fixed in <sha> | not fixed: <reason> | recorded for the weekly digest: <reason> | waits for the owner: <what they decide>',
+  );
   expect(renderFindings([])).toBe('Agent review left no finding on this PR.');
 });
 

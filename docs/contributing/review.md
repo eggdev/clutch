@@ -10,21 +10,24 @@ runs, and the labels each PR carries, are in [agent review](./agent-review.md).
 
 Each finding has one level:
 
-| Level      | Means                                                        |
-| ---------- | ------------------------------------------------------------ |
-| `blocking` | The change must not merge until the author fixes it.         |
-| `owner`    | The change may merge only when the owner merges it.          |
-| `note`     | The author reads it and decides. The change can merge as is. |
+| Level      | Means                                                                    |
+| ---------- | ------------------------------------------------------------------------ |
+| `blocking` | The change must not merge until the author fixes it.                     |
+| `owner`    | The change can merge. The weekly digest lists the finding for the owner. |
+| `note`     | The author reads it and decides. The change can merge as is.             |
 
 A rule below says which level it gives. When a rule does not say, the level is
 `note`.
 
 ## Owner findings
 
-An `owner` finding holds the PR until the owner approves it, so it has two
-causes only. Start the finding with its level, `owner`, then name its cause,
-`hard core` or `weaker check`. Any other concern is a `note`, or `blocking`
-when another rule says so.
+An `owner` finding does not hold the PR. The weekly digest lists it, so the
+owner reads it after the merge and asks for a fix where it is wrong. See
+[the weekly digest](./capabilities/factory-observability.md#weekly-digest).
+
+An `owner` finding has two causes only. Start the finding with its level,
+`owner`, then name its cause, `hard core` or `weaker check`. Any other concern
+is a `note`, or `blocking` when another rule says so.
 
 1. **Hard core.** The diff changes a path of the `one-way-door` tier of
    [`.clutch/risk.yaml`](../../.clutch/risk.yaml). That is a credential, a
@@ -59,7 +62,7 @@ These are not `owner`:
 
 Flag these on each pull request, also when a check passes. A check can pass
 while its rules get weaker. Most PRs merge with no person, so these findings
-are how a weaker check reaches the owner.
+are how a weaker check reaches the owner in the weekly digest.
 
 - **A weaker check**, as [owner findings](#owner-findings) defines it, is
   `owner`. A stronger check is a `note`.

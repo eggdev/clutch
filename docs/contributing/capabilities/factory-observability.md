@@ -79,7 +79,8 @@ For the factory numbers, the report reads one list of the Agent review runs in t
 `.github/workflows/weekly-digest.yml` runs every Monday, and from the Actions
 tab. For each repository in `fleet` in `clutch.yaml`, it checks the repository
 out at its `ref` and writes `clutch doctor --remote` and `clutch metrics` to the
-job summary. Then it adds a contact sheet of the screenshots that changed.
+job summary. Then it adds a contact sheet of the screenshots that changed, and
+the owner findings of the week.
 
 The contact sheet is `tools/journeys/visual-digest.ts`. A screenshot baseline
 is a PNG in a `__screenshots__` folder, named
@@ -90,6 +91,14 @@ no single PR needs the owner for its pictures. A repository with no such PNG
 gets the line "No screenshot baseline changed." The sheet reads the history of
 the checkout, which the job fetches with no file contents, so it makes no API
 call.
+
+The owner findings are `tools/github/owner-findings-digest.ts`. An `owner`
+finding of agent review holds no pull request. The digest lists each one on a
+PR that merged in the last 7 days. Each row gives the PR, the file and a link
+to the thread. The owner reads them after the merge, and asks for a fix where
+one is wrong. A repository with none gets the line "No owner finding on a pull
+request that merged in the last 7 days." The script reads the reviews of each
+merged PR. The pull requests permission of the digest is enough for that.
 
 ```yaml
 fleet:

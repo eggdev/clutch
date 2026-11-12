@@ -3,8 +3,9 @@ name: Agent review
 # An agent reviews each pull request against docs/contributing/review.md. The
 # job fails when the agent returns a blocking finding. Whether that blocks a
 # merge is a branch rule of each project. An owner finding, such as a weaker
-# check, passes the job with an annotation, and auto-merge then leaves the PR
-# for the owner. See docs/contributing/agent-review.md.
+# check, passes the job with an annotation and holds no merge. The verdict of
+# auto-merge lists it, and the weekly digest lists it for the owner. See
+# docs/contributing/agent-review.md.
 
 on:
   pull_request:
@@ -225,10 +226,10 @@ jobs:
           blocking="$(printf '%s' "$RESULT" | jq -r '.blocking')"
           summary="$(printf '%s' "$RESULT" | jq -r '.summary')"
           echo "$summary"
-          # An owner finding passes the check, so the owner can still merge,
-          # and leaves an annotation on this run. Auto-merge reads it from the
-          # run and leaves the PR for the owner. The title must stay the same
-          # as ownerAnnotation in tools/github/auto-merge.ts.
+          # An owner finding passes the check and leaves an annotation on this
+          # run. Auto-merge reads it from the run and lists it in its verdict.
+          # It holds no merge. The title must stay the same as ownerAnnotation
+          # in tools/github/auto-merge.ts.
           printf '%s' "$RESULT" | jq -r '(.owner // [])[] | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A") | "::warning title=Owner review needed::" + .'
           if [ "$blocking" != 0 ]; then
             echo "::error title=Agent review found $blocking blocking problem(s)::$summary Fix each blocking comment on the PR, then push."

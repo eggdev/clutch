@@ -16,7 +16,8 @@ export type Decision =
   | 'no-change'
   | 'owner'
   | 'flaky'
-  | 'after-approval';
+  | 'after-approval'
+  | 'recorded';
 
 export type Item = {
   kind: 'thread' | 'comment' | 'check';
@@ -191,6 +192,8 @@ export function renderDisposition(log: BabysitLog) {
       answer = item.action;
     } else if (item.decision === 'owner') {
       answer = `waits for the owner: ${item.reason}`;
+    } else if (item.decision === 'recorded') {
+      answer = `recorded for the weekly digest: ${item.reason}`;
     }
     return [`- ${level} \`${item.path ?? ''}\` (${id}): ${answer.replaceAll('\n', ' ')}`];
   });

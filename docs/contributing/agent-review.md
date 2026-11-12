@@ -29,19 +29,19 @@ fixes it, or replies with the reason and resolves it, or leaves it open for
 the owner. The owner's approval of the head resolves the owner's threads.
 
 The agent reads the full diff from the checkout, not from the API, so a large
-PR is reviewed whole. The job also counts every inline `owner` comment, so a
-short structured answer alone cannot let a PR through. A failed listing of
+PR is reviewed whole. The job also counts every inline `owner` comment, so the
+verdict of auto-merge lists each one when the structured answer is short. A failed listing of
 this head's comments is reported as a warning. A failed listing of the earlier
 heads' comments fails the job, so a re-run lists them again.
 
 The job fails when the agent returns one or more blocking findings. The job
 also fails when the agent returns no result. An `owner` finding passes the
-job, so the owner can still merge the PR. The job writes an "Owner review
-needed" annotation for it. Auto-merge reads that annotation on the head and
-leaves the PR for the owner. See
+job. It holds nothing: the PR merges when its checks pass and it has no
+`blocking` finding. The job writes an "Owner review needed" annotation for it,
+and the weekly digest lists it for the owner. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
 
-An owner finding carries over to each new head until the diff removes its cause and the review says so. A silent drop still holds the PR.
+An owner finding carries over to each new head until the diff removes its cause and the review says so.
 
 The agent runs on the cheapest Claude model, `claude-haiku-5-5`. To choose
 another model, set the `CLUTCH_AGENT_MODEL` repository variable to its id. The

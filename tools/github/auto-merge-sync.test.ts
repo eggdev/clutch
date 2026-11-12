@@ -1,13 +1,17 @@
 import { expect, test } from 'bun:test';
 
 import { app, decide, facts, fake, head, merges } from '@tools/github/auto-merge-fake';
-import { blockers, upstreamFindings, verdictText } from '@tools/github/auto-merge-rules';
+import { blockers, verdictText } from '@tools/github/auto-merge-rules';
 import type { Result } from '@tools/github/stack';
 
-/** The owner findings of a pure Clutch sync: the release bot's sync PR, with one owner finding from agent review. */
+/**
+ * Agent review's owner findings hold no pull request: the verdict records them
+ * for the weekly digest. A Clutch sync PR and an agent PR are judged the same.
+ */
 
 const sync = { headRefName: 'clutch-sync/latest', author: app };
 const finding = 'It lowers the file-size budget of a.ts.';
+const recorded = `Owner findings, recorded for the weekly digest:\n- ${finding}`;
 
 const ownerFindingAnswers: Array<[string, Partial<Result>]> = [
   [
@@ -20,20 +24,12 @@ const ownerFindingAnswers: Array<[string, Partial<Result>]> = [
 const checkRun = (name: string, conclusion: string, id: number) =>
   JSON.stringify({ id, name, status: 'completed', conclusion, app: 'github-actions' });
 
-/** The check runs of the head. `doctor` is the `clutch / doctor` run's conclusion, or null when the run is absent. */
-const headChecks = (doctor: string | null, validate: string) =>
-  [
-    checkRun('validate', validate, 1),
-    checkRun('agent-review', 'success', 2),
-    ...(doctor === null ? [] : [checkRun('clutch / doctor', doctor, 3)]),
-  ].join('\n');
-
-const headRuns = (doctor: string | null, validate = 'success'): [string, Partial<Result>] => [
+const headRuns = (validate = 'success'): [string, Partial<Result>] => [
   `gh api --paginate repos/eggdev/clutch/commits/${head}/check-runs`,
-  { out: headChecks(doctor, validate) },
+  { out: [checkRun('validate', validate, 1), checkRun('agent-review', 'success', 2)].join('\n') },
 ];
 
-/** The lineage at the head: a sync PR's managed files, none of which the pure sync fixtures change. */
+/** The lineage at the head: a sync PR's managed files, none of which the sync fixtures change. */
 const lineage: [string, Partial<Result>] = ['git show', { out: '{"files":{}}' }];
 
 const syncFiles = (
@@ -43,98 +39,83 @@ const syncFiles = (
   { out: files.map((file) => JSON.stringify(file)).join('\n') },
 ];
 
-test('a pure Clutch sync with doctor success merges past its owner finding, and the verdict lists it', async () => {
-  const gh = fake([...ownerFindingAnswers, headRuns('success'), lineage], sync);
+test('a Clutch sync merges past its owner finding, and the verdict records it for the digest', async () => {
+  const gh = fake([...ownerFindingAnswers, headRuns(), lineage], sync);
   expect(await decide(gh, { mode: 'on', step: 'bots' })).toEqual([
-    `Would auto-merge at the step bots.\nOwner findings, approved upstream in Clutch:\n- ${finding}\nQueued the merge.`,
+    `Would auto-merge at the step bots.\n${recorded}\nQueued the merge.`,
   ]);
   expect(merges(gh.calls)).toEqual([`gh pr merge 7 --auto --merge --match-head-commit ${head}`]);
 });
 
-test('a pure sync whose doctor check is missing or failed keeps its owner finding', async () => {
-  for (const doctor of [null, 'failure']) {
-    const gh = fake([...ownerFindingAnswers, headRuns(doctor), lineage], sync);
-    expect(await decide(gh, { mode: 'on', step: 'bots' })).toEqual([
-      `Would not auto-merge at the step bots:\n- Agent review asks the owner: ${finding}`,
-    ]);
-    expect(merges(gh.calls)).toEqual([]);
-  }
-});
-
-test('a sync with a file that clutch sync does not write keeps its owner finding, doctor or not', async () => {
+test('a sync with a file that clutch sync does not write is held by that file, not by its owner finding', async () => {
   const gh = fake(
     [
       ...ownerFindingAnswers,
-      headRuns('success'),
+      headRuns(),
       lineage,
       syncFiles([{ filename: 'apps/web/src/main.ts', patch: '+evil' }]),
     ],
     sync,
   );
   expect(await decide(gh, { mode: 'on', step: 'bots' })).toEqual([
-    `Would not auto-merge at the step bots:\n- apps/web/src/main.ts is not a file that clutch sync writes.\n- Agent review asks the owner: ${finding}`,
+    `Would not auto-merge at the step bots:\n- apps/web/src/main.ts is not a file that clutch sync writes.\n${recorded}`,
   ]);
   expect(merges(gh.calls)).toEqual([]);
 });
 
-test('a failed required check holds a pure sync, and its owner finding still shows as approved upstream', async () => {
-  const gh = fake([...ownerFindingAnswers, headRuns('success', 'failure'), lineage], sync);
+test('a failed required check holds a sync, and its owner finding still shows as recorded', async () => {
+  const gh = fake([...ownerFindingAnswers, headRuns('failure'), lineage], sync);
   expect(await decide(gh, { mode: 'on', step: 'bots' })).toEqual([
-    `Would not auto-merge at the step bots:\n- The required check validate is failure.\nOwner findings, approved upstream in Clutch:\n- ${finding}`,
+    `Would not auto-merge at the step bots:\n- The required check validate is failure.\n${recorded}`,
   ]);
   expect(merges(gh.calls)).toEqual([]);
 });
 
-test('an agent PR keeps its owner finding at every step, even with a doctor success', async () => {
-  for (const step of ['low', 'medium'] as const) {
-    const gh = fake([...ownerFindingAnswers, headRuns('success')]);
-    const [line] = await decide(gh, { mode: 'on', step });
-    expect(merges(gh.calls)).toEqual([]);
-    expect(line).toContain(`- Agent review asks the owner: ${finding}`);
-    expect(line).not.toContain('approved upstream');
-  }
+test('a green medium-risk agent PR merges past its owner finding at the step medium, and the verdict records it', async () => {
+  const gh = fake([
+    ...ownerFindingAnswers,
+    headRuns(),
+    ['bun tools/clutch.ts risk', { out: '{"tier":"medium"}' }],
+  ]);
+  expect(await decide(gh, { mode: 'on', step: 'medium' })).toEqual([
+    `Would auto-merge at the step medium.\n${recorded}\nQueued the merge.`,
+  ]);
+  expect(merges(gh.calls)).toEqual([`gh pr merge 7 --auto --merge --match-head-commit ${head}`]);
 });
 
-test('the rule takes a finding only from a pure sync whose doctor succeeded, and says so in the verdict', () => {
-  const pure = facts({ doctor: 'success', ownerFindings: [finding] }, sync);
-  expect(blockers(pure, 'bots')).toEqual([]);
-  expect(upstreamFindings(pure)).toEqual([finding]);
-  expect(verdictText(blockers(pure, 'bots'), 'bots', upstreamFindings(pure))).toBe(
-    `Would auto-merge at the step bots.\nOwner findings, approved upstream in Clutch:\n- ${finding}`,
+test('an owner finding adds no reason, and the verdict lists every finding after the reasons', () => {
+  const flagged = facts({ tier: 'medium', ownerFindings: [finding, 'It adds a migration.'] });
+  expect(blockers(flagged, 'medium')).toEqual([]);
+  expect(verdictText(blockers(flagged, 'medium'), 'medium', flagged.ownerFindings)).toBe(
+    `Would auto-merge at the step medium.\n${recorded}\n- It adds a migration.`,
   );
-  const held = `Agent review asks the owner: ${finding}`;
-  expect(blockers(facts({ doctor: 'pending', ownerFindings: [finding] }, sync), 'bots')).toEqual([
-    held,
-  ]);
-  expect(blockers(facts({ doctor: 'missing', ownerFindings: [finding] }, sync), 'bots')).toEqual([
-    held,
-  ]);
+  expect(blockers(flagged, 'low')).toEqual(['The risk tier is medium, not low.']);
+  expect(verdictText(['The pull request is a draft.'], 'low', [finding])).toBe(
+    `Would not auto-merge at the step low:\n- The pull request is a draft.\n${recorded}`,
+  );
+  expect(verdictText([], 'low', [])).toBe('Would auto-merge at the step low.');
+  expect(blockers(facts({ ownerFindings: [finding] }, sync), 'bots')).toEqual([]);
   expect(
     blockers(
-      facts({ doctor: 'success', ownerFindings: [finding], botProblems: ['x'] }, sync),
+      facts({ ownerFindings: [finding] }, { ...sync, author: { login: 'eggdev', is_bot: false } }),
       'bots',
     ),
-  ).toEqual(['x', held]);
-  expect(
-    blockers(
-      facts(
-        { doctor: 'success', ownerFindings: [finding] },
-        { ...sync, author: { login: 'eggdev', is_bot: false } },
-      ),
-      'bots',
-    ),
-  ).toEqual(['The author of the clutch-sync branch is not a bot.', held]);
-  expect(
-    blockers(
-      facts(
-        { doctor: 'success', ownerFindings: [finding] },
-        { headRefName: 'renovate/x', author: app },
-      ),
-      'bots',
-    ),
-  ).toEqual([held]);
-  expect(blockers(facts({ doctor: 'success', ownerFindings: [finding] }), 'medium')).toEqual([
-    held,
+  ).toEqual(['The author of the clutch-sync branch is not a bot.']);
+});
+
+test('a major change and a contract break still hold a PR that also has owner findings', () => {
+  const major = facts({
+    tier: 'medium',
+    ownerFindings: [finding],
+    major: ['its title has "!" before the colon'],
+  });
+  expect(blockers(major, 'medium')).toEqual([
+    'The change is major: its title has "!" before the colon. The owner signs off a major change.',
   ]);
-  expect(upstreamFindings(facts({ doctor: 'success', ownerFindings: [finding] }))).toEqual([]);
+  const broken = facts({ tier: 'medium', ownerFindings: [finding], breaks: ['Note.title'] });
+  expect(blockers(broken, 'medium')).toEqual([
+    'The contract snapshot names the break Note.title. The owner agrees to a break.',
+  ]);
+  expect(blockers({ ...major, ownerApproved: true }, 'medium')).toEqual([]);
+  expect(blockers({ ...broken, ownerApproved: true }, 'medium')).toEqual([]);
 });

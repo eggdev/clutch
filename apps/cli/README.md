@@ -487,7 +487,7 @@ merge as any other change. See
 Docs, tests, changesets and tracker files are `low`. Every other path is
 `medium`: product code, skills, check scripts, lint config, workflows, the code
 and rules of the merge gate, and `clutch.yaml`. Agent review gives a change
-that weakens a check an `owner` finding, so auto-merge leaves it for the owner.
+that weakens a check an `owner` finding, and the weekly digest lists it for the owner.
 
 ## clutch.yaml
 
@@ -591,7 +591,7 @@ The loader rejects unknown keys. Each error names its YAML path, such as
 `template.mode` or `capabilities.codeql_sast.reason`. An older `clutch.yaml`
 has `template.commit`. The loader accepts it and reads nothing from it, and
 the next sync removes it. A change to the file merges as any other change.
-Agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
+Agent review gives a change that weakens it an `owner` finding, and the weekly digest lists it for the owner.
 
 ## Init
 
@@ -901,7 +901,7 @@ A capability is present when every `detect` rule passes. It is partial when
 some pass and one fails, or when only `partial_if` rules pass. It is missing
 when none pass. It is unknown when the rules that did not pass are all
 unknown, such as remote rules without `--remote`. The registry is a guardrail
-file: agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
+file: agent review gives a change that weakens it an `owner` finding, and the weekly digest lists it for the owner.
 
 ## Test it
 

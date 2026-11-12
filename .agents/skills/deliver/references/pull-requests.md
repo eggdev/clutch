@@ -80,23 +80,22 @@ agent PR, so the owner approves it on GitHub like any other PR from another auth
 drifts. After a change to the one-way-door tier, run
 `mise exec -- bun tools/codeowners.ts --write`.
 
-Four kinds of PR wait for the owner without a GitHub approval rule:
+Three kinds of PR wait for the owner without a GitHub approval rule:
 
 - A rule with `lines`, such as a workflow's `permissions:`. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
-- A PR with an `owner` finding from agent review. Auto-merge holds it, except
-  a pure Clutch sync whose findings are approved upstream (see
-  [Auto-merge](#auto-merge)).
 - A PR that makes a contract break. Its diff changes `contract.json`, and the
   snapshot names the break. Auto-merge holds it, whatever its tier.
 - A major change. Its title has `!` before the colon, or a changeset in its
   diff names a major bump. Auto-merge holds it, whatever its tier.
 
-Do not merge any of these kinds with `pr merge` until the owner says so. `pr status` counts the `owner` findings, the contract breaks and a major change, and reports such a PR as not ready. `pr merge` refuses it until the owner approves it.
+Do not merge any of these kinds with `pr merge` until the owner says so. `pr status` counts the contract breaks and a major change, and reports such a PR as not ready. `pr merge` refuses it until the owner approves it.
+
+An `owner` finding from agent review holds nothing. The PR merges when its checks pass and it has no `blocking` finding. The weekly digest lists each `owner` finding for the owner. `pr status` prints them as `K owner (recorded for the weekly digest)`.
 
 The owner's approval is the last step. When `automerge.owner` in `clutch.yaml`
 approves the head commit, an `on` run of Auto-merge passes an agent PR at any
-tier, and drops agent review's `owner` findings. The bot rule still holds a bot
+tier. The bot rule still holds a bot
 PR, and a PR that a person opened is still refused. The required checks, a
 draft, the base branch and a red `main` still hold any PR. The session that
 watches the PR sees the approval and runs `bun run pr merge` again. A later
@@ -150,7 +149,8 @@ comment answers. Post or edit that one comment, with one line for each finding:
 ## Review disposition
 
 - blocking `docs/a.md` (4458028676): fixed in 443119f
-- owner `tools/x.ts` (4458080057, 4458124128): waits for the owner: approve the hatch
+- owner `.github/workflows/ci.yml` (4458080057): waits for the owner: the job gets a write permission
+- owner `tools/x.ts` (4458124128): recorded for the weekly digest: the hatch is needed for the fixture
 - note `ci.yml` (4458028977): not fixed: it says the check got stronger
 ```
 
@@ -247,8 +247,8 @@ it. The check gives the message that names the reviewer.
 line in its `## Review disposition` comment. See
 [answer each finding](#answer-each-finding).
 
-`merge` accepts the owner's approval of the current head as the answer to the
-owner findings. The owner is `automerge.owner` in `clutch.yaml`, else the
+`merge` accepts the owner's approval of the current head as the answer to a
+major change and a contract break. The owner is `automerge.owner` in `clutch.yaml`, else the
 default owner in `.github/CODEOWNERS`. A dismissed approval, or one on an older
 commit, does not count, and neither does another login's approval.
 
@@ -342,11 +342,7 @@ The bot rule:
   `package.json`, the TypeScript configs and the lockfile. The lockfile rule is
   the same as Renovate's. Sync also adds a new seed file under an
   `add_on_sync` entry, such as the factory tree. The bot rule does not accept
-  that file yet (CL-518), so a person merges that PR. The `clutch / doctor` check, which the project's CI
-  runs and no ruleset requires, proves that the managed files match the release.
-  When it succeeds on the head, its `owner` findings are approved upstream and
-  hold nothing, as [decision 0003](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0003-a-pure-clutch-sync-takes-owner-findings-as-approved-upstream.md)
-  records. The verdict still lists them.
+  that file yet (CL-518), so a person merges that PR.
 
 At each step, the PR also needs all of these:
 
@@ -358,11 +354,6 @@ At each step, the PR also needs all of these:
   from another app or token counts for nothing.
 - No required check is red on the default branch's latest commit. A red
   `main` stops every auto-merge until it is green again, except a revert PR.
-- Agent review left no `owner` finding on its head, unless the PR is a pure
-  Clutch sync, as above. A change to the hard core gets one, and so does a
-  change that weakens a check that gates the merge, whatever its path. See
-  [owner findings](../../../../docs/contributing/review.md#owner-findings). The
-  owner merges such a PR.
 - Its diff makes no contract break. A PR whose diff changes `contract.json`, and
   whose snapshot names a break, waits for the owner.
 - It is not a major change. A PR with `!` in its title, or with a changeset

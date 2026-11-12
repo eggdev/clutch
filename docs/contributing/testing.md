@@ -50,8 +50,8 @@ instead. A helper that asserts has a name that starts with `expect` or
 
 A change may delete or thin a test when the behavior it proves is gone, or
 when another test now proves it. The PR names that test. Agent review gives a
-weaker or deleted test an `owner` finding, so auto-merge leaves the PR for the
-owner. See [review](./review.md).
+weaker or deleted test an `owner` finding, and the weekly digest lists it for
+the owner. See [review](./review.md).
 
 ## Flaky tests
 

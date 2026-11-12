@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 
 import {
   fake,
@@ -91,34 +91,29 @@ async function mergeOutcome(reviews: Array<Reviewed>, reviewDecision = '') {
   }
 }
 
-test('merge proceeds with an owner finding once the owner approves the current head', async () => {
-  const me = await repoOwner();
-  const gh = mergingWithFinding('h3ad', [{ login: me, state: 'APPROVED', commit: 'h3ad' }]);
-  expect(await runPr(['merge', '17', '--owner'], gh.run, noWrite, fakeClock())).toBe(0);
-  expect(gh.calls).toContain('gh pr merge 17 --merge');
-});
+/** The line that `merge` prints for PR 17's one owner finding. */
+const recordedLine = '#17 has 1 owner finding(s) from agent review. The weekly digest lists them.';
 
-test('merge refuses an owner finding unless the owner approved the current head', async () => {
+test('merge does not refuse an owner finding, approved or not, and prints one line for the digest', async () => {
   const me = await repoOwner();
-  const refusal =
-    "#17 has 1 owner finding(s) from agent review, such as a weaker check. Ask the owner in this session's thread.";
-  const attempts = await Promise.all([
-    mergeOutcome([]),
-    mergeOutcome([{ login: me, state: 'DISMISSED', commit: 'h3ad' }]),
-    mergeOutcome([{ login: me, state: 'APPROVED', commit: 'old0000' }]),
-    mergeOutcome([{ login: 'someone-else', state: 'APPROVED', commit: 'h3ad' }]),
-    // GitHub's approval decision alone does not answer the owner's finding.
-    mergeOutcome([], 'APPROVED'),
-  ]);
-  expect(attempts.map((attempt) => attempt.outcome)).toEqual([
-    refusal,
-    refusal,
-    refusal,
-    refusal,
-    refusal,
-  ]);
-  // A refused merge runs no `gh pr merge` and no `gh stack merge`.
-  expect(attempts.map((attempt) => attempt.merges)).toEqual([[], [], [], [], []]);
+  const log = spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const attempts = await Promise.all([
+      mergeOutcome([]),
+      mergeOutcome([{ login: me, state: 'DISMISSED', commit: 'h3ad' }]),
+      mergeOutcome([{ login: me, state: 'APPROVED', commit: 'old0000' }]),
+      mergeOutcome([{ login: 'someone-else', state: 'APPROVED', commit: 'h3ad' }]),
+      mergeOutcome([{ login: me, state: 'APPROVED', commit: 'h3ad' }]),
+    ]);
+    expect(attempts.map((attempt) => attempt.outcome)).toEqual(attempts.map(() => 'merged'));
+    expect(attempts.map((attempt) => attempt.merges)).toEqual(
+      attempts.map(() => ['gh pr merge 17 --merge']),
+    );
+    const lines = log.mock.calls.map((call) => String(call[0]));
+    expect(lines.filter((line) => line === recordedLine)).toHaveLength(5);
+  } finally {
+    log.mockRestore();
+  }
 });
 
 const release = (status: string, conclusion: string) => ({
@@ -211,50 +206,37 @@ test('merge of a PR that the owner approval already merged goes on to the releas
   expect(gh.calls.some((call) => call.startsWith('gh run list --workflow ci.yml'))).toBe(true);
 });
 
-test('the judged path refuses an owner finding without the approval, and dispatches the judge with it', async () => {
-  const refused = mergingWithFinding('h3ad', []);
-  await expect(runPr(['merge', '17'], refused.run, noWrite, fakeClock())).rejects.toThrow(
-    'owner finding(s) from agent review',
-  );
-  expect(refused.calls.some((call) => call.startsWith('gh workflow run auto-merge.yml'))).toBe(
-    false,
-  );
-  const me = await repoOwner();
-  const judged = mergingWithFinding(
-    'h3ad',
-    [{ login: me, state: 'APPROVED', commit: 'h3ad' }],
-    '',
+test('the judged path dispatches the judge for a PR with an owner finding and no approval', async () => {
+  const judged = mergingWithFinding('h3ad', [], '', [
     [
+      'gh run list --workflow auto-merge.yml',
       [
-        'gh run list --workflow auto-merge.yml',
-        [
-          { out: '[]' },
-          {
-            out: JSON.stringify([
-              {
-                databaseId: 8,
-                displayTitle: 'Auto-merge #17',
-                status: 'completed',
-                conclusion: 'success',
-                createdAt: '2026-11-06T10:00:00Z',
-                url: 'https://github.com/o/r/actions/runs/8',
-              },
-            ]),
-          },
-        ],
-      ],
-      [
-        'gh pr view 17 --json state,autoMergeRequest,mergeCommit',
+        { out: '[]' },
         {
-          out: JSON.stringify({
-            state: 'MERGED',
-            autoMergeRequest: null,
-            mergeCommit: { oid: 'm3rge' },
-          }),
+          out: JSON.stringify([
+            {
+              databaseId: 8,
+              displayTitle: 'Auto-merge #17',
+              status: 'completed',
+              conclusion: 'success',
+              createdAt: '2026-11-06T10:00:00Z',
+              url: 'https://github.com/o/r/actions/runs/8',
+            },
+          ]),
         },
       ],
     ],
-  );
+    [
+      'gh pr view 17 --json state,autoMergeRequest,mergeCommit',
+      {
+        out: JSON.stringify({
+          state: 'MERGED',
+          autoMergeRequest: null,
+          mergeCommit: { oid: 'm3rge' },
+        }),
+      },
+    ],
+  ]);
   expect(await runPr(['merge', '17'], judged.run, noWrite, fakeClock())).toBe(0);
   expect(judged.calls).toContain('gh workflow run auto-merge.yml --ref main -f pr=17');
   expect(judged.calls.some((call) => call.startsWith('gh pr merge 17'))).toBe(false);

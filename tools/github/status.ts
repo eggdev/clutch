@@ -146,7 +146,7 @@ function codeownersDefault(text: string) {
 }
 
 /**
- * The owner whose approval answers agent review's owner findings: `automerge.owner`
+ * The owner whose approval lets a contract break or a major change merge: `automerge.owner`
  * in clutch.yaml, else the default owner in .github/CODEOWNERS. Tools may not
  * import from apps, so this reads only those two places.
  */
@@ -165,8 +165,8 @@ export async function ownerLogin(): Promise<string | undefined> {
 }
 
 /**
- * Whether agent review's owner findings still wait for the owner, the one rule
- * that `pr status` and `pr merge` both apply. They wait until the owner's latest
+ * Whether a contract break or a major change still waits for the owner, the one
+ * rule that `pr status` and `pr merge` both apply. It waits until the owner's latest
  * review approves the head commit, so a dismissed approval or one on an older
  * commit does not count. With no owner to name, GitHub's approval decides.
  */
@@ -174,9 +174,9 @@ export async function waitsForOwner(
   run: Run,
   number: string,
   pr: { headRefOid: string; reviewDecision?: string | null },
-  findings: number,
+  holds: number,
 ) {
-  if (findings === 0) {
+  if (holds === 0) {
     return false;
   }
   const owner = await ownerLogin();
@@ -263,7 +263,8 @@ export async function prStatus(run: Run, number: string) {
   const review =
     pr.reviewDecision || (pr.mergeStateStatus === 'BLOCKED' ? 'BLOCKED by a rule' : '');
   const approved =
-    !(await waitsForOwner(run, number, pr, owner + breaks.length + major.length)) &&
+    // Owner findings hold nothing: the weekly digest lists them.
+    !(await waitsForOwner(run, number, pr, breaks.length + major.length)) &&
     (review === '' || review === 'APPROVED');
   const ready =
     pr.state === 'OPEN' &&
@@ -305,7 +306,7 @@ function reviewLine(review: { posted: boolean; blocking: number | null; owner: n
       ? 'posted, but its blocking count is unreadable'
       : `${review.blocking} blocking`;
   return review.owner > 0
-    ? `${blocking}, ${review.owner} owner (the owner approves and merges it)`
+    ? `${blocking}, ${review.owner} owner (recorded for the weekly digest)`
     : blocking;
 }
 

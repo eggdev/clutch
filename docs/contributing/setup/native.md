@@ -149,7 +149,7 @@ Codex has no such tools.
 
 A shell script that runs one of these commands does not trigger the hook.
 Agent review is the control that holds. A change that weakens the gate in
-`tools/native/` gets an `owner` finding, and auto-merge leaves it for the
+`tools/native/` gets an `owner` finding, and the weekly digest lists it for the
 owner.
 
 ## CI
