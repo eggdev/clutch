@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.67.0 (2026-11-12)
+
+### Features
+
+- Let the server merge a green agent PR with no session, and stop open review threads holding a merge.
+
 ## 0.66.0 (2026-11-12)
 
 ### Features
