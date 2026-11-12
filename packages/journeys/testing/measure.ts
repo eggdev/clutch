@@ -4,6 +4,8 @@ import { stripVTControlCharacters as plain } from 'node:util';
 
 import type { BrowserContext, Page, TestInfo } from '@playwright/test';
 import { binding, pageScript } from '@repo/journeys/testing/measure-page';
+import { budgetsFrom, clickBudgetAt, clickBudgetMessage } from '@repo/journeys/types/budget';
+import type { Budgets } from '@repo/journeys/types/budget';
 
 /**
  * The measures of one web journey run on one device: its layout shifts, its
@@ -14,27 +16,6 @@ import { binding, pageScript } from '@repo/journeys/testing/measure-page';
  * journey runner joins those files into one file for each journey. See
  * https://github.com/eggdev/clutch/blob/main/docs/contributing/end-to-end-testing.md#measures.
  */
-
-/** The quality budgets of a run, from `budgets:` in clutch.yaml, which the runner passes in `JOURNEY_BUDGETS`. */
-export type Budgets = { layoutShift: number; clicks: Record<string, number> };
-
-/** The template defaults, as docs/contributing/journeys/core.md names them. */
-const defaultBudgets: Budgets = { layoutShift: 0.01, clicks: { 'sign-up': 3 } };
-
-/**
- * The outcome where the click budget of each core journey ends. Sign-up counts
- * from the entry. Each other journey counts from `signed-up`.
- */
-const budgetEnd: Readonly<Record<string, string>> = {
-  'sign-up': 'signed-up',
-  'sign-in': 'signed-in',
-  onboarding: 'onboarded',
-  'profile-management': 'profile-saved',
-  'billing-and-checkout': 'plan-upgraded',
-  'roles-and-access': 'member-invited',
-  'account-security': 'password-changed',
-  'contact-support': 'support-request-sent',
-};
 
 /** One layout shift with no recent input, in one document. */
 export type Shift = {
@@ -116,7 +97,12 @@ export type Measure = {
     from: string;
     to: string;
   } | null;
+  /** The layout problems of the last page of a passed try, or null. They are reported and never fail a try. */
+  screen?: ScreenFindings | null;
 };
+
+/** The layout problems of the last page, one sentence each: as the person sees it, and at the largest text size. */
+export type ScreenFindings = { asShown: Array<string>; largestText: Array<string> };
 
 /** What a run writes: its measures, its result and its layout shift. */
 export type Attempt = Omit<Measure, 'startedAt'> & {
@@ -168,11 +154,7 @@ export function coreOf(source: string): string | null {
 
 /** The budgets of `JOURNEY_BUDGETS`, over the defaults. */
 export function budgetsOf(text?: string): Budgets {
-  const given = (text ? JSON.parse(text) : {}) as Partial<Budgets>;
-  return {
-    layoutShift: given.layoutShift ?? defaultBudgets.layoutShift,
-    clicks: { ...defaultBudgets.clicks, ...given.clicks },
-  };
+  return budgetsFrom((text ? JSON.parse(text) : {}) as Partial<Budgets>);
 }
 
 /** Starts the measure of a journey run on the context: the binding, then the page script. */
@@ -183,7 +165,7 @@ export type MeasureInfo = Pick<TestInfo, 'file' | 'retry'> & {
 
 export async function startMeasure(context: BrowserContext, info: MeasureInfo): Promise<Measure> {
   const measure: Measure = {
-    journey: path.basename(info.file).replace(/\.pw\.ts$/u, ''),
+    journey: path.basename(info.file).replace(/\.(?:pw|journey)\.ts$/u, ''),
     file: path.relative(process.cwd(), info.file).split(path.sep).join('/'),
     core: coreOf(readFileSync(info.file, 'utf-8')),
     platform: 'web',
@@ -199,6 +181,7 @@ export async function startMeasure(context: BrowserContext, info: MeasureInfo): 
     axe: [],
     failure: null,
     clickBudget: null,
+    screen: null,
   };
   await context.exposeBinding(binding, (_source, event: PageEvent) => count(measure, event));
   await context.addInitScript(pageScript);
@@ -259,18 +242,21 @@ export function layoutShift(shifts: ReadonlyArray<Shift>): Attempt['layoutShift'
  */
 export function checkClickBudget(measure: Measure, name: string) {
   const { core } = measure;
-  const budget = core ? measure.budgets.clicks[core] : undefined;
-  if (!core || budget === undefined || budgetEnd[core] !== name) {
+  const mark = measure.outcomes.findLast((item) => item.name === name);
+  const start = measure.outcomes.find((item) => item.name === 'signed-up');
+  const check = clickBudgetAt(
+    core,
+    measure.budgets,
+    name,
+    mark?.steps ?? measure.steps,
+    start?.steps ?? 0,
+  );
+  if (check === null || !core) {
     return;
   }
-  const mark = measure.outcomes.findLast((item) => item.name === name);
-  const start =
-    core === 'sign-up' ? null : measure.outcomes.find((item) => item.name === 'signed-up');
-  const from = core === 'sign-up' ? 'the entry' : '`signed-up`';
-  const used = (mark?.steps ?? measure.steps) - (start?.steps ?? 0);
-  measure.clickBudget = { budget, used, from, to: name };
-  if (used > budget) {
-    const message = `${core} took ${used} clicks or taps from ${from} to \`${name}\`, over its budget of ${budget} in \`budgets.clicks\` of clutch.yaml. Remove a step. A larger budget is the owner's decision. See docs/contributing/journeys/core.md#budgets.`;
+  measure.clickBudget = { budget: check.budget, used: check.used, from: check.from, to: name };
+  if (check.over) {
+    const message = clickBudgetMessage(core, check);
     markFailure(measure, 'click-budget', message);
     throw new Error(message);
   }

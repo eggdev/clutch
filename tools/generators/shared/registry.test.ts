@@ -1,7 +1,13 @@
 import { expect, test } from 'bun:test';
 
 import { addGateEntry } from '@tools/generators/shared/gates.ts';
-import { addImport, addToArray } from '@tools/generators/shared/registry.ts';
+import {
+  addImport,
+  addToArray,
+  declaresConstant,
+  insertBeforeContract,
+  mergeNamedImport,
+} from '@tools/generators/shared/registry.ts';
 
 test('an element goes at the end of the named array, once, and an empty array takes it', () => {
   const source = '/** Lists. */\nexport const commands = [...notesCommands];\nconst other = [1];\n';
@@ -28,6 +34,40 @@ test('a call target finds the array argument, such as addChildren', () => {
   ).toBe('const tree = root.addChildren([homeRoute, notesRoute, billingRoute]);\n');
 });
 
+test('a property target finds the array of an object property, such as records', () => {
+  const source =
+    "export const notesContract = defineContract('notes', {\n  records: [noteRecord],\n  commands: [],\n});\n";
+  const added = addToArray(source, { property: 'records' }, 'spaceNoteCountRecord');
+  expect(added).toBe(
+    "export const notesContract = defineContract('notes', {\n  records: [noteRecord, spaceNoteCountRecord],\n  commands: [],\n});\n",
+  );
+  expect(addToArray(added, { property: 'records' }, 'spaceNoteCountRecord')).toBe(added);
+  expect(addToArray(source, { property: 'commands' }, 'createNote')).toBe(
+    "export const notesContract = defineContract('notes', {\n  records: [noteRecord],\n  commands: [createNote],\n});\n",
+  );
+  expect(() => addToArray(source, { property: 'loads' }, 'x')).toThrow(
+    'No array literal for `loads: [...]`.',
+  );
+});
+
+test('a callee target finds the last array argument of a plain call, such as clientPackage', () => {
+  const source =
+    'export const notesCommands = clientPackage(notesContract, [createNoteLocal]);\nexport const other = wrap([1]);\n';
+  expect(addToArray(source, { callee: 'clientPackage' }, 'renameNoteLocal')).toBe(
+    'export const notesCommands = clientPackage(notesContract, [createNoteLocal, renameNoteLocal]);\nexport const other = wrap([1]);\n',
+  );
+  expect(
+    addToArray(
+      'export const accessCommands = clientPackage(accessContract, []);\n',
+      { callee: 'clientPackage' },
+      'joinSpaceLocal',
+    ),
+  ).toBe('export const accessCommands = clientPackage(accessContract, [joinSpaceLocal]);\n');
+  expect(() =>
+    addToArray('export const x = serverPackage(other);\n', { callee: 'serverPackage' }, 'y'),
+  ).toThrow('No array literal for `serverPackage(..., [...])`.');
+});
+
 test('an import goes after the last import, once', () => {
   const source = "import { a } from 'a';\n\nexport const b = [a];\n";
   const added = addImport(source, "import { c } from 'c';");
@@ -36,6 +76,60 @@ test('an import goes after the last import, once', () => {
   expect(addImport('export const b = [];\n', "import { c } from 'c';")).toBe(
     "import { c } from 'c';\n\nexport const b = [];\n",
   );
+});
+
+test('named imports from one module merge into one line, and a type import stays apart', () => {
+  const source =
+    "import { load, record } from '@repo/sync/contract/record';\n\nexport const a = 1;\n";
+  expect(mergeNamedImport(source, '@repo/sync/contract/record', ['record'], false)).toBe(source);
+  expect(mergeNamedImport(source, '@repo/sync/contract/record', ['text'], false)).toBe(
+    "import { load, record, text } from '@repo/sync/contract/record';\n\nexport const a = 1;\n",
+  );
+  expect(mergeNamedImport(source, '@repo/sync/contract/record', ['RowOf'], true)).toBe(
+    "import { load, record } from '@repo/sync/contract/record';\nimport type { RowOf } from '@repo/sync/contract/record';\n\nexport const a = 1;\n",
+  );
+  expect(
+    mergeNamedImport(
+      'export const a = 1;\n',
+      '@repo/sync/contract/engine-groups',
+      ['userGroup'],
+      false,
+    ),
+  ).toBe("import { userGroup } from '@repo/sync/contract/engine-groups';\n\nexport const a = 1;\n");
+});
+
+test('a contract declaration gets new text above its JSDoc, and a file without one fails with the fix', () => {
+  const source = [
+    "import { defineContract } from '@repo/sync/contract/define';",
+    '',
+    '/** The contract of notes. */',
+    "export const notesContract = defineContract('notes', {",
+    '  records: [],',
+    '  commands: [],',
+    '  loads: [],',
+    '});',
+    '',
+  ].join('\n');
+  expect(insertBeforeContract(source, 'export const noteRecord = record();')).toBe(
+    [
+      "import { defineContract } from '@repo/sync/contract/define';",
+      '',
+      'export const noteRecord = record();',
+      '',
+      '/** The contract of notes. */',
+      "export const notesContract = defineContract('notes', {",
+      '  records: [],',
+      '  commands: [],',
+      '  loads: [],',
+      '});',
+      '',
+    ].join('\n'),
+  );
+  expect(() => insertBeforeContract('export const x = 1;\n', 'y')).toThrow(
+    'Declare the contract with `defineContract` first',
+  );
+  expect(declaresConstant(source, 'notesContract')).toBe(true);
+  expect(declaresConstant(source, 'noteRecord')).toBe(false);
 });
 
 test('a gate goes into the gates object once', () => {

@@ -2,29 +2,44 @@ import { expect, test } from 'bun:test';
 
 import { createSpaceServer } from '@repo/access/commands/create-space.server';
 import { testActor } from '@repo/identity/testing/actor';
-import { createNote } from '@repo/notes/commands/create-note';
 import { createNoteServer } from '@repo/notes/commands/create-note.server';
-import { renameNote } from '@repo/notes/commands/rename-note';
 import { renameNoteServer } from '@repo/notes/commands/rename-note.server';
-import { noteModel } from '@repo/notes/models/note';
-import { Notes } from '@repo/notes/service/notes';
+import { createNote, noteRecord, renameNote } from '@repo/notes/contract/notes';
+import { findNote } from '@repo/notes/repo/notes';
+import { notesClient } from '@repo/notes/runtime/client';
 import { NotesTest } from '@repo/notes/testing/notes';
 import { createPool } from '@repo/sync/runtime/pool';
 import { Database } from '@repo/sync/service/database';
 import type { Outbox } from '@repo/sync/service/jobs';
 import type { SyncGroups } from '@repo/sync/service/sync-groups';
+import { testStamps } from '@repo/sync/testing/pool-state';
 import { Effect } from 'effect';
 
 const at = '2026-10-28T12:00:00.000Z';
 
 test('the local changes create and rename a note in the pool at once', () => {
-  const pool = createPool([createNote, renameNote]);
+  const pool = createPool(notesClient.localChanges, notesClient.contract);
   pool.run(createNote, { id: 'n1', spaceId: 'general', title: 'Draft', at });
   pool.run(renameNote, { id: 'n1', title: 'Final', at });
-  expect(pool.get(noteModel, 'n1')?.title).toBe('Final');
+  expect(pool.get(noteRecord, 'n1')?.title).toBe('Final');
 });
 
-function server<A, E>(program: Effect.Effect<A, E, Database | Notes | Outbox | SyncGroups>) {
+test('a screen gives no ID and no time: the pool stamps the new note', () => {
+  const pool = createPool(notesClient.localChanges, notesClient.contract, {
+    stamps: testStamps(at),
+  });
+  pool.run(createNote, { spaceId: 'general', title: 'Draft' });
+  // The transaction took `id-1`, so the note got `id-2`.
+  expect(pool.get(noteRecord, 'id-2')).toEqual({
+    id: 'id-2',
+    spaceId: 'general',
+    title: 'Draft',
+    createdAt: at,
+    updatedAt: at,
+  });
+});
+
+function server<A, E>(program: Effect.Effect<A, E, Database | Outbox | SyncGroups>) {
   return Effect.runPromise(program.pipe(Effect.provide(NotesTest())));
 }
 
@@ -38,8 +53,7 @@ test('the server changes write the owner record and return the change for client
         { db, actor },
       );
       const second = yield* renameNoteServer.run({ id: 'n1', title: 'Final', at }, { db, actor });
-      const notes = yield* Notes;
-      return [first, second, yield* notes.byId(actor.organizationId, 'n1')];
+      return [first, second, yield* findNote(db, actor.organizationId, 'n1')];
     }),
   );
   expect(created.map((change) => change.id)).toEqual(['n1']);
@@ -62,8 +76,12 @@ test('the server rejects a rename of a missing note and a title that is too long
     }),
   );
   expect(reasons).toMatchObject([
-    { _tag: 'CommandRejected', reason: 'This record does not exist.' },
-    { _tag: 'CommandRejected', reason: 'The input of notes/create is not valid.' },
+    { _tag: 'CommandRejected', code: 'not-found', reason: 'This record does not exist.' },
+    {
+      _tag: 'CommandRejected',
+      code: 'invalid-input',
+      reason: 'The input of notes/create is not valid.',
+    },
   ]);
 });
 
@@ -83,6 +101,6 @@ test('only a member of a space can write a note there, and the note is in its sp
       return [refused, written];
     }),
   );
-  expect(outsider).toMatchObject({ reason: 'You may not change records here.' });
+  expect(outsider).toMatchObject({ code: 'forbidden', reason: 'You may not change records here.' });
   expect(Array.isArray(member) && member[0]?.groups).toEqual(['space:design']);
 });

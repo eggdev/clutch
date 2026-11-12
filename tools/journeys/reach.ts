@@ -2,7 +2,8 @@ import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { nativeApps } from '@tools/native/build';
+import { nativeApps } from '@tools/apps';
+import { declaresAppId } from '@tools/native/build';
 
 /**
  * The reach rule: the platforms that a change reaches, so the journeys of
@@ -59,13 +60,29 @@ export function reachOf(root: string, changes: ReadonlyArray<Change>): Reach {
     if (change.tier === 'one-way-door') {
       return [`${change.path} is a sensitive path`];
     }
-    if (change.path.endsWith('.maestro.yaml')) {
+    if (change.path.endsWith('.maestro.yaml') || change.path.endsWith('.journey.ts')) {
       return [`${change.path} is a native journey`];
     }
     const folder = folders.find((item) => change.path.startsWith(`${item}/`));
     return folder ? [`${change.path} is in ${folder}`] : [];
   });
   return { web: true, native: why.length > 0, why };
+}
+
+/**
+ * The CI outputs. `native` is reached and a native app exists. `ios` and
+ * `android` are native too, and at least one native app declares that
+ * platform's app ID in its app.json, so CI starts only the lanes that run.
+ */
+export type Outputs = { native: boolean; ios: boolean; android: boolean };
+
+export function outputsOf(root: string, reach: Reach): Outputs {
+  const native = reach.native && nativeApps(root).length > 0;
+  return {
+    native,
+    ios: native && declaresAppId(root, 'ios'),
+    android: native && declaresAppId(root, 'android'),
+  };
 }
 
 /** The changed files and their tiers, from `clutch risk`. */
@@ -108,8 +125,8 @@ async function main(args: Array<string>, root = process.cwd()) {
     console.error('Usage: bun tools/journeys/reach.ts --base <ref> --head <ref> | --main');
     return 2;
   }
+  const outputs = outputsOf(root, reach);
   const hasApp = nativeApps(root).length > 0;
-  const native = reach.native && hasApp;
   console.log(`Web: reached. Every PR runs the web journeys.`);
   if (!reach.native) {
     console.log(
@@ -117,11 +134,17 @@ async function main(args: Array<string>, root = process.cwd()) {
     );
   } else if (hasApp) {
     console.log(`Native: reached, because ${reach.why.slice(0, 5).join('; ')}.`);
+    console.log(
+      `Native lanes: iOS ${outputs.ios ? 'runs' : 'does not run'}, Android ${outputs.android ? 'runs' : 'does not run'}. A lane runs when a native app declares its app ID.`,
+    );
   } else {
     console.log('Native: reached, but the repository has no native app, so nothing runs.');
   }
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, `native=${native}\n`);
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `native=${outputs.native}\nios=${outputs.ios}\nandroid=${outputs.android}\n`,
+    );
   }
   return 0;
 }

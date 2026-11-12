@@ -1,7 +1,7 @@
-import { generalSpaceId, spaceGroup, spaceOfGroup } from '@repo/access/models/space';
+import { generalSpaceId, spaceGroup } from '@repo/access/contract/access';
 import { findMembership, spacesOf } from '@repo/access/repo/membership';
 import type { Actor } from '@repo/identity/types/actor';
-import { organizationGroup, userGroup } from '@repo/sync/models/define';
+import { organizationGroup, userGroup } from '@repo/sync/contract/engine-groups';
 import { Database } from '@repo/sync/service/database';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { SyncGroups } from '@repo/sync/service/sync-groups';
@@ -42,10 +42,13 @@ function canUseSpace(db: DrizzleDatabase, actor: Actor, spaceId: string) {
  * Every other group fails, so a new kind of group needs a rule here first.
  */
 function canUseGroup(db: DrizzleDatabase, actor: Actor, group: string) {
-  if (group === organizationGroup(actor.organizationId) || group === userGroup(actor.userId)) {
+  if (
+    group === organizationGroup.of(actor.organizationId) ||
+    group === userGroup.of(actor.userId)
+  ) {
     return Effect.succeed(true);
   }
-  const spaceId = spaceOfGroup(group);
+  const spaceId = spaceGroup.idOf(group);
   return spaceId === undefined ? Effect.succeed(false) : canUseSpace(db, actor, spaceId);
 }
 
@@ -56,8 +59,8 @@ const AccessLive = Layer.effect(Access)(
       groupsFor: (actor) =>
         spacesOf(db, actor.organizationId, actor.userId).pipe(
           Effect.map((spaceIds) => ({
-            eager: [organizationGroup(actor.organizationId), userGroup(actor.userId)],
-            lazy: [generalSpaceId, ...spaceIds].map(spaceGroup),
+            eager: [organizationGroup.of(actor.organizationId), userGroup.of(actor.userId)],
+            lazy: [generalSpaceId, ...spaceIds].map(spaceGroup.of),
           })),
         ),
       canUseGroup,

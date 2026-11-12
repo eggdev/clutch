@@ -1,9 +1,11 @@
-import type { Draft, Model, RecordRow } from '@repo/sync/types/records';
+import type { Draft } from '@repo/sync/contract/command';
+import type { Model, RecordRow } from '@repo/sync/contract/record';
 
 /**
  * The plain data helpers of the object pool: tables of records, the draft a
- * local change writes to, and the change detection that keeps unchanged
- * records as the same objects.
+ * local change writes to, the change detection that keeps unchanged records
+ * as the same objects, and the waits of the gates for a group. They share
+ * one module, because each module of the pool loads before the first paint.
  */
 export type Table = Map<string, RecordRow>;
 export type Tables = Map<string, Table>;
@@ -27,16 +29,17 @@ type SortBy = { readonly by: string; readonly direction: 'asc' | 'desc' };
 type FilterBy = { readonly field: string; readonly equals: string };
 
 /**
- * One record of a model, read with its type. A record that does not match the
- * fields of its model reads as missing, so code never sees a wrong shape.
+ * One record of a model, read with its type. The type guard is the only check:
+ * the doors of the pool check each record when it enters, so a stored record
+ * always fits its model, and a missing one reads as undefined.
  */
 export function readAs<Row extends RecordRow>(
   model: Model<Row>,
   tables: Tables,
   id: string,
 ): Row | undefined {
-  const record = tables.get(model.name)?.get(id);
-  return record !== undefined && model.is(record) ? record : undefined;
+  const record: unknown = tables.get(model.name)?.get(id);
+  return model.is(record) ? record : undefined;
 }
 
 export function draftOver(tables: Tables): Draft {
@@ -136,4 +139,68 @@ export function listenerMap() {
   };
 }
 
+/** Calls each listener once. */
+export function wake(listeners: Iterable<() => void>): void {
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
 export const recordKey = (model: string, id: string) => `${model}\u0000${id}`;
+
+/**
+ * The gates that wait for a group, and the groups that the engine still has
+ * to ask the server for. A wait ends in one of two ways: the group is loaded,
+ * or the server refuses it.
+ */
+export type GroupWaits = {
+  /** Waits for a group and wakes the engine. `true` means loaded, `false` means refused. */
+  readonly wait: (group: string) => Promise<boolean>;
+  /** Keeps a group asked for with no gate that waits, so the engine asks for it again. */
+  readonly keep: (group: string) => void;
+  /** Ends, as loaded, each wait whose group is loaded now. */
+  readonly wake: (isLoaded: (group: string) => boolean) => void;
+  /** Ends, as refused, each wait for one group, and forgets the request. */
+  readonly refuse: (group: string) => void;
+  /** The groups asked for and not loaded yet. */
+  readonly requested: () => ReadonlyArray<string>;
+  /** Wakes when a gate asks for a group. Only the engine uses it. */
+  readonly onRequest: (listener: (group: string) => void) => () => void;
+};
+
+export function groupWaits(): GroupWaits {
+  const waiters = new Map<string, Array<(loaded: boolean) => void>>();
+  const listeners = new Set<(group: string) => void>();
+
+  function end(group: string, loaded: boolean) {
+    const resolves = waiters.get(group) ?? [];
+    waiters.delete(group);
+    for (const resolve of resolves) {
+      resolve(loaded);
+    }
+  }
+
+  return {
+    wait: (group) =>
+      new Promise((resolve) => {
+        waiters.set(group, [...(waiters.get(group) ?? []), resolve]);
+        for (const listener of listeners) {
+          listener(group);
+        }
+      }),
+    keep(group) {
+      waiters.set(group, waiters.get(group) ?? []);
+    },
+    wake(isLoaded) {
+      for (const group of [...waiters.keys()].filter(isLoaded)) {
+        end(group, true);
+      }
+    },
+    refuse: (group) => end(group, false),
+    requested: () => [...waiters.keys()],
+    onRequest(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+}

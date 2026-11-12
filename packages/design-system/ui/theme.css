@@ -1,11 +1,27 @@
 /*
  * The token file. Each role from docs/contributing/architecture/styling.md has
- * a value for each scheme. `@theme` maps the roles to Tailwind classes, and
- * starts from `--*: initial`, so no default Tailwind color, font or radius works.
+ * a value for each scheme. apps/app/global.css imports this file after
+ * Tailwind's layers.
+ *
+ * `@theme` maps the roles to Tailwind classes, and starts from `--*: initial`,
+ * so no default Tailwind color, font or radius works.
+ *
+ * Light values are on `:root`. Dark values are on `.dark`: on the web, the boot
+ * script puts the `dark` class on <html>. The native style build reads the
+ * `.dark` block as `@media (prefers-color-scheme: dark)`, so a device follows
+ * its own scheme.
+ *
+ * Sizes are in rem, so the web follows the font size that a reader set. The
+ * native style compile reads 1 rem as 16 px. A line height is a ratio of its
+ * size. Colors are in hex, with the OKLCH value beside each:
+ * the native style compiler reads no OKLCH. No token mixes colors, and no
+ * class has an opacity modifier, a slash and a number after a color class,
+ * because the native compiler draws both wrong. The native style compile
+ * stops when it finds one.
  */
-@import 'tailwindcss';
 
-@theme {
+/* The colors read the scheme's variable in each class, so a nested scheme works. */
+@theme inline {
   --*: initial;
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -16,54 +32,173 @@
   --color-fg-muted: var(--fg-muted);
   --color-on-accent: var(--on-accent);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-focus: var(--focus);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-danger: var(--danger);
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
-  --text-caption: 0.8125rem;
-  --text-body: 1rem;
-  --text-title: 1.25rem;
-  --text-heading: 1.75rem;
-  --radius-control: 0.5rem;
-  --radius-surface: 0.75rem;
+  --color-transparent: transparent;
+
+  /* Web only. iOS draws a small shadow as dark arcs at rounded corners. */
+  --shadow-raised: var(--elevation-raised);
+  --shadow-focus: var(--elevation-focus);
+}
+
+@theme {
   --spacing: 0.25rem;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', roboto, 'Helvetica Neue', arial, sans-serif;
+  --default-font-family: var(--font-sans);
+
+  /* A count or a meta label. */
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.3846;
+  /* The label of a field or a button, and secondary text. */
+  --text-label: 0.9375rem;
+  --text-label--line-height: 1.4667;
+  /* Body text, and the text of a field: 16 px keeps iOS Safari from zooming on focus. */
+  --text-body: 1rem;
+  --text-body--line-height: 1.5;
+  /* The title of a section. */
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.4;
+  /* The title of a screen. */
+  --text-heading: 1.75rem;
+  --text-heading--line-height: 1.2143;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  --tracking-tight: -0.02em;
+
+  /* A button or a field. */
+  --radius-control: 0.5rem;
+  /* A card or a list. */
+  --radius-surface: 0.75rem;
+  --radius-pill: 9999px;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --default-transition-duration: var(--speed-quick);
+  --default-transition-timing-function: var(--ease-out);
+
+  /* The viewport width where a screen changes its layout. */
   --breakpoint-desktop: 64rem;
+  --container-sm: 24rem;
+  --container-md: 28rem;
+  --container-lg: 32rem;
+  --container-xl: 36rem;
+  /* The page at desktop width: a 14rem side column, a gap and a reading column. */
+  --container-4xl: 56rem;
 }
 
 :root {
   --speed-instant: 0ms;
   --speed-quick: 120ms;
+  /* A dismissed thing fades out over 150 ms. See docs/principles/compositor-only-motion.md. */
   --speed-fade-out: 150ms;
   --speed-regular: 200ms;
   --speed-slow: 300ms;
-  --bg: oklch(98.5% 0 0);
-  --surface: oklch(100% 0 0);
-  --surface-raised: oklch(100% 0 0);
-  --hover: oklch(96% 0 0);
-  --press: oklch(93% 0 0);
-  --fg: oklch(22% 0 0);
-  --fg-muted: oklch(48% 0 0);
-  --on-accent: oklch(99% 0 0);
-  --line: oklch(90% 0 0);
-  --focus: oklch(55% 0.18 255);
-  --accent: oklch(52% 0.19 255);
-  --accent-hover: oklch(47% 0.19 255);
-  --danger: oklch(54% 0.2 27);
+
+  /* oklch(0.985 0 0) */
+  --bg: #fafafa;
+  --surface: #fff;
+  --surface-raised: #fff;
+  /* oklch(0.96 0 0) */
+  --hover: #f2f2f2;
+  /* oklch(0.93 0 0) */
+  --press: #e8e8e8;
+  /* oklch(0.22 0 0) */
+  --fg: #1b1b1b;
+  /* oklch(0.48 0 0) */
+  --fg-muted: #5d5d5d;
+  /* oklch(0.99 0 0) */
+  --on-accent: #fcfcfc;
+  /* oklch(0.9 0 0) */
+  --line: #dedede;
+  /* The edge of a field: 3:1 on the surface. oklch(0.62 0 0) */
+  --line-strong: #868686;
+  /* oklch(0.55 0.18 255) */
+  --focus: #026fd7;
+  /* oklch(0.52 0.19 255), inside the sRGB gamut */
+  --accent: #0065d2;
+  /* oklch(0.47 0.19 255), inside the sRGB gamut */
+  --accent-hover: #0055c1;
+  /* oklch(0.54 0.2 27) */
+  --danger: #c92324;
+
+  --elevation-raised: 0 0.0625rem 0.125rem 0 rgb(0 0 0 / 5%);
+  --elevation-focus: 0 0 0 0.1875rem rgb(2 111 215 / 30%);
 }
 
 .dark {
-  --bg: oklch(17% 0 0);
-  --surface: oklch(21% 0 0);
-  --surface-raised: oklch(25% 0 0);
-  --hover: oklch(27% 0 0);
-  --press: oklch(31% 0 0);
-  --fg: oklch(95% 0 0);
-  --fg-muted: oklch(72% 0 0);
-  --on-accent: oklch(99% 0 0);
-  --line: oklch(32% 0 0);
-  --focus: oklch(70% 0.15 255);
-  --accent: oklch(64% 0.17 255);
-  --accent-hover: oklch(69% 0.17 255);
-  --danger: oklch(68% 0.18 27);
+  /* oklch(0.17 0 0) */
+  --bg: #0f0f0f;
+  /* oklch(0.21 0 0) */
+  --surface: #181818;
+  /* oklch(0.25 0 0) */
+  --surface-raised: #222;
+  /* oklch(0.27 0 0) */
+  --hover: #262626;
+  /* oklch(0.31 0 0) */
+  --press: #303030;
+  /* oklch(0.95 0 0) */
+  --fg: #eee;
+  /* oklch(0.72 0 0) */
+  --fg-muted: #a4a4a4;
+  /* The accent is light in this scheme, so its label is dark. oklch(0.17 0 0) */
+  --on-accent: #0f0f0f;
+  /* oklch(0.32 0 0) */
+  --line: #333;
+  /* oklch(0.53 0 0) */
+  --line-strong: #6b6b6b;
+  /* oklch(0.7 0.15 255) */
+  --focus: #59a0f9;
+  /* oklch(0.64 0.17 255) */
+  --accent: #388cf0;
+  /* oklch(0.69 0.17 255), inside the sRGB gamut */
+  --accent-hover: #499cff;
+  /* oklch(0.68 0.18 27) */
+  --danger: #f36358;
+
+  --elevation-raised: 0 0.0625rem 0.125rem 0 rgb(0 0 0 / 30%);
+  --elevation-focus: 0 0 0 0.1875rem rgb(89 160 249 / 35%);
+}
+
+/* Every duration is zero under reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --speed-instant: 0s;
+    --speed-quick: 0s;
+    --speed-fade-out: 0s;
+    --speed-regular: 0s;
+    --speed-slow: 0s;
+  }
+}
+
+/*
+ * The properties a control tweens, by name. A bare `transition` tweens a broad
+ * default list, so any property that changes can start to animate by accident.
+ * See docs/principles/compositor-only-motion.md.
+ */
+@utility transition-control {
+  transition-property: scale, opacity, background-color, border-color;
+}
+@utility transition-field {
+  transition-property: background-color, border-color;
+}
+
+/*
+ * NativeWind points `font-sans` at the system font of each platform. The theme
+ * above replaces that with the list of the web, so each platform gets its
+ * system font again.
+ */
+:root {
+  @media ios {
+    --font-sans: System;
+  }
+
+  @media android {
+    --font-sans: SystemAndroid;
+  }
 }

@@ -17,14 +17,14 @@ Tailwind is the only styling tool.
 
 ## Platforms
 
-| Platform   | Framework                      | Styling                             |
-| ---------- | ------------------------------ | ----------------------------------- |
-| Web only   | Vite, or Next for public pages | Tailwind v4, configured in CSS      |
-| Native too | One or Expo, with React Native | A Tailwind binding for React Native |
+| Platform       | Framework                      | Styling                          |
+| -------------- | ------------------------------ | -------------------------------- |
+| Web only       | Vite, or Next for public pages | Tailwind v4, configured in CSS   |
+| Web and native | One with Expo and React Native | NativeWind 5 with Tailwind 4.3.3 |
 
-The template ships the web profile: `apps/web` uses Vite and Tailwind 4.3.3
-through `@tailwindcss/vite`. The kickoff profile picks the row. See
-[client profiles](./client.md#profiles).
+The template ships the native row. `apps/app` uses One with Expo and React Native.
+It styles with NativeWind 5 and Tailwind 4.3.3, on the web, iOS and Android. The
+kickoff profile picks the row. See [client profiles](./client.md#profiles).
 
 <!-- kickoff: For a native profile, the Tailwind binding for React Native and its version. Delete this slot for a web-only project. -->
 
@@ -33,20 +33,21 @@ through `@tailwindcss/vite`. The kickoff profile picks the row. See
 These names are the same in every project. A project sets their values. It
 adds a role only when no role fits, and adds it here in the same change.
 
-| Group   | Roles                                                                                | Class                      |
-| ------- | ------------------------------------------------------------------------------------ | -------------------------- |
-| Surface | `bg`, `surface`, `surface-raised`, `overlay`, `hover`, `press`, `selected`           | `bg-surface`               |
-| Text    | `fg`, `fg-muted`, `fg-subtle`, `on-accent`                                           | `text-fg-muted`            |
-| Line    | `line`, `line-subtle`, `line-strong`, `focus`                                        | `border-line`              |
-| Intent  | `accent`, `accent-hover`, `danger`, `success`, `warning`, and `-subtle` fills        | `text-danger`              |
-| Type    | `font-sans`, `font-mono`, `text-caption`, `text-body`, `text-title`, `text-heading`  | `text-body`                |
-| Shape   | `radius-control`, `radius-surface`, `radius-pill`, `shadow-raised`, `shadow-overlay` | `rounded-control`          |
-| Space   | `spacing`: one 4 px step                                                             | `p-4`                      |
-| Layout  | `breakpoint-desktop`, and the container sizes `sm` to `xl`                           | `@md:flex-row`             |
-| Speed   | `speed-instant`, `speed-quick`, `speed-fade-out`, `speed-regular`, `speed-slow`      | `duration-(--speed-quick)` |
+| Group   | Roles                                                                                             | Class                      |
+| ------- | ------------------------------------------------------------------------------------------------- | -------------------------- |
+| Surface | `bg`, `surface`, `surface-raised`, `overlay`, `hover`, `press`, `selected`                        | `bg-surface`               |
+| Text    | `fg`, `fg-muted`, `fg-subtle`, `on-accent`                                                        | `text-fg-muted`            |
+| Line    | `line`, `line-subtle`, `line-strong`, `focus`                                                     | `border-line`              |
+| Intent  | `accent`, `accent-hover`, `danger`, `success`, `warning`, and `-subtle` fills                     | `text-danger`              |
+| Type    | `font-sans`, `font-mono`, `text-caption`, `text-label`, `text-body`, `text-title`, `text-heading` | `text-body`                |
+| Shape   | `radius-control`, `radius-surface`, `radius-pill`, `shadow-raised`, `shadow-overlay`              | `rounded-control`          |
+| Space   | `spacing`: one 4 px step                                                                          | `p-4`                      |
+| Layout  | `breakpoint-desktop`, and the container sizes `sm` to `xl`                                        | `@md:flex-row`             |
+| Speed   | `speed-instant`, `speed-quick`, `speed-fade-out`, `speed-regular`, `speed-slow`                   | `duration-(--speed-quick)` |
 
 A status color goes on the value or the label. Its `-subtle` fill carries soft
-emphasis. A status color never fills a large area.
+emphasis. A status color never fills a large area. Each size is in px, because
+React Native reads `rem` as 14 px.
 
 ## Theme
 
@@ -55,12 +56,21 @@ emphasis. A status color never fills a large area.
 | Scheme | `light`, `dark`, system   | The template: each project has both |
 | Other  | Such as density or accent | The project                         |
 
-The inline boot script in the HTML `<head>` reads the scheme from device
+The boot script in `apps/app/lib/boot-script.ts` reads the scheme from device
 storage and sets the `dark` class on `<html>` before the first paint. See
 [fast first load](../../principles/fast-first-load.md). The token file sets
-each role under `:root` and again under `.dark`.
+each role under `:root` and again under `.dark`. Native follows the scheme of
+the device.
 
 <!-- kickoff: The theme: the value of each role in each scheme, the font files, the shadow policy, the scheme for a first visit, and any axis beyond the scheme. -->
+
+## One set of classes for web and native
+
+Components are React Native components with Tailwind classes.
+`packages/app-build` gives them a `className` prop, and it compiles the classes
+for native. No class has an opacity modifier, and no token mixes colors. The
+native style compile stops at one, which `packages/app-build/runtime/native-styles.test.ts`
+checks. A file with a `.native.tsx` suffix replaces its twin on a device.
 
 ## Rules
 
@@ -116,7 +126,8 @@ The records live in `docs/design/proposals/`, and `check-proposals` checks them.
 ## What to read when changing it
 
 - `packages/design-system/ui/theme.css`: the tokens and the theme
-- `apps/web/src/styles.css`: the Tailwind entry CSS
+- `apps/app/global.css`: the Tailwind entry CSS
+- `packages/app-build/runtime/native-styles.ts`: the native class compile
 - `packages/design-system/ui/`: the components
 
 - [Client performance](./client-performance.md)

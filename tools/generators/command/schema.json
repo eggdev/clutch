@@ -20,14 +20,14 @@
         "index": 1
       }
     },
-    "model": {
+    "record": {
       "type": "string",
-      "description": "The model that the local change writes, such as invoice. It must exist."
+      "description": "The record that the command writes, such as invoice. Its record must be declared in the contract."
     },
     "waits": {
       "type": "string",
       "enum": ["local", "server"],
-      "description": "local: the screen shows the change at once. server: the screen waits for the server."
+      "description": "local: the screen shows the change at once, and the command gets a local change. server: the screen waits for the server."
     },
     "access": {
       "type": "string",
@@ -35,5 +35,5 @@
       "description": "organization: any actor of the organization may run it. group: the actor must be allowed the sync group of the record it writes."
     }
   },
-  "required": ["package", "name", "model", "waits", "access"]
+  "required": ["package", "name", "record", "waits", "access"]
 }

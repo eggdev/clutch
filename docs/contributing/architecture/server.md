@@ -46,9 +46,9 @@ rollback undoes all of its work.
   [`primitives.yaml`](./primitives.yaml). `check-transaction-safe` rejects a
   marked service that the registry does not list. A grant is a new escape
   hatch, so agent review gives it an `owner` finding.
-- `defineServerChange` accepts only marked services. A vendor service has no
+- `serverChange` accepts only marked services. A vendor service has no
   mark, so a server change that uses one fails the typecheck.
-  `packages/sync/commands/define.server.test.ts` proves both cases.
+  `packages/sync/commands/server-change.server.test.ts` proves it.
 - `SyncServer` needs the services of every server change, so the composition
   root must provide each one. A missing one fails the typecheck of the app.
 - A vendor call goes in a job, which runs after the commit. See
@@ -66,8 +66,10 @@ Each server change also declares its access rule. See
   enforces it.
 - An error is a `Schema.TaggedError`. Handle one with `Effect.catchTag` or
   `Effect.matchEffect`.
-- A server change refuses a transaction with `CommandRejected`. The sync
-  server rolls the database transaction back and tells the client why.
+- A server half refuses a transaction with `refuse(code, reason)` from its run
+  context. The code must be one that its command declares, or a built-in one. The sync
+  server rolls the database transaction back and tells the client the code and
+  the reason. See [refusal codes](./contract.md#refusal-codes).
 
 ## Configuration
 
@@ -94,8 +96,8 @@ Layer reads it when it builds. Use `Config.String`, `Config.Port`,
 - `DatabasePostgres` connects to a Postgres server. The composition root uses
   it when `DATABASE_URL` is set.
 - No repo knows which driver runs. Both give the same `Database` service.
-- A repo maps each row to its public record. A record type comes from
-  `types/`, never from a table. A round-trip test proves the mapping.
+- A repo maps each row to its public record. A record type comes from the
+  contract, never from a table. A round-trip test proves the mapping.
 - `apps/api/src/server.ts` runs each package's migrations before the server
   takes a request. See [migrations](../setup/migrations.md).
 
@@ -107,22 +109,29 @@ protocol, inside `HttpRouter.serve`, with `RpcSerialization.layerJson`.
 `BunHttpServer.layer` gives the HTTP server, and `BunHttpServer.layerTest`
 gives one for tests.
 
-The server changes come from `apps/api/src/packages.ts`. Each package
-registers its server changes in `runtime/handlers.server.ts`. The event log
-and the flow of a write are on the
+`SyncServer(serverChanges, contracts)` takes the server change of each command,
+and the contracts that the app serves. It stops at start when a command of a
+listed contract has no server change. `serverOf(packages)` gives both lists from
+`apps/api/src/packages.ts`. Each package lists its server changes in
+`runtime/server.server.ts`. The event log and the flow of a write are on the
 [local-first sync page](./local-first-sync.md).
+
+## The event log
+
+`eventLog(contracts)` in `packages/sync/service/event-log.ts` is the door that every change passes before a client gets it. Each commit checks its changes against the contracts that the server serves. A change of a model that no contract declares stops the commit. An upsert whose data does not fit its record also stops it, and the error names the fields that do not fit. A delete checks only its model. A failed check dies inside the transaction, so no event is appended. `packages/sync/service/event-log.test.ts` tests each rule.
 
 ## Jobs and the outbox
 
 A job does slow or outside work after a commit, such as a vendor call or a
 count over many rows. `packages/sync/service/jobs.ts` defines the parts.
 
-| Part             | What it does                                                                                    |
-| ---------------- | ----------------------------------------------------------------------------------------------- |
-| `defineJob`      | Defines a job: a name, a payload schema and `run`. It lives in the `jobs/` section of a package |
-| `Outbox.enqueue` | Writes a job in the transaction it is given, so the job exists only if the transaction commits  |
-| `JobRunner`      | Claims due jobs after the commit and runs them. The server app starts it                        |
-| `defineSchedule` | Asks for a job at each interval                                                                 |
+| Part             | What it does                                                                                   |
+| ---------------- | ---------------------------------------------------------------------------------------------- |
+| `job`            | Declares a job in the package contract: its name and the fields of its payload                 |
+| `defineJob`      | Gives the code of a declared job: its `run`, with the payload type of the declaration          |
+| `Outbox.enqueue` | Writes a job in the transaction it is given, so the job exists only if the transaction commits |
+| `JobRunner`      | Claims due jobs after the commit and runs them. The server app starts it                       |
+| `defineSchedule` | Asks for a job at each interval                                                                |
 
 - `Outbox` is transaction-safe, so a server change may use it.
 - A job may use any service, a vendor service too. It runs outside the
@@ -137,8 +146,11 @@ count over many rows. `packages/sync/service/jobs.ts` defines the parts.
 - `run` must be safe to repeat, because a job can run again after a failure.
 - `context.commit` writes records as the system actor, keyed by the job ID.
   Each client of their sync groups gets a delta.
-- Each package lists its jobs and schedules in `runtime/jobs.server.ts`.
-  `apps/api/src/packages.ts` passes them to `JobRunner`.
+- Each package declares its jobs in its contract, and lists their code in the
+  `jobs` of `runtime/server.server.ts`. `serverOf` gives the list to `JobRunner`,
+  with the contracts.
+- `JobRunner` stops at start when a contract declares a job that no list
+  lists. `packages/sync/runtime/job-runner.test.ts` tests it.
 - Each interval of a schedule has one job ID, so two servers run it once.
   `sync/sweep-jobs` deletes done jobs after seven days, once an hour.
 
@@ -153,9 +165,12 @@ Code that is not a command writes through `commitAsSystem` in
 runs. The `key` must be the same for each repeat of one outside event, so the
 event log commits it once.
 
-A package lists its HTTP routes in `runtime/routes.server.ts`, with
-`defineRoute` from `packages/sync/service/routes.ts`. `HttpRoutes` adds them to
-the router of the server app. A route that fails answers 500.
+A package declares its HTTP routes in its contract, with `route` from
+`packages/sync/contract/route.ts`. Its code is `defineRoute` in
+`runtime/routes.server.ts`, and the `routes` of `runtime/server.server.ts` list the
+code. `HttpRoutes` adds the list to the router of the server app, with the contracts. A route that fails
+answers 500. `HttpRoutes` stops at start when a contract declares a route that
+no list lists. `packages/sync/runtime/http-routes.server.test.ts` tests it.
 
 A webhook follows four steps. `packages/notes/runtime/routes.server.ts` shows
 them in the note import route.
@@ -169,12 +184,15 @@ them in the note import route.
 ## Add a package with server code
 
 1. Run `mise exec -- bun nx g @tools/generators:package <name>
-   --sections=types,models,commands,repo,runtime --record=<record>
-   --group=<group>`. It registers the package's migrations in
-   `apps/api/src/packages.ts`.
-2. Add a command with the `command` generator. It registers the server change.
+   --sections=contract,commands,repo,runtime --record=<record>
+   --group=<group>`. It declares the first record in the contract, and it
+   writes `runtime/server.server.ts` with the migrations. `nx sync` then adds
+   the package to each app's list.
+2. Add a command with the `command` generator. It declares the command in the
+   contract and registers the server change. See the
+   [contract page](./contract.md#change-a-contract).
    Add a job with `mise exec -- bun nx g @tools/generators:job <name> <job>`.
-   It registers the job in the package and in the server app.
+   It registers the job in the package's `runtime/server.server.ts`.
 3. Run `mise exec -- bun nx run @repo/<name>:db-generate` after each table
    change.
    Only drizzle-kit writes migrations.
@@ -183,5 +201,7 @@ them in the note import route.
 
 - `apps/api/src/main.ts` and `apps/api/src/server.ts`
 - `packages/sync/service/event-log.ts` and `packages/sync/runtime/server.server.ts`
+- `packages/sync/commands/server-change.server.ts`, which builds each server half
+- [Contract](./contract.md)
 - [Lint rules for Effect code](../setup/lint-rules.md#effect-code)
 - [API errors](./api-errors.md)

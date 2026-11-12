@@ -1,3 +1,5 @@
+import type { Contract } from '@repo/sync/contract/define';
+import { manifestOf } from '@repo/sync/contract/manifest';
 import { claimJobs, failJob, finishJob, insertJob } from '@repo/sync/repo/jobs';
 import type { JobRow } from '@repo/sync/repo/schema';
 import { Database } from '@repo/sync/service/database';
@@ -97,21 +99,38 @@ export function askForScheduledJobs<R>(schedules: ReadonlyArray<JobSchedule<R>>)
 /**
  * The job runner of a server app. At each tick it asks for the scheduled jobs
  * and runs the due ones. A tick that fails is logged, and the next tick runs.
- * `jobs` lists every job; the jobs of `schedules` are added to it.
+ * `jobs` lists every job; the jobs of `schedules` are added to it. `contracts`
+ * lists each contract that the app serves. A job that a contract declares and
+ * no runner lists stops the runner at its start.
  */
 export function JobRunner<R>(
   jobs: ReadonlyArray<RunnableJob<R>>,
   schedules: ReadonlyArray<JobSchedule<R>>,
+  contracts: ReadonlyArray<Contract>,
   tick: Duration.Input = '500 millis',
 ) {
   const all = [...jobs, ...schedules.map((schedule) => schedule.job)];
+  const runnable = new Set(all.map((job) => job.name));
+  const unrun = manifestOf(contracts).jobs.filter((declared) => !runnable.has(declared.name));
+  const running = askForScheduledJobs(schedules).pipe(
+    Effect.andThen(runDueJobs(all)),
+    Effect.catchCause((cause) => Effect.logError('A job runner tick failed', cause)),
+    Effect.andThen(Effect.sleep(tick)),
+    Effect.forever,
+    Effect.forkScoped,
+  );
   return Layer.effectDiscard(
-    askForScheduledJobs(schedules).pipe(
-      Effect.andThen(runDueJobs(all)),
-      Effect.catchCause((cause) => Effect.logError('A job runner tick failed', cause)),
-      Effect.andThen(Effect.sleep(tick)),
-      Effect.forever,
-      Effect.forkScoped,
-    ),
+    Effect.gen(function* () {
+      // A declared job with no runner would fail each attempt with "no job
+      // named". The runner stops at its start instead.
+      if (unrun.length) {
+        return yield* Effect.die(
+          new Error(
+            `The server app passes no job runner for: ${unrun.map((declared) => declared.name).join(', ')}. Add the jobs of each contract to the \`jobs\` list of the server app.`,
+          ),
+        );
+      }
+      yield* running;
+    }),
   );
 }

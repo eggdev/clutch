@@ -1,18 +1,61 @@
+import type { Replayable } from '@repo/sync/contract/command';
+import type { Contract } from '@repo/sync/contract/define';
+import type { Stamps } from '@repo/sync/contract/fields';
 import { createPool } from '@repo/sync/runtime/pool';
 import type { Pool } from '@repo/sync/runtime/pool';
+import type { Report } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase } from '@repo/sync/types/local-database';
-import type { Replayable } from '@repo/sync/types/records';
+
+/** The commands of the contracts that show at once and have no local change in `changes`. */
+function withoutLocalChange(
+  contracts: ReadonlyArray<Contract>,
+  changes: ReadonlyArray<Replayable>,
+): Array<string> {
+  const known = new Set(changes.map((change) => change.name));
+  return contracts
+    .flatMap((contract) => contract.commands)
+    .filter((declared) => declared.waits === 'local' && !known.has(declared.name))
+    .map((declared) => declared.name);
+}
 
 /**
  * Loads the object pool from the local database before the first paint. Each
  * change to the pool is written back. This file imports no Effect code, so
  * the first screen stays small.
+ *
+ * `contracts` lists each contract of the app. A command of one of them that
+ * shows at once and has no local change in `changes` stops the app here, at
+ * its start, so no screen runs a command that would show nothing.
+ *
+ * `stamps` is where a new ID and the time come from on this platform. The
+ * web leaves it out and gets `crypto.randomUUID` and the device clock. A
+ * native app fills the global `crypto` of Hermes before it loads, and leaves
+ * it out too.
+ *
+ * `report` receives each sentence about a saved copy that does not fit this
+ * build. The web leaves it out and gets the console.
  */
 export async function loadPool(
   database: LocalDatabase,
-  commands: ReadonlyArray<Replayable>,
+  changes: ReadonlyArray<Replayable>,
+  contracts: ReadonlyArray<Contract>,
+  stamps?: Stamps,
+  report?: Report,
 ): Promise<Pool> {
-  const pool = createPool(commands);
+  const missing = withoutLocalChange(contracts, changes);
+  if (missing.length) {
+    throw new Error(
+      `The app gives the object pool no local change for: ${missing.join(', ')}. Add the local changes of each contract to its \`commands\` list.`,
+    );
+  }
+  const pool = createPool(
+    changes,
+    {
+      records: contracts.flatMap((contract) => contract.records),
+      commands: contracts.flatMap((contract) => contract.commands),
+    },
+    { stamps, report },
+  );
   const state = await database.read();
   if (state) {
     pool.load(state);
@@ -49,7 +92,8 @@ const paintWait = 500;
 /**
  * Runs `start` once, in the task after the first paint. A page that loads
  * hidden has no paint to wait for, so `start` runs at once. A page that has
- * not painted after `paintWait` starts anyway.
+ * not painted after `paintWait` starts anyway. A native app has no document,
+ * and it waits for its first frame the same way.
  */
 export function afterFirstPaint(start: () => void): void {
   let started = false;
@@ -59,7 +103,7 @@ export function afterFirstPaint(start: () => void): void {
       start();
     }
   };
-  if (document.visibilityState === 'hidden') {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
     once();
     return;
   }
@@ -73,7 +117,14 @@ export function afterFirstPaint(start: () => void): void {
  */
 export function connectAfterPaint(
   pool: Pool,
-  options: { readonly url: string; readonly onSessionEnded: () => void },
+  options: {
+    readonly url: string;
+    readonly onSessionEnded: () => void;
+    /** The contracts of the app. Their digest names this build to the server. */
+    readonly contracts: ReadonlyArray<Contract>;
+    /** The headers of the socket. Only a native app can send them. */
+    readonly headers?: Readonly<Record<string, string>>;
+  },
 ) {
   afterFirstPaint(async () => {
     const { connect } = await import('@repo/sync/runtime/transport');

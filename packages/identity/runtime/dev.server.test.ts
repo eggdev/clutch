@@ -31,3 +31,14 @@ test('a connection can name its development actor in headers', async () => {
     organizationId: 'org-dev',
   });
 });
+
+test('a browser names its development actor in cookies, and a header wins over a cookie', async () => {
+  const cookies = 'theme=dark; dev-organization-id=journey%201; dev-user-id=user-c';
+  expect(await actorFrom({}, { cookie: cookies })).toEqual({
+    userId: 'user-c',
+    organizationId: 'journey 1',
+  });
+  expect(await actorFrom({}, { cookie: cookies, 'x-dev-user-id': 'user-b' })).toMatchObject({
+    userId: 'user-b',
+  });
+});

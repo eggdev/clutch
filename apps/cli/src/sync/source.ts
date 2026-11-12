@@ -1,5 +1,6 @@
 import { parse } from 'yaml';
 
+import { gitProgram } from '@/git';
 import { releaseAt } from '@/release';
 import { fingerprint, gitBytes, safeRelative, tree } from '@/review-source';
 import type { SyncFile, SyncSource } from '@/sync/engine';
@@ -113,7 +114,7 @@ export async function loadClutchSource(
 ): Promise<ClutchSource> {
   const commitBytes = await gitBytes(template, ['rev-parse', '--verify', `${revision}^{commit}`]);
   const commit = commitBytes.toString().trim();
-  const exists = Bun.spawnSync(['git', 'cat-file', '-e', `${commit}:${filesList}`], {
+  const exists = Bun.spawnSync([gitProgram, 'cat-file', '-e', `${commit}:${filesList}`], {
     cwd: template,
   });
   if (exists.exitCode !== 0) {

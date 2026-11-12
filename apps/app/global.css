@@ -1,0 +1,28 @@
+/* The Tailwind entry of the web, and of the native style compile. See docs/contributing/architecture/styling.md. */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+/* Unlayered, so the styles of React Native for Web never win over a class. */
+@import 'tailwindcss/utilities.css';
+@import 'nativewind/theme';
+/* The token file starts the theme from `--*: initial`, so only its roles exist as classes. */
+@import '../../packages/design-system/ui/theme.css';
+
+/* The screens live in features/ and their parts in packages/. A class that only they use needs both. */
+@source '../../packages';
+@source '../../features';
+
+/*
+ * Text renders the same on each browser. A phone keeps the type size when it
+ * turns, and a tap shows the pressed state only. Text with no color class
+ * takes `fg`, not the default of the browser.
+ */
+@layer base {
+  html {
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+}

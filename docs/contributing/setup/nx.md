@@ -15,22 +15,23 @@ Bun and Nx, and never a global CLI. The root project is named after the root
 
 ## Generators
 
-Make a package, a feature, a command or a model with a generator. Do not copy
-files by hand. A generator writes the shape that the checks expect, then
+Make a package, a record, a command, a job or a feature with a generator. Do not
+copy files by hand. A generator writes the shape that the checks expect, then
 registers the result.
 
-| Generator | Example                                                                                                                     | Writes and registers                                                                                                                                                   |
-| --------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package` | `mise exec -- bun nx g @tools/generators:package billing --sections=types,models,repo,runtime --record=invoice --group=org` | Only the named sections and a primitive. With `--record`: its schema, model and table. With `repo/`: the drizzle-kit config, `db-generate` and the API migration entry |
-| `model`   | `mise exec -- bun nx g @tools/generators:model billing payment --group=space:spaceId`                                       | The record schema in `types/`, its model in `models/` and, in a package with `repo/`, its table and row mapping                                                        |
-| `command` | `mise exec -- bun nx g @tools/generators:command billing pay-invoice --model=invoice --waits=server --access=group`         | The paired command files, the input schema, and both halves in `runtime/` and in the apps                                                                              |
-| `job`     | `mise exec -- bun nx g @tools/generators:job billing send-invoice`                                                          | A job in `jobs/`, registered in the package and in the server app                                                                                                      |
-| `feature` | `mise exec -- bun nx g @tools/generators:feature billing`                                                                   | The gate, a screen, `components/`, a route in `apps/web`, the gate in the lint options, and a primitive                                                                |
+| Generator | Example                                                                                                                 | Writes and registers                                                                                                                                                                                                            |
+| --------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package` | `mise exec -- bun nx g @tools/generators:package billing --sections=contract,repo,runtime --record=invoice --group=org` | Only the named sections, the package contract and a primitive. With `--record`: the first record and its table in `repo/`. With `repo/`: the drizzle-kit config, `db-generate` and the migrations in `runtime/server.server.ts` |
+| `record`  | `mise exec -- bun nx g @tools/generators:record billing invoice --group=space:spaceId`                                  | The record in the package's `contract/`, with its sync group. In a package with `repo/`, its table and row mapping                                                                                                              |
+| `command` | `mise exec -- bun nx g @tools/generators:command billing pay-invoice --record=invoice --waits=server --access=group`    | The command in the package's `contract/`, its server change and, with `--waits=local`, its local change. Both halves register in `runtime/`                                                                                     |
+| `job`     | `mise exec -- bun nx g @tools/generators:job billing send-invoice`                                                      | A job in `jobs/`, registered in the package's `runtime/server.server.ts`                                                                                                                                                        |
+| `feature` | `mise exec -- bun nx g @tools/generators:feature billing`                                                               | The gate, a screen, `components/`, a route in the client app, the gate in the lint options, and a primitive                                                                                                                     |
 
-`--sections` has no default. Choose the sections on purpose. A package owns no
-record until `--record` names one. A record needs `--group`: `org`, `user`, or
-`<kind>:<field>`, such as `space:spaceId`. A package with `repo/` needs
-`runtime/` and a record.
+`--sections` has no default. Choose the sections on purpose. A package needs
+`contract/` or `types/`. `commands/` needs `contract/`. `repo/` needs `runtime/`
+and `--record`. A record needs `--group`: `org`, `user`, or `<kind>:<field>`,
+such as `space:spaceId`. A package owns no record until `--record` or the
+`record` generator adds one.
 
 No generator writes a migration. After a schema change, run
 `mise exec -- bun nx run @repo/<package>:db-generate`. See
@@ -40,8 +41,13 @@ Each generator then installs the workspace links, runs `nx sync` for the
 tsconfig references, and formats each file. Add `--dry-run` to see the files
 first.
 
-A generated command rejects each run until you write its server change. A
-generated feature has no caller. The first button or link that opens it calls
+`nx sync` also runs the `packages` sync generator in `tools/generators/packages/`.
+It writes `packages.ts` in each client app and each server app, from the packages
+that have `runtime/client.ts` or `runtime/server.server.ts`.
+
+A generated command refuses each run until you write its server change. A
+command with `waits: 'local'` also gets a local change to write. A generated
+feature has no caller. The first button or link that opens it calls
 the gate.
 
 The generators are a local Nx plugin in `tools/generators/`. Node loads them

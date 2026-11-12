@@ -31,10 +31,13 @@
       "path": "./apps/api"
     },
     {
-      "path": "./apps/web"
+      "path": "./packages/access"
     },
     {
-      "path": "./packages/access"
+      "path": "./apps/app"
+    },
+    {
+      "path": "./packages/app-build"
     }
   ]
 }
