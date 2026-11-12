@@ -28,8 +28,8 @@ mise exec -- bun install
 mise exec -- bun run dev
 ```
 
-- `http://clutch.localhost:1355` opens the web app: Vite, React and
-  TanStack Router. The notes example shows the sync engine. Open it in two
+- `http://app.clutch.localhost:1355` opens the app in a browser: One, React
+  and React Native for Web. The notes example shows the sync engine. Open it in two
   tabs, and an edit in one shows in the other.
 - `http://api.clutch.localhost:1355` is the API: Bun and Effect, with
   Postgres in the process through PGlite. It needs no database server.

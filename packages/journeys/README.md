@@ -33,5 +33,25 @@ A core journey reads email through `@repo/journeys/testing/inbox`:
 of `clutch.yaml`. See the
 [core journey catalog](https://github.com/eggdev/clutch/blob/main/docs/contributing/journeys/core.md#vendors-in-test-mode).
 
+A journey reads what the app stores and calls what the app serves. `poolState`,
+`records` and `settled` in `@repo/journeys/testing/pool` read the object pool
+that the page keeps in IndexedDB. `callTool` in `@repo/journeys/testing/tools`
+calls an agent tool through `/mcp`, as the organization of the page. See
+[agent and pool](https://github.com/eggdev/clutch/blob/main/docs/contributing/end-to-end-testing.md#agent-and-pool).
+
+The journey test also records the layout problems of its last page, as shown and
+at the largest text size. These findings never fail a journey. `bun run verify`
+prints them in one report. See
+[screen findings](https://github.com/eggdev/clutch/blob/main/docs/contributing/end-to-end-testing.md#screen-findings)
+and the [verify report](https://github.com/eggdev/clutch/blob/main/docs/contributing/setup/verification.md#verify-report).
+
+A data journey, in `features/<feature>/journeys/*.journey.ts`, calls `journey(title, steps)`
+from `testing/journey.ts`. Its steps come from the builders in `testing/steps.ts`. The web run
+registers it as a test, and the native run compiles it with `toMaestro` in `tools/journeys/`.
+`tool` and `holds` take the declarations of a contract, such as `createNote` in
+`packages/notes/contract/notes.ts`, so a rename fails the type check.
+`types/` holds the step types, and the click budget rule in `types/budget.ts`.
+See [data journeys](https://github.com/eggdev/clutch/blob/main/docs/contributing/end-to-end-testing.md#data-journeys).
+
 The runner and the Playwright config live in `tools/journeys/`. A feature may
 import only packages, so the checks live here.

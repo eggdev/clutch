@@ -1,0 +1,22 @@
+import { <%= propertyName %>Contract } from '@repo/<%= fileName %>/contract/<%= fileName %>';
+<% if (repo) { %>import type { DrizzleDatabase } from '@repo/sync/service/database';
+import { migratePackage } from '@repo/sync/service/migrations';
+<% } %>import { serverPackage } from '@repo/sync/service/server-package.server';
+<% if (repo) { %>
+/** Runs the migrations of the <%= title %> tables. drizzle-kit writes them. */
+export function migrate<%= className %>(db: DrizzleDatabase) {
+  return migratePackage(db, '<%= fileName %>', new URL('../repo/migrations', import.meta.url));
+}
+<% } %>
+/**
+ * The server half of the <%= title %> package: the server change of each command, its
+ * jobs, its HTTP routes and its migrations. A command with no server change here, or a
+ * declared job or route with no code, does not compile. The server app lists it in
+ * `packages`.
+ */
+export const <%= propertyName %>Server = serverPackage(<%= propertyName %>Contract, {
+  changes: [],
+  jobs: [],
+  routes: [],
+<% if (repo) { %>  migrate: migrate<%= className %>,
+<% } %>});

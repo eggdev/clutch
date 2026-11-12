@@ -1,22 +1,19 @@
-import { <%= propertyName %> } from '@repo/<%= packageName %>/commands/<%= fileName %>';
-import { <%= className %>Input } from '@repo/<%= packageName %>/types/<%= fileName %>';
-import { defineServerChange } from '@repo/sync/commands/define.server';
-import { CommandRejected } from '@repo/sync/types/command-rejected';
+import { <%= propertyName %> } from '@repo/<%= packageName %>/contract/<%= packageName %>';
+import { serverChange } from '@repo/sync/commands/server-change.server';
 import { Effect } from 'effect';
 
 /**
  * The server half of `<%= packageName %>/<%= fileName %>`. Until you write it, each run is
- * rejected. Write the owner records with `db`, and return each record it
+ * refused. Write the owner records with `db`, and return each record it
  * changed. The access rule runs before `run`, so `run` never checks access.
 <% if (access === 'group') { %> * `group` names the sync group of the record that the change writes. It
- * returns `null` until you write it, so every run is rejected.
+ * returns `null` until you write it, so every run is refused.
 <% } %> */
-export const <%= propertyName %>Server = defineServerChange(<%= propertyName %>, {
-  input: <%= className %>Input,
-<% if (access === 'group') { %>  access: { group: () => Effect.succeed(null) },
-<% } else { %>  access: 'organization',
-<% } %>  run: () =>
+export const <%= propertyName %>Server = serverChange(<%= propertyName %>, {
+<% if (access === 'group') { %>  // Returns null until you write it, so every run is refused.
+  group: () => Effect.succeed(null),
+<% } %>  run: (_input, { refuse }) =>
     Effect.fail(
-      new CommandRejected({ reason: 'The <%= packageName %>/<%= fileName %> command has no server change yet.' }),
+      refuse('failed', 'The <%= packageName %>/<%= fileName %> command has no server change yet.'),
     ),
 });

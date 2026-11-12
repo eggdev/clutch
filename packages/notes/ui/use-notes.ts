@@ -1,5 +1,5 @@
-import { noteModel } from '@repo/notes/models/note';
-import type { Note } from '@repo/notes/types/note';
+import { noteRecord } from '@repo/notes/contract/notes';
+import type { Note } from '@repo/notes/contract/notes';
 import { useRecord, useRecordIds } from '@repo/sync/ui/sync-provider';
 
 /**
@@ -8,7 +8,7 @@ import { useRecord, useRecordIds } from '@repo/sync/ui/sync-provider';
  */
 export function useNoteIds(spaceId: string): ReadonlyArray<string> {
   return useRecordIds(
-    noteModel,
+    noteRecord,
     { by: 'createdAt', direction: 'desc' },
     { field: 'spaceId', equals: spaceId },
   );
@@ -16,5 +16,5 @@ export function useNoteIds(spaceId: string): ReadonlyArray<string> {
 
 /** One note. Only the component that shows it re-renders when it changes. */
 export function useNote(id: string): Note | undefined {
-  return useRecord(noteModel, id);
+  return useRecord(noteRecord, id);
 }

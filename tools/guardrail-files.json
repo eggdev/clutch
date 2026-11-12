@@ -49,6 +49,7 @@
     "tools/run-quarantined.ts",
     "tools/validate.ts",
     "tools/dev.ts",
+    "tools/apps.ts",
     "tools/native/**",
     "packages/sync/service/transaction-safe.ts",
     "docs/contributing/review.md",
@@ -69,7 +70,11 @@
     "tools/release/**",
     "tools/clutch.ts",
     ".gitleaks.toml",
-    ".gitleaksignore"
+    ".gitleaksignore",
+    "contract.json",
+    "packages/sync/contract/**",
+    "apps/*/src/packages.ts",
+    "apps/*/lib/packages.ts"
   ],
   "exempt": {
     "AGENTS.md": "check-file-size measures the length of each AGENTS.md file, check-structure allows one in a package, and the doc checks read it as a doc. It sets no rule.",
@@ -80,6 +85,7 @@
     "tools/recap/upsert-recap-block.ts": "It writes the PR recap block. It enforces no rule.",
     ".agents/skills/setup-verification/references/journey-specification.md": "A journey header follows its format, and check-journeys quotes its path in a fix. It sets no rule.",
     ".clutch/TRACKER.md": "The release workflow generates it on main from the issue files with clutch issues --write. A pull request never commits it. It sets no rule.",
-    "CHANGELOG.md": "The release workflow writes it from the changesets, and tools/release/changeset.ts reads it to add a section. It sets no rule."
+    "CHANGELOG.md": "The release workflow writes it from the changesets, and tools/release/changeset.ts reads it to add a section. It sets no rule.",
+    ".data/dev-run.json": "tools/dev.ts writes the dev servers that a run started here, and reads it to stop them. Git ignores the folder, so no pull request holds it. It sets no rule."
   }
 }

@@ -1,11 +1,21 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
+import { maestroCommand } from '@tools/native/maestro';
+import type { JavaLookup } from '@tools/native/maestro';
+
 /**
  * The device host is the one place that drives a simulator, an emulator or a
- * native build. Each project sets up its own host at kickoff. The template
- * ships only `none`, which refuses each call. `DEVICE_HOST` names the host.
+ * native build. `DEVICE_HOST` names the host. Without it the host is `none`,
+ * which refuses each call.
  * See docs/contributing/setup/native.md#device-host.
  *
  * The interface holds the device rules:
@@ -26,6 +36,8 @@ export type DeviceHost = {
   readonly bootedDevice: (platform: Platform) => Promise<Device | null>;
   /** Installs a built app on a booted device. */
   readonly install: (device: Device, app: string) => Promise<void>;
+  /** Has Maestro read a flow, with no device. A flow that Maestro cannot read fails here. */
+  readonly checkFlow: (flow: string) => Promise<Result>;
   /** Runs a Maestro flow on a booted device. */
   readonly runFlow: (device: Device, flow: string) => Promise<Result>;
   /** Builds the native app in `appRoot` for the platform. */
@@ -44,6 +56,7 @@ const none: DeviceHost = {
   name: 'none',
   bootedDevice: () => Promise.reject(new DeviceHostError(setup)),
   install: () => Promise.reject(new DeviceHostError(setup)),
+  checkFlow: () => Promise.reject(new DeviceHostError(setup)),
   runFlow: () => Promise.reject(new DeviceHostError(setup)),
   build: () => Promise.reject(new DeviceHostError(setup)),
 };
@@ -110,7 +123,13 @@ async function bootedEmulator(run: Run): Promise<Device | null> {
   return { platform: 'android', id, name: name || id };
 }
 
-export function ciHost(run: Run = spawnRun): DeviceHost {
+/** Runs Maestro, or answers the sentence that says why it cannot run here. */
+async function maestro(run: Run, args: ReadonlyArray<string>, java?: JavaLookup): Promise<Result> {
+  const command = await maestroCommand(args, java);
+  return typeof command === 'string' ? { exitCode: 1, output: command } : run(command);
+}
+
+export function ciHost(run: Run = spawnRun, java?: JavaLookup): DeviceHost {
   return {
     name: 'ci',
     bootedDevice: (platform: Platform) =>
@@ -123,7 +142,8 @@ export function ciHost(run: Run = spawnRun): DeviceHost {
           : ['adb', '-s', device.id, 'install', '-r', app],
       );
     },
-    runFlow: (device, flow) => run(['maestro', '--device', device.id, 'test', flow]),
+    checkFlow: (flow) => maestro(run, ['check-syntax', flow], java),
+    runFlow: (device, flow) => maestro(run, ['--device', device.id, 'test', flow], java),
     build: () =>
       Promise.reject(
         new DeviceHostError(
@@ -134,10 +154,131 @@ export function ciHost(run: Run = spawnRun): DeviceHost {
 }
 
 /**
- * Each host by its `DEVICE_HOST` name. `ci` drives the device that a CI job
- * booted on its own runner. Kickoff adds the project's host here.
+ * Where a debug build of the app lands, or null when no build exists. The
+ * `local` host builds there, and `native:build --install` reads it.
  */
-const hosts: Record<string, () => DeviceHost> = { none: () => none, ci: () => ciHost() };
+export function builtApp(appRoot: string, platform: Platform): string | null {
+  if (platform === 'android') {
+    const apk = path.join(appRoot, 'android/app/build/outputs/apk/debug/app-debug.apk');
+    return existsSync(apk) ? apk : null;
+  }
+  const products = path.join(appRoot, 'ios/build/Build/Products/Debug-iphonesimulator');
+  const app = existsSync(products)
+    ? readdirSync(products).find((name) => name.endsWith('.app'))
+    : undefined;
+  return app ? path.join(products, app) : null;
+}
+
+/**
+ * The commands of a debug build, in order. Each is a function, because the
+ * second reads what the first wrote: the prebuild of the app writes the native
+ * project, and the build compiles it. The iOS build is for any simulator, so
+ * it boots none. A step gives null when the project it needs is missing.
+ */
+function buildSteps(appRoot: string, platform: Platform): Array<() => Array<string> | null> {
+  const prebuild = () => [
+    'bun',
+    'run',
+    '--cwd',
+    appRoot,
+    'prebuild:native',
+    '--platform',
+    platform,
+  ];
+  if (platform === 'android') {
+    const project = path.join(appRoot, 'android');
+    return [
+      prebuild,
+      () =>
+        existsSync(project)
+          ? [path.join(project, 'gradlew'), '-p', project, ':app:assembleDebug']
+          : null,
+    ];
+  }
+  return [
+    prebuild,
+    () => {
+      const folder = path.join(appRoot, 'ios');
+      const workspace = existsSync(folder)
+        ? readdirSync(folder).find((name) => name.endsWith('.xcworkspace'))
+        : undefined;
+      return workspace
+        ? [
+            'xcodebuild',
+            '-workspace',
+            path.join(folder, workspace),
+            '-scheme',
+            workspace.replace(/\.xcworkspace$/u, ''),
+            '-configuration',
+            'Debug',
+            '-sdk',
+            'iphonesimulator',
+            '-destination',
+            'generic/platform=iOS Simulator',
+            '-derivedDataPath',
+            path.join(folder, 'build'),
+            '-quiet',
+            'build',
+          ]
+        : null;
+    },
+  ];
+}
+
+/**
+ * The `local` device host: the booted simulator or emulator of the machine
+ * that runs the command. It finds the device and runs Maestro on it as the
+ * `ci` host does. It also builds: the `prebuild:native` script of the app
+ * writes the native project, and the build tool of the platform compiles a
+ * debug build of it. The build needs no device, and the host never boots one.
+ * When the owner has booted a device, the build is installed on it.
+ */
+export function localHost(run: Run = spawnRun): DeviceHost {
+  const base = ciHost(run);
+  return {
+    ...base,
+    name: 'local',
+    async build(appRoot, platform) {
+      let output = '';
+      for (const step of buildSteps(appRoot, platform)) {
+        const command = step();
+        if (command === null) {
+          return {
+            exitCode: 1,
+            output: `${output}The prebuild of ${appRoot} wrote no ${platform} project, so there is nothing to build.\n`,
+          };
+        }
+        const result = await run(command);
+        output += result.output;
+        if (result.exitCode !== 0) {
+          return { exitCode: result.exitCode, output };
+        }
+      }
+      // The build needs no device. A device that the owner booted gets the build.
+      const device = await base.bootedDevice(platform);
+      const app = builtApp(appRoot, platform);
+      if (device && app) {
+        await base.install(device, app);
+        return { exitCode: 0, output: `${output}Installed the build on ${device.name}.\n` };
+      }
+      return {
+        exitCode: 0,
+        output: `${output}No ${platform} device is booted, so the build is not installed. After the owner boots one, run \`mise exec -- bun run native:build --platform ${platform} --install\`.\n`,
+      };
+    },
+  };
+}
+
+/**
+ * Each host by its `DEVICE_HOST` name. `ci` drives the device that a CI job
+ * booted on its own runner, and `local` drives the booted device of this
+ * machine. Kickoff adds a host for any other machine here.
+ */
+const hosts: Record<string, () => DeviceHost> = {
+  none: () => none,
+  ci: () => ciHost(),
+  local: () => localHost(),
+};
 
 /** The host that `DEVICE_HOST` names. It is `none` when the variable is not set. */
 export function deviceHost(env: NodeJS.ProcessEnv = process.env): DeviceHost {

@@ -1,6 +1,9 @@
 import { afterEach, expect, test } from 'bun:test';
 
-import { EventLog, EventLogLive } from '@repo/sync/service/event-log';
+import { defineContract } from '@repo/sync/contract/define';
+import { organizationGroup } from '@repo/sync/contract/engine-groups';
+import { record } from '@repo/sync/contract/record';
+import { EventLog, eventLog } from '@repo/sync/service/event-log';
 import { feed } from '@repo/sync/service/feed';
 import type { Granted } from '@repo/sync/service/sync-groups';
 import { DatabaseTest } from '@repo/sync/testing/database';
@@ -8,17 +11,24 @@ import type { Change, SyncMessage } from '@repo/sync/types/protocol';
 import { Effect, Fiber, Layer, Queue, Stream } from 'effect';
 import type { Context } from 'effect';
 
+/** A card of the organization, so each change of `Card` fits a declared record. */
+const cardRecord = record('Card', {
+  fields: { id: 'string', title: 'string' },
+  groups: [organizationGroup.ofScope],
+});
+const cards = defineContract('cards', { records: [cardRecord], commands: [], loads: [] });
+
 const change = (id: string, groups: ReadonlyArray<string>): Change => ({
   model: 'Card',
   id,
   action: 'upsert',
-  data: { title: id },
+  data: { id, title: id },
   groups,
 });
 
 function run<A, E>(program: Effect.Effect<A, E, EventLog>) {
   return Effect.runPromise(
-    program.pipe(Effect.provide(EventLogLive.pipe(Layer.provide(DatabaseTest())))),
+    program.pipe(Effect.provide(eventLog([cards]).pipe(Layer.provide(DatabaseTest())))),
   );
 }
 

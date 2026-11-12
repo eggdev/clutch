@@ -1,0 +1,10 @@
+import { <%= propertyName %>, <%= recordProperty %>Record } from '@repo/<%= packageName %>/contract/<%= packageName %>';
+import { localChange } from '@repo/sync/contract/command';
+
+/** The local change of `<%= packageName %>/<%= fileName %>`. Say what shows at once. */
+export const <%= propertyName %>Local = localChange(<%= propertyName %>, (draft, input) => {
+  const current = draft.get(<%= recordProperty %>Record, input.id);
+  if (current) {
+    draft.put(<%= recordProperty %>Record, { ...current, updatedAt: input.at });
+  }
+});

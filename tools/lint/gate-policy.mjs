@@ -43,12 +43,14 @@ function strings(node, found = []) {
 
 /**
  * The gated route that a string opens, or null when the file may name it.
- * `gates` maps a route, such as `/feature`, to its gate file and route folder.
+ * `gates` maps a route, such as `/feature`, to its gate file and its route, a
+ * file (`apps/app/app/feature.tsx`) or a folder (`apps/app/app/feature`).
  */
 export function gateProblem(text, file, gates) {
   for (const [route, { gate, routes }] of Object.entries(gates)) {
     const opens = text === route || text.startsWith(`${route}/`) || text.startsWith(`${route}?`);
-    if (opens && file !== gate && !file.startsWith(`${routes}/`)) {
+    const ownRoute = file === routes || file.startsWith(`${routes}/`);
+    if (opens && file !== gate && !ownRoute) {
       return { route, gate };
     }
   }

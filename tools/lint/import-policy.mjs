@@ -65,7 +65,7 @@ const filenameOf = (context) => (context.filename ?? context.getFilename()).repl
 export const sections = {
   types: 'public',
   config: 'private',
-  models: 'public',
+  contract: 'public',
   commands: 'public',
   repo: 'private',
   service: 'public',
@@ -120,7 +120,7 @@ export function targetOf(value) {
 }
 
 export const isTestFile = (filename) =>
-  /(?:^|\/)test\//u.test(filename) || /\.(?:test|spec|pw)\.[cm]?[jt]sx?$/u.test(filename);
+  /(?:^|\/)test\//u.test(filename) || /\.(?:test|spec|pw|journey)\.[cm]?[jt]sx?$/u.test(filename);
 /** A specifier for one of our own modules. */
 export const internal = (value) =>
   /^(?:@repo\/|@features\/|@tools\/|@\/|\.{1,2}(?:\/|$))/u.test(value);
@@ -457,7 +457,7 @@ export default {
         schema: [],
         messages: {
           server:
-            'Client code cannot import server code (`config/`, `repo/`, `service/` or a `.server` file). Register a server change in `packages/<name>/runtime/handlers.server.ts`; a server app loads that file. See docs/contributing/import-boundaries.md#server-code.',
+            'Client code cannot import server code (`config/`, `repo/`, `service/` or a `.server` file). Register a server change in `packages/<name>/runtime/server.server.ts`; a server app loads that file. See docs/contributing/import-boundaries.md#server-code.',
         },
       },
       create(context) {

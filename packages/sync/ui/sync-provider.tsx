@@ -1,13 +1,9 @@
+import { builtInRefusals } from '@repo/sync/contract/command';
+import type { BuiltInRefusal, Waits } from '@repo/sync/contract/command';
+import type { CallOf, Fields } from '@repo/sync/contract/fields';
+import type { Load, Model, RecordRow } from '@repo/sync/contract/record';
 import type { Pool } from '@repo/sync/runtime/pool';
-import type {
-  Command,
-  Load,
-  Model,
-  Order,
-  ReadablePool,
-  RecordRow,
-  Where,
-} from '@repo/sync/types/records';
+import type { Order, ReadablePool, Where } from '@repo/sync/types/records';
 import { createContext, use, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 
@@ -61,8 +57,19 @@ export function useRecord<Row extends RecordRow>(model: Model<Row>, id: string):
   return useSyncExternalStore((listener) => pool.watchRecord(model, id, listener), read, read);
 }
 
-/** Runs a command: the local change shows at once, and the sync engine sends it. */
-export function useCommand<Input>(command: Command<Input>): (input: Input) => string {
+/** What the hooks need of a command declaration: its name, the fields of its input and whether it waits. */
+type Runnable<F extends Fields> = {
+  readonly name: string;
+  readonly input: F;
+  readonly waits: Waits;
+};
+
+/**
+ * Runs a command: the local change shows at once, and the sync engine sends
+ * it. The object pool fills each stamp of the input, so a screen passes no ID
+ * and no time.
+ */
+export function useCommand<F extends Fields>(command: Runnable<F>): (input: CallOf<F>) => string {
   const { run } = useSync();
   return (input) => run(command, input);
 }
@@ -91,19 +98,58 @@ export function usePending(transactionId?: string): boolean {
 }
 
 /**
- * Runs a command and reports whether its last run still waits. Use it for a
- * command with `waits: 'server'`, so the control that sent it shows a pending
- * state while the rest of the screen stays live.
+ * The code of a refusal from the wire, as this build knows it. A newer server
+ * can refuse with a code that this build does not declare. That reads as
+ * `failed`, and the reason still tells the person what happened.
  */
-export function usePendingCommand<Input>(command: Command<Input>): {
-  readonly run: (input: Input) => string;
+function knownCode<Refusal extends string>(
+  declared: ReadonlyArray<Refusal>,
+  code: string,
+): Refusal | BuiltInRefusal {
+  return (
+    declared.find((known) => known === code) ??
+    builtInRefusals.find((known) => known === code) ??
+    'failed'
+  );
+}
+
+/** Why the server refused a run: a code that the command declares, or a built-in one, and the reason. */
+type Refused<Refusal extends string> = {
+  readonly code: Refusal | BuiltInRefusal;
+  readonly reason: string;
+};
+
+/**
+ * Runs a command and reports on its last run: whether it still waits, and the
+ * refusal if the server refused it. Use it for a command with `waits:
+ * 'server'`, so the control that sent it shows a pending state while the rest
+ * of the screen stays live. `refused.code` is typed from the `refuses` of the
+ * command, so a branch on a code that the command does not declare fails to
+ * compile.
+ */
+export function usePendingCommand<F extends Fields, const Refusal extends string>(
+  command: Runnable<F> & { readonly refuses: ReadonlyArray<Refusal> },
+): {
+  readonly run: (input: CallOf<F>) => string;
   readonly pending: boolean;
+  readonly refused: Refused<Refusal> | undefined;
 } {
-  const { run } = useSync();
+  const pool = useSync();
+  const { run } = pool;
   const [last, setLast] = useState<string>();
   const pending = usePending(last);
+  // Only the rejection of this control's own run, so another control's
+  // rejection does not re-render this one.
+  const read = () => {
+    const rejection = pool.lastRejection();
+    return rejection?.transactionId === last ? rejection : undefined;
+  };
+  const mine = useSyncExternalStore(pool.watchRejection, read, read);
   return {
     pending,
+    refused: mine
+      ? { code: knownCode(command.refuses, mine.code), reason: mine.reason }
+      : undefined,
     run: (input) => {
       const id = run(command, input);
       setLast(id);
@@ -112,7 +158,10 @@ export function usePendingCommand<Input>(command: Command<Input>): {
   };
 }
 
-/** The reason for the last rejected transaction, for the screen to show. */
+/**
+ * The last rejected transaction of the whole pool, with its code and reason,
+ * for a screen-level message.
+ */
 export function useLastRejection() {
   const pool = useSync();
   return useSyncExternalStore(pool.watchRejection, pool.lastRejection, pool.lastRejection);
@@ -124,19 +173,13 @@ const loadWait = 3000;
 /**
  * The loader that a gate calls before it navigates. It asks the sync engine
  * for the group of a load function and waits until its records are in the
- * pool. Offline, or past `loadWait`, it stops waiting and reports `false`, so
- * the gate still opens the screen.
+ * pool. Offline, past `loadWait`, or when the server refuses the group, it
+ * stops waiting and reports `false`, so the gate still opens the screen.
  */
-export function useLoad(): <Args extends ReadonlyArray<unknown>>(
-  load: Load<Args>,
-  ...args: Args
-) => Promise<boolean> {
+export function useLoad(): (load: Load, id: string) => Promise<boolean> {
   const { loadGroup } = useSync();
-  return (load, ...args) => {
-    const loaded = (async () => {
-      await loadGroup(load.group(...args));
-      return true;
-    })();
+  return (load, id) => {
+    const loaded = loadGroup(load.group(id));
     const timedOut = new Promise<boolean>((resolve) => {
       setTimeout(() => resolve(false), loadWait);
     });

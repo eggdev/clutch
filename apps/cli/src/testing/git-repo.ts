@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -10,6 +10,15 @@ async function writeFiles(root: string, files: Record<string, string>) {
     await writeFile(path.join(root, name), content);
   }
 }
+
+/**
+ * The identity of a test repo, and no commit signing. One write to the config
+ * file of the repo sets all three, where three `git config` processes did.
+ * A test file calls `gitRepo` many times, and each process costs more on a
+ * busy machine.
+ */
+const repoConfig =
+  '[user]\n\tname = Test\n\temail = test@example.com\n[commit]\n\tgpgsign = false\n';
 
 /**
  * Makes a temporary folder that holds a git repo with one commit of `files` on
@@ -27,10 +36,11 @@ export async function gitRepo(
   await writeFiles(root, files);
   if (options.git !== false) {
     await gitOrThrow(root, 'init', '--quiet', '--initial-branch=main');
-    await gitOrThrow(root, 'config', 'user.name', 'Test');
-    await gitOrThrow(root, 'config', 'user.email', 'test@example.com');
-    await gitOrThrow(root, 'config', 'commit.gpgsign', 'false');
-    await gitOrThrow(root, 'add', '--all');
+    await appendFile(path.join(root, '.git/config'), repoConfig);
+    // A repo with no file has nothing to add, so the commit alone makes it.
+    if (Object.keys(files).length > 0) {
+      await gitOrThrow(root, 'add', '--all');
+    }
     await gitOrThrow(root, 'commit', '--quiet', '--allow-empty', '--message', 'Initial commit');
   }
   return {

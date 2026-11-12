@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "digest": "115f72547d0c4430",
+  "since": null,
+  "breaks": [],
+  "records": [
+    {
+      "name": "Membership",
+      "contract": "access",
+      "fields": {
+        "id": "string",
+        "joinedAt": "string",
+        "spaceId": "string",
+        "userId": "string"
+      },
+      "groups": ["user:{userId}"]
+    },
+    {
+      "name": "Note",
+      "contract": "notes",
+      "fields": {
+        "createdAt": "string",
+        "id": "string",
+        "spaceId": "string",
+        "title": {
+          "kind": "string",
+          "min": 0,
+          "max": 200
+        },
+        "updatedAt": "string"
+      },
+      "groups": ["space:{spaceId}"]
+    },
+    {
+      "name": "Space",
+      "contract": "access",
+      "fields": {
+        "createdAt": "string",
+        "id": "string",
+        "name": {
+          "kind": "string",
+          "min": 0,
+          "max": 80
+        },
+        "updatedAt": "string"
+      },
+      "groups": ["org:{organizationId}"]
+    },
+    {
+      "name": "SpaceNoteCount",
+      "contract": "notes",
+      "fields": {
+        "id": "string",
+        "noteCount": "number",
+        "spaceId": "string",
+        "updatedAt": "string"
+      },
+      "groups": ["space:{spaceId}"]
+    }
+  ],
+  "commands": [
+    {
+      "name": "access/create-space",
+      "contract": "access",
+      "input": {
+        "at": "now",
+        "id": "new-id",
+        "name": {
+          "kind": "string",
+          "min": 0,
+          "max": 80
+        }
+      },
+      "waits": "server",
+      "access": "organization",
+      "permission": null,
+      "refuses": ["name-missing"],
+      "tool": "none"
+    },
+    {
+      "name": "access/join-space",
+      "contract": "access",
+      "input": {
+        "at": "now",
+        "spaceId": "string"
+      },
+      "waits": "server",
+      "access": "organization",
+      "permission": null,
+      "refuses": ["general-space"],
+      "tool": "none"
+    },
+    {
+      "name": "access/leave-space",
+      "contract": "access",
+      "input": {
+        "spaceId": "string"
+      },
+      "waits": "server",
+      "access": "organization",
+      "permission": null,
+      "refuses": ["general-space", "not-a-member"],
+      "tool": "none"
+    },
+    {
+      "name": "notes/create",
+      "contract": "notes",
+      "input": {
+        "at": "now",
+        "id": "new-id",
+        "spaceId": "string",
+        "title": {
+          "kind": "string",
+          "min": 0,
+          "max": 200
+        }
+      },
+      "waits": "local",
+      "access": "group",
+      "permission": null,
+      "refuses": [],
+      "tool": {
+        "does": "adds",
+        "idempotent": true,
+        "closed": true,
+        "says": "Add a note to a space. Only a member of the space may add one."
+      }
+    },
+    {
+      "name": "notes/rename",
+      "contract": "notes",
+      "input": {
+        "at": "now",
+        "id": "string",
+        "title": {
+          "kind": "string",
+          "min": 0,
+          "max": 200
+        }
+      },
+      "waits": "local",
+      "access": "group",
+      "permission": null,
+      "refuses": [],
+      "tool": {
+        "does": "changes",
+        "idempotent": true,
+        "closed": true,
+        "says": "Change the title of a note. The last title that the server gets stands."
+      }
+    }
+  ],
+  "loads": [
+    {
+      "name": "notes/of-space",
+      "contract": "notes",
+      "record": "Note",
+      "group": "space",
+      "tool": {
+        "says": "List the notes of a space, by the ID of the space.",
+        "fields": ["title"]
+      }
+    }
+  ],
+  "jobs": [
+    {
+      "name": "notes/count-notes",
+      "contract": "notes",
+      "payload": {
+        "spaceId": "string"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "name": "notes/import-note",
+      "contract": "notes",
+      "method": "POST",
+      "path": "/webhooks/notes",
+      "body": {
+        "eventId": "string",
+        "organizationId": "string",
+        "title": {
+          "kind": "string",
+          "min": 0,
+          "max": 200
+        }
+      },
+      "says": "An outside system posts one note to import it, signed with the webhook secret."
+    }
+  ]
+}

@@ -6,6 +6,14 @@
     "types": ["bun"],
     "lib": ["es2024", "dom", "dom.iterable"]
   },
-  "include": ["testing/**/*.ts"],
-  "exclude": ["out-tsc/**", "node_modules/**"]
+  "include": ["testing/**/*.ts", "types/**/*.ts"],
+  "exclude": ["out-tsc/**", "node_modules/**"],
+  "references": [
+    {
+      "path": "../sync/tsconfig.lib.json"
+    },
+    {
+      "path": "../sync/tsconfig.spec.json"
+    }
+  ]
 }

@@ -14,6 +14,25 @@ files:
   - path: packages/journeys/
     rule: managed
     capability: a11y_checks
+  # The contract vocabulary: how a package declares its records, commands, load functions,
+  # jobs and routes. It imports nothing outside its folder, so it runs on the sync engine
+  # that each project owns. The rest of packages/sync belongs to the project.
+  - path: packages/sync/contract/
+    rule: managed
+  # The built-in groups of the project's sync engine. Their prefixes are in each stored
+  # event, so the project owns the file after sync adds it once.
+  - path: packages/sync/contract/engine-groups.ts
+    rule: seed
+    add_on_sync: true
+  # The helper that proves a wrong call does not compile. The tests of the journey kit and
+  # of a project's own engine share it, so it ships as one file of the project's sync package.
+  - path: packages/sync/testing/type-errors.ts
+    rule: managed
+  # The Vite plugin that lists the modules of each built chunk. The first-screen check in
+  # tools/check-bundle.ts reads its list, so the plugin ships with the check. A project adds
+  # it to the Vite config of each client app. The rest of packages/app-build belongs to the project.
+  - path: packages/app-build/runtime/chunk-modules.ts
+    rule: managed
   - path: .agents/skills/
     rule: managed
     capability: skills_dir

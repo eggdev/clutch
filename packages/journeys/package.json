@@ -2,6 +2,9 @@
   "name": "@repo/journeys",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@repo/sync": "workspace:*"
+  },
   "nx": {
     "tags": [
       "type:tool"

@@ -1,0 +1,25 @@
+/**
+ * <%= fileName %>-open: A user opens the <%= title %> screen.
+ * State: draft. Replace the goal and the steps with the feature's real user goal.
+ * Contract: docs/contributing/project-intent.md#end-to-end-journeys
+ * Actor and platform: the dev actor, web and native
+ * Entry: the `/<%= fileName %>` route, until a button or link calls the gate
+ * Prerequisites: the dev servers, from `mise exec -- bun run dev`
+ * Isolation and cleanup: it writes nothing
+ * Budget: 30 s
+ *
+ * | User action | Expected observation | Proof |
+ * | --- | --- | --- |
+ * | Open the <%= title %> screen | The screen shows its heading, and axe finds no violation | heading assertion, axe check |
+ *
+ * Driver: `mise exec -- bun run journey <%= fileName %>-open`
+ * Limits: it proves only that the screen renders.
+ */
+import { journey } from '@repo/journeys/testing/journey';
+import { accessible, heading, open, see, webOnly } from '@repo/journeys/testing/steps';
+
+export const <%= propertyName %>Open = journey('the <%= title %> screen opens', [
+  open('/<%= fileName %>'),
+  see(heading('<%= heading %>', 1)),
+  webOnly(accessible('<%= fileName %> screen'), 'axe reads a web page'),
+]);

@@ -1,24 +1,19 @@
-import { joinSpace } from '@repo/access/commands/join-space';
-import { generalSpaceId } from '@repo/access/models/space';
+import { generalSpaceId, joinSpace } from '@repo/access/contract/access';
 import { findMembership, insertMembership, joinedChange } from '@repo/access/repo/membership';
 import { findSpace } from '@repo/access/repo/space';
-import { JoinSpaceInput } from '@repo/access/types/join-space';
-import { defineServerChange } from '@repo/sync/commands/define.server';
-import { CommandRejected } from '@repo/sync/types/command-rejected';
+import { serverChange } from '@repo/sync/commands/server-change.server';
 import { Clock, Effect } from 'effect';
 
 /** Makes the actor a member of a space in its organization. Joining twice changes nothing. */
-export const joinSpaceServer = defineServerChange(joinSpace, {
-  input: JoinSpaceInput,
-  access: 'organization',
-  run: (input, { db, actor }) =>
+export const joinSpaceServer = serverChange(joinSpace, {
+  run: (input, { db, actor, refuse }) =>
     Effect.gen(function* () {
       if (input.spaceId === generalSpaceId) {
-        return yield* new CommandRejected({ reason: 'Everyone is in the general space.' });
+        return yield* refuse('general-space', 'Everyone is in the general space.');
       }
       const space = yield* findSpace(db, actor.organizationId, input.spaceId);
       if (!space) {
-        return yield* new CommandRejected({ reason: 'This space does not exist.' });
+        return yield* refuse('not-found', 'This space does not exist.');
       }
       const existing = yield* findMembership(db, actor.organizationId, space.id, actor.userId);
       if (existing) {

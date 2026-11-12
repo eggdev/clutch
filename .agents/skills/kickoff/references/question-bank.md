@@ -90,10 +90,10 @@ ask it.
 Apply routine setup using the checklist reference. Use these prompts only for
 remaining gaps; do not re-ask platform choices or facts the code supplies.
 
-- Which profile does each client app use? Default: Vite with TanStack Router,
-  as `apps/web` ships. Propose Next.js only when public pages need server
-  rendering for search. Propose One, the usual native choice, or Expo only
-  when project intent lists a native app as a must. Write the profile in the
+- Which profile does each client app use? Default: One with Expo and React
+  Native, as `apps/app` ships, on the web, iOS and Android. Propose Vite with
+  TanStack Router only for a web-only app, or Next.js only when public pages
+  need server rendering for search. Write the profile in the
   architecture index. It is not a decision record.
 - On native, which Tailwind binding? Look up which binding supports the
   Tailwind version of the web build, and bring its version.
