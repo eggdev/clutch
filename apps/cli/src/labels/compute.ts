@@ -42,13 +42,13 @@ const revertLabel: Label = {
 /**
  * The label that a person adds to a merged PR that exists to rehearse a revert,
  * before they add `revert`. The revert PR then carries it too, and it does not
- * count toward the revert brake or the revert metric. See
+ * count toward the revert metric. See
  * docs/contributing/operations/rollback.md#rehearsal.
  */
 const drillLabel: Label = {
   name: 'drill',
   color: 'd4d4d4',
-  description: 'A rehearsal: its revert does not count toward the revert brake or metric.',
+  description: 'A rehearsal: its revert does not count toward the revert metric.',
 };
 
 /**

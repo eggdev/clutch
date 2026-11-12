@@ -3,13 +3,9 @@ import { expect, test } from 'bun:test';
 import { fake } from '@tools/github/fake-run';
 import { isRed, latestChecks, requiredChecks } from '@tools/github/main-checks';
 
-test('the required checks are the rules of the branch, plus agent review once', async () => {
-  const gh = fake([
-    ['gh api repos/acme/shop/rules/branches/main', { out: '["validate","agent-review"]' }],
-  ]);
-  expect(await requiredChecks(gh.run, 'acme/shop', 'main')).toEqual(['validate', 'agent-review']);
+test('the required checks are the rules of the branch, and agent review is not added', async () => {
   const bare = fake([['gh api repos/acme/shop/rules/branches/main', { out: '["validate"]' }]]);
-  expect(await requiredChecks(bare.run, 'acme/shop', 'main')).toEqual(['validate', 'agent-review']);
+  expect(await requiredChecks(bare.run, 'acme/shop', 'main')).toEqual(['validate']);
 });
 
 /** The job lines that the Actions jobs API gives, one JSON object per line. */

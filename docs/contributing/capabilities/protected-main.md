@@ -24,14 +24,11 @@ required check reaches each project. This repository's file is the example.
    can approve them. See
    [approval](../../../.agents/skills/deliver/references/pull-requests.md#approval).
 2. Allow merge commits only, so the rule matches `bun run pr merge`.
-   Require each review thread to be resolved
-   (`required_review_thread_resolution: true`). The
-   [babysitter](../../../.agents/skills/babysit-pr/SKILL.md) answers and
-   resolves each thread, so a comment that no one answered holds the merge.
+   Do not require review threads to be resolved. An open thread is advice, and the
+   [babysitter](../../../.agents/skills/babysit-pr/SKILL.md) still answers each one.
 3. Require the status checks that run the canonical check command. This
    repository requires `validate`, `journeys`, `secrets` and `commits`, plus
-   `sast` (see [CodeQL / SAST](./codeql-sast.md)) and `agent-review` (see
-   [review](../review.md)). Pin each one to the GitHub Actions app with
+   `sast` (see [CodeQL / SAST](./codeql-sast.md)). Pin each one to the GitHub Actions app with
    `"integration_id": 15368`. Then a check run with the same name from another
    app, or from a token with `checks: write`, cannot pass the rule. Auto-merge
    counts only those runs too.

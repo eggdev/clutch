@@ -1,0 +1,43 @@
+# Deploys each green main to production, then proves it: the core journeys run
+# on the live URL. A project names its command and URL in `deploy:` of
+# clutch.yaml, which kickoff fills. A project that names none deploys nothing.
+# Each deploy runs in order. See docs/principles/proof-gates-code.md.
+name: Deploy
+
+on:
+  # It deploys only a green push to main. It runs no code from a pull request.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency: production
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # One question for the owner when production fails twice.
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile
+      - name: Deploy
+        run: bun tools/deploy.ts run
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Prove the core journeys on production
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: bun tools/deploy.ts prove "$HEAD_SHA"

@@ -94,6 +94,7 @@ tests the workflow and dependency checks.
 | `check-vendor-leaks`         | A vendor type in the built declarations of a public section. It runs after `typecheck`                                                                                                                                                                                                                                                                                                  |
 | `check-bundle`               | A first screen of a client app that loads more modules before the first paint than `budget` in the check, or a module of Effect. It runs the `build:web` script of each client app                                                                                                                                                                                                      |
 | `check-decisions`            | Duplicate decision numbers, or an index that does not match                                                                                                                                                                                                                                                                                                                             |
+| `check-deploy`               | A project past kickoff with a shippable app and no `deploy:` in `clutch.yaml`.                                                                                                                                                                                                                                                                                                          |
 | `check-proposals`            | A design proposal with a bad status, too few or too many directions, or prototype code left after the build shipped                                                                                                                                                                                                                                                                     |
 | `check-file-size`            | An `AGENTS.md` file over 20 lines at any depth, or a source file over its limit. See [file size](#file-size)                                                                                                                                                                                                                                                                            |
 | `knip`                       | An unused file, export or dependency. See [dead code](#dead-code)                                                                                                                                                                                                                                                                                                                       |
@@ -103,6 +104,7 @@ tests the workflow and dependency checks.
 | `check-workflow-lint`        | actionlint errors, shellcheck findings in `run:` scripts, and zizmor findings of medium severity or higher                                                                                                                                                                                                                                                                              |
 | `check-flaky-tests`          | A quarantined test that is expired, more than 30 days out, missing from its file, or tied to a done issue                                                                                                                                                                                                                                                                               |
 | `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)                                                                                                                                                                                                                                                                                                    |
+| `check-scope`                | A PR over `pr_size.max` lines, a new screen with no stated `hand_test`, or a new feature after kickoff with no `goal:` from project intent.                                                                                                                                                                                                                                             |
 | `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md)                                                                                                                                                                                                                                                                                      |
 | `check-guardrail-coverage`   | A file that a check, a lint plugin or a hook reads, with no pattern in `tools/guardrail-files.json`. See [guardrail files](../harness-engineering.md#guardrail-files)                                                                                                                                                                                                                   |
 | `check-transaction-safe`     | A service that marks itself transaction-safe when `primitives.yaml` does not list it. See [server](../architecture/server.md#services-in-a-server-change)                                                                                                                                                                                                                               |
@@ -263,17 +265,18 @@ The [Labels workflow](../../../.github/workflows/labels.yml) labels each PR
 `risk/low`, `risk/medium`, `risk/high` or `risk/one-way-door` from the paths it
 touches. It runs `clutch risk` from the base branch, with the rules in
 `.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk). The
-`one-way-door` tier holds only what cannot be paid back: credentials, auth,
-access, identity and migrations. It also holds two lists that each project
-fills: its billing code, and its infra, deploy and secrets paths. The merge
-judge holds a major change for the owner too. See
+`one-way-door` tier holds only what cannot be paid back. That is credentials,
+auth until its journeys exist, and a migration that can lose data. It is also a
+workflow line that gives a grant, and the `owner:` line of `clutch.yaml`. It also holds two lists that each
+project fills: its billing code, and its infra, deploy and secrets paths. The
+merge judge holds a major change and a contract break for the owner too. See
 [decision record 0005](../decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
 
 The [Labels workflow](../../../.github/workflows/labels.yml) runs `clutch labels`
 on each PR. It sets `kind/<type>` from the title and `area/<part>` for each
 workspace package or top folder the PR touches. It also sets `size/S` to
 `size/XL` by the changed lines. Above `pr_size.warn` in `clutch.yaml` the run
-warns. Size never fails a PR. See
+warns. Above `pr_size.max`, `check-scope` fails the PR, so it splits. See
 [labels](../agent-review.md#labels).
 
 <!-- kickoff: The globs of the project's payment and billing code, as the paths of the billing rule in .clutch/risk.yaml. Leave the list empty when the product bills nothing. -->
@@ -282,8 +285,8 @@ warns. Size never fails a PR. See
 
 The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
 `bun run pr merge <number>` dispatches it from the session that built the PR.
-It also runs when the owner approves a head, and when CI completes on a
-`revert/` or bot PR, which no session owns. No schedule starts it. It judges a pull request of this repository,
+It also runs when the owner approves a head, and when CI completes on an agent's
+`clutch/` PR, a `revert/` PR or a bot PR. No schedule starts it. It judges a pull request of this repository,
 never a fork's, and logs a person's as not judged.
 An agent's PR is one that a bot opens. A bot's PR is on a `renovate/`,
 `gardening/`, `clutch-sync/` or `revert/` branch. It acts on `automerge.mode`

@@ -18,8 +18,8 @@ It gives one label: `size/S` (up to 100 lines), `size/M` (300), `size/L` (800)
 or `size/XL`. The Labels workflow sets it on each pull request.
 
 1. Add `pr_size` to `clutch.yaml`, such as `pr_size: { warn: 300, exclude: [] }`.
-2. Above `warn`, the workflow adds a warning to the run. Size never fails a
-   pull request: in the research, size had no link to throughput.
+2. Above `warn`, the workflow adds a warning to the run. Above `max`,
+   `tools/check-scope.ts` fails the pull request, so the work splits.
 3. Set `pr_size_limits` to `adopted` in `clutch.yaml`.
 
 ## Waive

@@ -1,20 +1,11 @@
-import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 import { missingJourneys } from '@tools/check-journeys';
 import { devApps, isUp, urlOf } from '@tools/dev';
 import type { DevApp } from '@tools/dev';
-import {
-  budgetOf,
-  coreJourneys,
-  coreWithout,
-  fieldOf,
-  headerOf,
-  inboxCommandOf,
-  journeys,
-  requiredOutcomes,
-  webDevices,
-} from '@tools/journeys/journeys';
+import { isCore, unprovenCore } from '@tools/journeys/core-proof';
+import { budgetOf, inboxCommandOf, journeys, webDevices } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
 import {
   budgetsOf,
@@ -194,47 +185,6 @@ async function runPlaywright(
 }
 
 /**
- * The core journeys of a passed run that did not record each outcome that the
- * catalog names, `signed-up` first, on each device. The source checks read the
- * code. This reads what held in the browser, so a call that never ran proves
- * nothing. The last try of each device is the one that passed.
- */
-export function unprovenCore(
-  root: string,
-  ran: ReadonlyArray<Journey>,
-  runsOf: (journey: Journey) => ReadonlyArray<DeviceRun>,
-): Array<string> {
-  return ran.flatMap((journey) => {
-    const name = fieldOf(headerOf(readFileSync(path.join(root, journey.file), 'utf-8')), 'Core');
-    if (name === undefined || !(coreJourneys as ReadonlyArray<string>).includes(name)) {
-      return [];
-    }
-    const runs = runsOf(journey);
-    return webDevices.flatMap((device) => {
-      const at = `${journey.file} on ${device.name}`;
-      const last = runs.find((run) => run.device === device.name)?.attempts.at(-1);
-      const seen = (last?.outcomes ?? []).map((outcome) => outcome.name);
-      const missing = requiredOutcomes(
-        name as (typeof coreJourneys)[number],
-        coreWithout(root, name),
-      ).filter((outcome) => !seen.includes(outcome));
-      const problems: Array<string> = [];
-      if (seen[0] !== 'signed-up') {
-        problems.push(
-          `${at}: the run did not record \`signed-up\` first, so it did not prove a new account. See docs/contributing/journeys/core.md.`,
-        );
-      }
-      if (missing.length > 0) {
-        problems.push(
-          `${at}: the run passed, but recorded no ${missing.map((item) => `\`${item}\``).join(', ')}. Each catalog outcome must hold in the run. See docs/contributing/journeys/core.md.`,
-        );
-      }
-      return problems;
-    });
-  });
-}
-
-/**
  * Writes the measures file of each journey that ran, and reports each flake.
  * Returns the runs of each journey, and a line for each device run that
  * failed. Playwright passes a run whose retry passed, so these lines are how a
@@ -261,6 +211,9 @@ async function collect(
 
 /** The journeys that `id` selects: one by its ID, or each web journey for `--all`. */
 function select(all: ReadonlyArray<Journey>, id: string | undefined): Array<Journey> | string {
+  if (id === '--production') {
+    return all.filter((item) => item.platform === 'web');
+  }
   if (id === '--all') {
     return all.filter((item) => item.platform === 'web');
   }
@@ -275,18 +228,90 @@ function select(all: ReadonlyArray<Journey>, id: string | undefined): Array<Jour
   return [journey];
 }
 
+type Budgets = Exclude<ReturnType<typeof budgetsOf>, string>;
+
+async function runJourneys(
+  root: string,
+  selected: ReadonlyArray<Journey>,
+  url: string,
+  budgets: Budgets,
+  sink: Sink,
+  fileFlake: FileFlake,
+) {
+  const budget = selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
+  const dir = runsDir(root);
+  const code = await runPlaywright(
+    root,
+    selected.map((journey) => journey.file),
+    url,
+    budget,
+    {
+      JOURNEY_MEASURES_DIR: dir,
+      JOURNEY_BUDGETS: JSON.stringify(budgets),
+      JOURNEY_INBOX: JSON.stringify(inboxCommandOf(root) ?? []),
+    },
+  );
+  const { runsOf, failed } = await collect(root, selected, dir, sink, fileFlake);
+  for (const line of failed) {
+    sink.error(line);
+  }
+  if (code !== 0) {
+    return code;
+  }
+  if (failed.length > 0) {
+    return 1;
+  }
+  const unproven = unprovenCore(root, selected, runsOf);
+  for (const problem of unproven) {
+    sink.error(problem);
+  }
+  return unproven.length > 0 ? 1 : 0;
+}
+
+/** Runs only the core journeys against a deployed URL. No core journey means no proof. */
+function runProduction(
+  root: string,
+  found: ReadonlyArray<Journey>,
+  url: string,
+  sink: Sink,
+  fileFlake: FileFlake,
+) {
+  const selected = found.filter((journey) => isCore(root, journey));
+  const budgets = budgetsOf(root);
+  if (typeof budgets === 'string') {
+    sink.error(budgets);
+    return 1;
+  }
+  if (selected.length === 0) {
+    sink.error(
+      'No core journey exists, so production has no proof. Add a journey with a `Core:` line.',
+    );
+    return 1;
+  }
+  return runJourneys(root, selected, url, budgets, sink, fileFlake);
+}
+
 /** Runs the selected journeys. Returns the exit code. Exported for the runner's tests. */
 export async function main(
   root: string,
   id: string | undefined,
   sink: Sink = consoleSink,
   fileFlake: FileFlake = frictionFlake(root),
+  productionUrl?: string,
 ): Promise<number> {
-  const selected = select(journeys(root), id);
-  if (typeof selected === 'string') {
-    sink.error(selected);
+  const found = select(journeys(root), id);
+  if (typeof found === 'string') {
+    sink.error(found);
     return 1;
   }
+  if (id === '--production' && !productionUrl) {
+    sink.error('--production needs the URL to prove.');
+    return 1;
+  }
+  if (productionUrl) {
+    return runProduction(root, found, productionUrl, sink, fileFlake);
+  }
+  const selected = found;
   const budgets = budgetsOf(root);
   if (typeof budgets === 'string') {
     sink.error(budgets);
@@ -311,34 +336,7 @@ export async function main(
   const urls = new Map(apps.map((app) => [app.name, urlOf(root, app.name)]));
   const started = (await allUp(apps, urls)) ? null : await startServers(root, apps, urls);
   try {
-    const budget = selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
-    const dir = runsDir(root);
-    const code = await runPlaywright(
-      root,
-      selected.map((journey) => journey.file),
-      urls.get(web.name) ?? '',
-      budget,
-      {
-        JOURNEY_MEASURES_DIR: dir,
-        JOURNEY_BUDGETS: JSON.stringify(budgets),
-        JOURNEY_INBOX: JSON.stringify(inboxCommandOf(root) ?? []),
-      },
-    );
-    const { runsOf, failed } = await collect(root, selected, dir, sink, fileFlake);
-    for (const line of failed) {
-      sink.error(line);
-    }
-    if (code !== 0) {
-      return code;
-    }
-    if (failed.length > 0) {
-      return 1;
-    }
-    const unproven = unprovenCore(root, selected, runsOf);
-    for (const problem of unproven) {
-      sink.error(problem);
-    }
-    return unproven.length > 0 ? 1 : 0;
+    return await runJourneys(root, selected, urls.get(web.name) ?? '', budgets, sink, fileFlake);
   } finally {
     if (started) {
       await stopServers(started);
@@ -352,7 +350,13 @@ if (import.meta.main) {
     process.exitCode =
       first === '--native'
         ? await nativeMain(process.cwd(), platform as Platform)
-        : await main(process.cwd(), first);
+        : await main(
+            process.cwd(),
+            first,
+            undefined,
+            undefined,
+            first === '--production' ? platform : undefined,
+          );
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;

@@ -13,7 +13,7 @@ Rank 5 of the researched practices. More than four in five of the leading reposi
 ## Adopt
 
 1. Add `.github/CODEOWNERS`. The [`CODEOWNERS`](../../../.github/CODEOWNERS) file of this repository is an example.
-2. Generate it from the `one-way-door` tier of `.clutch/risk.yaml`: `mise exec -- bun tools/codeowners.ts --write`. It keeps the owner named in the current file. `check-agent-hooks` fails when the file drifts from the tier, or names no owner. The main ruleset requires a code owner's approval, so GitHub asks the owner to approve each one-way-door PR. See [approval](../../../.agents/skills/deliver/references/pull-requests.md#approval).
+2. Generate it from the `one-way-door` tier of `.clutch/risk.yaml`, what cannot be paid back: `mise exec -- bun tools/codeowners.ts --write`. It keeps the owner named in the current file. `check-agent-hooks` fails when the file drifts from the tier, or names no owner. The main ruleset requires a code owner's approval, so GitHub asks the owner to approve each one-way-door PR. See [approval](../../../.agents/skills/deliver/references/pull-requests.md#approval). A rule with `journeys:` leaves the file once each named journey exists.
 3. Require code owner review. The main ruleset in `.github/rulesets/main.json` sets `require_code_owner_review: true`. Run `mise exec -- bun run clutch ruleset --apply` to send it to GitHub.
 4. Set `codeowners` to `adopted` in `clutch.yaml`.
 

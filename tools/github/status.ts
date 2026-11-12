@@ -1,11 +1,12 @@
 import path from 'node:path';
 
-import { contractBreaks, ownerFindings } from '@tools/github/auto-merge';
+import { changedFiles, ownerApproved, ownerFindings } from '@tools/github/auto-merge';
 import { marker } from '@tools/github/auto-merge-rules';
+import { contractBreaks } from '@tools/github/contract-breaks';
 import { must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import { majorChange } from '@tools/github/major-change';
-import { ownerCount, reviews } from '@tools/github/owner-reviews';
+import { ownerCount } from '@tools/github/owner-reviews';
 import type { Run } from '@tools/github/stack';
 
 type State = 'pass' | 'fail' | 'pending' | 'skipped';
@@ -110,15 +111,11 @@ function thisRunsReview(posted: Array<Comment>, started?: string) {
 }
 
 /**
- * The blocking count of the head. The agent-review job fails on any blocking finding,
- * so a passed check has none, and the summary gives the count only when the check did
- * not pass. No summary means the review did not run, so the count stays unknown.
+ * The blocking count of the head, from the agent review summary. No summary means the
+ * review did not run, so the count stays unknown.
  */
-function blockingOf(review: Comment | undefined, agent: Check | undefined): number | null {
-  if (review === undefined) {
-    return null;
-  }
-  return agent?.state === 'pass' ? 0 : blockingCount(review.body);
+function blockingOf(review: Comment | undefined): number | null {
+  return review === undefined ? null : blockingCount(review.body);
 }
 
 const root = path.resolve(import.meta.dir, '../..');
@@ -162,30 +159,6 @@ export async function ownerLogin(): Promise<string | undefined> {
   }
   const codeowners = Bun.file(path.join(root, '.github/CODEOWNERS'));
   return (await codeowners.exists()) ? codeownersDefault(await codeowners.text()) : undefined;
-}
-
-/**
- * Whether agent review's owner findings still wait for the owner, the one rule
- * that `pr status` and `pr merge` both apply. They wait until the owner's latest
- * review approves the head commit, so a dismissed approval or one on an older
- * commit does not count. With no owner to name, GitHub's approval decides.
- */
-export async function waitsForOwner(
-  run: Run,
-  number: string,
-  pr: { headRefOid: string; reviewDecision?: string | null },
-  findings: number,
-) {
-  if (findings === 0) {
-    return false;
-  }
-  const owner = await ownerLogin();
-  if (owner === undefined) {
-    return pr.reviewDecision !== 'APPROVED';
-  }
-  const all = await reviews(run, number);
-  const latest = all.findLast((review) => review.login === owner);
-  return latest?.state !== 'APPROVED' || latest.commit !== pr.headRefOid;
 }
 
 /** The status checks that the rules of `branch` require. None when the token cannot read them. */
@@ -243,28 +216,27 @@ export async function prStatus(run: Run, number: string) {
   const reviewComment = thisRunsReview(posted, agentRun?.startedAt);
   const dryRun = notes.findLast((note) => note.body.includes(marker(pr.headRefOid)));
   const count = (state: State) => all.filter((check) => check.state === state).length;
-  const blocking = blockingOf(
-    reviewComment,
-    all.find((check) => check.name === 'agent-review'),
-  );
+  const blocking = blockingOf(reviewComment);
   // The annotations of the latest agent-review run on the head decide whether an owner finding exists, as auto-merge reads them.
   const findings = await ownerFindings(run, '{owner}/{repo}', pr.headRefOid);
   const owner = await ownerCount(run, number, pr.headRefOid, findings.length);
-  // The one-way changes that the snapshot of the head names, which the owner agrees to.
-  const breaks = await contractBreaks(run, '{owner}/{repo}', number, pr.headRefOid);
-  // The reasons the change is major, which the owner signs off.
-  const major = await majorChange(run, '{owner}/{repo}', number);
   // A repository without agent review has no review to wait for.
   const reviewed =
-    blocking === 0 || (blocking === null && !all.some((check) => check.name === 'agent-review'));
+    reviewComment !== undefined || !all.some((check) => check.name === 'agent-review');
   // A rule such as a code-owner review can still hold the merge after every check passes.
   // A ruleset's code-owner review leaves reviewDecision empty, but GitHub
   // still reports the merge state as BLOCKED.
   const review =
     pr.reviewDecision || (pr.mergeStateStatus === 'BLOCKED' ? 'BLOCKED by a rule' : '');
-  const approved =
-    !(await waitsForOwner(run, number, pr, owner + breaks.length + major.length)) &&
-    (review === '' || review === 'APPROVED');
+  const approved = review === '' || review === 'APPROVED';
+  // What the merge judge holds for the owner, as auto-merge reads it. The owner's approval of the head lifts it.
+  const changed = await changedFiles(run, '{owner}/{repo}', number);
+  const breaks = await contractBreaks(run, '{owner}/{repo}', changed, pr.headRefOid);
+  const major = await majorChange(run, '{owner}/{repo}', number, changed);
+  const holds = [...breaks, ...major];
+  const lifted =
+    holds.length === 0 ||
+    (await ownerApproved(run, '{owner}/{repo}', number, pr.headRefOid, await ownerLogin()));
   const ready =
     pr.state === 'OPEN' &&
     pr.mergeable === 'MERGEABLE' &&
@@ -272,7 +244,8 @@ export async function prStatus(run: Run, number: string) {
     count('pending') === 0 &&
     required.every((check) => check.state === 'pass' || check.state === 'skipped') &&
     reviewed &&
-    approved;
+    approved &&
+    lifted;
   return {
     number: pr.number,
     url: pr.url,
@@ -286,9 +259,9 @@ export async function prStatus(run: Run, number: string) {
     checks: all,
     counts: { pass: count('pass'), fail: count('fail'), pending: count('pending') },
     agentReview: { posted: reviewComment !== undefined, blocking, owner },
+    review: review || 'none required',
     contractBreaks: breaks,
     major,
-    review: review || 'none required',
     dryRun: dryRun ? verdict(dryRun.body) : null,
     ready,
   };
@@ -304,9 +277,7 @@ function reviewLine(review: { posted: boolean; blocking: number | null; owner: n
     review.blocking === null
       ? 'posted, but its blocking count is unreadable'
       : `${review.blocking} blocking`;
-  return review.owner > 0
-    ? `${blocking}, ${review.owner} owner (the owner approves and merges it)`
-    : blocking;
+  return review.owner > 0 ? `${blocking}, ${review.owner} owner (advisory)` : blocking;
 }
 
 /** The status as a short block. */

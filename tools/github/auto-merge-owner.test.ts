@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { contractBreaks, ownerApproved } from '@tools/github/auto-merge';
+import { ownerApproved } from '@tools/github/auto-merge';
 import { decide, facts, fake, head, merges } from '@tools/github/auto-merge-fake';
 import { blockers, verdictText } from '@tools/github/auto-merge-rules';
 import type { Result } from '@tools/github/stack';
@@ -12,10 +12,13 @@ const oneWayDoor: [string, { out: string }] = [
 ];
 
 test("the owner's approval of the head lifts the tier and the owner findings, and nothing else", () => {
-  const held = facts({ tier: 'one-way-door', ownerFindings: ['It adds a migration.'] });
+  const held = facts({
+    tier: 'one-way-door',
+    weakerJourneys: ['x.pw.ts: it no longer proves the outcome `paid`.'],
+  });
   expect(blockers(held, 'medium')).toEqual([
     'The risk tier is one-way-door, not low or medium.',
-    'Agent review asks the owner: It adds a migration.',
+    'A journey gets weaker, so the owner decides: x.pw.ts: it no longer proves the outcome `paid`.',
   ]);
   expect(blockers({ ...held, ownerApproved: true }, 'bots')).toEqual([]);
   expect(
@@ -36,7 +39,7 @@ test("the owner's approval of the head lifts the tier and the owner findings, an
   expect(blockers(facts({ ownerApproved: true }, { isDraft: true }), 'medium')).toEqual([
     'The pull request is a draft.',
   ]);
-  expect(verdictText([], 'medium', [], true)).toBe(
+  expect(verdictText([], 'medium', true)).toBe(
     'Would auto-merge at the step medium. The owner approved this head.',
   );
 });
@@ -89,47 +92,31 @@ const files = (...names: Array<string>): [string, Partial<Result>] => [
   { out: names.map((filename) => JSON.stringify({ filename, patch: '' })).join('\n') },
 ];
 
-test('contractBreaks gives each name the snapshot of the head names under breaks', async () => {
-  const two = fake([
-    files('contract.json'),
-    [contract, { out: JSON.stringify({ breaks: ['A.one', 'B.two'] }) }],
-  ]);
-  expect(await contractBreaks(two.run, 'eggdev/clutch', '7', head)).toEqual(['A.one', 'B.two']);
-  expect(two.calls.find((call) => call.startsWith(contract))).toContain(`?ref=${head}`);
-  const none = fake([files('contract.json'), [contract, { out: JSON.stringify({ breaks: [] }) }]]);
-  expect(await contractBreaks(none.run, 'eggdev/clutch', '7', head)).toEqual([]);
-});
+/** A snapshot of the head that names `breaks`. */
+const snapshot = (breaks: unknown): [string, Partial<Result>] => [
+  contract,
+  { out: JSON.stringify({ breaks }) },
+];
 
-test('contractBreaks has no breaks when the head has no contract snapshot', async () => {
-  const missing = fake([
-    files('contract.json'),
-    [contract, { ok: false, err: 'gh: Not Found (HTTP 404)' }],
-  ]);
-  expect(await contractBreaks(missing.run, 'eggdev/clutch', '7', head)).toEqual([]);
-});
-
-test('contractBreaks refuses a snapshot whose breaks is not a list of strings', async () => {
-  const bad = fake([
-    files('contract.json'),
-    [contract, { out: JSON.stringify({ breaks: 'Note.title' }) }],
-  ]);
-  await expect(contractBreaks(bad.run, 'eggdev/clutch', '7', head)).rejects.toThrow(
-    `contract.json at ${head}: \`breaks\` is not a list of strings.`,
+test('on holds a low-risk PR whose diff makes a contract break, until the owner approves its head', async () => {
+  const config = { mode: 'on', step: 'medium', owner: 'eggdev' } as const;
+  const waiting = fake([files('contract.json'), snapshot(['Note.title'])]);
+  const [before] = await decide(waiting, config);
+  expect(before).toContain(
+    'The contract snapshot names the break Note.title. The owner agrees to a break.',
   );
-  const mixed = fake([
+  expect(merges(waiting.calls)).toEqual([]);
+  expect(waiting.calls.filter((call) => call.includes('/pulls/7/files'))).toHaveLength(1);
+  const approvedHead = fake([
     files('contract.json'),
-    [contract, { out: JSON.stringify({ breaks: ['A', 1] }) }],
+    snapshot(['Note.title']),
+    [reviews, { out: `APPROVED\t${head}` }],
   ]);
-  await expect(contractBreaks(mixed.run, 'eggdev/clutch', '7', head)).rejects.toThrow(
-    `contract.json at ${head}`,
-  );
-});
-
-test('a pull request that does not change contract.json has no breaks, also when the snapshot of its head names one', async () => {
-  const gh = fake([
-    files('bun.lock'),
-    [contract, { out: JSON.stringify({ breaks: ['Note.title'] }) }],
+  expect(await decide(approvedHead, config)).toEqual([
+    'Would auto-merge at the step medium. The owner approved this head.\nQueued the merge.',
   ]);
-  expect(await contractBreaks(gh.run, 'eggdev/clutch', '7', head)).toEqual([]);
-  expect(gh.calls.some((call) => call.startsWith(contract))).toBe(false);
+  const untouched = fake([files('docs/x.md'), snapshot(['Note.title'])]);
+  expect(await decide(untouched, config)).toEqual([
+    'Would auto-merge at the step medium.\nQueued the merge.',
+  ]);
 });

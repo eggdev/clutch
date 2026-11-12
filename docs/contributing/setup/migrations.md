@@ -61,6 +61,10 @@ When `check-migrations` fails, restore the merged migration and write a new one.
 
 ## One-way migrations
 
+A migration waits for the owner only when its SQL can lose data: it drops,
+empties, deletes or retypes stored data. `.clutch/risk.yaml` names those lines.
+Any other migration merges on proof.
+
 Rehearse a one-way migration on a preview with seed data before it merges, and
 attach the difference before and after to the PR. See
 [seed data](./seeding.md) and [previews](./previews.md).

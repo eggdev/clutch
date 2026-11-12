@@ -17,27 +17,6 @@ export type Mode = (typeof modes)[number];
 export const steps = ['bots', 'low', 'medium'] as const;
 export type Step = (typeof steps)[number];
 
-/**
- * The revert brake: auto-merge steps down one step while reverts pass
- * `maxRevertRate` of the PRs merged in `window`, once there are `minMerged`.
- * Decision 0002 sets the 2% that tightens it on evidence.
- */
-export const brake = { window: '30d', minMerged: 20, maxRevertRate: 0.02 };
-
-/** The step that the brake gives: one step lower while the revert rate passes the limit. */
-export function brakedStep(step: Step, merged: number, reverts: number): Step {
-  if (merged < brake.minMerged || reverts / merged <= brake.maxRevertRate) {
-    return step;
-  }
-  return steps[Math.max(steps.indexOf(step) - 1, 0)];
-}
-
-/** The sentence that the verdict gives when the brake steps down. */
-export function brakeReason(merged: number, reverts: number, from: Step, to: Step) {
-  const rate = ((reverts / merged) * 100).toFixed(1);
-  return `Reverts are ${reverts} of ${merged} merged PRs in the last ${brake.window}, ${rate}%, over the ${brake.maxRevertRate * 100}% brake, so the step drops from ${from} to ${to}.`;
-}
-
 /** The step after `step`, which an `on` run calibrates. The last step calibrates itself. */
 export const nextStep = (step: Step): Step => steps[Math.min(steps.indexOf(step) + 1, 2)];
 
@@ -63,21 +42,21 @@ export type Facts = {
   tier: string;
   /** Each required check, with the conclusion of its latest run, `pending` or `missing`. */
   checks: Record<string, string>;
-  /** The conclusion of the `clutch / doctor` check on the head, which no ruleset requires: `success`, `pending`, `missing` or a failure. */
-  doctor: string;
-  /**
-   * Agent review's `owner` findings on the head: the change weakens a check, a
-   * lint rule, a budget or a test. Each one leaves the PR for the owner, except
-   * the findings of a pure Clutch sync, see `approvedUpstream`.
-   */
-  ownerFindings: Array<string>;
+  /** The conclusions of the native journey jobs that ran on the head. */
+  native: Record<string, string>;
+  /** Why the PR weakens a journey or a budget, from `weakerJourneys`. */
+  weakerJourneys: Array<string>;
   /**
    * Each one-way change that the contract snapshot of the head names under
    * `breaks`, when the PR's own diff changes `contract.json`. The owner agrees
-   * to a break, so each one leaves the PR for the owner, whatever its risk tier.
+   * to a break, so each one holds the PR for the owner, whatever its risk tier.
    */
   breaks: Array<string>;
-  /** Why the PR is a major change, or nothing: a title with `!`, or a changeset in its diff that names a major bump. The owner signs off a major change, whatever its risk tier. */
+  /**
+   * Why the PR is a major change, from `majorChange`: a title with `!`, or a
+   * changeset in its diff that names a major bump. The owner signs off a major
+   * change, so it holds the PR for the owner, whatever its risk tier.
+   */
   major: Array<string>;
   /** Why a bot PR fails its bot rule: a diff that is more than a version, or a revert that may not merge. Empty for an agent PR. */
   botProblems: Array<string>;
@@ -86,7 +65,8 @@ export type Facts = {
   /**
    * Whether `automerge.owner` approved the head commit, and gave no later
    * review that asks for changes. The owner's approval is the review that a
-   * one-way-door PR waits for, so it lifts the tier and the owner findings.
+   * one-way-door PR waits for, so it lifts the tier, a weaker journey, a
+   * contract break and a major change.
    * The checks, a draft, the base and a red main still hold the PR.
    */
   ownerApproved: boolean;
@@ -138,47 +118,13 @@ export async function revertProblems(
   return problems;
 }
 
-/**
- * Whether the PR's owner findings were approved upstream, so they hold nothing.
- * A pure Clutch sync is the release bot's sync PR whose diff passes the sync
- * rule, and whose `clutch / doctor` check succeeded on its head. Clutch's
- * owner already approved the gate changes it carries, so agent review's
- * findings on them repeat that approval. See decision 0003.
- */
-function approvedUpstream(facts: Facts) {
-  return (
-    botKind(facts.pr.headRefName) === 'clutch-sync' &&
-    kindProblem(facts.pr) === null &&
-    facts.botProblems.length === 0 &&
-    facts.doctor === 'success'
-  );
-}
-
-/** The owner findings that `approvedUpstream` takes as approved upstream. The verdict lists them. */
-export function upstreamFindings(facts: Facts) {
-  return approvedUpstream(facts) ? facts.ownerFindings : [];
-}
-
-/**
- * The holds that the owner's approval of the head lifts, decided in one place:
- * the step and risk tier of an agent PR, agent review's `owner` findings, and
- * the contract breaks that the snapshot of the head names, and a major change.
- * The kind of PR, the
- * bot rule, the checks, a draft, the base and a red main still hold it. A pure
- * Clutch sync also takes its findings as approved upstream, see
- * `approvedUpstream`.
- */
-function ownerLifts(facts: Facts) {
-  return { reach: facts.ownerApproved, findings: facts.ownerApproved || approvedUpstream(facts) };
-}
-
 /** Why the PR's kind and tier are not in reach at `step`. */
 function stepProblems(facts: Facts, step: Step): Array<string> {
   const { pr, tier, botProblems } = facts;
   if (!isAgentPr(pr)) {
     return botProblems;
   }
-  if (ownerLifts(facts).reach) {
+  if (facts.ownerApproved) {
     return [];
   }
   if (step === 'bots') {
@@ -207,7 +153,20 @@ export function blockers(facts: Facts, step: Step): Array<string> {
   } else {
     reasons.push(...stepProblems(facts, step));
   }
-  if (!ownerLifts(facts).reach) {
+  for (const [name, conclusion] of Object.entries(checks)) {
+    if (conclusion !== 'success') {
+      reasons.push(`The required check ${name} is ${conclusion}.`);
+    }
+  }
+  for (const [name, conclusion] of Object.entries(facts.native)) {
+    if (!['success', 'skipped', 'missing'].includes(conclusion)) {
+      reasons.push(`The native journey ${name} is ${conclusion}.`);
+    }
+  }
+  if (!facts.ownerApproved) {
+    for (const reason of facts.weakerJourneys) {
+      reasons.push(`A journey gets weaker, so the owner decides: ${reason}`);
+    }
     for (const name of facts.breaks) {
       reasons.push(`The contract snapshot names the break ${name}. The owner agrees to a break.`);
     }
@@ -215,16 +174,6 @@ export function blockers(facts: Facts, step: Step): Array<string> {
       reasons.push(
         `The change is major: ${facts.major.join(', and ')}. The owner signs off a major change.`,
       );
-    }
-  }
-  for (const [name, conclusion] of Object.entries(checks)) {
-    if (conclusion !== 'success') {
-      reasons.push(`The required check ${name} is ${conclusion}.`);
-    }
-  }
-  if (!ownerLifts(facts).findings) {
-    for (const finding of facts.ownerFindings) {
-      reasons.push(`Agent review asks the owner: ${finding}`);
     }
   }
   // A revert is how a red main turns green, so the red main does not hold it.
@@ -239,24 +188,14 @@ export function blockers(facts: Facts, step: Step): Array<string> {
 }
 
 /**
- * The verdict that a run prints: whether the PR would auto-merge at `step`, the
- * reasons when it would not, and the owner findings that a pure sync takes as
- * approved upstream, so that they stay visible.
+ * The verdict that a run prints: whether the PR would auto-merge at `step`, and
+ * the reasons when it would not.
  */
-export function verdictText(
-  reasons: Array<string>,
-  step: Step,
-  upstream: Array<string>,
-  ownerApproved = false,
-) {
+export function verdictText(reasons: Array<string>, step: Step, ownerApproved = false) {
   const approved = ownerApproved ? ' The owner approved this head.' : '';
-  const verdict =
-    reasons.length > 0
-      ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
-      : `Would auto-merge at the step ${step}.${approved}`;
-  return upstream.length > 0
-    ? `${verdict}\nOwner findings, approved upstream in Clutch:\n${upstream.map((finding) => `- ${finding}`).join('\n')}`
-    : verdict;
+  return reasons.length > 0
+    ? `Would not auto-merge at the step ${step}:\n${reasons.map((reason) => `- ${reason}`).join('\n')}`
+    : `Would auto-merge at the step ${step}.${approved}`;
 }
 
 /** Marks the dry-run comment for one head commit, so a rerun does not repeat it. */

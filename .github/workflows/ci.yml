@@ -34,6 +34,8 @@ jobs:
           # A PR compares with its target branch. A push to main compares with
           # the commit before the push.
           CHECK_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+          SCOPE_BASE: ${{ github.event.pull_request.base.sha }}
+          SCOPE_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             bun run validate --changed
@@ -127,7 +129,7 @@ jobs:
       # local database of the object pool that the project has. Validate has no browser.
       - name: Run the browser tests
         run: git ls-files -- 'packages/*.browser.test.ts' | sed 's#^#./#' | xargs bun test
-      - run: bun run journey --all
+      - run: bun tools/journeys/run.ts --all
       - name: Keep the traces of a failed journey
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

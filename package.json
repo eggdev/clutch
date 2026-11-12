@@ -1,6 +1,6 @@
 {
   "name": "clutch",
-  "version": "0.64.0",
+  "version": "1.0.0",
   "private": true,
   "license": "UNLICENSED",
   "workspaces": [
@@ -213,6 +213,20 @@
         },
         "cache": false
       },
+      "check-deploy": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/deploy.ts check"
+        },
+        "cache": false
+      },
+      "check-scope": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-scope.ts"
+        },
+        "cache": false
+      },
       "check-file-size": {
         "executor": "nx:run-commands",
         "options": {
@@ -300,6 +314,8 @@
           "check-bundle",
           "check-decisions",
           "check-proposals",
+          "check-scope",
+          "check-deploy",
           "check-file-size",
           "check-kickoff-slots",
           "check-primitives",

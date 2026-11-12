@@ -6,7 +6,7 @@ import { agentsIn, isRevert, percentile } from '@/metrics/compute';
  */
 export const factoryDefinitions = 'warp-2026-11-04';
 
-/** The revert rate that steps auto-merge down: the brake of decision D-004. */
+/** The revert rate that the metric flags. No gate reads it. */
 const revertBrake = 0.02;
 
 /** One commit of a pull request, as `pulls/<n>/commits` lists it. */

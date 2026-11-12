@@ -6,11 +6,11 @@
 # stays delegated. check-agent-hooks fails when this file drifts. Kickoff
 # replaces @eggdev with the owner of the project.
 #
-# The workflow rule of the tier matches changed lines, which CODEOWNERS cannot
-# express, so it is not here. Auto-merge leaves those changes for the owner by
-# their tier. The merge judge also holds a major change and a contract break for
-# the owner. A change that weakens a check gets an owner finding from agent
-# review. See docs/contributing/review.md.
+# The migration, workflow and clutch.yaml rules of the tier match changed
+# lines, which CODEOWNERS cannot express, so they are not here. Auto-merge
+# leaves those changes for the owner by their tier. The merge judge also holds
+# a major change, a contract break and a change that weakens a journey for the
+# owner. See docs/contributing/review.md.
 
 /.gitleaks.toml @eggdev
 /.gitleaksignore @eggdev
@@ -19,6 +19,3 @@
 **/auth/ @eggdev
 /packages/access/ @eggdev
 /packages/identity/ @eggdev
-/apps/**/migrations/ @eggdev
-/features/**/migrations/ @eggdev
-/packages/**/migrations/ @eggdev
