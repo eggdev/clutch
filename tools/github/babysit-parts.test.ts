@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { blockingGuard } from '@tools/github/babysit-answer';
+import { answerComments, blockingGuard } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import type { Item } from '@tools/github/babysit-log';
 import { decisionsNow, onlyOwnerLeft, ownerAsk } from '@tools/github/babysit-owner';
@@ -150,4 +150,29 @@ test('the ask names what the owner must do', () => {
   expect(ownerAsk({ ...base, stuck: true })).toContain('fixed form');
   expect(ownerAsk({ ...base, left: true })).toContain('https://github.com/a/b/pull/7/files');
   expect(ownerAsk({ ...base, now: [{ ref: 'deploy' }] })).toContain('deploy need the owner now');
+});
+
+test('a comment with no answer gets no reply, and does not go to the owner', async () => {
+  const gh = fake([]);
+  const items = await answerComments({
+    run: gh.run,
+    repo: 'a/b',
+    answers: [],
+    pushed: null,
+    plan: {
+      number: 7,
+      head: 'h3adbeef',
+      approved: false,
+      triggers: [],
+      sync: 'none',
+      failed: [],
+      threads: [],
+      comments: [{ id: 3, author: 'bot', body: 'A thought.', at: '', url: '' }],
+      approvedThreads: [],
+      skip: null,
+      stuck: false,
+    },
+  });
+  expect(items).toEqual([]);
+  expect(gh.calls).toEqual([]);
 });

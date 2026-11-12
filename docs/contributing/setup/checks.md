@@ -263,8 +263,8 @@ The [Labels workflow](../../../.github/workflows/labels.yml) labels each PR
 `risk/low`, `risk/medium`, `risk/high` or `risk/one-way-door` from the paths it
 touches. It runs `clutch risk` from the base branch, with the rules in
 `.clutch/risk.yaml`. See [risk](../../../apps/cli/README.md#risk). The
-`one-way-door` tier holds only the hard core: the merge gate, credentials, auth,
-migrations, and decision records and policy docs. It also holds two lists that
+`one-way-door` tier holds only the hard core: the merge gate, credentials, auth
+until its journeys exist, migrations, and decision records and policy docs. It also holds two lists that
 each project fills: its billing code, and its infra, deploy and secrets paths.
 See
 [decision record 0002](../decisions/0002-merge-most-prs-with-no-human.md).
@@ -282,8 +282,8 @@ warns. Size never fails a PR. See
 
 The [Auto-merge workflow](../../../.github/workflows/auto-merge.yml) runs when
 `bun run pr merge <number>` dispatches it from the session that built the PR.
-It also runs when the owner approves a head, and when CI completes on a
-`revert/` or bot PR, which no session owns. No schedule starts it. It judges a pull request of this repository,
+It also runs when the owner approves a head, and when CI completes on an agent's
+`clutch/` PR, a `revert/` PR or a bot PR. No schedule starts it. It judges a pull request of this repository,
 never a fork's, and logs a person's as not judged.
 An agent's PR is one that a bot opens. A bot's PR is on a `renovate/`,
 `gardening/`, `clutch-sync/` or `revert/` branch. It acts on `automerge.mode`

@@ -75,11 +75,6 @@ sast: auto
 pr_size:
   warn: 300
   exclude: []
-# agent-review is a required check here, so a run without the Anthropic credential fails it
-# (decision 5 in .clutch/PLAN.md). A project keeps notice, the default, until it adopts the
-# check. See docs/contributing/review.md.
-agentReview:
-  missingCredential: fail
 # clutch worktree new --check runs check in the new checkout after the setup.
 worktree:
   root: ../clutch.worktrees

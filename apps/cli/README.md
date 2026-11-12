@@ -456,6 +456,8 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
   tier of its files, and a change with no files is `low`.
 - A rule with `guardrails: tools/guardrail-files.json` adds every pattern in
   that list to its paths, so the two cannot drift.
+- A rule with `journeys` holds nothing once each named journey exists on the
+  default branch. `tools/codeowners.ts` then leaves it out of CODEOWNERS too.
 - A rule with `lines` matches a file only when one of its added or removed
   lines matches one of those regular expressions. `tools/codeowners.ts` leaves
   such a rule out of CODEOWNERS, which cannot express it.
@@ -476,8 +478,7 @@ Clutch's own rules follow
   `review.md`, and the code that computes a tier.
 - Credentials: secret scanning and the MCP configs. A workflow change to
   `permissions:`, an environment, a secret, an app token's permissions or a
-  privileged trigger. The `automerge` and `agentReview` sections of
-  `clutch.yaml`.
+  privileged trigger. The `automerge` section of `clutch.yaml`.
 - Auth (`packages/access`, `packages/identity` and any `auth` folder) and
   migrations.
 - A billing rule and an infra, deploy and secrets rule, both empty until a
@@ -525,8 +526,6 @@ sast: auto # optional: auto (the default), codeql or semgrep
 pr_size: # optional
   warn: 300 # the default: clutch labels warns above it, and never fails
   exclude: [] # globs whose lines do not count, such as generated code
-agentReview: # optional
-  missingCredential: notice # notice (the default) or fail
 factory: # optional
   root: factory # the default: the folder of the factory tree. . is the project root
 journeys: # optional: set webApp, inbox or both
@@ -561,10 +560,6 @@ a failed health check still reverts the PR that broke it. The default is an
 empty list. Auto-merge and the red-main metric judge main by the required checks
 alone. See [rollback](../../docs/contributing/operations/rollback.md#auto-revert).
 
-`agentReview.missingCredential` tells `agent-review.yml` what to do without an
-Anthropic credential: pass with a notice, or fail. Set `fail` once
-`agent-review` is a required check. See [agent review](../../docs/contributing/agent-review.md).
-
 `journeys.webApp` names the app that `bun run journey` drives in a browser. Set
 it when a repository has more than one app with a web entry, which is an Nx
 `dev` target that is not tagged `platform:server` or `platform:native`. Without
@@ -590,8 +585,7 @@ Semgrep even on a public repository. See
 The loader rejects unknown keys. Each error names its YAML path, such as
 `template.mode` or `capabilities.codeql_sast.reason`. An older `clutch.yaml`
 has `template.commit`. The loader accepts it and reads nothing from it, and
-the next sync removes it. Its `automerge` and
-`agentReview` sections are in the one-way-door tier. For the rest of the
+the next sync removes it. Its `automerge` section is in the one-way-door tier. For the rest of the
 file, agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
 
 ## Init

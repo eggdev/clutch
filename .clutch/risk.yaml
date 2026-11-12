@@ -33,11 +33,11 @@ rules:
       # Each auto-merge file that decides or makes a merge. Its tests and the
       # fake are not held. Name a new auto-merge source file here.
       - tools/github/auto-merge.ts
-      - tools/github/auto-merge-brake.ts
       - tools/github/auto-merge-checks.ts
       - tools/github/auto-merge-enable.ts
       - tools/github/auto-merge-rules.ts
       - tools/github/bot-rule.ts
+      - tools/github/weaker-journeys.ts
       - .github/workflows/auto-merge.yml
       - .github/workflows/agent-review.yml
       - docs/contributing/review.md
@@ -49,10 +49,6 @@ rules:
       - .gitleaksignore
       - .mcp.json
       - .cursor/mcp.json
-      # Auth and access: who an actor is and what it may see.
-      - '**/auth/**'
-      - packages/access/**
-      - packages/identity/**
       # Migrations, the paths tools/check-migrations.ts matches. A deployed
       # migration can lose data.
       - '{apps,features,packages}/**/migrations/**'
@@ -63,6 +59,14 @@ rules:
       - docs/principles/**
       - docs/contributing/project-intent.md
       - .clutch/PLAN.md
+  - tier: one-way-door
+    # Auth and access: who an actor is and what it may see. When each journey
+    # exists on the default branch, proof holds these paths and the owner does not.
+    paths:
+      - '**/auth/**'
+      - packages/access/**
+      - packages/identity/**
+    journeys: [sign-up, sign-in, roles-and-access, account-security]
   - tier: one-way-door
     # Credentials and permissions in a workflow: its token permissions, an
     # environment, a secret, an app token's permissions, or a trigger that runs
@@ -77,13 +81,12 @@ rules:
       - '^\s*permission-[a-z-]+:'
       - '^\s*(pull_request_target|workflow_run):'
   - tier: one-way-door
-    # The automerge and agentReview sections of clutch.yaml. The rest of the
+    # The automerge section of clutch.yaml. The rest of the
     # file, such as capabilities, is medium.
     paths:
       - clutch.yaml
     lines:
       - '^automerge:'
-      - '^agentReview:'
       - '^\s+(step|owner|missingCredential):'
       - '^\s+mode:\s*(on|off|dry-run)\b'
   - tier: one-way-door

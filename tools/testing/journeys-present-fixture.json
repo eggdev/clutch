@@ -1,0 +1,9 @@
+{
+  "files": {
+    "features/a/journeys/first-visit.pw.ts": "/**\n * Core: sign-up\n */\n",
+    "features/a/journeys/notes.pw.ts": "test('notes', () => {});\n",
+    "features/b/journeys/open-app.maestro.yaml": "# Core: sign-in\nappId: app\n",
+    "features/b/journeys/readme.md": "Core: not-a-journey\n"
+  },
+  "expected": ["first-visit", "notes", "open-app", "sign-in", "sign-up"]
+}

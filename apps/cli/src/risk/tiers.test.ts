@@ -1,6 +1,10 @@
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
-import { changeTier, classify, validateRiskConfig } from '@/risk/tiers';
+import { changeTier, classify, heldRules, journeysPresent, validateRiskConfig } from '@/risk/tiers';
 import type { RiskConfig } from '@/risk/tiers';
 
 const config: RiskConfig = {
@@ -103,4 +107,46 @@ test('lines must be a list of valid regular expressions', () => {
     { path: 'rules.0.lines', message: 'Expected a list of regular expressions.' },
   ]);
   expect(validateRiskConfig(linesRule(['^a'])).config?.rules[0].lines).toEqual(['^a']);
+});
+
+test('a rule with journeys holds until each one exists', () => {
+  const rule = { journeys: ['sign-in', 'sign-up'] };
+  const plain = {};
+  expect(heldRules([rule, plain], new Set(['sign-in']))).toEqual([rule, plain]);
+  expect(heldRules([rule, plain], new Set(['sign-in', 'sign-up']))).toEqual([plain]);
+});
+
+test('journeysPresent names each file and its Core line', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'risk-journeys-'));
+  try {
+    await mkdir(path.join(root, 'features/a/journeys'), { recursive: true });
+    await writeFile(
+      path.join(root, 'features/a/journeys/first-visit.pw.ts'),
+      '/**\n * Core: sign-up\n */\n',
+    );
+    expect([...journeysPresent(root)].toSorted()).toEqual(['first-visit', 'sign-up']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// tools/codeowners.ts keeps a copy of journeysPresent, since a project has no
+// CLI source. Its test reads the same fixture and expects the same names.
+test('journeysPresent gives the names of the shared fixture', async () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      path.join(import.meta.dir, '../../../../tools/testing/journeys-present-fixture.json'),
+      'utf-8',
+    ),
+  ) as { files: Record<string, string>; expected: Array<string> };
+  const root = await mkdtemp(path.join(tmpdir(), 'risk-journeys-fixture-'));
+  try {
+    for (const [name, content] of Object.entries(fixture.files)) {
+      await mkdir(path.join(root, path.dirname(name)), { recursive: true });
+      await writeFile(path.join(root, name), content);
+    }
+    expect([...journeysPresent(root)].toSorted()).toEqual(fixture.expected);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

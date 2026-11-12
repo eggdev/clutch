@@ -15,7 +15,8 @@ Inspect the checkout before editing. Use [task records](./references/task-record
 for one authoritative brief, evidence and resume point; do not invent a ticket.
 
 Extract outcome, acceptance criteria, exclusions, destination and permissions.
-An unspecified destination means a verified local result, not merge or release.
+An issue with `owner: agent` ends merged to `main`. Any other unspecified
+destination means a verified local result, not merge or release.
 A plain task request does not authorize an unattended queue.
 
 Before asking anything: reuse a settled decision; look up observable facts;
@@ -61,6 +62,9 @@ open one issue in the same form:
 `mise exec -- bun run pr ask --title "<the question>" --body-file <file>`. It
 labels the issue `needs-owner` and assigns the owner. It refuses a section with
 no text. Read the answer on the issue, and close it with `gh issue close <n>`.
+
+When the issue says `Hand test: yes`, ask the owner to test it after it deploys,
+with its link. The merge does not wait for that test.
 
 After the owner answers, write the answer into the issue or project intent, so
 no agent asks again. Then merge on proof. A held path still needs the owner's
