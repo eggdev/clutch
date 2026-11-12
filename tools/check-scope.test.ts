@@ -85,3 +85,15 @@ test('after kickoff, a new feature needs an issue with a goal from project inten
   git('add', '-A');
   expect(checkScope(root, 'HEAD', limits)[0]).toContain('goal:');
 });
+
+test('a hand_test line in the body of an issue does not count', async () => {
+  await write('KICKOFF.md', '# Kickoff\n');
+  git('add', '-A');
+  git('commit', '-qm', 'kickoff');
+  await write('features/a/screens/x.tsx', 'x\n');
+  await write('.clutch/issues/CL-1.md', '---\nid: CL-1\n---\n\nhand_test: yes\n');
+  git('add', '-A');
+  const errors = checkScope(root, 'HEAD', { ...limits, max: 100 });
+  expect(errors).toHaveLength(1);
+  expect(errors[0]).toContain('hand_test');
+});

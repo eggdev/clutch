@@ -53,10 +53,16 @@ function contentOf(root: string, head: string | null, file: string) {
   return existsSync(path.join(root, file)) ? readFileSync(path.join(root, file), 'utf-8') : '';
 }
 
+/** The YAML frontmatter of an issue file. Empty when it has none. */
+const frontmatter = (text: string) => /^---\n([\s\S]*?)\n---(?:\n|$)/u.exec(text)?.[1] ?? '';
+
+/** Whether a changed issue states `hand_test:` in its frontmatter. A body line does not count. */
 function statesHandTest(root: string, head: string | null, files: ReadonlyArray<string>) {
   return files
     .filter((file) => issue.test(file))
-    .some((file) => /^hand_test:\s*(?:yes|no)\s*$/mu.test(contentOf(root, head, file)));
+    .some((file) =>
+      /^hand_test:\s*(?:yes|no)\s*$/mu.test(frontmatter(contentOf(root, head, file))),
+    );
 }
 
 const intentFile = 'docs/contributing/project-intent.md';

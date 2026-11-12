@@ -3,6 +3,13 @@
 Each PR gets its own preview deploy. A merge to `main` deploys production. There
 is no staging step.
 
+The [Deploy workflow](../../../.github/workflows/deploy.yml) runs after each
+green CI run of a push to `main`, one run at a time. `deploy:` in `clutch.yaml`
+names the command and the production URL. `tools/deploy.ts` deploys, then runs
+the core journeys on production, and runs them once more on a failure. A second
+failure marks the deploy red and opens one `needs-owner` question. See
+[where journeys run](./verification.md#where-journeys-run).
+
 <!-- kickoff: The hosting for previews, the preview URL pattern, the workflow that deploys it, and what each preview gets of its own (database, storage, mail). Delete this page when the hosting cannot run previews, and say so in local-development.md. -->
 
 ## A healthy preview proves nothing about a flow
