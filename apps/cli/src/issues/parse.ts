@@ -90,7 +90,11 @@ export function parseIssue(
   }
   const errors: Array<IssueError> = [];
   for (const field of Object.keys(data)) {
-    if (!(field in checks)) {
+    if (field === 'hand_test') {
+      if (data[field] !== 'yes' && data[field] !== 'no') {
+        errors.push({ file, field, message: `Expected yes or no. Got ${show(data[field])}.` });
+      }
+    } else if (!(field in checks)) {
       errors.push({ file, field, message: 'Unknown field.' });
     }
   }

@@ -1,6 +1,6 @@
 ---
 name: design-proposal
-description: Create, iterate, adopt and retire a design proposal - today's screen next to 2 or 3 directions, built on the project's real components and tokens, rendered in the app at phone and desktop widths, for the owner to pick one. Use before building a new visible feature or a material UI change, when the owner answers a proposal, when the build of an adopted proposal ships, and when gardening lists a stale proposal. Skip it for a routine change.
+description: Create, iterate, adopt and retire a design proposal - today's screen next to 2 or 3 directions, built on the project's real components and tokens, rendered in the app at phone and desktop widths, for the owner to pick one. Use when the owner asks for options on a new visible feature or a material UI change, when the owner answers a proposal, when the build of an adopted proposal ships, and when gardening lists a stale proposal. Skip it for a routine change.
 ---
 
 # Design proposals
@@ -17,18 +17,19 @@ checks both, in `validate`.
 
 ## When to propose
 
-| Change                                                                  | Propose? |
-| ----------------------------------------------------------------------- | -------- |
-| A new screen, flow or visible feature                                   | Yes      |
-| A change to the layout, hierarchy or primary action of a screen         | Yes      |
-| A new visual pattern that the design system has no component for        | Yes      |
-| A bug fix, a copy fix, a token value, a state an adopted spec describes | No       |
-| Work inside an adopted proposal                                         | No: build it |
-| Internal refactor with no visible change                                | No       |
+Propose only when the owner asks for options. Otherwise build your pick and
+state `hand_test:` in the issue, as the deliver skill says.
 
-When unsure, ask one question: would the owner want to choose between two
-versions of this? If not, build it. Proposals are cheap, but the owner's
-attention is not.
+| Change                                                                  | Propose?                     |
+| ----------------------------------------------------------------------- | ---------------------------- |
+| A new screen, flow or visible feature                                   | Only when the owner asks     |
+| A change to the layout, hierarchy or primary action of a screen         | Only when the owner asks     |
+| A new visual pattern that the design system has no component for        | Only when the owner asks     |
+| A bug fix, a copy fix, a token value, a state an adopted spec describes | No                           |
+| Work inside an adopted proposal                                         | No: build it                 |
+| Internal refactor with no visible change                                | No                           |
+
+Proposals are cheap, but the owner's attention is not.
 
 ## Lifecycle
 

@@ -63,7 +63,7 @@ open one issue in the same form:
 labels the issue `needs-owner` and assigns the owner. It refuses a section with
 no text. Read the answer on the issue, and close it with `gh issue close <n>`.
 
-When the issue says `Hand test: yes`, ask the owner to test it after it deploys,
+When the issue says `hand_test: yes`, ask the owner to test it after it deploys,
 with its link. The merge does not wait for that test.
 
 After the owner answers, write the answer into the issue or project intent, so
@@ -110,10 +110,9 @@ When a consequential design choice remains open, use the research and design
 procedure to test a usage sketch or prototype before committing to it. A
 settled direction proceeds to implementation without another planning gate.
 
-A new visible feature or a material UI change starts with a
-[design proposal](../design-proposal/SKILL.md), unless an adopted proposal
-already covers it. Build against the adopted proposal's spec, and name it in
-the PR. When the build ships, retire the proposal in the same PR.
+Build your pick of a new visible feature. Do not wait for a design choice.
+State `hand_test:` in the issue, and the owner looks after it deploys. Use a
+[design proposal](../design-proposal/SKILL.md) only when the owner asks for options.
 
 ## Verify and finalize
 

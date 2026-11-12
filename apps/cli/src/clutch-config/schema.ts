@@ -10,7 +10,6 @@ const modes = ['sync', 'doctor'] as const;
 const automergeModes = ['off', 'dry-run', 'on'] as const;
 const automergeSteps = ['bots', 'low', 'medium'] as const;
 const sastEngines = ['auto', 'codeql', 'semgrep'] as const;
-const missingCredentials = ['notice', 'fail'] as const;
 const loginPattern = /^[a-z\d](?:[a-z\d-]{0,38})$/iu;
 
 type CapabilityStatus = (typeof capabilityStatuses)[number];
@@ -54,13 +53,8 @@ export type ClutchConfig = {
    * scanning takes results and Semgrep elsewhere.
    */
   sast?: (typeof sastEngines)[number];
-  /** When `clutch labels` warns about a large PR. It never fails one. */
-  pr_size?: { warn: number; exclude: Array<string> };
-  /**
-   * What agent-review.yml does without an Anthropic credential: pass with a
-   * notice (the default), or fail, once agent review is a required check.
-   */
-  agentReview?: { missingCredential: (typeof missingCredentials)[number] };
+  /** When `clutch labels` warns about a large PR, and when a PR must split. */
+  pr_size?: { warn: number; max?: number; exclude: Array<string> };
   /** Whether the project has each core journey. See docs/contributing/journeys/core.md. */
   coreJourneys?: Record<CoreJourney, CoreDecision>;
   /** The quality budgets of the core journeys, which kickoff fills. */
@@ -311,34 +305,23 @@ function readPrSize(value: unknown, errors: Errors) {
     errors.push({ path: 'pr_size', message: 'Expected a map with warn and exclude.' });
     return;
   }
-  unknownKeys(value, ['warn', 'exclude'], 'pr_size', errors);
-  const { warn = 300, exclude = [] } = value;
+  unknownKeys(value, ['warn', 'max', 'exclude'], 'pr_size', errors);
+  const { warn = 300, max, exclude = [] } = value;
   const before = errors.length;
-  if (typeof warn !== 'number' || !Number.isInteger(warn) || warn < 1) {
-    errors.push({ path: 'pr_size.warn', message: 'Expected a whole number of lines.' });
+  for (const [key, lines] of [
+    ['warn', warn],
+    ['max', max ?? 1],
+  ] as const) {
+    if (typeof lines !== 'number' || !Number.isInteger(lines) || lines < 1) {
+      errors.push({ path: `pr_size.${key}`, message: 'Expected a whole number of lines.' });
+    }
   }
   if (!isStringList(exclude)) {
     errors.push({ path: 'pr_size.exclude', message: 'Expected a list of globs.' });
   }
   return errors.length === before
-    ? { warn: warn as number, exclude: exclude as Array<string> }
+    ? { warn: warn as number, max: max as number | undefined, exclude: exclude as Array<string> }
     : undefined;
-}
-
-function readAgentReview(value: unknown, errors: Errors) {
-  if (!isObject(value)) {
-    errors.push({ path: 'agentReview', message: 'Expected a map with missingCredential.' });
-    return;
-  }
-  unknownKeys(value, ['missingCredential'], 'agentReview', errors);
-  if (!oneOf(missingCredentials, value.missingCredential)) {
-    errors.push({
-      path: 'agentReview.missingCredential',
-      message: `Expected ${missingCredentials.join(' or ')}.`,
-    });
-    return;
-  }
-  return { missingCredential: value.missingCredential };
 }
 
 /** The optional sections. Each reader returns the typed value, or nothing after an error. */
@@ -348,7 +331,6 @@ const optionalSections: Record<string, (value: unknown, errors: Errors) => unkno
   autoRevert: readAutoRevert,
   pr: readPr,
   fleet: readFleet,
-  agentReview: readAgentReview,
   pr_size: readPrSize,
   journeys: readJourneys,
   coreJourneys: readCoreJourneys,

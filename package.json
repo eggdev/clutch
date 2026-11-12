@@ -213,6 +213,13 @@
         },
         "cache": false
       },
+      "check-scope": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun tools/check-scope.ts"
+        },
+        "cache": false
+      },
       "check-file-size": {
         "executor": "nx:run-commands",
         "options": {
@@ -300,6 +307,7 @@
           "check-bundle",
           "check-decisions",
           "check-proposals",
+          "check-scope",
           "check-file-size",
           "check-kickoff-slots",
           "check-primitives",
