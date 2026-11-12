@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 (2026-11-12)
+
+### Features
+
+- Hold a PR that removes a screen or route, and tie a new feature to a user goal from project intent.
+
 ## 1.2.0 (2026-11-12)
 
 ### Features
