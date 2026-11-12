@@ -13,7 +13,7 @@ Rank 7 of the researched practices. About seven in ten of the leading repositori
 ## Adopt
 
 1. Add `.clutch/risk.yaml` with rules. Each rule maps a tier to a list of path globs. The highest matching tier wins, whatever the rule order.
-2. Put only the hard core in the highest tier. That is the merge gate, credentials and workflow permissions, auth, migrations, billing and infra. Decision records and policy docs belong there too. Use a `lines` rule for a part of a file, such as a workflow's `permissions:`. Put docs and tests in the lowest tier, and every other path in `medium`. See [decision record 0002](../decisions/0002-merge-most-prs-with-no-human.md).
+2. Put only the hard core in the highest tier. That is the merge gate, credentials and workflow permissions, auth, a migration that can lose data, billing and infra. Project intent belongs there too. Use a `lines` rule for a part of a file, such as a workflow's `permissions:`. Put docs and tests in the lowest tier, and every other path in `medium`. See [decision record 0002](../decisions/0002-merge-most-prs-with-no-human.md).
 3. Add a CI job that labels each pull request with its tier, such as `risk/low`.
 4. Add a workflow that runs `gh pr merge --auto` for a low-risk pull request, with the merge method that the branch rules allow. Require an allowed author and green required checks. Clutch's workflow uses `--merge`, and it counts a PR as an agent's when a bot opened it, or when it is on a `clutch/cl-` branch.
 5. Start in a dry-run mode that comments instead of merging. Compare the comments with human judgment.

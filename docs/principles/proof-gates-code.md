@@ -59,8 +59,9 @@ app can break sign-in as surely as a change to auth.
 
 A sensitive path in `.clutch/risk.yaml` can name its journeys under `journeys:`.
 When each one exists on the default branch, its path leaves the owner's hold and
-CODEOWNERS. Sensitive paths include auth, billing, roles and access, migrations,
-credentials and the merge gate. A change to a sensitive path merges when:
+CODEOWNERS. Sensitive paths include auth, billing, roles and access, a migration
+that can lose data, credentials and the merge gate. A change to a sensitive path
+merges when:
 
 1. each journey that its paths name passes on the PR head, on each platform
    that the change reaches

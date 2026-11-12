@@ -459,7 +459,7 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
 - A rule with `journeys` holds nothing once each named journey exists on the
   default branch. `tools/codeowners.ts` then leaves it out of CODEOWNERS too.
 - A rule with `lines` matches a file only when one of its added or removed
-  lines matches one of those regular expressions. `tools/codeowners.ts` leaves
+  lines matches one of those regular expressions, in upper or lower case. `tools/codeowners.ts` leaves
   such a rule out of CODEOWNERS, which cannot express it.
 - The rules and the CLI come from the working tree. The
   [Labels workflow](../../.github/workflows/labels.yml) checks out the base
@@ -474,16 +474,17 @@ Clutch's own rules follow
 `one-way-door` holds only the hard core:
 
 - The merge gate: `.github/rulesets`, CODEOWNERS, `.clutch/risk.yaml`, the
-  guardrail list, the auto-merge script and workflow, agent review and
-  `review.md`, and the code that computes a tier.
+  guardrail list, the auto-merge script and workflow, agent review, and the
+  code that computes a tier.
 - Credentials: secret scanning and the MCP configs. A workflow change to
   `permissions:`, an environment, a secret, an app token's permissions or a
   privileged trigger. The `automerge` section of `clutch.yaml`.
-- Auth (`packages/access`, `packages/identity` and any `auth` folder) and
-  migrations.
+- Auth (`packages/access`, `packages/identity` and any `auth` folder), until
+  its journeys exist.
+- A migration whose SQL can lose data.
 - A billing rule and an infra, deploy and secrets rule, both empty until a
   project names its paths.
-- Decision records, `docs/principles`, project intent and `.clutch/PLAN.md`.
+- Project intent.
 
 Docs, tests, changesets and tracker files are `low`. Every other path is
 `medium`: product code, skills, check scripts, lint config and workflows.

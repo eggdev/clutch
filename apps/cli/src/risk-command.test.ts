@@ -74,25 +74,28 @@ test('tests alone are low, and app code is medium', async () => {
 });
 
 // One run gives the tier of each path on its own, so a path that drops a tier shows by name.
-test('the hard core is a one-way door: the merge gate, auth, migrations and policy docs', async () => {
+test('the hard core is a one-way door, and policy docs are low', async () => {
   const hardCore = [
     '.github/rulesets/main.json',
     '.github/CODEOWNERS',
     'tools/github/auto-merge.ts',
     'tools/github/bot-rule.ts',
     '.github/workflows/agent-review.yml',
-    'docs/contributing/review.md',
     'apps/cli/src/risk/tiers.ts',
     'packages/identity/service/actors.ts',
     'packages/access/service/access.ts',
     'apps/api/src/auth/session.ts',
     'packages/access/repo/migrations/20261030000000_x/migration.sql',
+    'docs/contributing/project-intent.md',
+  ];
+  const policyDocs = [
+    'docs/contributing/review.md',
     'docs/contributing/decisions/0001-a.md',
     'docs/principles/fail-loudly.md',
     '.clutch/PLAN.md',
   ];
-  const risk = await riskOf([...hardCore, 'docs/a.md']);
-  expect(risk.files).toEqual({ ...eachAt(hardCore, 'one-way-door'), 'docs/a.md': 'low' });
+  const risk = await riskOf([...hardCore, ...policyDocs]);
+  expect(risk.files).toEqual({ ...eachAt(hardCore, 'one-way-door'), ...eachAt(policyDocs, 'low') });
   expect(risk.tier).toBe('one-way-door');
 });
 
