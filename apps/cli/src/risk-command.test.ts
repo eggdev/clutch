@@ -39,12 +39,28 @@ async function changeOf(files: Array<string> | Record<string, string>) {
   return repo;
 }
 
-async function tierOf(files: Array<string> | Record<string, string>) {
+/** One run of `clutch risk` over a change: the tier of the change, and the tier of each file by its path. */
+async function riskOf(files: Array<string> | Record<string, string>) {
   await using repo = await changeOf(files);
   const result = await clutchRisk(repo.root, '--base', 'main', '--json');
   expect(result.code).toBe(0);
-  return JSON.parse(result.stdout).tier;
+  const report: { tier: string; files: Array<{ path: string; tier: string }> } = JSON.parse(
+    result.stdout,
+  );
+  return {
+    tier: report.tier,
+    files: Object.fromEntries(report.files.map((file) => [file.path, file.tier])),
+  };
 }
+
+async function tierOf(files: Array<string> | Record<string, string>) {
+  const risk = await riskOf(files);
+  return risk.tier;
+}
+
+/** Each path with one tier, as `riskOf` lists the files of a change. */
+const eachAt = (paths: ReadonlyArray<string>, tier: string) =>
+  Object.fromEntries(paths.map((file) => [file, tier]));
 
 test('a docs-only change is low', async () => {
   expect(
@@ -62,7 +78,7 @@ test('tests alone are low, and app code is medium', async () => {
 });
 
 test('the hard core is a one-way door: the merge gate, auth, migrations and policy docs', async () => {
-  for (const file of [
+  const hardCore = [
     '.github/rulesets/main.json',
     '.github/CODEOWNERS',
     'tools/github/auto-merge.ts',
@@ -77,13 +93,17 @@ test('the hard core is a one-way door: the merge gate, auth, migrations and poli
     'docs/contributing/decisions/0001-a.md',
     'docs/principles/fail-loudly.md',
     '.clutch/PLAN.md',
-  ]) {
-    expect(await tierOf([file, 'docs/a.md'])).toBe('one-way-door');
-  }
+  ];
+  // One run gives the tier of each path on its own, so a path that drops a tier shows by name.
+  const risk = await riskOf([...hardCore, 'docs/a.md']);
+  expect(risk.files).toEqual({ ...eachAt(hardCore, 'one-way-door'), 'docs/a.md': 'low' });
+  expect(risk.tier).toBe('one-way-door');
+  // One hard-core path beside a docs file is enough to make the change a one-way door.
+  expect(await tierOf(['.clutch/PLAN.md', 'docs/a.md'])).toBe('one-way-door');
 });
 
 test('skills, check scripts, lint config, workflows and any unlisted path are medium or low', async () => {
-  for (const file of [
+  const medium = [
     '.github/workflows/ci.yml',
     'tools/check-workflows.ts',
     'tools/github/pr.ts',
@@ -94,24 +114,30 @@ test('skills, check scripts, lint config, workflows and any unlisted path are me
     'packages/sync/service/push.ts',
     'bun.lock',
     'vite.config.ts',
-  ]) {
-    expect(await tierOf([file, 'docs/a.md'])).toBe('medium');
-  }
+  ];
+  const risk = await riskOf([...medium, 'docs/a.md']);
+  expect(risk.files).toEqual({ ...eachAt(medium, 'medium'), 'docs/a.md': 'low' });
+  expect(risk.tier).toBe('medium');
   expect(await tierOf(['AGENTS.md', '.agents/skills/deliver/SKILL.md'])).toBe('low');
 });
 
 test('a workflow permission or secret, or the automerge section, is a one-way door', async () => {
-  const workflow = '.github/workflows/ci.yml';
-  expect(await tierOf({ [workflow]: 'jobs:\n  a:\n    runs-on: x\n' })).toBe('medium');
-  for (const line of [
+  const lines = [
     'permissions:',
     '      contents: write',
     '    environment: release',
     '        token: secrets.T',
     '  workflow_run:',
-  ]) {
-    expect(await tierOf({ [workflow]: `${line}\n` })).toBe('one-way-door');
-  }
+  ];
+  // Each workflow file holds one line, so one run shows which line sets the tier of its file.
+  const guarded = lines.map((_line, index) => `.github/workflows/guarded-${index}.yml`);
+  const plain = '.github/workflows/ci.yml';
+  const risk = await riskOf({
+    [plain]: 'jobs:\n  a:\n    runs-on: x\n',
+    ...Object.fromEntries(guarded.map((file, index) => [file, `${lines[index] ?? ''}\n`])),
+  });
+  expect(risk.files).toEqual({ [plain]: 'medium', ...eachAt(guarded, 'one-way-door') });
+  expect(await tierOf({ [plain]: 'jobs:\n  a:\n    runs-on: x\n' })).toBe('medium');
   expect(await tierOf({ 'clutch.yaml': 'capabilities:\n  ci: adopted\n' })).toBe('medium');
   expect(await tierOf({ 'clutch.yaml': 'automerge:\n  step: medium\n' })).toBe('one-way-door');
 });
