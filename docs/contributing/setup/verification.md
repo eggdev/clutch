@@ -10,7 +10,7 @@ distinguishes delivery, authoring, execution, audit and recap.
 
 Clutch has two kinds of surface.
 
-- **The starter app.** `apps/web` and `apps/api` run together through
+- **The starter app.** `apps/app` and `apps/api` run together through
   `mise exec -- bun run dev`. It reuses running servers and prints the
   portless URLs. Open the web URL in a browser to check a screen or a sync
   flow. See [local development](./local-development.md).
@@ -30,10 +30,11 @@ A green gate while KICKOFF.md exists does not establish that kickoff has closed.
 A journey proves one user goal through the real app. Each one lives in the
 feature that it proves:
 
-| File                                         | Platform | Runner     |
-| -------------------------------------------- | -------- | ---------- |
-| `features/<name>/journeys/<id>.pw.ts`        | Web      | Playwright |
-| `features/<name>/journeys/<id>.maestro.yaml` | Native   | Maestro    |
+| File                                         | Platform | Runner                 |
+| -------------------------------------------- | -------- | ---------------------- |
+| `features/<name>/journeys/<id>.pw.ts`        | Web      | Playwright             |
+| `features/<name>/journeys/<id>.maestro.yaml` | Native   | Maestro                |
+| `features/<name>/journeys/<id>.journey.ts`   | Both     | Playwright and Maestro |
 
 The header of each journey follows the
 [journey specification](../../../.agents/skills/setup-verification/references/journey-specification.md).
@@ -71,8 +72,8 @@ python3 tools/verification/verify.py --config .agents/skills/verify/verification
 `check-journeys` rejects these problems:
 
 - A feature with a screen that an app ships, but no journey for that platform.
-  This check counts `apps/web` as the web app, and `journeys.webApp` does not
-  change it. A native app has the Nx tag `platform:native`.
+  An app that depends on `expo` or `react-native` ships the feature on native.
+  A web app ships it on web. `tools/apps.ts` defines both rules.
 - A journey header with no goal line, or no `Contract:`, `Entry:` or
   `Isolation and cleanup:` line.
 - A journey that `verification.json` does not register, and a flow that runs a
@@ -90,6 +91,24 @@ Each web journey also calls `accessible(page, 'where')` from
 `@repo/journeys/testing/a11y` after each step that renders a page. It fails on
 any axe violation. See
 [accessibility checks](../capabilities/a11y-checks.md).
+
+### Verify report
+
+`bun run verify` runs the journeys, then prints one report of each journey and each device.
+
+```sh
+mise exec -- bun run verify notes-sync
+```
+
+Pass journey IDs, or pass none to run every web journey. The report shows each
+outcome that a device recorded. It also shows each screen finding under `As shown`
+and under `At the largest text size`. A finding is reported, and it never fails a journey.
+
+The last line counts the failed journeys and the findings. It reads `Done: each journey passed, with no screen finding.` when both counts are zero.
+The exit code is 1 when a journey fails, or when the runner exits with an error.
+The report runs no device. For each native app, it prints a `Native: not run` line before the last line.
+`tools/journeys/verify.test.ts` holds that line.
+See [screen findings](../end-to-end-testing.md#screen-findings).
 
 ### Screenshots
 
@@ -141,8 +160,8 @@ To change a screen on purpose:
 To seed a baseline from a design, copy its PNG to the baseline path. CI
 confirms it, or fails and uploads the real shot.
 
-The `feature` generator writes a draft journey and its flow. Replace the draft
-goal with the real one before the feature ships.
+The `feature` generator writes a draft journey in data form, and registers its
+web flow. Replace the draft goal with the real one before the feature ships.
 
 ### Where journeys run
 
@@ -155,8 +174,8 @@ They run in these places:
 
 A web journey runs against the web app. `journeys.webApp` in `clutch.yaml`
 names it, as `apps/app`. Without the key, it is the one app under `apps/` with
-an Nx `dev` target, not tagged `platform:server` or `platform:native`. Several
-such apps without the key fail the run.
+an Nx `dev` target and is a web app. Several such apps without the key fail the
+run.
 
 When a feature ships a screen and no journey ran, `--all` exits 1 and names the
 feature. When no feature ships a screen and no web journey exists, `--all` exits 0 and

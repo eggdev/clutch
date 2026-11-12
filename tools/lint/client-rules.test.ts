@@ -69,7 +69,7 @@ test('client code never uses the network or device storage, and the sync engine 
       {
         'apps/web/src/save.ts': "window.localStorage.setItem('draft', '1');",
         'features/notes/gate.ts': "export const socket = new WebSocket('wss://x');",
-        'packages/notes/models/note.ts': "export const ping = () => navigator.sendBeacon('/a');",
+        'packages/notes/contract/notes.ts': "export const ping = () => navigator.sendBeacon('/a');",
         'packages/notes/commands/rename-note.ts': 'export const db = indexedDB;',
         'packages/notes/ui/use-notes.ts': "export const load = () => globalThis.fetch('/a');",
       },
@@ -79,7 +79,7 @@ test('client code never uses the network or device storage, and the sync engine 
     'apps/web/src/save.ts eslint/no-restricted-properties',
     'features/notes/gate.ts eslint/no-restricted-globals',
     'packages/notes/commands/rename-note.ts eslint/no-restricted-globals',
-    'packages/notes/models/note.ts eslint/no-restricted-properties',
+    'packages/notes/contract/notes.ts eslint/no-restricted-properties',
     'packages/notes/ui/use-notes.ts eslint/no-restricted-properties',
   ]);
   expect(
@@ -103,14 +103,14 @@ test('client code imports Effect and schemas as types only', async () => {
           "import { Note } from '@repo/notes/types/note'; export const x = Note;",
         'packages/notes/ui/use-notes.ts':
           "import { Schema } from 'effect'; export const x = Schema;",
-        'packages/notes/models/note.ts':
+        'packages/notes/contract/notes.ts':
           "import { RpcClient } from 'effect/rpc'; export const x = RpcClient;",
       },
       plugins,
     ),
   ).toEqual([
     'features/notes/components/note-row.tsx eslint/no-restricted-imports',
-    'packages/notes/models/note.ts eslint/no-restricted-imports',
+    'packages/notes/contract/notes.ts eslint/no-restricted-imports',
     'packages/notes/ui/use-notes.ts eslint/no-restricted-imports',
   ]);
   expect(

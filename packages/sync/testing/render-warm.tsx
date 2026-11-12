@@ -1,7 +1,8 @@
+import type { Replayable } from '@repo/sync/contract/command';
 import { createPool } from '@repo/sync/runtime/pool';
 import type { Pool } from '@repo/sync/runtime/pool';
+import type { PoolDeclarations } from '@repo/sync/runtime/pool-doors';
 import type { PoolState } from '@repo/sync/types/local-database';
-import type { Replayable } from '@repo/sync/types/records';
 import { SyncProvider } from '@repo/sync/ui/sync-provider';
 import type { ReactElement } from 'react';
 import { renderToString } from 'react-dom/server';
@@ -16,9 +17,10 @@ const networkGlobals = ['fetch', 'WebSocket', 'XMLHttpRequest', 'EventSource'] a
 export function renderWarm(
   screen: (pool: Pool) => ReactElement,
   state: PoolState,
-  commands: ReadonlyArray<Replayable> = [],
+  changes: ReadonlyArray<Replayable>,
+  declarations: PoolDeclarations,
 ): string {
-  const pool = createPool(commands);
+  const pool = createPool(changes, declarations);
   pool.load(state);
   const calls: Array<string> = [];
   const saved = networkGlobals.map((name) => [name, Reflect.get(globalThis, name)] as const);

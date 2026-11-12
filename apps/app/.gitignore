@@ -1,0 +1,20 @@
+node_modules
+dist
+out-tsc
+*.tsbuildinfo
+.DS_Store
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+.expo
+
+# generated code
+/ios
+/android
+/app/routes.d.ts
+/lib/native-styles.generated.json

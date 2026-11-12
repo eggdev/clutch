@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "out-tsc/lib/tsconfig.lib.tsbuildinfo",
     "lib": ["es2024", "dom", "dom.iterable"],
     "jsx": "react-jsx",
-    "types": []
+    "types": ["react-native-css/types"]
   },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": [

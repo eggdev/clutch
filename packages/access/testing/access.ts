@@ -1,4 +1,4 @@
-import { migrateAccess } from '@repo/access/runtime/migrate.server';
+import { migrateAccess } from '@repo/access/runtime/server.server';
 import { SyncGroupsFromAccess } from '@repo/access/service/access';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { DatabaseTest } from '@repo/sync/testing/database';

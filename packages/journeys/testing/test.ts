@@ -1,4 +1,5 @@
 import { test as base } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { accessible } from '@repo/journeys/testing/a11y';
 import {
   flush,
@@ -8,6 +9,29 @@ import {
   startMeasure,
   writeMeasure,
 } from '@repo/journeys/testing/measure';
+import type { Measure, ScreenFindings } from '@repo/journeys/testing/measure';
+import { atLargestText, screenProblems } from '@repo/journeys/testing/screen';
+
+/**
+ * The screen findings of the last page: its layout problems as shown, and at
+ * the largest text size. The font change makes layout shifts that no person
+ * causes, so the shifts that it sends are dropped from the measure.
+ */
+async function findingsOf(page: Page, measure: Measure): Promise<ScreenFindings> {
+  const before = measure.shifts.length;
+  const asShown = await screenProblems(page);
+  const largestText = await atLargestText(page, () => screenProblems(page));
+  // The page sends each shift a moment after it happens, so two frames pass first.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+  await flush(page);
+  measure.shifts.splice(before);
+  return { asShown, largestText };
+}
 
 /**
  * The `test` of every web journey. It is Playwright's `test`, and it measures
@@ -19,6 +43,8 @@ import {
  *   in a `<select>`. `outcome()` fails a core journey over its click budget.
  * - each axe result. `outcome()` runs axe after each outcome holds, and this
  *   runs it once more on the last page.
+ * - each layout problem of the last page, as shown and at the largest text
+ *   size. A passed try records them, and they never fail it.
  *
  * A measured budget that fails on any try fails the run, even when the retry
  * passes. The measures file names the kind of each failure. A journey takes
@@ -28,7 +54,13 @@ import {
 export const test = base.extend<{ journeyMeasure: null }>({
   journeyMeasure: [
     async ({ context, page }, use, info) => {
-      const measure = await startMeasure(context, info);
+      // A data journey registers its test from journey.ts, so the file of the journey comes from its annotation.
+      const declared = info.annotations.find((item) => item.type === 'journey-file')?.description;
+      const measure = await startMeasure(context, {
+        file: declared ?? info.file,
+        retry: info.retry,
+        project: info.project,
+      });
       await use(null);
       const passed = info.status === info.expectedStatus;
       let thrown: unknown = null;
@@ -54,6 +86,10 @@ export const test = base.extend<{ journeyMeasure: null }>({
           kindOf(info),
           info.error?.message ?? `The try ended as ${info.status}.`,
         );
+      }
+      // Reported in the measures, and never a failure of the try.
+      if (passed && !page.isClosed()) {
+        measure.screen = await findingsOf(page, measure);
       }
       writeMeasure(measure, {
         status: passed && thrown === null ? 'passed' : 'failed',

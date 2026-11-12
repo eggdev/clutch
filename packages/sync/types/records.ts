@@ -1,33 +1,4 @@
-import type { Shape } from '@repo/sync/models/shape';
-
-/** One record in the object pool. Its fields are plain JSON, as the server sent them. */
-export type RecordRow = { readonly id: string } & Readonly<Record<string, unknown>>;
-
-/** What `groupsOf` may read besides the record: the organization that owns it. */
-export type GroupScope = { readonly organizationId: string };
-
-/**
- * The definition of one kind of record. Screens read records of a model from
- * the pool. `groupsOf` names the sync groups of a record: a client gets the
- * record only when it has loaded one of them. `is` checks a record from the
- * pool against the fields of the model, so code reads it with its type.
- */
-export type Model<Row extends RecordRow> = {
-  readonly name: string;
-  readonly groupsOf: (record: Row, scope: GroupScope) => ReadonlyArray<string>;
-  readonly is: (record: RecordRow) => record is Row;
-  /** Only for types. A model holds no rows. */
-  readonly row?: Row;
-};
-
-/**
- * A load function: how a screen asks for the records of one group, such as
- * the notes of one space. A gate calls it before it navigates.
- */
-export type Load<Args extends ReadonlyArray<unknown>> = {
-  readonly model: string;
-  readonly group: (...args: Args) => string;
-};
+import type { Model, RecordRow } from '@repo/sync/contract/record';
 
 /** How a list of IDs is sorted: by one field, then by ID so the order is stable. */
 export type Order<Row extends RecordRow> = {
@@ -65,49 +36,19 @@ export type ReadablePool = {
     id: string,
     listener: () => void,
   ) => () => void;
-  /** The last rejected transaction and its reason, for the screen that sent it. */
+  /** The last rejected transaction, with its code and reason, for the screen that sent it. */
   readonly lastRejection: () => Rejection | undefined;
   readonly watchRejection: (listener: () => void) => () => void;
 };
 
-/** The writable view that only a command's local change receives. */
-export type Draft = {
-  readonly get: <Row extends RecordRow>(model: Model<Row>, id: string) => Row | undefined;
-  readonly put: <Row extends RecordRow>(model: Model<Row>, row: Row) => void;
-  readonly remove: <Row extends RecordRow>(model: Model<Row>, id: string) => void;
-};
-
-export type Rejection = { readonly transactionId: string; readonly reason: string };
-
 /**
- * What a command author writes: its name, whether it waits for the server,
- * the shape of its input, and its local change. A command that waits for the
- * server shows nothing until its delta arrives, so it needs no local change.
+ * Why the server refused a transaction. `code` is stable: it is a refusal
+ * that the command declares, or a built-in one. Code branches on it. `reason`
+ * is the sentence that the screen shows.
  */
-export type CommandDefinition<Input> =
-  | {
-      readonly name: string;
-      readonly waits: 'local';
-      readonly input: Shape<Input>;
-      readonly apply: (draft: Draft, input: Input) => void;
-    }
-  | {
-      readonly name: string;
-      readonly waits: 'server';
-      readonly input: Shape<Input>;
-      readonly apply?: (draft: Draft, input: Input) => void;
-    };
-
-/**
- * What the object pool needs to run a saved transaction again: the input of
- * a saved transaction is plain JSON, so `replay` checks it against the input
- * shape before it runs the local change.
- */
-export type Replayable = {
-  readonly name: string;
-  readonly waits: 'local' | 'server';
-  readonly replay: (draft: Draft, input: unknown) => void;
+export type Rejection = {
+  readonly transactionId: string;
+  readonly command: string;
+  readonly code: string;
+  readonly reason: string;
 };
-
-/** One command, as `defineCommand` makes it. */
-export type Command<Input> = CommandDefinition<Input> & Replayable;

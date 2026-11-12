@@ -53,6 +53,67 @@ test('prose about a directive, a string that is not a comment, and node_modules 
   ).toEqual([]);
 });
 
+test('a file that git ignores is skipped, and a tracked file is checked', async () => {
+  const matches = await inRepo(
+    {
+      '.gitignore': 'apps/app/app/routes.d.ts\n',
+      'apps/app/app/routes.d.ts': `// ${directive('eslint', 'disable')}\n`,
+      'tools/tracked.ts': `// ${directive('eslint', 'disable')}\n`,
+    },
+    async (root) => {
+      const git = Bun.spawn(['git', '-C', root, 'init', '-q'], {
+        stdout: 'ignore',
+        stderr: 'ignore',
+      });
+      await git.exited;
+      const tracked = Bun.spawn(['git', '-C', root, 'add', '-f', 'apps/app/app/routes.d.ts'], {
+        stdout: 'ignore',
+        stderr: 'ignore',
+      });
+      await tracked.exited;
+      return checkSuppressions(root);
+    },
+  );
+  expect(matches.map((m) => `${m.file}:${m.line} ${m.label}`)).toEqual([
+    'apps/app/app/routes.d.ts:1 lint disable',
+    'tools/tracked.ts:1 lint disable',
+  ]);
+});
+
+test('a git-ignored file in a git repository is left out of the check', async () => {
+  const matches = await inRepo(
+    {
+      '.gitignore': 'apps/app/app/routes.d.ts\n',
+      'apps/app/app/routes.d.ts': `// ${directive('eslint', 'disable')}\n`,
+      'tools/checked.ts': `// ${directive('eslint', 'disable')}\n`,
+    },
+    async (root) => {
+      const git = Bun.spawn(['git', '-C', root, 'init', '-q'], {
+        stdout: 'ignore',
+        stderr: 'ignore',
+      });
+      await git.exited;
+      return checkSuppressions(root);
+    },
+  );
+  expect(matches.map((m) => `${m.file}:${m.line} ${m.label}`)).toEqual([
+    'tools/checked.ts:1 lint disable',
+  ]);
+});
+
+test('outside a git repository nothing is ignored, so every file is checked', async () => {
+  const matches = await inRepo(
+    {
+      '.gitignore': 'apps/app/app/routes.d.ts\n',
+      'apps/app/app/routes.d.ts': `// ${directive('eslint', 'disable')}\n`,
+    },
+    checkSuppressions,
+  );
+  expect(matches.map((m) => `${m.file}:${m.line} ${m.label}`)).toEqual([
+    'apps/app/app/routes.d.ts:1 lint disable',
+  ]);
+});
+
 test('a semgrep suppression needs the rule and a reason, in source, scripts and workflows', async () => {
   const semgrep = `no${'semgrep'}`;
   const matches = await inRepo(

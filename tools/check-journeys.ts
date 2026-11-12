@@ -1,11 +1,13 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { appNames, isNativeApp, isWebApp, manifestOf } from '@tools/apps';
 import { coreProblems } from '@tools/journeys/core-rules';
 import {
   coreWithout,
   fieldOf,
   headerOf,
+  isDataJourney,
   journeyCommand,
   journeys,
   verificationFile,
@@ -18,8 +20,8 @@ import ts from 'typescript';
  * This check rejects:
  *
  * - A feature with a screen that an app ships, but no journey for that app's
- *   platform. The web app is `apps/web`. A native app has the Nx tag
- *   `platform:native`.
+ *   platform. An app that depends on the feature ships it on native when it is
+ *   a native app, and on web when it is a web app. See `tools/apps.ts`.
  * - A journey with no spec header: the `<id>: <goal>` line, `Contract:`,
  *   `Entry:` and `Isolation and cleanup:`.
  * - A journey that the verify config does not register as a flow, and a flow
@@ -41,23 +43,22 @@ function readJson(file: string) {
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf-8')) : undefined;
 }
 
-/** Each platform that ships a feature: an app that depends on it. */
+/**
+ * Each platform that ships a feature: an app that depends on it ships it on
+ * native when the app is a native app, and on web when the app is a web app.
+ */
 function shippedOn(root: string, feature: string): Array<keyof typeof platforms> {
-  const apps = path.join(root, 'apps');
-  if (!existsSync(apps)) {
-    return [];
-  }
   const found = new Set<keyof typeof platforms>();
-  for (const app of readdirSync(apps)) {
-    const manifest = readJson(path.join(apps, app, 'package.json'));
-    if (!manifest?.dependencies?.[`@features/${feature}`]) {
+  for (const app of appNames(root)) {
+    const manifest = manifestOf(root, app);
+    if (!manifest.dependencies?.[`@features/${feature}`]) {
       continue;
     }
-    if (app === 'web') {
-      found.add('web');
-    }
-    if ((manifest.nx?.tags ?? []).includes('platform:native')) {
+    if (isNativeApp(manifest)) {
       found.add('native');
+    }
+    if (isWebApp(manifest)) {
+      found.add('web');
     }
   }
   return [...found];
@@ -149,6 +150,15 @@ function headerProblems(root: string, journey: Journey): Array<string> {
   for (const name of requiredFields.filter((field) => fieldOf(header, field) === undefined)) {
     problems.push(`${journey.file}: the header has no \`${name}:\` line. Add it.`);
   }
+  // A data journey imports `journey`, not `test`, and the core rules read only the script form.
+  if (isDataJourney(journey)) {
+    return fieldOf(header, 'Core') === undefined
+      ? problems
+      : [
+          ...problems,
+          `${journey.file}: a \`Core:\` journey stays in the script form, since the core journey rules read the Playwright source. Write it as features/<feature>/journeys/<id>.pw.ts.`,
+        ];
+  }
   // A core journey's own rules name this problem.
   const plain =
     journey.platform === 'web' && fieldOf(header, 'Core') === undefined
@@ -165,7 +175,10 @@ function headerProblems(root: string, journey: Journey): Array<string> {
 function registrationProblems(root: string, all: ReadonlyArray<Journey>): Array<string> {
   const flows: Record<string, Flow> = readJson(path.join(root, verificationFile))?.flows ?? {};
   const problems: Array<string> = [];
-  for (const journey of all) {
+  // A data journey has one flow, the web run. Its native run is not a registered flow.
+  for (const journey of all.filter(
+    (item) => !(isDataJourney(item) && item.platform === 'native'),
+  )) {
     const flow = flows[journey.id];
     const command = JSON.stringify([journeyCommand(journey.id)]);
     if (flow?.platform !== journey.platform || JSON.stringify(flow.commands) !== command) {
@@ -191,10 +204,12 @@ function registrationProblems(root: string, all: ReadonlyArray<Journey>): Array<
 
 export function checkJourneys(root: string): Array<string> {
   const all = journeys(root);
+  // A data journey has two entries with one file, so an ID is unique per platform.
   const seen = new Map<string, string>();
   const duplicates = all.flatMap((journey) => {
-    const other = seen.get(journey.id);
-    seen.set(journey.id, journey.file);
+    const key = `${journey.platform}:${journey.id}`;
+    const other = seen.get(key);
+    seen.set(key, journey.file);
     return other
       ? [`${journey.file}: ${other} has the same ID. Give each journey its own ID.`]
       : [];
@@ -202,7 +217,10 @@ export function checkJourneys(root: string): Array<string> {
   return [
     ...duplicates,
     ...missingJourneys(root, all),
-    ...all.flatMap((journey) => headerProblems(root, journey)),
+    // Each data journey is checked once, as its web entry.
+    ...all
+      .filter((journey) => !(isDataJourney(journey) && journey.platform === 'native'))
+      .flatMap((journey) => headerProblems(root, journey)),
     ...registrationProblems(root, all),
   ].toSorted();
 }

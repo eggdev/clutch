@@ -58,7 +58,7 @@ the whole checklist. Silence is not acceptance.
 | Search beyond ordinary filters | On / off / later / undecided | Off |
 | Product analytics and feature flags | Choose each separately: on / off / later / undecided | Off for each |
 | Inbound webhooks | On / off / later / undecided | Off |
-| Platforms and profiles | Web (Vite or Next.js) / native (One or Expo) / both / no client | Web, Vite with TanStack Router |
+| Platforms and profiles | Web (Vite or Next.js) / native (One or Expo) / both / no client | One with Expo and React Native |
 | Repository access | Private / public; outside contributions yes / no | Private; no outside contributions |
 | Static analysis (SAST) | Auto / CodeQL / Semgrep. CodeQL is free on a public repository. On a private one it needs GitHub Code Security, about $30 per active committer per month, sold to organizations. Semgrep Community Edition is free everywhere; its findings show in the check log, with no Security tab. | Auto: CodeQL where code scanning takes results, Semgrep elsewhere |
 

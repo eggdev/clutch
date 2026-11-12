@@ -6,7 +6,9 @@ import { main, unprovenCore } from '@tools/journeys/run';
 import type { Sink } from '@tools/journeys/run';
 import { inRepo } from '@tools/testing/in-repo';
 
+/** A web app: it depends on React, and it has a dev target. */
 const app = JSON.stringify({
+  dependencies: { react: '19.2.3' },
   nx: {
     tags: ['type:app'],
     targets: { dev: { executor: 'nx:run-commands', options: { command: 'one dev' } } },
@@ -56,7 +58,7 @@ test('no journey ran while a feature ships a screen fails, and names the feature
       'package.json': JSON.stringify({ name: 'shop' }),
       'apps/web/package.json': JSON.stringify({
         name: 'web',
-        dependencies: { '@features/billing': 'workspace:*' },
+        dependencies: { '@features/billing': 'workspace:*', react: '19.2.3' },
       }),
       'features/billing/package.json': JSON.stringify({ name: '@features/billing' }),
       'features/billing/screens/pay.tsx': 'export const Pay = 1;\n',
@@ -75,8 +77,7 @@ test('a native feature with its native journey and no web journey still exits 0'
       'package.json': JSON.stringify({ name: 'shop' }),
       'apps/mobile/package.json': JSON.stringify({
         name: 'mobile',
-        dependencies: { '@features/billing': 'workspace:*' },
-        nx: { tags: ['platform:native'] },
+        dependencies: { '@features/billing': 'workspace:*', 'react-native': '0.86.3' },
       }),
       'features/billing/package.json': JSON.stringify({ name: '@features/billing' }),
       'features/billing/screens/pay.tsx': 'export const Pay = 1;\n',

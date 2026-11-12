@@ -1,9 +1,11 @@
-import { joinSpace } from '@repo/access/commands/join-space';
-import { leaveSpace } from '@repo/access/commands/leave-space';
+import { joinSpace, leaveSpace } from '@repo/access/contract/access';
 import { useIsMember, useSpace } from '@repo/access/ui/use-spaces';
 import { Button } from '@repo/design-system/ui/button';
+import { ListItem } from '@repo/design-system/ui/list';
+import { Text } from '@repo/design-system/ui/text';
 import { usePendingCommand } from '@repo/sync/ui/sync-provider';
 import { memo } from 'react';
+import { View } from 'react-native';
 
 /**
  * One space: its name, a way to open it, and Join or Leave. Join and Leave wait
@@ -27,28 +29,35 @@ function SpaceRowView({
     return null;
   }
   return (
-    <li className="flex items-center justify-between gap-2 rounded-surface border border-line bg-surface px-3 py-2">
-      <span className="text-body text-fg">{space.name}</span>
-      <span className="flex gap-2">
+    <ListItem className="flex-wrap gap-y-2 py-2">
+      <Text className="min-w-0 grow basis-32">{space.name}</Text>
+      <View className="flex-row gap-2">
         {member ? (
           <>
-            <Button disabled={current} onClick={() => onOpen(id)}>
+            <Button size="small" disabled={current} onPress={() => onOpen(id)}>
               Open
             </Button>
-            <Button disabled={leave.pending} onClick={() => leave.run({ spaceId: id })}>
+            <Button
+              size="small"
+              disabled={leave.pending}
+              aria-busy={leave.pending}
+              onPress={() => leave.run({ spaceId: id })}
+            >
               {leave.pending ? 'Leaving…' : 'Leave'}
             </Button>
           </>
         ) : (
           <Button
+            size="small"
             disabled={join.pending}
-            onClick={() => join.run({ spaceId: id, at: new Date().toISOString() })}
+            aria-busy={join.pending}
+            onPress={() => join.run({ spaceId: id })}
           >
             {join.pending ? 'Joining…' : 'Join'}
           </Button>
         )}
-      </span>
-    </li>
+      </View>
+    </ListItem>
   );
 }
 

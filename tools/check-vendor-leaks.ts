@@ -9,7 +9,7 @@ import { parseRegistry, readRegistry } from '@tools/lint/import-policy.mjs';
  * declaration. This check builds each product package's declarations and
  * reads the public ones. See docs/principles/generic-platform.md.
  */
-export const publicSections = ['types', 'models', 'commands', 'service', 'ui'];
+export const publicSections = ['types', 'contract', 'commands', 'service', 'ui'];
 const specifier = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"]([^'"]+)['"]/gu;
 
 /** The folders under `packages/` with the Nx tag `type:package`. */

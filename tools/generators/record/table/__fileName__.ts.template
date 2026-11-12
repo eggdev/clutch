@@ -1,0 +1,30 @@
+import type { <%= className %>Row } from '@repo/<%= packageName %>/repo/schema';
+import { <%= propertyName %>Record } from '@repo/<%= packageName %>/contract/<%= packageName %>';
+import type { <%= className %> } from '@repo/<%= packageName %>/contract/<%= packageName %>';
+import { upsertChange } from '@repo/sync/contract/change';
+
+/** The public record of a row. The table shape stays inside this package. */
+export function toRecord(row: <%= className %>Row): <%= className %> {
+  return {
+    id: row.id,
+<% if (groupField) { %>    <%= groupField %>: row.<%= groupField %>,
+<% } %>    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** The row of a record, in one organization. */
+export function toRow(record: <%= className %>, organizationId: string): <%= className %>Row {
+  return {
+    id: record.id,
+    organizationId,
+<% if (groupField) { %>    <%= groupField %>: record.<%= groupField %>,
+<% } %>    createdAt: new Date(record.createdAt),
+    updatedAt: new Date(record.updatedAt),
+  };
+}
+
+/** The change that writes a row to each client of its sync groups. */
+export function toChange(row: <%= className %>Row) {
+  return upsertChange(<%= propertyName %>Record, toRecord(row), { organizationId: row.organizationId });
+}

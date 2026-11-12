@@ -30,6 +30,7 @@ The engine is our own code, not a vendor.
 | Transport      | `packages/sync/runtime/transport.ts`                                              | Client, after the first paint |
 | React bindings | `packages/sync/ui/sync-provider.tsx`                                              | Client                        |
 | Protocol       | `packages/sync/types/protocol.ts`                                                 | Both                          |
+| Contract       | `packages/sync/contract/`: the fields, groups, records, commands and manifest     | Both                          |
 | Event log      | `packages/sync/service/event-log.ts`, `packages/sync/repo/events.ts`              | Server                        |
 | Feed           | `packages/sync/service/feed.ts`: the messages of one connection                   | Server                        |
 | Group seam     | `packages/sync/service/sync-groups.ts`, filled by `packages/access`               | Server                        |
@@ -39,7 +40,10 @@ The engine is our own code, not a vendor.
 The protocol has three calls over one WebSocket for each organization, through
 `effect/rpc`:
 
-- `Push` sends a batch of transactions and returns one outcome for each.
+- `Push` sends a batch of transactions and returns one outcome for each
+  write that the server tried. When the database does not answer, the list
+  ends at that write. The client keeps each write with no outcome and sends
+  it again. `packages/sync/runtime/transport.test.ts` holds this.
 - `Pull` names the groups that the client loaded before. It streams a `Groups`
   message first, then the deltas after the client's last sync ID, then each
   live delta. Each delta holds only the changes of the loaded groups.
@@ -50,18 +54,23 @@ The protocol has three calls over one WebSocket for each organization, through
 `ServerBehind` when the client's last sync ID is above the server's newest
 event.
 
+`Pull` also sends the digest of the app's contracts. See
+[the manifest and the digest](./contract.md#manifest-and-digest).
+
 Records travel as plain JSON objects. The wire form and the stored form are
 the same, so loading the local database needs no decode.
 
 ## The flow of a write
 
-1. A screen calls a command. Its local change runs on the object pool at once.
+1. A screen calls a command with its input, and no ID or time. The pool fills
+   each stamp, then runs the local change at once.
 2. The transaction goes to the transaction queue. The pool writes its state,
    queue included, to the local database.
-3. The transport sends the unsent transactions with `Push`, and retries with
-   exponential backoff.
-4. The server runs the server change. In one database transaction, it writes
-   the owner records and appends one event to the log.
+3. The transport sends the unsent transactions with `Push`. A failed push
+   tries again after 200 ms, then twice as long each time, up to 3 seconds.
+4. The server checks the input against its fields, then the access rule. Then
+   it runs the server change. In one database transaction, it writes the owner
+   records and appends one event to the log.
 5. Appending an event locks the organization's row in `sync_counters`, so sync
    IDs only increase and have no gaps.
 6. After the commit, the server publishes the delta to every open `Pull` of the
@@ -70,13 +79,17 @@ the same, so loading the local database needs no decode.
 7. The client applies the delta to its confirmed records, then applies each
    pending local change again on top. This is the rebase.
 8. A rejected transaction leaves the queue, and the object pool drops its
-   local change. `useLastRejection` gives the screen the reason.
+   local change. `usePendingCommand` gives the refused code and the reason of
+   a run. `useLastRejection` gives the last rejection of the pool.
 
 ## Rules
 
 - A screen reads the object pool. `renderWarm` in `packages/sync/testing/`
   renders a screen with a warm pool and fails on any network call.
 - A local change runs in the same frame as the user action.
+- Only the object pool reads the clock and makes IDs on the client. The lint
+  rule `repo-determinism/no-ambient-time` rejects `Date.now()` and the other
+  clock and random calls in client code outside `packages/sync`.
 - Each transaction has an ID. The server applies a transaction once, also when
   the client sends it again.
 - The queue survives a reload. A transaction made offline goes to the server
@@ -98,11 +111,11 @@ the same, so loading the local database needs no decode.
 
 ## Sync groups
 
-A sync group decides which clients get a change. Each model names the groups
-of a record in `groupsOf`.
+A sync group decides which clients get a change. Each record names its groups
+in `groups`.
 
 ```ts
-export const noteModel = defineModel<Note>('Note', {
+export const noteRecord = record('Note', {
   fields: {
     id: 'string',
     spaceId: 'string',
@@ -110,19 +123,24 @@ export const noteModel = defineModel<Note>('Note', {
     createdAt: 'string',
     updatedAt: 'string',
   },
-  groupsOf: (note) => [spaceGroup(note.spaceId)],
+  groups: [spaceGroup.by('spaceId')],
 });
 ```
 
-`fields` gives the JSON kind of each field. TypeScript checks it against the
-record type, so the two cannot drift. The object pool reads a record with its
-type only when the record matches its fields. A record that does not match
-reads as missing. A command declares the shape of its `input` the same way,
-so a saved transaction runs its local change again only on a valid input.
-Product code asserts no types, so these shapes replace each `as` cast.
+`record()` takes the kind of each field from `fields`, and the record type
+comes from them, so the two cannot drift. The object pool checks each copy
+where it enters. A saved copy is checked when the pool loads. A record from
+a server delta is checked when it arrives. A command that the app runs is
+checked before it is queued. Past those checks, the pool trusts the copy.
+A command declares the shape of its `input` the same way. A saved
+transaction whose input does not match is refused when the pool loads.
+Product code asserts no types, so these shapes replace each `as` cast. See
+[the field kinds](./contract.md#field-kinds) and
+[older copies recover](../../principles/older-copies-recover.md).
 
 - A server change builds each change with `upsertChange` or `deleteChange`
-  from `packages/sync/models/change.ts`. They add the groups of the record.
+  from `packages/sync/contract/change.ts`. Each takes the record declaration,
+  the record and the organization, and it adds the groups of the record.
 - The event log stores the groups of all changes of an event in an array
   column. A GIN index covers it. A change with no group fails the commit.
 - `SyncGroups.groupsFor(actor)` names the groups that an actor may load.
@@ -139,10 +157,11 @@ save removes them from the local database too.
 
 ## Load functions
 
-A load function says how a screen asks for the records of one group.
+A load function says how a screen asks for the records of one group. A
+contract declares it with `load()`.
 
 ```ts
-export const notesOf = defineLoad(noteModel, (spaceId: string) => spaceGroup(spaceId));
+export const notesOf = load('notes/of-space', noteRecord, spaceGroup);
 ```
 
 A gate calls it through `useLoad` before it navigates:
@@ -159,12 +178,14 @@ open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
   undoes a later change.
 - After 3 seconds, or offline, the gate stops waiting and opens the screen
   with what the pool has.
+- When the server refuses the group, the gate stops waiting at once. The pool
+  reports one sentence that names the group, and does not ask again.
 
 ## Server-confirmed writes
 
 A command with `waits: 'server'` does not change the object pool before the
 server confirms it. The screen shows a pending state on the control that sent
-it. `check-commands` rejects a command without `waits`.
+it. `command()` requires `waits`, so a command without it does not compile.
 
 <!-- kickoff: One line for each command that waits for the server: what it does and why. Start from writes that move money, give consent, change access or touch a hard invariant. -->
 
@@ -174,7 +195,7 @@ Some data comes from the server, not from a person: a count over many rows,
 or a result from a vendor. A screen never fetches it, and never computes it
 from a large list. The pattern:
 
-1. A model defines the record, such as `spaceNoteCountModel`.
+1. The contract declares the record, such as `spaceNoteCountRecord`.
 2. A job or a server change computes the value on the server, then commits
    the record. See [jobs and the outbox](./server.md#jobs-and-the-outbox).
 3. The record reaches each client of its sync group as a delta.
@@ -192,11 +213,14 @@ screen shows nothing in its place.
 ## Add a command
 
 1. Run `mise exec -- bun nx g @tools/generators:command <package> <name>
-   --model=<model> --waits=local --access=group`. It writes `<name>.ts` and
-   `<name>.server.ts`, and registers both halves.
-2. Write the local change in `<name>.ts`, in plain TypeScript.
-3. Write the server change in `<name>.server.ts`, in Effect. Its `access`
-   rule runs first, so `run` only writes and returns the changes it wrote. See
+   --record=<record> --waits=local --access=group`. It declares the command in
+   the contract, writes `<name>.ts` and `<name>.server.ts`, and registers both
+   halves. See [commands](./contract.md#commands).
+2. For `waits: 'local'`, write the local change in `<name>.ts` with
+   `localChange`, in plain TypeScript.
+3. Write the server change in `<name>.server.ts` with `serverChange`, in
+   Effect. The access check of `access` runs first, so `run` only writes and
+   returns the changes it wrote. See
    [one door for each write](./authorization.md#one-door-for-each-write).
 4. Write one test for the accepted path and one for the rejected path, through
    the Test Layers. See `packages/notes/commands/notes-commands.test.ts`.

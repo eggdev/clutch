@@ -26,6 +26,7 @@ function findGates(file: ts.SourceFile): ts.ObjectLiteralExpression | null {
   return gates;
 }
 
+/** The gates object with the route added once. A route that is already there stays as it is. */
 export function addGateEntry(source: string, route: string, gate: string, routes: string) {
   const file = ts.createSourceFile(lintConfig, source, ts.ScriptTarget.Latest, true);
   const object = findGates(file);
@@ -42,6 +43,7 @@ export function addGateEntry(source: string, route: string, gate: string, routes
   return `${source.slice(0, at)}${last ? ', ' : ''}${entry}${source.slice(at)}`;
 }
 
+/** Registers a gated route in the lint config, when the repository has one. */
 export function addGate(tree: Tree, route: string, gate: string, routes: string) {
   const source = tree.read(lintConfig, 'utf-8');
   if (source !== null) {
