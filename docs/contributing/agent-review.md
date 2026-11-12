@@ -33,7 +33,7 @@ this head's comments is reported as a warning. A failed listing of the earlier
 heads' comments fails the job, so a re-run lists them again.
 
 Model findings are advisory. The job reports each finding, and no finding holds
-the merge. The job fails only when the agent returns no result. The session
+the merge. The job warns when the agent returns no result. The session
 still answers each finding. `tools/github/weaker-journeys.ts` holds a PR that
 weakens a journey or a budget, by comparing the two copies. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
@@ -44,17 +44,10 @@ gardening workflow reads the same variable.
 
 When the repository has no `ANTHROPIC_API_KEY` secret and no
 `CLAUDE_CODE_OAUTH_TOKEN` secret, the job writes a notice and passes. A pull
-request from a fork gets no secrets, so the same notice applies. Set
-`agentReview.missingCredential: fail` in `clutch.yaml` to fail the job
-instead, so a green `agent-review` check proves that a review ran. The job
-reads the setting from the base branch, so a pull request cannot change it.
-Clutch sets `fail`. A fork pull request then fails agent review, and the owner
-reviews it.
+request from a fork gets no secrets, so the same notice applies.
 
-The main ruleset in `.github/rulesets/main.json` makes `agent-review` a
-required status check, so the review must run on each head. A project that
-has not set up the credential keeps the default, `notice`, and the check
-passes with a notice until the project adopts it.
+Agent review is advice, so no ruleset requires it. A project with no credential
+gets a notice, and the check passes.
 
 ## Visual review
 
@@ -70,12 +63,12 @@ screenshot baseline (a PNG in a `__screenshots__/` folder, see
    missing content, poor contrast, a scheme mix-up or an unstyled element. Set
    the `CLUTCH_VISUAL_MODEL` repository variable to use another model.
 3. The script posts one comment with the before and after pictures and the
-   verdicts. A new head edits that comment. The job fails when a pair is
-   unexplained or broken, or has no verdict.
+   verdicts. A new head edits that comment. The job warns when a pair is
+   unexplained or broken, or has no verdict, and it holds no merge.
 
 A PR that changes no baseline skips these steps, with no install and no API
 call. A PR that changes a baseline on purpose and says why in its body passes,
-so it can still merge with no person. To clear a block, fix the screen, or say
+so it can still merge with no person. To clear a warning, fix the screen, or say
 what changed and why in the PR body. Then re-run the `agent-review` job.
 
 The job runs the default branch's copy of the script, so a PR cannot change
