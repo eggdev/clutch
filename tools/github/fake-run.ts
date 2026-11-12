@@ -19,6 +19,9 @@ export function fake(answers: Array<[string, Partial<Result> | Array<Partial<Res
       const index = used.get(prefix) ?? 0;
       used.set(prefix, index + 1);
       answer = Array.isArray(value) ? (value[Math.min(index, value.length - 1)] ?? {}) : value;
+    } else if (line.endsWith(' --jq .title')) {
+      // A PR's title, unless the test names one: a plain title, so no test is a major change by accident.
+      answer = { out: 'fix: a small change\n' };
     }
     return Promise.resolve({ ok: true, out: '', err: '', ...answer });
   };

@@ -221,6 +221,15 @@ test('a named contract break holds a low-risk PR for the owner, and the owner ap
   expect(blockers(facts({ breaks: [] }), 'low')).toEqual([]);
 });
 
+test('a major change holds a low-risk PR for the owner, and the owner approval lifts it', () => {
+  const major = facts({ major: ['its title has "!" before the colon'] });
+  expect(blockers(major, 'low')).toEqual([
+    'The change is major: its title has "!" before the colon. The owner signs off a major change.',
+  ]);
+  expect(blockers({ ...major, ownerApproved: true }, 'low')).toEqual([]);
+  expect(blockers(facts({ major: [] }), 'low')).toEqual([]);
+});
+
 test('brakeReason names the rate, the counts and the step', () => {
   expect(brakeReason(40, 3, 'medium', 'low')).toBe(
     'Reverts are 3 of 40 merged PRs in the last 30d, 7.5%, over the 2% brake, so the step drops from medium to low.',

@@ -291,3 +291,35 @@ test('merge refuses a PR that names a contract break, and names it, until the ow
   );
   expect(gh.calls.some((call) => call.startsWith('gh pr merge'))).toBe(false);
 });
+
+test('merge refuses a major change, and names why, until the owner approves', async () => {
+  const gh = fake([
+    trunk,
+    ['gh pr view 17 --json mergeCommit', { out: 'm3rge' }],
+    [
+      'gh pr view 17',
+      {
+        out: JSON.stringify({
+          baseRefName: 'main',
+          headRefName: 'cl-027',
+          headRefOid: 'h3ad',
+          reviewDecision: '',
+          mergeStateStatus: 'CLEAN',
+          reviewRequests: [],
+          latestReviews: [],
+        }),
+      },
+    ],
+    [
+      'gh api --paginate repos/{owner}/{repo}/pulls/17/files',
+      { out: JSON.stringify({ filename: 'bun.lock', patch: '' }) },
+    ],
+    ['gh api repos/{owner}/{repo}/pulls/17 --jq .title', { out: 'feat!: drop the old flag\n' }],
+    ...findingsOn('h3ad', []),
+    reviewsOf('17'),
+  ]);
+  await expect(runPr(['merge', '17'], gh.run, noWrite, fakeClock())).rejects.toThrow(
+    `#17 is a major change (its title has "!" before the colon), and waits for the owner's sign-off. Ask the owner in this session's thread.`,
+  );
+  expect(gh.calls.some((call) => call.startsWith('gh pr merge'))).toBe(false);
+});

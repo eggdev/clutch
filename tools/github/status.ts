@@ -4,6 +4,7 @@ import { contractBreaks, ownerFindings } from '@tools/github/auto-merge';
 import { marker } from '@tools/github/auto-merge-rules';
 import { must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
+import { majorChange } from '@tools/github/major-change';
 import { ownerCount, reviews } from '@tools/github/owner-reviews';
 import type { Run } from '@tools/github/stack';
 
@@ -251,6 +252,8 @@ export async function prStatus(run: Run, number: string) {
   const owner = await ownerCount(run, number, pr.headRefOid, findings.length);
   // The one-way changes that the snapshot of the head names, which the owner agrees to.
   const breaks = await contractBreaks(run, '{owner}/{repo}', number, pr.headRefOid);
+  // The reasons the change is major, which the owner signs off.
+  const major = await majorChange(run, '{owner}/{repo}', number);
   // A repository without agent review has no review to wait for.
   const reviewed =
     blocking === 0 || (blocking === null && !all.some((check) => check.name === 'agent-review'));
@@ -260,7 +263,7 @@ export async function prStatus(run: Run, number: string) {
   const review =
     pr.reviewDecision || (pr.mergeStateStatus === 'BLOCKED' ? 'BLOCKED by a rule' : '');
   const approved =
-    !(await waitsForOwner(run, number, pr, owner + breaks.length)) &&
+    !(await waitsForOwner(run, number, pr, owner + breaks.length + major.length)) &&
     (review === '' || review === 'APPROVED');
   const ready =
     pr.state === 'OPEN' &&
@@ -284,6 +287,7 @@ export async function prStatus(run: Run, number: string) {
     counts: { pass: count('pass'), fail: count('fail'), pending: count('pending') },
     agentReview: { posted: reviewComment !== undefined, blocking, owner },
     contractBreaks: breaks,
+    major,
     review: review || 'none required',
     dryRun: dryRun ? verdict(dryRun.body) : null,
     ready,
@@ -318,6 +322,9 @@ export function renderStatus(status: PrStatus) {
     `Agent review: ${reviewLine(status.agentReview)}. Review decision: ${status.review}.`,
     ...(status.contractBreaks.length > 0
       ? [`Contract breaks: ${status.contractBreaks.join(', ')}. The owner agrees to a break.`]
+      : []),
+    ...(status.major.length > 0
+      ? [`Major change: ${status.major.join(', and ')}. The owner signs off a major change.`]
       : []),
     `Dry run: ${status.dryRun ? `${status.dryRun} auto-merge at ${status.head.slice(0, 7)}` : 'no verdict for this head'}`,
     `Ready to merge: ${status.ready ? 'yes' : 'no'}`,

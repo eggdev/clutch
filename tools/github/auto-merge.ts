@@ -20,8 +20,8 @@ import {
 import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rules';
 import { autoMerged } from '@tools/github/auto-revert';
 import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
-import type { ChangedFile } from '@tools/github/bot-rule';
 import { retrying } from '@tools/github/command';
+import { changedFiles, majorChange } from '@tools/github/major-change';
 import type { Run } from '@tools/github/stack';
 
 /**
@@ -138,22 +138,6 @@ export async function ownerFindings(run: Run, repo: string, sha: string) {
     `.[] | select(.title == "${ownerAnnotation}") | .message`,
   );
   return out.split('\n').filter(Boolean);
-}
-
-/** The changed files of a pull request, with their diffs. */
-async function changedFiles(run: Run, repo: string, pr: string): Promise<Array<ChangedFile>> {
-  const out = await gh(
-    run,
-    'api',
-    '--paginate',
-    `repos/${repo}/pulls/${pr}/files?per_page=100`,
-    '--jq',
-    '.[] | {filename, patch}',
-  );
-  return out
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as ChangedFile);
 }
 
 const isString = (value: unknown): value is string => typeof value === 'string';
@@ -305,6 +289,7 @@ export async function runAutoMerge(
     doctor,
     ownerFindings: await ownerFindings(run, repo, pr.headRefOid),
     breaks: await contractBreaks(run, repo, values.pr, pr.headRefOid),
+    major: await majorChange(run, repo, values.pr),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
     ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),

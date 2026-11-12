@@ -82,8 +82,7 @@ drifts. After a change to the one-way-door tier, run
 
 Two kinds of PR wait for the owner without a GitHub approval rule:
 
-- A rule with `lines`, such as a workflow's `permissions:` or the `automerge`
-  section of `clutch.yaml`. CODEOWNERS cannot express it, so auto-merge holds
+- A rule with `lines`, such as a workflow's `permissions:`. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
 - A PR with an `owner` finding from agent review. Auto-merge holds it, except
   a pure Clutch sync whose findings are approved upstream (see
@@ -156,8 +155,7 @@ its level. A `blocking` finding must not merge until it is fixed, so only
 `fixed in <sha>` answers it. `pr findings <number> --check` exits 1 while a finding has no line,
 and `pr merge` refuses the PR until it passes. A new push can bring new
 findings, so run it again after each review. Auto-merge does not read the
-disposition yet. CL-416 adds that, and it needs the owner, since auto-merge is
-part of the merge gate.
+disposition yet. CL-416 adds that.
 
 After the owner approves a PR, do not push a fix for a new `owner` or `note`
 finding. The push dismisses the approval, as

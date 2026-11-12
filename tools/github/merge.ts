@@ -6,6 +6,7 @@ import { prFindings, unanswered } from '@tools/github/findings';
 import { defaultBranch, must } from '@tools/github/github';
 import type { Clock } from '@tools/github/github';
 import { autoMerge, watchMain } from '@tools/github/main-watch';
+import { majorChange } from '@tools/github/major-change';
 import type { Run } from '@tools/github/stack';
 import { waitForChecks, waitsForOwner } from '@tools/github/status';
 
@@ -194,6 +195,12 @@ async function mergeOpen(
       `#${number} waits for the owner, who agrees to the contract break(s) ${breaks.join(', ')}. Ask the owner in this session's thread.${link}`,
     );
   }
+  const major = await majorChange(run, '{owner}/{repo}', number);
+  if (await waitsForOwner(run, number, pr, major.length)) {
+    throw new Error(
+      `#${number} is a major change (${major.join(', and ')}), and waits for the owner's sign-off. Ask the owner in this session's thread.${link}`,
+    );
+  }
   // Each finding of every head has a fix or a reason, so none drops out unseen.
   const open = unanswered(await prFindings(run, number));
   if (open.length > 0) {
@@ -243,7 +250,7 @@ async function mergeOpen(
  * Then it waits for the release and for CI on the default branch at the merge
  * commit, and starts the revert when that CI fails twice. It refuses while
  * GitHub reports that the PR needs a review, and while agent review's owner
- * findings or a contract break wait for the owner's approval.
+ * findings, a contract break or a major change wait for the owner's approval.
  */
 export async function merge(
   run: Run,

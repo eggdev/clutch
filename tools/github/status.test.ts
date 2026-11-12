@@ -349,3 +349,22 @@ test('a PR that names a contract break is not ready, and pr status names the bre
     'Contract breaks: Note.title. The owner agrees to a break.',
   );
 });
+
+test('a major change is not ready, and pr status names why', async () => {
+  const gh = fake([
+    [
+      'gh pr view 7',
+      view(head170, [check('validate', 'SUCCESS'), check('agent-review', 'SUCCESS')]),
+    ],
+    rules,
+    comments(summary170),
+    ...findingsOn(head170, []),
+    ['gh api repos/{owner}/{repo}/pulls/7 --jq .title', { out: 'feat!: drop the old flag\n' }],
+    reviews170,
+  ]);
+  const status = await prStatus(gh.run, '7');
+  expect(status).toMatchObject({ major: ['its title has "!" before the colon'], ready: false });
+  expect(renderStatus(status)).toContain(
+    'Major change: its title has "!" before the colon. The owner signs off a major change.',
+  );
+});

@@ -469,25 +469,25 @@ mise exec -- bun run clutch risk --base origin/main --head HEAD --json
 Clutch's own rules follow
 [decision record 0002](../../docs/contributing/decisions/0002-merge-most-prs-with-no-human.md):
 80% of PRs merge with no human, and a rule tightens only on evidence.
-`one-way-door` holds only the hard core:
+`one-way-door` holds only what cannot be paid back:
 
-- The merge gate: `.github/rulesets`, CODEOWNERS, `.clutch/risk.yaml`, the
-  guardrail list, the auto-merge script and workflow, agent review and
-  `review.md`, and the code that computes a tier.
 - Credentials: secret scanning and the MCP configs. A workflow change to
   `permissions:`, an environment, a secret, an app token's permissions or a
-  privileged trigger. The `automerge` and `agentReview` sections of
-  `clutch.yaml`.
+  privileged trigger.
 - Auth (`packages/access`, `packages/identity` and any `auth` folder) and
   migrations.
 - A billing rule and an infra, deploy and secrets rule, both empty until a
   project names its paths.
-- Decision records, `docs/principles`, project intent and `.clutch/PLAN.md`.
+
+The merge judge also holds a major change and a contract break for the owner,
+whatever the tier. The merge gate, the decision records and the policy docs
+merge as any other change. See
+[decision record 0005](../../docs/contributing/decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
 
 Docs, tests, changesets and tracker files are `low`. Every other path is
-`medium`: product code, skills, check scripts, lint config and workflows.
-Agent review gives a change that weakens a check an `owner` finding, so
-auto-merge leaves it for the owner.
+`medium`: product code, skills, check scripts, lint config, workflows, the code
+and rules of the merge gate, and `clutch.yaml`. Agent review gives a change
+that weakens a check an `owner` finding, so auto-merge leaves it for the owner.
 
 ## clutch.yaml
 
@@ -590,9 +590,8 @@ Semgrep even on a public repository. See
 The loader rejects unknown keys. Each error names its YAML path, such as
 `template.mode` or `capabilities.codeql_sast.reason`. An older `clutch.yaml`
 has `template.commit`. The loader accepts it and reads nothing from it, and
-the next sync removes it. Its `automerge` and
-`agentReview` sections are in the one-way-door tier. For the rest of the
-file, agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
+the next sync removes it. A change to the file merges as any other change.
+Agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
 
 ## Init
 
