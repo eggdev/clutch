@@ -3,7 +3,12 @@ import type { Errors } from '@/clutch-config/checks';
 import { readBudgets, readCoreJourneys } from '@/clutch-config/core-journeys';
 import type { Budgets, CoreDecision, CoreJourney } from '@/clutch-config/core-journeys';
 import type { Intake } from '@/clutch-config/intake';
-import { readAutoRevert, readFactory, readJourneys } from '@/clutch-config/optional-keys';
+import {
+  readAutoRevert,
+  readDeploy,
+  readFactory,
+  readJourneys,
+} from '@/clutch-config/optional-keys';
 
 const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
 const modes = ['sync', 'doctor'] as const;
@@ -46,6 +51,8 @@ export type ClutchConfig = {
   pr?: { branchPrefix: string };
   /** What auto-revert judges main by, besides the required checks. `watch` names checks or jobs. */
   autoRevert?: { watch: Array<string> };
+  /** The command that deploys, and the production URL that the core journeys prove. */
+  deploy?: { command: Array<string>; url: string };
   /** The repositories that the weekly digest reads: each `owner/name` and the branch to read. */
   fleet?: Array<{ repo: string; ref: string }>;
   /**
@@ -80,6 +87,7 @@ const topKeys = [
   'worktree',
   'automerge',
   'autoRevert',
+  'deploy',
   'pr',
   'fleet',
   'sast',
@@ -329,6 +337,7 @@ const optionalSections: Record<string, (value: unknown, errors: Errors) => unkno
   worktree: readWorktree,
   automerge: readAutomerge,
   autoRevert: readAutoRevert,
+  deploy: readDeploy,
   pr: readPr,
   fleet: readFleet,
   pr_size: readPrSize,

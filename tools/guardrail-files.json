@@ -1,6 +1,7 @@
 {
   "description": "Files that configure a check, a lint rule, a budget, a test rule or an agent hook. After kickoff, an agent edit to one of them needs a person's approval in the session. Agent review flags a PR that makes one weaker as an owner finding, and auto-merge leaves it for the owner. This list itself is in the one-way-door tier of .clutch/risk.yaml. check-guardrail-coverage fails when a file that a check, a lint plugin or a hook reads matches no pattern here. `exempt` lists files that tooling reads but that set no rule. See docs/contributing/harness-engineering.md#guardrail-files.",
   "patterns": [
+    "tools/deploy.ts",
     "oxlint.config.ts",
     "stylelint.config.ts",
     ".oxfmtrc.json",
