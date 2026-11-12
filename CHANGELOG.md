@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0 (2026-11-12)
+
+### Features
+
+- Hold a migration for the owner only when its SQL can lose data, and take policy docs out of the hard core.
+
 ## 1.3.0 (2026-11-12)
 
 ### Features
