@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.12.0 (2026-11-13)
+
+### Features
+
+- feat(tools): fail a server-rendered route with no reason (CL-542)
+
 ## 1.11.1 (2026-11-13)
 
 ### Fixes and maintenance
