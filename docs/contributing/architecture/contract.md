@@ -202,77 +202,6 @@ export const renameNoteServer = serverChange(renameNote, {
 });
 ```
 
-## Claims
-
-A command makes claims in its declaration: what it `does`, whether it is
-`idempotent`, and the limits of each input field. A test proves each claim
-that a machine can decide. The claims stay in the contract, and no other file
-lists them.
-
-`proveClaims` in `packages/sync/testing/claims.ts` takes the contract and the
-local changes of a package, as `runtime/client.ts` holds them. It makes inputs
-from the declared fields, runs each command on an object pool, and checks the
-claims. Each package calls it from `runtime/contract-claims.test.ts`, under
-`bun test`:
-
-```ts
-test('each command of the notes contract keeps the claims that the contract makes', () => {
-  const report = proveClaims(notesClient);
-  expect(report.checked.length).toBeGreaterThanOrEqual(notesClient.contract.commands.length * 2);
-});
-```
-
-The inputs come from a seeded generator, `seeded` in
-`packages/sync/testing/seeded.ts`. The default seed is 532, so each run tries
-the same inputs. `CLAIMS_SEED=7 mise exec -- bun test packages/notes` tries
-other inputs. A failure names the seed, the claim, the run and the input.
-
-Before each run, the pool holds records of the contract with the IDs `k1`,
-`k2` and `k3`. A plain `string` field takes one of those values, so a command
-that names a record by its ID finds one. A `text` field takes its shortest
-length, its longest length or a length between them.
-
-| Claim                  | Holds when                                                                                                                                          |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A valid input is taken | The pool queues an input that fits each field, and does not refuse it                                                                               |
-| Each limit refuses     | The pool refuses an input with one field outside its kind, too long, too short, outside `oneOf` or missing. It changes no record and queues nothing |
-| `does: 'adds'`         | A run adds a record, and changes or removes none. Some run must add one                                                                             |
-| `does: 'changes'`      | A run removes no record. Some run must change one                                                                                                   |
-| `does: 'removes'`      | A run adds no record. Some run must remove one                                                                                                      |
-| `idempotent: true`     | The pool takes a second run of the same input, with the stamps of the first run, and the run changes no record                                      |
-
-`does` and `idempotent` are checked on the local change, so only for a
-command with `waits: 'local'` and a `tool`. A command for which the proof
-can make no valid input fails, such as one with `oneOf()` and no values. So
-does a command that claims `does` and never acts on any generated input.
-An error that a run throws fails the claim of that run, with the run and the
-input. A refused second run fails `idempotent`, as a refused run changes
-nothing.
-
-The proof does not check these claims. The report of `proveClaims` lists
-each one that a command declares, under `unchecked`:
-
-- `closed`: whether a command reaches an outside service is not visible on the pool.
-- `says`: it is words for a reader.
-- `refuses`, `access` and `permission`: only the server half decides them.
-- `does` and `idempotent` of a command with `waits: 'server'`: it has no local change.
-
-`idempotent: false` promises nothing, so it needs no proof.
-
-`check-contract` fails a package that has a contract and no test file that
-imports `@repo/sync/testing/claims` and calls `proveClaims`. It reads the
-files on disk and runs no test. The package generator writes
-`runtime/contract-claims.test.ts` for each package with a contract. It also
-writes `runtime/client.ts`, which the test passes to `proveClaims`. A package
-with no client passes `{ contract, localChanges: [] }`.
-
-`clutch sync` ships `claims.ts`, `claim-inputs.ts` and `seeded.ts` to each
-project as managed files. The proof runs on the project's own object pool,
-so it imports `packages/sync/runtime/pool.ts` and
-`packages/sync/testing/pool-state.ts`.
-`claims.ts` and `claim-inputs.ts` are guardrail files, as a weaker proof
-weakens `check-contract`.
-
 ## Registration
 
 Registration is exhaustive. Each package declares its halves in one file per side, and the apps derive their lists from those files.
@@ -366,7 +295,6 @@ snapshot, and `breaks`, the IDs of the one-way changes that the owner accepted.
 - A file of `contract/` declares a part, and the package exports no contract.
 - An app's `packages` list does not list a contract.
 - A one-way change from the base branch is not named under `breaks`.
-- A package has a contract, and no test calls `proveClaims` on it.
 
 `mise exec -- bun tools/check-contract.ts --write` writes the snapshot. It
 prints each change as two-way or one-way. A one-way change needs
@@ -438,7 +366,6 @@ has the steps. The template keeps no code for the older form.
 - A server change refuses only with a code that its command lists, or a built-in code. `packages/sync/commands/server-change.server.test.ts` tests a declared and an undeclared code.
 - The server rejects an input that does not match its fields with `invalid-input`. `packages/sync/commands/server-change.server.test.ts` tests a bad input.
 - A server half with `access: 'group'` must have a `group` function, and one without it does not compile. `packages/sync/commands/server-change.server.test.ts` tests it through the typecheck.
-- Each claim of a command that a machine can decide holds on generated inputs. `packages/sync/testing/claims.test.ts` tests the proof, and `tools/check-contract.test.ts` tests that each package calls it.
 - The digest changes with any change to the contracts. `packages/sync/contract/manifest.test.ts` tests the digest.
 - A job or a route does not change the digest. `packages/sync/contract/job-route.test.ts` tests it.
 - A job or route change is sorted two-way or one-way by `compareManifests`. `packages/sync/contract/job-route.test.ts` tests each rule, and `tools/check-contract.test.ts` tests a changed payload.

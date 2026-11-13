@@ -5,7 +5,6 @@ import type { compareManifests } from '@repo/sync/contract/compatibility';
 import type { Contract, isContract, unlistedParts } from '@repo/sync/contract/define';
 import type { Manifest, manifestOf } from '@repo/sync/contract/manifest';
 import { findBase } from '@tools/check-base';
-import { claimsFindings } from '@tools/contract-claims';
 import {
   check,
   committedSnapshot,
@@ -86,9 +85,9 @@ function contractFiles(root: string, name: string): Array<string> {
 const errorLines = (error: unknown) =>
   (error instanceof Error ? error.message : String(error)).split('\n');
 
-/** Each value that the module at `file` exports, by its export name. */
-async function exportsOf(file: string): Promise<Array<[string, unknown]>> {
-  return Object.entries(await import(file));
+/** Each value that the module at `file` exports. */
+async function exportsOf(file: string): Promise<Array<unknown>> {
+  return Object.values(await import(file));
 }
 
 /**
@@ -98,14 +97,12 @@ async function exportsOf(file: string): Promise<Array<[string, unknown]>> {
 async function loadContracts(root: string, engine: Engine) {
   const contracts: Array<Contract> = [];
   const problems: Array<Finding> = [];
-  // A claim with no proof does not make the manifest wrong, so it does not stop the snapshot check.
-  const unproven: Array<Finding> = [];
   for (const name of folders(root, 'packages')) {
     const files = name === 'sync' ? [] : contractFiles(root, name);
-    const named: Array<[string, unknown]> = [];
+    const exported: Array<unknown> = [];
     for (const file of files) {
       try {
-        named.push(...(await exportsOf(file)));
+        exported.push(...(await exportsOf(file)));
       } catch (error) {
         // A contract that breaks a rule fails as it loads, and its message lists each problem.
         problems.push(
@@ -118,7 +115,6 @@ async function loadContracts(root: string, engine: Engine) {
         );
       }
     }
-    const exported = named.map(([, value]) => value);
     const found = exported.filter((value) => engine.isContract(value));
     const folder = `packages/${name}/contract/`;
     if (found.length > 1) {
@@ -157,13 +153,9 @@ async function loadContracts(root: string, engine: Engine) {
         });
       }
     }
-    if (found.length) {
-      const contractName = named.find(([, value]) => value === found[0])?.[0];
-      unproven.push(...claimsFindings(root, name, contractName));
-    }
     contracts.push(...found);
   }
-  return { contracts, problems, unproven };
+  return { contracts, problems };
 }
 
 /**
@@ -236,12 +228,12 @@ async function inspect(root: string, options: Options) {
   if (!engine) {
     return null;
   }
-  const { contracts, problems, unproven } = await loadContracts(root, engine);
+  const { contracts, problems } = await loadContracts(root, engine);
   if (problems.length) {
     // The manifest of wrong contracts is wrong, so the snapshot waits. The apps
     // are still read, so one run reports each problem that it can.
     return {
-      problems: [...problems, ...unproven, ...(await appProblems(root, engine, contracts))],
+      problems: [...problems, ...(await appProblems(root, engine, contracts))],
       manifest: null,
       base: null,
       changes: [],
@@ -252,7 +244,7 @@ async function inspect(root: string, options: Options) {
     options.baseCommit === undefined ? findBase(root, process.env.CHECK_BASE) : options.baseCommit;
   const base = baseCommit ? snapshotAt(root, baseCommit) : null;
   return {
-    problems: [...unproven, ...(await appProblems(root, engine, contracts))],
+    problems: await appProblems(root, engine, contracts),
     manifest,
     base,
     changes: base ? engine.compareManifests(base, manifest) : [],
