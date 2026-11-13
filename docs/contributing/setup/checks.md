@@ -161,16 +161,21 @@ mise exec -- bun run validate --json
 
 `validate --json` runs every validate target and prints one JSON document on
 standard output. Nx prints its log to standard error. The document holds
-`exitCode`, `checks` (each check that reported findings) and `findings`. Nx
-runs each check in a process of its own. So each check that uses findings
-writes them to `tmp/check-findings/<check>.json` on each run, also when it
-finds nothing. `validate --json` deletes that folder first, and reads it at
-the end. Each check that writes findings has `cache: false`. A cached check
-must list its findings file in the `outputs` of its target, so a cache hit
-restores the file.
+`exitCode`, `checks` (each check that reported findings), `missing` and
+`findings`. Nx runs each check in a process of its own. So each check that
+uses findings writes them to `tmp/check-findings/<check>.json` on each run,
+also when it finds nothing. `validate --json` deletes that folder first, and
+reads it at the end. Each check that writes findings has `cache: false`. A
+cached check must list its findings file in the `outputs` of its target, so a
+cache hit restores the file.
 
-`check-file-size` and `check-contract` use findings. The other checks print
-text only, until they move.
+`missing` names each check that uses findings and wrote no file, or a file
+that does not parse. Such a check stopped before the end, so it did not find
+nothing. Read its text output on standard error.
+
+`check-file-size` and `check-contract` use findings. `findingChecks` in
+`tools/findings.ts` lists them, and a check that moves joins the list. The
+other checks print text only, until they move.
 
 ## File size
 
