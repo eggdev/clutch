@@ -1,6 +1,12 @@
 import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
+import type {
+  JSONReport,
+  JSONReportSuite,
+  JSONReportTest,
+  JSONReportTestResult,
+} from '@playwright/test/reporter';
 import { inboxCommandOf, webDevices } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
 
@@ -13,13 +19,20 @@ import type { Journey } from '@tools/journeys/journeys';
  * docs/contributing/end-to-end-testing.md#flake-hunt.
  */
 
-/** The parts of a Playwright JSON report that the count reads. */
-type ReportResult = { status: string; retry: number };
-type ReportTest = { projectName: string; results: Array<ReportResult> };
+/**
+ * The parts of a Playwright JSON report that the count reads, taken from the
+ * report types of Playwright. `hunt` passes a whole `JSONReport` to the count,
+ * so a change of the report shape in Playwright fails the type check.
+ */
+type ReportResult = Pick<JSONReportTestResult, 'status' | 'retry'>;
+type ReportTest = Pick<JSONReportTest, 'projectName'> & { results: Array<ReportResult> };
 type ReportSpec = { tests: Array<ReportTest> };
-type ReportSuite = { file?: string; specs?: Array<ReportSpec>; suites?: Array<ReportSuite> };
+type ReportSuite = Partial<Pick<JSONReportSuite, 'file'>> & {
+  specs?: Array<ReportSpec>;
+  suites?: Array<ReportSuite>;
+};
 export type Report = {
-  config: { rootDir: string };
+  config: Pick<JSONReport['config'], 'rootDir'>;
   suites: Array<ReportSuite>;
   errors?: Array<{ message?: string }>;
 };
@@ -204,7 +217,7 @@ export async function hunt(
     );
     return 1;
   }
-  const data = JSON.parse(readFileSync(report, 'utf-8')) as Report;
+  const data = JSON.parse(readFileSync(report, 'utf-8')) as JSONReport;
   const devices = webDevices.map((device) => device.name);
   const counts = countFirstRuns(root, data, selected, devices);
   const errors = (data.errors ?? []).map((error) => error.message ?? 'An unnamed error.');

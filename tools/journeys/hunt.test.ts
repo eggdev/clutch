@@ -23,8 +23,14 @@ const pay: Journey = {
   platform: 'web',
 };
 
+type Status = Report['suites'][number] extends { specs?: Array<{ tests: Array<infer Test> }> }
+  ? Test extends { results: Array<{ status: infer Value }> }
+    ? Value
+    : never
+  : never;
+
 /** One repeat of a test on one device, as the JSON report writes it. */
-const run = (projectName: string, ...statuses: Array<string>) => ({
+const run = (projectName: string, ...statuses: Array<Status>) => ({
   projectName,
   results: statuses.map((status, retry) => ({ status, retry })),
 });
