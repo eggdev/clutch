@@ -1,6 +1,12 @@
 import { expect, test } from 'bun:test';
 
-import { changedPlan, checkTargets, runManyArgs, validateTargets } from '@tools/validate';
+import {
+  changedPlan,
+  checkTargets,
+  findingsDocument,
+  runManyArgs,
+  validateTargets,
+} from '@tools/validate';
 
 test('each run prints failing tasks in full', () => {
   expect(runManyArgs(['lint'])).toEqual([
@@ -42,4 +48,18 @@ test('validate --changed runs the affected projects, then the root checks', () =
   // Every other validate target runs on the affected projects.
   expect(affected.slice(4)).toEqual(validateTargets.filter((target) => target !== 'checks'));
   expect(checks).toEqual(runManyArgs(['checks']));
+});
+
+test('validate --json lists each finding of each check that reported, with the exit code', () => {
+  const finding = {
+    id: 'check-file-size/over-limit',
+    file: 'tools/large.ts',
+    problem: '11 lines, limit 10.',
+    fix: 'Split the file.',
+  };
+  expect(findingsDocument(1, { 'check-contract': [], 'check-file-size': [finding] })).toEqual({
+    exitCode: 1,
+    checks: ['check-contract', 'check-file-size'],
+    findings: [finding],
+  });
 });

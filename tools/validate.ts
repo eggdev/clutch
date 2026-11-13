@@ -1,6 +1,8 @@
 import { availableParallelism } from 'node:os';
 
 import { changedFiles, findBase } from '@tools/check-base';
+import { clearFindings, readFindings } from '@tools/findings';
+import type { Finding } from '@tools/findings';
 import { isDocsOnly } from '@tools/hooks/paths.mjs';
 
 /**
@@ -45,10 +47,15 @@ export const runManyArgs = (targets: Array<string>) => [
   ...targets,
 ];
 
-function runNx(args: Array<string>, env: Record<string, string | undefined>) {
+/** Runs Nx. `stdout` is `inherit`, or 2 to send its output to standard error. */
+function runNx(
+  args: Array<string>,
+  env: Record<string, string | undefined>,
+  stdout: 'inherit' | 2 = 'inherit',
+) {
   return Bun.spawnSync([process.execPath, 'x', 'nx', ...args], {
     env,
-    stdout: 'inherit',
+    stdout,
     stderr: 'inherit',
   }).exitCode;
 }
@@ -56,6 +63,34 @@ function runNx(args: Array<string>, env: Record<string, string | undefined>) {
 /** Runs `targets` with Nx and returns its exit code. */
 export function runTargets(targets: Array<string>, env: Record<string, string | undefined>) {
   return runNx(runManyArgs(targets), env);
+}
+
+/**
+ * The document that `validate --json` prints. `checks` names each check that
+ * reported findings as data in this run, so a reader knows what the list
+ * covers. A check that has not moved to findings yet prints only text, and
+ * `exitCode` still counts it.
+ */
+export function findingsDocument(exitCode: number, byCheck: Record<string, Array<Finding>>) {
+  return {
+    exitCode,
+    checks: Object.keys(byCheck),
+    findings: Object.values(byCheck).flat(),
+  };
+}
+
+/**
+ * Runs the validate targets and prints one JSON document of findings on
+ * standard output. Nx prints to standard error, so standard output holds only
+ * the document. Each moved check writes its findings to a file, because Nx
+ * runs each check in a process of its own. See
+ * docs/contributing/setup/checks.md#findings.
+ */
+function validateJson(root: string, env: Record<string, string | undefined>) {
+  clearFindings(root);
+  const exitCode = runNx(runManyArgs(validateTargets), env, 2);
+  console.log(JSON.stringify(findingsDocument(exitCode, readFindings(root)), null, 2));
+  return exitCode;
 }
 
 /**
@@ -128,6 +163,13 @@ async function validateChanged(root: string, explicitBase: string | undefined) {
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
+  if (args.includes('--json')) {
+    if (args.includes('--changed') || args.includes('--quick')) {
+      console.error('validate --json runs every target. Run it without --changed and --quick.');
+      process.exit(2);
+    }
+    process.exit(validateJson(process.cwd(), { ...process.env, CI: '1' }));
+  }
   if (args.includes('--changed')) {
     const at = args.indexOf('--base');
     process.exit(await validateChanged(process.cwd(), at === -1 ? undefined : args[at + 1]));

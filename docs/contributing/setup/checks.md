@@ -120,7 +120,8 @@ tests the workflow and dependency checks.
 | `audit-prod`                 | A moderate or worse advisory in a production dependency                                                                                                                                                                                                                                                                                                                                 |
 
 Add a check as `tools/check-<name>.ts`. Export a `check<Name>(root)` function
-that returns the problems, so a test can call it on a temporary repository. Add
+that returns its findings, so a test can call it on a temporary repository. A
+new check starts on the finding type. See [findings](#findings). Add
 a test, a root target in `package.json`, the target in the `dependsOn` list of
 the root `checks` target, and a row here. `validate` and the pre-push hook both
 run `checks`, so the new check runs in both.
@@ -135,6 +136,41 @@ string, and the run continues. See [CI](#ci) for the other three rules.
 
 [Dependencies](./dependencies.md) explains `check-dependency-overrides` and
 `audit-prod`. `audit-prod` needs network access.
+
+### Findings
+
+A finding is one problem that a check found, as data. The type and its text
+printer are in [`tools/findings.ts`](../../../tools/findings.ts). A finding has
+these fields:
+
+- `id`: the kind of problem, as `<check>/<problem>` in kebab case, such as
+  `check-file-size/over-limit`. Rewording the message keeps the id. The test of
+  the check pins each id.
+- `file`: the file with the problem, relative to the repository root.
+- `line`: the line, when the problem has one. A problem with the whole file
+  leaves it out.
+- `problem` and `fix`: the problem, and how to fix it. An empty `fix` means
+  that the problem already says it, as a message from another tool does.
+
+`formatFinding` prints the text form: the file, the problem and the fix. A
+check prints that text, so its text output still follows the rule above.
+
+```sh
+mise exec -- bun run validate --json
+```
+
+`validate --json` runs every validate target and prints one JSON document on
+standard output. Nx prints its log to standard error. The document holds
+`exitCode`, `checks` (each check that reported findings) and `findings`. Nx
+runs each check in a process of its own. So each check that uses findings
+writes them to `tmp/check-findings/<check>.json` on each run, also when it
+finds nothing. `validate --json` deletes that folder first, and reads it at
+the end. Each check that writes findings has `cache: false`. A cached check
+must list its findings file in the `outputs` of its target, so a cache hit
+restores the file.
+
+`check-file-size` and `check-contract` use findings. The other checks print
+text only, until they move.
 
 ## File size
 
