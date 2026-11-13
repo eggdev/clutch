@@ -117,11 +117,6 @@ The [principles index](../principles/index.md) marks these principles
 `Review only`. Review is the only thing that stops a change that breaks one.
 Each finding below is `blocking`.
 
-- **Single-page app.** Flag a route that renders on the server when the PR
-  gives neither reason. One reason is content that a person sees without the
-  app. The other is HTML that is ready sooner than the browser can make it.
-  Also flag a server render of a screen that reads the account's records. See
-  [single-page app](../principles/single-page-app.md).
 - **Keyboard first.** Flag a key that a file outside the shortcut registry
   binds. Flag a new common action with no shortcut, and a menu item or tooltip
   that does not show its shortcut. Also flag a single-key shortcut that fires

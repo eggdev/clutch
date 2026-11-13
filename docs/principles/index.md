@@ -23,7 +23,7 @@ user sees or does.
 
 | Principle                                             | When to open it                                                       | Held by                                                                                                              |
 | ----------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| [Single-page app](./single-page-app.md)               | Adding a route, a render mode, a server render or a web host          | Review only                                                                                                          |
+| [Single-page app](./single-page-app.md)               | Adding a route, a render mode, a server render or a web host          | `check-structure` (only that each server render names its reason)                                                    |
 | [Local first](./local-first.md)                       | Adding a screen, a read, a write, a search or a boot step             | `no-restricted-globals` (only network calls in client code)                                                          |
 | [Stay at 60 FPS](./stay-at-60-fps.md)                 | Adding a page, a guard, a data load, or work that runs on navigation  | `features/notes/screens/notes-screen.test.tsx` (only no request before a warm paint; no frame-budget journey yet)    |
 | [Fast first load](./fast-first-load.md)               | Adding a dependency, a route, a font or a step before the first paint | `check-bundle`                                                                                                       |
