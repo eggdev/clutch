@@ -83,12 +83,23 @@ function repositoryOf(file) {
 }
 
 const isCallee = (node) => node.parent?.type === 'CallExpression' && node.parent.callee === node;
+/**
+ * Whether code gives `node` a local name: `const media = matchMedia` or
+ * `view = window`. Lint follows no local name, so each read through it is
+ * hidden.
+ */
+const isAliased = (node) =>
+  (node.parent?.type === 'VariableDeclarator' &&
+    node.parent.init === node &&
+    node.parent.id.type === 'Identifier') ||
+  (node.parent?.type === 'AssignmentExpression' && node.parent.right === node);
 const isWidthField = (owner, name) =>
   owner === 'screen' ? screenFields.has(name) : widthFields.has(name);
 
 /**
  * What code reads from the global object `owner` through `node`. Each item is
- * a width field, `{ node, read }`, or a call to `matchMedia`, `{ call }`.
+ * a width field, `{ node, read }`, a call to `matchMedia`, `{ call }`, or a
+ * local name for the object or for `matchMedia`, `{ alias, name }`.
  * `window.innerWidth`, `window.screen.width` and `const { innerWidth } = window`
  * each read a width field.
  */
@@ -102,9 +113,16 @@ function fieldReads(node, owner) {
     if (isWidthField(owner, name)) {
       return [{ node: parent, read: `${owner}.${name}` }];
     }
-    return owner !== 'screen' && name === 'matchMedia' && isCallee(parent)
-      ? [{ call: parent.parent }]
-      : [];
+    if (owner === 'screen' || name !== 'matchMedia') {
+      return [];
+    }
+    if (isCallee(parent)) {
+      return [{ call: parent.parent }];
+    }
+    return isAliased(parent) ? [{ alias: parent, name: 'matchMedia' }] : [];
+  }
+  if (isAliased(node)) {
+    return [{ alias: parent, name: owner }];
   }
   if (
     parent?.type === 'VariableDeclarator' &&
@@ -116,7 +134,7 @@ function fieldReads(node, owner) {
       .filter((name) => isWidthField(owner, name))
       .map((name) => ({ node: parent, read: `${owner}.${name}` }));
     return owner !== 'screen' && keys.includes('matchMedia')
-      ? [...reads, { alias: parent }]
+      ? [...reads, { alias: parent, name: 'matchMedia' }]
       : reads;
   }
   return [];
@@ -159,7 +177,7 @@ const noViewportReads = {
       query:
         '`matchMedia` needs a string literal, so lint can tell whether the query reads the window width. See docs/principles/mobile-first.md.',
       alias:
-        '`matchMedia` under a local name hides its query from lint. Call `matchMedia` or `window.matchMedia` with a string literal. See docs/principles/mobile-first.md.',
+        '`{{name}}` under a local name hides what it reads from lint. Read the window through `window`, and call `matchMedia` with a string literal. See docs/principles/mobile-first.md.',
     },
   },
   create(context) {
@@ -186,7 +204,7 @@ const noViewportReads = {
         if (item.call) {
           checkQuery(item.call);
         } else if (item.alias) {
-          context.report({ node: item.alias, messageId: 'alias' });
+          context.report({ node: item.alias, messageId: 'alias', data: { name: item.name } });
         } else {
           report(item.node, item.read);
         }
@@ -248,6 +266,12 @@ const noViewportReads = {
             report(identifier, name);
           } else if (name === 'matchMedia' && isCallee(identifier)) {
             checkQuery(identifier.parent);
+          } else if (name === 'matchMedia' && isAliased(identifier)) {
+            context.report({
+              node: identifier.parent,
+              messageId: 'alias',
+              data: { name: 'matchMedia' },
+            });
           } else if (globals.has(name)) {
             checkObject(identifier, name);
           } else if (name === 'screen') {

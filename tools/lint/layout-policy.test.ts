@@ -119,6 +119,42 @@ test('a query that lint cannot read fails', async () => {
   ]);
 });
 
+test('matchMedia or the window under a local name fails', async () => {
+  expect(
+    await lint({
+      'features/notes/ui/alias.tsx': [
+        'export const a = window.matchMedia;',
+        'export const b = matchMedia;',
+        'export const c = window;',
+        'let d: unknown;',
+        'd = globalThis;',
+        'd = self.matchMedia;',
+        'export const read = () => d;',
+      ].join('\n'),
+    }),
+  ).toEqual([
+    'features/notes/ui/alias.tsx 1',
+    'features/notes/ui/alias.tsx 2',
+    'features/notes/ui/alias.tsx 3',
+    'features/notes/ui/alias.tsx 5',
+    'features/notes/ui/alias.tsx 6',
+  ]);
+});
+
+test('a test for the window, and the window as an argument, pass', async () => {
+  expect(
+    await lint({
+      'features/notes/ui/guard.tsx': [
+        "export const a = typeof window === 'undefined';",
+        "export const b = typeof matchMedia === 'function';",
+        "export const c = typeof window.matchMedia === 'function';",
+        "export const d = () => window.addEventListener('keydown', () => {});",
+        'export const e = (listen: (target: unknown) => void) => listen(window);',
+      ].join('\n'),
+    }),
+  ).toEqual([]);
+});
+
 test('the app shell, tests and testing helpers pass', async () => {
   expect(
     await lint({
