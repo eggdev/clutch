@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.1 (2026-11-13)
+
+### Fixes and maintenance
+
+- chore(clutch): file the follow-ups of the 2026-11-12 merge day
+
 ## 1.7.0 (2026-11-12)
 
 ### Features
