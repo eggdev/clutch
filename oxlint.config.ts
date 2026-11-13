@@ -98,6 +98,7 @@ export default defineConfig({
     { name: 'repo-tests', specifier: './tools/lint/test-policy.mjs' },
     { name: 'repo-components', specifier: './tools/lint/component-policy.mjs' },
     { name: 'repo-determinism', specifier: './tools/lint/determinism-policy.mjs' },
+    { name: 'repo-layout', specifier: './tools/lint/layout-policy.mjs' },
   ],
   rules: {
     // Function declarations read as the module's API and hoist. Arrow
@@ -201,6 +202,9 @@ export default defineConfig({
         'no-restricted-imports': ['error', noEffectValues],
         'no-restricted-globals': ['error', ...networkGlobals],
         'no-restricted-properties': ['error', ...networkProperties],
+        // A component responds to its container. Only the app shell, the root
+        // layout, reads the window width. See docs/principles/mobile-first.md.
+        'repo-layout/no-viewport-reads': ['error', { shell: ['apps/app/app/_layout+ssg.tsx'] }],
       },
     },
     {
@@ -325,6 +329,7 @@ export default defineConfig({
         'tools/lint/test-policy.mjs',
         'tools/lint/component-policy.mjs',
         'tools/lint/determinism-policy.mjs',
+        'tools/lint/layout-policy.mjs',
       ],
       rules: { 'import/no-default-export': 'off' },
     },

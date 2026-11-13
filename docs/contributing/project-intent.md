@@ -50,10 +50,11 @@ core journeys that every product has.
 
 ## End-to-end journeys
 
-Each hard invariant has one journey that proves it. See
-[test the workflow](../principles/test-the-workflow.md).
+Each hard invariant has one journey that proves it. The `journey` field of
+each invariant in the [primitives registry](./architecture/primitives.yaml)
+names it. See [test the workflow](../principles/test-the-workflow.md).
 
-<!-- kickoff: A numbered list that matches the invariants. Each journey is one sentence: who acts, what they do, and the assertion. -->
+<!-- kickoff: A numbered list that matches the invariants. Each journey is one sentence: who acts, what they do, and the assertion. Then write the journey id in the `journey` field of the invariant in docs/contributing/architecture/primitives.yaml. Until the journey file exists, write `journey: not-written`. check-primitives counts those invariants, and the count only goes down. -->
 
 ## What not to assume
 
