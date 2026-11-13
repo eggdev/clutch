@@ -179,6 +179,58 @@ export const routes = {
       },
     ],
   },
+  // The CI workflow: one PR run in the period, which took 5 min, and one in the period before, which took 4 min.
+  [`repos/${repo}/actions/workflows/ci.yml/runs`]: {
+    workflow_runs: [
+      {
+        id: 901,
+        event: 'pull_request',
+        conclusion: 'success',
+        created_at: '2026-10-10T00:00:00Z',
+        run_started_at: '2026-10-10T00:00:00Z',
+        updated_at: '2026-10-10T00:05:00Z',
+      },
+      {
+        id: 900,
+        event: 'pull_request',
+        conclusion: 'success',
+        created_at: '2026-09-25T00:00:00Z',
+        run_started_at: '2026-09-25T00:00:00Z',
+        updated_at: '2026-09-25T00:04:00Z',
+      },
+    ],
+  },
+  // Its validate step took 90 s, against 60 s in the period before: a rise of 50%.
+  ...Object.fromEntries(
+    [
+      [901, '2026-10-10T00:01:00Z', '2026-10-10T00:02:30Z'],
+      [900, '2026-09-25T00:01:00Z', '2026-09-25T00:02:00Z'],
+    ].map(([id, started, completed], index) => [
+      `repos/${repo}/actions/runs/${id}/jobs`,
+      {
+        jobs: [
+          {
+            name: 'validate',
+            steps: [
+              {
+                name: 'Set up job',
+                conclusion: 'success',
+                started_at: started,
+                completed_at: started,
+              },
+              // The older run has the step's name from before 2026-10-30.
+              {
+                name: index === 0 ? 'validate' : 'Run bun run validate',
+                conclusion: 'success',
+                started_at: started,
+                completed_at: completed,
+              },
+            ],
+          },
+        ],
+      },
+    ]),
+  ),
   [`repos/${repo}`]: { default_branch: 'main' },
   // The open risk-tighten issues. A pull request with the label is not one.
   [`repos/${repo}/issues`]: [

@@ -210,6 +210,31 @@ as `Name: message`, with no stack. `tools/testing/console-guard.ts` also fails
 a test that allows a message and does not log it. Never replace `console.error` or `console.warn` with a
 mock to hide output. A blanket mock hides the next regression too.
 
+## Time is reported, and a count blocks
+
+A check that blocks a change uses a count. `check-bundle` counts the modules
+before the first paint, and `check-file-size` counts the lines in a file. A
+count gives the same answer on each machine, so it cannot fail a good change by
+chance. Time changes with the load on the runner. So time is reported, and it
+does not block. Do not add a check that blocks on time. No check covers this
+rule, so review keeps it.
+
+- `validate --changed` prints its time and warns above `changedBudgetSeconds`
+  in `tools/validate.ts`. The warning never fails the run.
+- `clutch metrics` reports the time of the agent loop in CI. It prints the
+  median time of the `validate` step and of the whole CI run, for PRs and for
+  pushes to main. It compares each median with the period before, which has the
+  same length, and marks a rise of more than 20%. The Watch row names each rise.
+  `--json` puts the same numbers under `loop`.
+
+A failed or cancelled run stops early, so only passed runs count. The run time
+uses each passed run. The step time costs one request for each run. So it reads
+up to 40 passed runs of each kind in each period, spread evenly over the period.
+
+The test time budget in `tools/test-budget.ts` is the one older check that
+blocks on time. It fails a suite above 60 seconds, a ceiling for a suite that
+hangs or grows out of hand.
+
 ## Performance budgets
 
 A performance check compares a measurement with a committed budget:
