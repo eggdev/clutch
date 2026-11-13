@@ -36,7 +36,7 @@ Each surface starts on a phone and takes every visual value from a token.
 
 | Principle                                           | When to open it                                               | Held by                                                                                                                                            |
 | --------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Mobile first](./mobile-first.md)                   | Adding a screen, a component, a breakpoint or a fixed width   | Review only                                                                                                                                        |
+| [Mobile first](./mobile-first.md)                   | Adding a screen, a component, a breakpoint or a fixed width   | `repo-layout/no-viewport-reads` (only a window width read outside the app shell)                                                                   |
 | [Tokens for every visual value](./design-tokens.md) | Adding a color, a size, a radius, a shadow, a font or a theme | `repo-classes/no-arbitrary-values`, `repo-classes/no-dark-variant`, `repo-classes/speed-tokens-only`, `declaration-property-value-disallowed-list` |
 
 ## Everything else

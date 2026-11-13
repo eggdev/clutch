@@ -245,6 +245,29 @@ mise exec -- bun run clutch ratchet add no-ambient-time \
   --files '{apps,features,packages}/**/*.{ts,tsx}'
 ```
 
+## Layout
+
+The `repo-layout` plugin,
+[`tools/lint/layout-policy.mjs`](../../../tools/lint/layout-policy.mjs), has
+one rule. [`tools/lint/layout-policy.test.ts`](../../../tools/lint/layout-policy.test.ts)
+proves it with code that passes and code that fails.
+
+| Rule                | Rejects                                                                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `no-viewport-reads` | `window.innerWidth`, `outerWidth`, `screen.width`, `screen.availWidth`, `matchMedia` with a width query, and `useWindowDimensions()` and `Dimensions.get()` from React Native, in client code |
+
+A component responds to its container, so only the app shell reads the
+window width. The rule's `shell` option in `oxlint.config.ts` lists the shell
+files: the root layout, `apps/app/app/_layout+ssg.tsx`. Tests and `testing/`
+are exempt. A query that does not read the width passes, such as
+`(prefers-reduced-motion: reduce)`. A query that is not a string literal
+fails, because lint cannot read it. See
+[mobile first](../../principles/mobile-first.md).
+
+A project that takes this rule with old call sites ratchets them, as it does
+for [the design-system rule](#ratchet-a-rule). The rule skips each file that
+the `no-viewport-reads` ratchet counts.
+
 ## Formatting
 
 Oxfmt formats each file. [`.oxfmtrc.json`](../../../.oxfmtrc.json) states each

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.11.0 (2026-11-13)
+
+### Features
+
+- feat(lint): fail a component that reads the window width (CL-541)
+
+## 1.10.0 (2026-11-13)
+
+### Features
+
+- feat(primitives): name the journey of each invariant (CL-536)
+
+## 1.9.3 (2026-11-13)
+
+### Fixes and maintenance
+
+- docs(decisions): keep the checks with no cap or monthly target (CL-527)
+
 ## 1.9.2 (2026-11-13)
 
 ### Fixes and maintenance

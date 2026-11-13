@@ -1,16 +1,25 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { journeys } from '@tools/journeys/journeys';
 import { parseRegistry, readRegistry, registryFile } from '@tools/lint/import-policy.mjs';
 
 /**
  * Checks the primitives registry: unique ids, known groups and kinds, real
- * paths, short summaries, vendors only on packages, docs for each invariant,
- * and a primitive for each Nx project folder. See
+ * paths, short summaries, vendors only on packages, docs and a journey for
+ * each invariant, and a primitive for each Nx project folder. See
  * docs/contributing/architecture/index.md#modules.
  */
 const kinds = new Set(['package', 'feature', 'app', 'tool']);
 const maxSummary = 120;
+
+/** The `journey` of an invariant whose journey is not written yet. */
+export const notWritten = 'not-written';
+/** The ratchet in `.clutch/ratchets.json` that counts the invariants with no journey yet. */
+export const journeyRatchet = 'invariants-without-journey';
+const ratchetsFile = '.clutch/ratchets.json';
+const countCommand = 'bun tools/check-primitives.ts --count';
+const addRatchet = `mise exec -- bun run clutch ratchet add ${journeyRatchet} --command '${countCommand}' --files ${registryFile}`;
 
 type Entry = {
   id?: string;
@@ -20,6 +29,7 @@ type Entry = {
   summary?: string;
   code?: Array<string>;
   docs?: Array<string>;
+  journey?: unknown;
   vendors?: Array<unknown>;
   primitives?: Array<string>;
 };
@@ -86,14 +96,64 @@ function primitiveProblems(root: string, primitive: Entry, groups: Set<unknown>)
   ].filter((problem): problem is string => typeof problem === 'string');
 }
 
+/** The problem with the `journey` of one invariant, given the ids of the journeys on disk. */
+function journeyProblem(invariant: Entry, journeyIds: Set<string>): string | null {
+  const { journey } = invariant;
+  if (typeof journey !== 'string' || !journey.trim()) {
+    return `has no \`journey\`. Name the journey that proves it, or write \`journey: ${notWritten}\` until that journey exists.`;
+  }
+  if (journey !== notWritten && !journeyIds.has(journey)) {
+    return `names the journey \`${journey}\`, which does not exist. Name the id of a journey in features/<feature>/journeys/, or write \`journey: ${notWritten}\`.`;
+  }
+  return null;
+}
+
 /** The problems with one invariant. */
-function invariantProblems(root: string, invariant: Entry): Array<string> {
+function invariantProblems(root: string, invariant: Entry, journeyIds: Set<string>): Array<string> {
   return [
     summaryProblem(invariant.summary),
     !invariant.docs?.length &&
       'has no `docs`. Link the page that states it, such as docs/contributing/project-intent.md#hard-invariants.',
     ...missingPaths(root, invariant.docs ?? []),
+    journeyProblem(invariant, journeyIds),
   ].filter((problem): problem is string => typeof problem === 'string');
+}
+
+/** How many invariants say that their journey is not written yet. */
+function countNotWritten(registry: Registry): number {
+  return (registry.invariants ?? []).filter((invariant) => invariant.journey === notWritten).length;
+}
+
+/** The start of a count problem, such as "has 2 entries with `journey: not-written`". */
+const entries = (count: number) =>
+  `has ${count} ${count === 1 ? 'entry' : 'entries'} with \`journey: ${notWritten}\``;
+
+/**
+ * The problem with the count of invariants that have no journey yet. The
+ * ratchet `invariants-without-journey` in `.clutch/ratchets.json` holds the
+ * count, and `clutch ratchet check` lets it go down but never up. This check
+ * asks for the ratchet once the count is above 0, and fails a count above its
+ * baseline. See docs/contributing/capabilities/ratchets.md.
+ */
+function countProblem(root: string, count: number): string | null {
+  if (count === 0) {
+    return null;
+  }
+  const file = path.join(root, ratchetsFile);
+  const ratchets = existsSync(file)
+    ? (JSON.parse(readFileSync(file, 'utf-8')) as {
+        ratchets?: Record<string, { counts?: Record<string, number> }>;
+      })
+    : {};
+  const ratchet = ratchets.ratchets?.[journeyRatchet];
+  if (!ratchet) {
+    return `${entries(count)}, and ${ratchetsFile} has no \`${journeyRatchet}\` ratchet to hold that count. Add it: ${addRatchet}`;
+  }
+  const baseline = ratchet.counts?.[registryFile] ?? 0;
+  if (count > baseline) {
+    return `${entries(count)}, but the \`${journeyRatchet}\` ratchet allows ${baseline}. The count only goes down. Write the journey of each new invariant first.`;
+  }
+  return null;
 }
 
 /** Each error in the registry, after its exceptions and patterns parse. */
@@ -128,10 +188,15 @@ function registryProblems(root: string, registry: Registry): Array<string> {
       ]);
     }
   }
+  const journeyIds = new Set(journeys(root).map((journey) => journey.id));
   for (const invariant of invariants) {
-    for (const problem of invariantProblems(root, invariant)) {
+    for (const problem of invariantProblems(root, invariant, journeyIds)) {
       problems.push([`invariant \`${invariant.id}\``, problem]);
     }
+  }
+  const count = countProblem(root, countNotWritten(registry));
+  if (count) {
+    problems.push(['`invariants`', count]);
   }
   const roots = primitives.flatMap((primitive) => primitive.code ?? []);
   for (const folder of projectFolders(root)) {
@@ -159,7 +224,23 @@ export function checkPrimitives(root: string): Array<string> {
   return [...errors, ...registryProblems(root, registry)];
 }
 
-if (import.meta.main) {
+/**
+ * Prints `path:count` for the ratchet `invariants-without-journey`: the
+ * registry and how many of its invariants have no journey yet. It prints
+ * nothing when the count is 0.
+ */
+export function journeyCount(root: string): Array<string> {
+  const registry: Registry | null = readRegistry(root);
+  const count = registry ? countNotWritten(registry) : 0;
+  return count > 0 ? [`${registryFile}:${count}`] : [];
+}
+
+if (import.meta.main && process.argv.includes('--count')) {
+  const lines = journeyCount(process.cwd());
+  if (lines.length > 0) {
+    console.log(lines.join('\n'));
+  }
+} else if (import.meta.main) {
   const errors = checkPrimitives(process.cwd());
   if (errors.length) {
     console.error(
@@ -172,6 +253,8 @@ if (import.meta.main) {
     );
     process.exitCode = 1;
   } else {
-    console.log('Each primitive has a known group and kind, real paths and a short summary.');
+    console.log(
+      'Each primitive has a known group and kind, real paths and a short summary. Each invariant names its journey.',
+    );
   }
 }
