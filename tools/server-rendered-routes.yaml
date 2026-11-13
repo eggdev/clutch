@@ -1,0 +1,30 @@
+# Each route of a One app that renders on the server. The browser renders every
+# other route. tools/check-structure.ts fails on a route that renders on the
+# server and is not in this list, and on an entry for a route that does not.
+# Each route has one entry. A route is a .ts or .tsx file in the app/ folder of
+# the app, and the web build leaves out .native, .ios and .android files.
+# See docs/principles/single-page-app.md.
+#
+# Fields: route (the route file), reason (one of the two reasons below), note
+#         (why the reason applies to this route).
+#
+# Reasons:
+#   seen without the app: a person must see the content without the app, such
+#                         as from a shared link, a link preview or a search engine.
+#   ready sooner:         HTML from the server makes the screen ready sooner than
+#                         the browser can, such as content that is the same for
+#                         every person.
+#
+# Example:
+#
+# - route: apps/app/app/shared/[token]+ssr.tsx
+#   reason: seen without the app
+#   note: >-
+#     A person opens it from a text message, with no app.
+
+- route: apps/app/app/_layout+ssg.tsx
+  reason: ready sooner
+  note: >-
+    The root layout is the one static document. One renders it once at build
+    time. It is the same for every person, so a deep link paints the shell and
+    the theme before any module loads.

@@ -7,7 +7,9 @@ device already has, not from HTML that a server made.
 ## Rules
 
 - **The browser renders each route.** A new route needs no setting to render
-  in the browser. That is the default in every web profile.
+  in the browser. That is the default in every web profile. The Vite config
+  of each One app sets `defaultRenderMode: 'spa'` as one string literal, so
+  `check-structure` can read it.
 - **The root document is the one static file.** It holds `<html>`, `<head>`,
   the inline shell CSS and the boot script. In `apps/app`, it is the root layout
   in `apps/app/app/_layout+ssg.tsx`, which One renders once at build time. A deep
@@ -18,7 +20,9 @@ device already has, not from HTML that a server made.
   app, such as from a shared link, in a link preview or in a search engine.
   Or HTML from the server makes the screen ready sooner than the browser can,
   such as content that is the same for every person. The route names its
-  mode, and the PR says which reason applies.
+  mode, and its entry in `tools/server-rendered-routes.yaml` names the reason:
+  `seen without the app` or `ready sooner`. `check-structure` fails a server
+  render that the list does not name.
 - **A server render never replaces local data.** A screen that reads the
   account's records renders in the browser from the object pool. HTML from the
   server for such a screen is old the moment it arrives, and it delays the
