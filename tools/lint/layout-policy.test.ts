@@ -141,6 +141,22 @@ test('matchMedia or the window under a local name fails', async () => {
   ]);
 });
 
+test('a type cast, a non-null mark and bind do not hide the window or matchMedia', async () => {
+  expect(
+    await lint({
+      'features/notes/ui/wrapped.tsx': [
+        'export const a = window as Window;',
+        'export const b = window.matchMedia as typeof matchMedia;',
+        'export const c = window.matchMedia.bind(window);',
+        'export const d = window!;',
+        'export const e = (window as Window).innerWidth;',
+        'export const f = matchMedia.bind(window);',
+        "export const g = (matchMedia as typeof matchMedia)('(min-width: 600px)');",
+      ].join('\n'),
+    }),
+  ).toEqual(Array.from({ length: 7 }, (_, index) => `features/notes/ui/wrapped.tsx ${index + 1}`));
+});
+
 test('a test for the window, and the window as an argument, pass', async () => {
   expect(
     await lint({
