@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.2 (2026-11-13)
+
+### Fixes and maintenance
+
+- docs(checks): limit the time rule to the time of a run (CL-548)
+
 ## 1.9.1 (2026-11-13)
 
 ### Fixes and maintenance
