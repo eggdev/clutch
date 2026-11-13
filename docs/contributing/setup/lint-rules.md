@@ -261,7 +261,8 @@ window width. The rule's `shell` option in `oxlint.config.ts` lists the shell
 files: the root layout, `apps/app/app/_layout+ssg.tsx`. Tests and `testing/`
 are exempt. A query that does not read the width passes, such as
 `(prefers-reduced-motion: reduce)`. A query that is not a string literal
-fails, because lint cannot read it. See
+fails, because lint cannot read it. A `matchMedia` or a window under a local
+name fails too, because lint follows no local name. See
 [mobile first](../../principles/mobile-first.md).
 
 A project that takes this rule with old call sites ratchets them, as it does
