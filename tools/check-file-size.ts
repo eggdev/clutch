@@ -1,6 +1,9 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+import { formatFinding, writeFindings } from '@tools/findings';
+import type { Finding } from '@tools/findings';
+
 /**
  * Line limits. Each AGENTS.md file, at the root or in a folder, has a fixed
  * budget, because agents load it on every task in its scope
@@ -30,38 +33,66 @@ export function ignoredByGit(root: string, files: Array<string>): Set<string> {
   return new Set(run.stdout.toString().split('\n').filter(Boolean));
 }
 
+/** The name of the check, which starts the id of each of its findings. */
+const check = 'check-file-size';
+
 /** The problems with one source file, given its line count and its budget entry. */
 function sizeProblems(
   file: string,
   lines: number,
   limit: number,
   entry: { lines: number; reason: string } | undefined,
-): Array<string> {
+): Array<Finding> {
   if (!entry) {
     return lines > limit
       ? [
-          `${file}: ${lines} lines, limit ${limit}. Split the file, or add an entry with a reason to tools/file-size-budgets.json.`,
+          {
+            id: `${check}/over-limit`,
+            file,
+            problem: `${lines} lines, limit ${limit}.`,
+            fix: 'Split the file, or add an entry with a reason to tools/file-size-budgets.json.',
+          },
         ]
       : [];
   }
-  const problems: Array<string> = [];
+  const problems: Array<Finding> = [];
   if (!entry.reason?.trim()) {
-    problems.push(`${file}: the budget entry has no reason. Say why the file stays deep.`);
+    problems.push({
+      id: `${check}/budget-without-reason`,
+      file,
+      problem: 'the budget entry has no reason.',
+      fix: 'Say why the file stays deep.',
+    });
   }
   if (lines <= limit) {
-    problems.push(
-      `${file}: ${lines} lines is within the limit of ${limit}. Delete its budget entry.`,
-    );
+    problems.push({
+      id: `${check}/budget-not-needed`,
+      file,
+      problem: `${lines} lines is within the limit of ${limit}.`,
+      fix: 'Delete its budget entry.',
+    });
   } else if (lines > entry.lines) {
-    problems.push(
-      `${file}: ${lines} lines, budget ${entry.lines}. Split the file, or raise the budget and update its reason in the same change.`,
-    );
+    problems.push({
+      id: `${check}/over-budget`,
+      file,
+      problem: `${lines} lines, budget ${entry.lines}.`,
+      fix: 'Split the file, or raise the budget and update its reason in the same change.',
+    });
   }
   return problems;
 }
 
-export async function checkFileSize(root: string): Promise<Array<string>> {
-  const errors: Array<string> = [];
+/** The findings, in the order of their text form. */
+function sorted(findings: Array<Finding>) {
+  const text = new Map(findings.map((finding) => [finding, formatFinding(finding)]));
+  return findings.toSorted((a, b) => {
+    const [left, right] = [text.get(a) ?? '', text.get(b) ?? ''];
+    return left < right ? -1 : Number(left > right);
+  });
+}
+
+export async function checkFileSize(root: string): Promise<Array<Finding>> {
+  const errors: Array<Finding> = [];
   const agents: Array<string> = [];
   for await (const file of new Bun.Glob(agentsFiles.pattern).scan({
     cwd: root,
@@ -78,14 +109,17 @@ export async function checkFileSize(root: string): Promise<Array<string>> {
     }
     const lines = await countLines(path.join(root, file));
     if (lines > agentsFiles.budget) {
-      errors.push(
-        `${file}: ${lines} lines, budget ${agentsFiles.budget}. Move detail to the page that owns it.`,
-      );
+      errors.push({
+        id: `${check}/agents-file-over-budget`,
+        file,
+        problem: `${lines} lines, budget ${agentsFiles.budget}.`,
+        fix: 'Move detail to the page that owns it.',
+      });
     }
   }
   const budgetsFile = path.join(root, 'tools/file-size-budgets.json');
   if (!existsSync(budgetsFile)) {
-    return errors.toSorted();
+    return sorted(errors);
   }
   const { limit, files }: Budgets = await Bun.file(budgetsFile).json();
   const seen = new Set<string>();
@@ -108,16 +142,25 @@ export async function checkFileSize(root: string): Promise<Array<string>> {
   }
   for (const file of Object.keys(files)) {
     if (!seen.has(file)) {
-      errors.push(`tools/file-size-budgets.json: ${file} does not exist. Delete its entry.`);
+      errors.push({
+        id: `${check}/budget-for-missing-file`,
+        file: 'tools/file-size-budgets.json',
+        problem: `${file} does not exist.`,
+        fix: 'Delete its entry.',
+      });
     }
   }
-  return errors.toSorted();
+  return sorted(errors);
 }
 
 if (import.meta.main) {
-  const errors = await checkFileSize(process.cwd());
+  const root = process.cwd();
+  const errors = await checkFileSize(root);
+  writeFindings(root, check, errors);
   if (errors.length) {
-    console.error([`File size check failed (${errors.length}).`, '', ...errors].join('\n'));
+    console.error(
+      [`File size check failed (${errors.length}).`, '', ...errors.map(formatFinding)].join('\n'),
+    );
     process.exitCode = 1;
   } else {
     console.log('Files are within their line limits and budgets.');

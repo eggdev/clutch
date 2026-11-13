@@ -1,11 +1,21 @@
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type { ManifestChange } from '@repo/sync/contract/change-doors';
 import type { compareManifests } from '@repo/sync/contract/compatibility';
 import type { Contract, isContract, unlistedParts } from '@repo/sync/contract/define';
 import type { Manifest, manifestOf } from '@repo/sync/contract/manifest';
 import { findBase } from '@tools/check-base';
+import {
+  check,
+  committedSnapshot,
+  snapshotAt,
+  snapshotFile,
+  snapshotProblems,
+  write,
+} from '@tools/contract-snapshot';
+import type { Snapshot } from '@tools/contract-snapshot';
+import { formatFinding, writeFindings } from '@tools/findings';
+import type { Finding } from '@tools/findings';
 
 /**
  * The contract check. It loads the contract of each package, builds the
@@ -20,12 +30,6 @@ import { findBase } from '@tools/check-base';
  * engine has nothing to check.
  */
 
-/** The committed snapshot: the manifest, the digest of its base, and each one-way change since. */
-export type Snapshot = Manifest & {
-  readonly since: string | null;
-  readonly breaks: ReadonlyArray<string>;
-};
-
 /** The functions of the engine that the check calls, with the engine's own types. */
 type Engine = {
   readonly isContract: typeof isContract;
@@ -33,9 +37,6 @@ type Engine = {
   readonly manifestOf: typeof manifestOf;
   readonly compareManifests: typeof compareManifests;
 };
-
-const snapshotFile = 'contract.json';
-const write = 'mise exec -- bun tools/check-contract.ts --write';
 
 /** Loads the contract engine from `packages/sync/contract/`, or nothing when the repository has none. */
 async function loadEngine(root: string): Promise<Engine | null> {
@@ -95,7 +96,7 @@ async function exportsOf(file: string): Promise<Array<unknown>> {
  */
 async function loadContracts(root: string, engine: Engine) {
   const contracts: Array<Contract> = [];
-  const problems: Array<string> = [];
+  const problems: Array<Finding> = [];
   for (const name of folders(root, 'packages')) {
     const files = name === 'sync' ? [] : contractFiles(root, name);
     const exported: Array<unknown> = [];
@@ -104,29 +105,52 @@ async function loadContracts(root: string, engine: Engine) {
         exported.push(...(await exportsOf(file)));
       } catch (error) {
         // A contract that breaks a rule fails as it loads, and its message lists each problem.
-        problems.push(...errorLines(error).map((line) => `${path.relative(root, file)}: ${line}`));
+        problems.push(
+          ...errorLines(error).map((line) => ({
+            id: `${check}/contract-rejected`,
+            file: path.relative(root, file),
+            problem: line,
+            fix: '',
+          })),
+        );
       }
     }
     const found = exported.filter((value) => engine.isContract(value));
     const folder = `packages/${name}/contract/`;
     if (found.length > 1) {
-      problems.push(
-        `${folder}: exports ${found.length} contracts. A package has one. Export it from \`contract/${name}.ts\` with \`defineContract('${name}', ...)\`.`,
-      );
+      problems.push({
+        id: `${check}/two-contracts`,
+        file: folder,
+        problem: `exports ${found.length} contracts. A package has one.`,
+        fix: `Export it from \`contract/${name}.ts\` with \`defineContract('${name}', ...)\`.`,
+      });
     }
     // A part outside the contract is in no manifest. A folder of plain values alone declares nothing.
     for (const part of engine.unlistedParts(exported, found[0])) {
       problems.push(
         found.length
-          ? `${folder}: the ${part.kind} \`${part.name}\` is not in the contract. Add it to \`${part.list}\`.`
-          : `${folder}: declares the ${part.kind} \`${part.name}\` and exports no contract. Export \`defineContract('${name}', ...)\` from \`contract/${name}.ts\`, and add it to \`${part.list}\`.`,
+          ? {
+              id: `${check}/part-not-in-contract`,
+              file: folder,
+              problem: `the ${part.kind} \`${part.name}\` is not in the contract.`,
+              fix: `Add it to \`${part.list}\`.`,
+            }
+          : {
+              id: `${check}/part-without-contract`,
+              file: folder,
+              problem: `declares the ${part.kind} \`${part.name}\` and exports no contract.`,
+              fix: `Export \`defineContract('${name}', ...)\` from \`contract/${name}.ts\`, and add it to \`${part.list}\`.`,
+            },
       );
     }
     for (const contract of found) {
       if (contract.name !== name) {
-        problems.push(
-          `${folder}: the contract is named \`${contract.name}\`. Name it \`${name}\`, after its package, so each command name starts with the package.`,
-        );
+        problems.push({
+          id: `${check}/contract-misnamed`,
+          file: folder,
+          problem: `the contract is named \`${contract.name}\`.`,
+          fix: `Name it \`${name}\`, after its package, so each command name starts with the package.`,
+        });
       }
     }
     contracts.push(...found);
@@ -143,17 +167,21 @@ const appLists = ['src/packages.ts', 'lib/packages.ts'];
 
 /** An app that lists packages must list each contract, or it cannot run or serve the commands of the rest. */
 async function appProblems(root: string, engine: Engine, contracts: ReadonlyArray<Contract>) {
-  const problems: Array<string> = [];
+  const problems: Array<Finding> = [];
   for (const app of folders(root, 'apps')) {
     for (const list of appLists) {
       const file = path.join(root, 'apps', app, list);
       if (existsSync(file)) {
+        const where = `apps/${app}/${list}`;
         // An app list imports each package, so a broken contract stops it as it loads.
         const loaded = await import(file).catch((error: unknown) => errorLines(error)[0]);
         if (typeof loaded === 'string') {
-          problems.push(
-            `apps/${app}/${list}: did not load, so its lists are not checked. ${loaded}`,
-          );
+          problems.push({
+            id: `${check}/app-list-did-not-load`,
+            file: where,
+            problem: `did not load, so its lists are not checked. ${loaded}`,
+            fix: '',
+          });
           continue;
         }
         const { packages: listed } = loaded;
@@ -166,82 +194,25 @@ async function appProblems(root: string, engine: Engine, contracts: ReadonlyArra
           problems.push(
             ...contracts
               .filter((contract) => !names.has(contract.name))
-              .map(
-                (contract) =>
-                  `apps/${app}/${list}: \`packages\` does not list the contract \`${contract.name}\`. Run \`nx sync\`, which writes the list from each package's runtime/client.ts or runtime/server.server.ts.`,
-              ),
+              .map((contract) => ({
+                id: `${check}/app-list-missing-contract`,
+                file: where,
+                problem: `\`packages\` does not list the contract \`${contract.name}\`.`,
+                fix: "Run `nx sync`, which writes the list from each package's runtime/client.ts or runtime/server.server.ts.",
+              })),
           );
         } else if (contracts.length) {
-          problems.push(
-            `apps/${app}/${list}: exports no \`packages\` list. Run \`nx sync\`, which writes it.`,
-          );
+          problems.push({
+            id: `${check}/app-list-missing`,
+            file: where,
+            problem: 'exports no `packages` list.',
+            fix: 'Run `nx sync`, which writes it.',
+          });
         }
       }
     }
   }
   return problems;
-}
-
-/** The body of a manifest, as the snapshot holds it. */
-const bodyOf = (manifest: Manifest) =>
-  JSON.stringify([
-    manifest.records,
-    manifest.commands,
-    manifest.loads,
-    manifest.jobs,
-    manifest.routes,
-  ]);
-
-/**
- * The problems of the committed snapshot. `base` is the manifest of the base
- * branch, or nothing when there is none to compare with. `changes` are the
- * differences from `base` to `manifest`.
- */
-export function snapshotProblems(
-  manifest: Manifest,
-  committed: Snapshot | null,
-  base: Manifest | null,
-  changes: ReadonlyArray<ManifestChange>,
-): Array<string> {
-  if (!committed) {
-    return [`${snapshotFile}: is missing. Run \`${write}\`, and commit it.`];
-  }
-  if (bodyOf(committed) !== bodyOf(manifest) || committed.digest !== manifest.digest) {
-    return [
-      `${snapshotFile}: does not match the contracts. Run \`${write}\`, read the diff, and commit it.`,
-    ];
-  }
-  if (!base || base.digest === manifest.digest) {
-    return [];
-  }
-  const oneWay = changes.filter((change) => change.door === 'one-way');
-  const named = new Set(committed.breaks);
-  const unnamed = oneWay.filter((change) => !named.has(change.id));
-  if (unnamed.length) {
-    return [
-      `${snapshotFile}: this change is a one-way door for installed builds. See docs/principles/two-way-doors.md.`,
-      ...unnamed.map((change) => `  ${change.id}: ${change.says}`),
-      `  Keep the old shape, or add the new one beside it. When the owner agreed to the break, run \`${write} --accept-breaks\`.`,
-    ];
-  }
-  const ids = new Set(oneWay.map((change) => change.id));
-  if (committed.since !== base.digest || committed.breaks.some((id) => !ids.has(id))) {
-    return [
-      `${snapshotFile}: \`since\` and \`breaks\` do not describe the change from the base branch. Run \`${write}\`.`,
-    ];
-  }
-  return [];
-}
-
-/** The snapshot that `git` holds at `base`, or nothing when the base has none. */
-function snapshotAt(root: string, base: string): Snapshot | null {
-  const run = Bun.spawnSync(['git', '-C', root, 'show', `${base}:${snapshotFile}`]);
-  return run.exitCode === 0 ? JSON.parse(run.stdout.toString()) : null;
-}
-
-function committedSnapshot(root: string): Snapshot | null {
-  const file = path.join(root, snapshotFile);
-  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf-8')) : null;
 }
 
 /**
@@ -294,7 +265,7 @@ const isEmpty = (manifest: Manifest) =>
  * no contract yet has no snapshot to hold, so it passes until its first
  * package declares one.
  */
-export async function checkContract(root: string, options: Options = {}): Promise<Array<string>> {
+export async function checkContract(root: string, options: Options = {}): Promise<Array<Finding>> {
   const found = await inspect(root, options);
   if (!found) {
     return [];
@@ -324,7 +295,7 @@ export async function writeSnapshot(
 ): Promise<Array<string>> {
   const found = await inspect(root, options);
   if (!found?.manifest) {
-    return found?.problems ?? [];
+    return (found?.problems ?? []).map(formatFinding);
   }
   const oneWay = found.changes.filter((change) => change.door === 'one-way');
   if (oneWay.length && !acceptBreaks) {
@@ -353,14 +324,19 @@ export async function writeSnapshot(
   for (const change of found.changes) {
     console.log(`${change.door}  ${change.id}: ${change.says}`);
   }
-  return found.problems;
+  return found.problems.map(formatFinding);
 }
 
 if (import.meta.main) {
   const root = process.cwd();
-  const problems = process.argv.includes('--write')
-    ? await writeSnapshot(root, process.argv.includes('--accept-breaks'))
-    : await checkContract(root);
+  let problems: Array<string>;
+  if (process.argv.includes('--write')) {
+    problems = await writeSnapshot(root, process.argv.includes('--accept-breaks'));
+  } else {
+    const findings = await checkContract(root);
+    writeFindings(root, check, findings);
+    problems = findings.map(formatFinding);
+  }
   if (problems.length) {
     console.error(
       [
