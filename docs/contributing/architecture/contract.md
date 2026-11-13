@@ -239,12 +239,15 @@ length, its longest length or a length between them.
 | `does: 'adds'`         | A run adds a record, and changes or removes none. Some run must add one                                                                             |
 | `does: 'changes'`      | A run removes no record. Some run must change one                                                                                                   |
 | `does: 'removes'`      | A run adds no record. Some run must remove one                                                                                                      |
-| `idempotent: true`     | A second run of the same input, with the stamps of the first run, changes no record                                                                 |
+| `idempotent: true`     | The pool takes a second run of the same input, with the stamps of the first run, and the run changes no record                                      |
 
 `does` and `idempotent` are checked on the local change, so only for a
 command with `waits: 'local'` and a `tool`. A command for which the proof
 can make no valid input fails, such as one with `oneOf()` and no values. So
 does a command that claims `does` and never acts on any generated input.
+An error that a run throws fails the claim of that run, with the run and the
+input. A refused second run fails `idempotent`, as a refused run changes
+nothing.
 
 The proof does not check these claims. The report of `proveClaims` lists
 each one that a command declares, under `unchecked`:
@@ -258,7 +261,17 @@ each one that a command declares, under `unchecked`:
 
 `check-contract` fails a package that has a contract and no test file that
 imports `@repo/sync/testing/claims` and calls `proveClaims`. It reads the
-files on disk and runs no test. The package generator writes the test file.
+files on disk and runs no test. The package generator writes
+`runtime/contract-claims.test.ts` for each package with a contract. It also
+writes `runtime/client.ts`, which the test passes to `proveClaims`. A package
+with no client passes `{ contract, localChanges: [] }`.
+
+`clutch sync` ships `claims.ts`, `claim-inputs.ts` and `seeded.ts` to each
+project as managed files. The proof runs on the project's own object pool,
+so it imports `packages/sync/runtime/pool.ts` and
+`packages/sync/testing/pool-state.ts`.
+`claims.ts` and `claim-inputs.ts` are guardrail files, as a weaker proof
+weakens `check-contract`.
 
 ## Registration
 

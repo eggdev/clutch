@@ -152,9 +152,7 @@ test('a package with a contract and no test that calls proveClaims fails, whatev
     'check-contract/claims-not-proven',
     'check-contract/snapshot-missing',
   ]);
-  expect(text(findings)[0]).toBe(
-    'packages/billing/: has a contract, and no test calls `proveClaims` on it. Add `runtime/contract-claims.test.ts` that calls `proveClaims(billingClient)` from `@repo/sync/testing/claims`.',
-  );
+  // tools/contract-claims.test.ts tests the text of the finding.
   const other = await repository({
     'packages/billing/contract/billing.ts': billing('billing'),
     'packages/billing/runtime/pay.test.ts': "test('pays', () => {});\n",

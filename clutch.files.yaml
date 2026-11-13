@@ -28,6 +28,18 @@ files:
   # of a project's own engine share it, so it ships as one file of the project's sync package.
   - path: packages/sync/testing/type-errors.ts
     rule: managed
+  # The proof of the claims of each contract. check-contract fails on a package whose tests
+  # never call it, so it ships with the check, and a project keeps no weaker copy. It runs
+  # on the project's own object pool: packages/sync/runtime/pool.ts and
+  # packages/sync/testing/pool-state.ts belong to the project.
+  - path: packages/sync/testing/claims.ts
+    rule: managed
+  # The valid and invalid inputs that the proof makes from the declared fields.
+  - path: packages/sync/testing/claim-inputs.ts
+    rule: managed
+  # The seeded generator of the proof, so a failing seed runs the same inputs again.
+  - path: packages/sync/testing/seeded.ts
+    rule: managed
   # The Vite plugin that lists the modules of each built chunk. The first-screen check in
   # tools/check-bundle.ts reads its list, so the plugin ships with the check. A project adds
   # it to the Vite config of each client app. The rest of packages/app-build belongs to the project.

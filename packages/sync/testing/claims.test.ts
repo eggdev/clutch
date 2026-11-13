@@ -40,7 +40,8 @@ const keeps = cards((draft, input) => {
 });
 
 test('a contract whose commands keep their claims passes, and says what it checked', () => {
-  const report = proveClaims(keeps);
+  // The test names its seed, so a person who sets CLAIMS_SEED gets the same result.
+  const report = proveClaims(keeps, { seed: 532 });
   expect(report.seed).toBe(532);
   expect(report.checked).toEqual([
     'cards/rename: a valid input is taken (40 runs)',
@@ -89,7 +90,7 @@ test('a command that never does what it claims fails, and is not skipped', () =>
   const idle = cards(() => {
     // It changes nothing, though it claims to change a card.
   });
-  expect(() => proveClaims(idle)).toThrow(
+  expect(() => proveClaims(idle, { seed: 532 })).toThrow(
     'no generated input made it change a record, so the claim is not proven',
   );
 });
@@ -103,7 +104,52 @@ test('a command for which no valid input can be made fails loudly', () => {
     tool: 'none',
   });
   const contract = defineContract('cards', { records: [card], commands: [pick], loads: [] });
-  expect(() => proveClaims({ contract, localChanges: [] })).toThrow(
-    'the proof can make no valid input: `oneOf` names no value',
+  const run = () => proveClaims({ contract, localChanges: [] }, { seed: 532 });
+  expect(run).toThrow(
+    'valid input, run 0: the proof can make no valid input: `oneOf` names no value.\n',
   );
+  expect(run).not.toThrow('..');
+});
+
+test('the seed comes from CLAIMS_SEED when the test names none', () => {
+  const saved = process.env.CLAIMS_SEED;
+  process.env.CLAIMS_SEED = '9';
+  try {
+    expect(proveClaims(keeps).seed).toBe(9);
+    expect(proveClaims(keeps, { seed: 4 }).seed).toBe(4);
+  } finally {
+    if (saved === undefined) {
+      delete process.env.CLAIMS_SEED;
+    } else {
+      process.env.CLAIMS_SEED = saved;
+    }
+  }
+});
+
+test('a local change that throws fails the claim of its run, with the input, and not as no valid input', () => {
+  const throws = cards((draft, input) => {
+    if (draft.get(card, input.id)) {
+      throw new Error('the local change broke');
+    }
+  });
+  const run = () => proveClaims(throws, { seed: 532 });
+  expect(run).toThrow(/ run \d+: the run threw an error: [^\n]*the local change broke/u);
+  expect(run).toThrow(/Input: \{"id":"k\d"/u);
+  expect(run).not.toThrow('no valid input');
+});
+
+test('an idempotent command whose second run is refused fails, as a refused run proves nothing', () => {
+  // The local change empties its saved input, so the same input again no longer fits and is refused.
+  const empties = cards((draft, input) => {
+    const current = draft.get(card, input.id);
+    if (current) {
+      draft.put(card, { ...current, title: input.title });
+    }
+    Object.assign(input, { title: '' });
+  });
+  const run = () => proveClaims(empties, { seed: 532 });
+  expect(run).toThrow(
+    /idempotent, run \d+: the pool refused a second run of the same input, so the claim is not proven\.\n {4}Input: \{"id":"k\d","title":""\}/u,
+  );
+  expect(run).not.toThrow('does: changes');
 });

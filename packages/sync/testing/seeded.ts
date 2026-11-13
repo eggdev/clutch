@@ -16,6 +16,15 @@ export function seeded(seed: number): Random {
   };
 }
 
+/** A generator seeded by `seed` and a name, so each name gets its own numbers from one seed. */
+export function seededFor(seed: number, name: string): Random {
+  let hash = 0x81_1c_9d_c5;
+  for (const char of name) {
+    hash = Math.imul(hash ^ (char.codePointAt(0) ?? 0), 0x01_00_01_93);
+  }
+  return seeded(seed ^ hash);
+}
+
 /** One item of a list that is not empty, chosen by the generator. */
 export function pick<Item>(random: Random, items: ReadonlyArray<Item>): Item {
   return items[Math.floor(random() * items.length)];

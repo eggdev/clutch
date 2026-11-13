@@ -1,10 +1,11 @@
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { compareManifests } from '@repo/sync/contract/compatibility';
 import type { Contract, isContract, unlistedParts } from '@repo/sync/contract/define';
 import type { Manifest, manifestOf } from '@repo/sync/contract/manifest';
 import { findBase } from '@tools/check-base';
+import { claimsFindings } from '@tools/contract-claims';
 import {
   check,
   committedSnapshot,
@@ -81,36 +82,13 @@ function contractFiles(root: string, name: string): Array<string> {
     .map((file) => path.join(folder, file));
 }
 
-/** The module that holds the proof of the claims of a contract, and its function. */
-const claimsModule = '@repo/sync/testing/claims';
-const claimsCall = 'proveClaims(';
-
-/** The test files of one package, at any depth, but none in `node_modules`. */
-function testFiles(folder: string): Array<string> {
-  return readdirSync(folder, { recursive: true, encoding: 'utf-8' })
-    .filter((file) => /\.test\.tsx?$/u.test(file) && !file.split(path.sep).includes('node_modules'))
-    .map((file) => path.join(folder, file));
-}
-
-/**
- * Whether a test file of the package calls the proof of its claims. It reads
- * the files on disk and runs no test: a file that imports the proof and calls
- * it counts.
- */
-function provesClaims(root: string, name: string): boolean {
-  return testFiles(path.join(root, 'packages', name)).some((file) => {
-    const source = readFileSync(file, 'utf-8');
-    return source.includes(claimsModule) && source.includes(claimsCall);
-  });
-}
-
 /** The lines of the message of an error from a module that failed to load. */
 const errorLines = (error: unknown) =>
   (error instanceof Error ? error.message : String(error)).split('\n');
 
-/** Each value that the module at `file` exports. */
-async function exportsOf(file: string): Promise<Array<unknown>> {
-  return Object.values(await import(file));
+/** Each value that the module at `file` exports, by its export name. */
+async function exportsOf(file: string): Promise<Array<[string, unknown]>> {
+  return Object.entries(await import(file));
 }
 
 /**
@@ -124,10 +102,10 @@ async function loadContracts(root: string, engine: Engine) {
   const unproven: Array<Finding> = [];
   for (const name of folders(root, 'packages')) {
     const files = name === 'sync' ? [] : contractFiles(root, name);
-    const exported: Array<unknown> = [];
+    const named: Array<[string, unknown]> = [];
     for (const file of files) {
       try {
-        exported.push(...(await exportsOf(file)));
+        named.push(...(await exportsOf(file)));
       } catch (error) {
         // A contract that breaks a rule fails as it loads, and its message lists each problem.
         problems.push(
@@ -140,6 +118,7 @@ async function loadContracts(root: string, engine: Engine) {
         );
       }
     }
+    const exported = named.map(([, value]) => value);
     const found = exported.filter((value) => engine.isContract(value));
     const folder = `packages/${name}/contract/`;
     if (found.length > 1) {
@@ -178,13 +157,9 @@ async function loadContracts(root: string, engine: Engine) {
         });
       }
     }
-    if (found.length && !provesClaims(root, name)) {
-      unproven.push({
-        id: `${check}/claims-not-proven`,
-        file: `packages/${name}/`,
-        problem: 'has a contract, and no test calls `proveClaims` on it.',
-        fix: `Add \`runtime/contract-claims.test.ts\` that calls \`proveClaims(${name}Client)\` from \`${claimsModule}\`.`,
-      });
+    if (found.length) {
+      const contractName = named.find(([, value]) => value === found[0])?.[0];
+      unproven.push(...claimsFindings(root, name, contractName));
     }
     contracts.push(...found);
   }

@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import type { Tree } from '@nx/devkit';
 import { createTreeWithEmptyWorkspace } from '@nx/devkit/testing';
+import { checkContract } from '@tools/check-contract';
 import { checkDb } from '@tools/check-db';
 import { checkJourneys } from '@tools/check-journeys';
 import { checkStructure } from '@tools/check-structure';
@@ -43,9 +44,17 @@ async function workspace(): Promise<Tree> {
   return tree;
 }
 
-/** Writes each created or changed source file of the tree into a new folder, then runs `check` there. */
-async function inFolder<T>(tree: Tree, check: (folder: string) => Promise<T> | T): Promise<T> {
-  const folder = await mkdtemp(path.join(tmpdir(), 'generated-'));
+/**
+ * Writes each created or changed source file of the tree into a new folder in
+ * `parent`, then runs `check` there. A folder in the repository reads its aliases.
+ */
+async function inFolder<T>(
+  tree: Tree,
+  check: (folder: string) => Promise<T> | T,
+  parent = tmpdir(),
+): Promise<T> {
+  await mkdir(parent, { recursive: true });
+  const folder = await mkdtemp(path.join(parent, 'generated-'));
   try {
     for (const change of tree.listChanges()) {
       if (change.type !== 'DELETE' && !change.path.startsWith('node_modules/')) {
@@ -278,6 +287,30 @@ test('a command needs its record in the contract, and a name that is taken fails
   expect(() => addFeature(tree, { name: 'notes' })).toThrow(
     'already has the primitive `notes-feature`',
   );
+});
+
+test('each package with a contract gets a test that proves its claims, so check-contract passes', async () => {
+  const tree = await workspace();
+  // Neither package asks for `runtime/`, and each one still gets a client half and a proof.
+  addPackage(tree, { name: 'demo-pad', sections: 'contract,commands' });
+  addPackage(tree, { name: 'drafts', sections: 'contract' });
+  addPackage(tree, { name: 'email', sections: 'types' });
+  for (const [name, client] of [
+    ['demo-pad', 'demoPadClient'],
+    ['drafts', 'draftsClient'],
+  ]) {
+    expect(tree.exists(`packages/${name}/runtime/client.ts`)).toBe(true);
+    const proof = tree.read(`packages/${name}/runtime/contract-claims.test.ts`, 'utf-8') ?? '';
+    expect(proof).toContain(`import { ${client} } from '@repo/${name}/runtime/client';`);
+    expect(proof).toContain(`proveClaims(${client})`);
+  }
+  expect(tree.exists('packages/email/runtime')).toBe(false);
+  const findings = await inFolder(
+    tree,
+    (folder) => checkContract(folder, { engineRoot: root, baseCommit: null }),
+    path.join(root, '.data'),
+  );
+  expect(findings.map((finding) => finding.id)).not.toContain('check-contract/claims-not-proven');
 });
 
 test('a package owns no record until --record names one, and repo/ needs runtime/ and a record', async () => {

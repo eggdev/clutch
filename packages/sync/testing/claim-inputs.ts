@@ -6,7 +6,7 @@ import type { Random } from '@repo/sync/testing/seeded';
 /**
  * The inputs that `proveClaims` runs, made from the declared fields of a
  * command or a record. A valid value fits its kind. An invalid value breaks
- * one declared limit of its kind. See docs/contributing/architecture/contract.md#claims.
+ * one declared limit of its kind. See https://github.com/eggdev/clutch/blob/main/docs/contributing/architecture/contract.md#claims.
  */
 
 /**
@@ -15,6 +15,11 @@ import type { Random } from '@repo/sync/testing/seeded';
  * the pool before it.
  */
 export const words: ReadonlyArray<string> = ['k1', 'k2', 'k3'];
+
+/** The error of a kind that no value fits. The proof reports it as a command with no valid input. */
+export class NoValidInputError extends Error {
+  override name = 'NoValidInputError';
+}
 
 const letters = 'abcdefghijklmnopqrstuvwxyz';
 
@@ -55,7 +60,7 @@ function plainValue(random: Random, kind: string): unknown {
       return pick(random, [null, 1, 'x', { a: [1] }]);
     }
     default: {
-      throw new Error(`The kind \`${kind}\` is not a kind that a contract declares.`);
+      throw new NoValidInputError(`The kind \`${kind}\` is not a kind that a contract declares.`);
     }
   }
 }
@@ -76,14 +81,16 @@ function validValue(random: Random, kind: InputField): unknown {
     case 'string': {
       const min = kind.min ?? 0;
       if (min > kind.max) {
-        throw new Error(`No text is at least ${min} and at most ${kind.max} characters.`);
+        throw new NoValidInputError(
+          `No text is at least ${min} and at most ${kind.max} characters.`,
+        );
       }
       // The shortest and the longest length each come up, as edges break most often.
       return textOf(random, pick(random, [min, kind.max, between(random, min, kind.max)]));
     }
     case 'enum': {
       if (kind.values.length === 0) {
-        throw new Error('`oneOf` names no value.');
+        throw new NoValidInputError('`oneOf` names no value.');
       }
       return pick(random, kind.values);
     }
