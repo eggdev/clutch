@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.2 (2026-11-13)
+
+### Fixes and maintenance
+
+- fix(ci): start the iOS lane only where a repository turns it on (CL-484)
+
 ## 1.7.1 (2026-11-13)
 
 ### Fixes and maintenance
