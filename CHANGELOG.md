@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0 (2026-11-13)
+
+### Features
+
+- feat(cli): report the time of the agent loop in clutch metrics (CL-535)
+
 ## 1.8.0 (2026-11-13)
 
 ### Features
