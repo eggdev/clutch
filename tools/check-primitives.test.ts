@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { checkPrimitives } from '@tools/check-primitives';
+import { checkPrimitives, journeyCount } from '@tools/check-primitives';
 import { inRepo } from '@tools/testing/in-repo';
 
 const file = 'docs/contributing/architecture/primitives.yaml';
@@ -36,9 +36,11 @@ invariants:
   - id: paid-plans
     summary: A team pays before it uses a paid feature.
     docs: [docs/intent.md#hard-invariants]
+    journey: pay-first
 `;
 
 const projects = {
+  'features/billing/journeys/pay-first.pw.ts': '',
   'packages/billing/package.json': '{}',
   'apps/web/package.json': '{}',
   'apps/notes/README.md': '',
@@ -84,6 +86,7 @@ invariants:
   - id: paid-plans
     summary: A team pays before it uses a paid feature.
     docs: []
+    journey: pay-first
 exceptions:
   - rule: vendor-owner
     file: legacy\\.ts$
@@ -116,5 +119,81 @@ test('the old `layers` key fails with the rename', async () => {
 test('a missing registry fails with the fix', async () => {
   expect(await inRepo(projects, checkPrimitives)).toEqual([
     `${file}: the file is missing. Restore it from Clutch.`,
+  ]);
+});
+
+/** The valid registry with the `paid-plans` invariant's journey line replaced. */
+const withJourney = (line: string) => valid.replace('    journey: pay-first\n', line);
+
+const ratchets = (counts: Record<string, number>) =>
+  JSON.stringify({
+    schemaVersion: 1,
+    ratchets: {
+      'invariants-without-journey': {
+        command: 'bun tools/check-primitives.ts --count',
+        files: file,
+        counts,
+      },
+    },
+  });
+
+test('an invariant with no journey fails, and the message names the invariant', async () => {
+  expect(await inRepo({ ...projects, [file]: withJourney('') }, checkPrimitives)).toEqual([
+    `${file}: invariant \`paid-plans\` has no \`journey\`. Name the journey that proves it, or write \`journey: not-written\` until that journey exists.`,
+  ]);
+});
+
+test('an invariant that names a journey with no file fails', async () => {
+  expect(
+    await inRepo({ ...projects, [file]: withJourney('    journey: pay-later\n') }, checkPrimitives),
+  ).toEqual([
+    `${file}: invariant \`paid-plans\` names the journey \`pay-later\`, which does not exist. Name the id of a journey in features/<feature>/journeys/, or write \`journey: not-written\`.`,
+  ]);
+});
+
+test('a journey of each kind of journey file counts as written', async () => {
+  const { 'features/billing/journeys/pay-first.pw.ts': _web, ...rest } = projects;
+  for (const name of ['pay-first.maestro.yaml', 'pay-first.journey.ts']) {
+    const files = { ...rest, [file]: valid, [`features/billing/journeys/${name}`]: '' };
+    expect(await inRepo(files, checkPrimitives)).toEqual([]);
+  }
+});
+
+test('an invariant whose journey is not written passes, and the ratchet counts it', async () => {
+  const files = {
+    ...projects,
+    [file]: withJourney('    journey: not-written\n'),
+    '.clutch/ratchets.json': ratchets({ [file]: 1 }),
+  };
+  expect(await inRepo(files, checkPrimitives)).toEqual([]);
+  expect(await inRepo(files, journeyCount)).toEqual([`${file}:1`]);
+});
+
+test('the count is 0, and prints nothing, when each invariant names its journey', async () => {
+  expect(await inRepo({ ...projects, [file]: valid }, journeyCount)).toEqual([]);
+});
+
+test('an invariant with no journey yet needs the ratchet that holds the count', async () => {
+  const files = { ...projects, [file]: withJourney('    journey: not-written\n') };
+  expect(await inRepo(files, checkPrimitives)).toEqual([
+    `${file}: \`invariants\` has 1 entry with \`journey: not-written\`, and .clutch/ratchets.json has no \`invariants-without-journey\` ratchet to hold that count. Add it: mise exec -- bun run clutch ratchet add invariants-without-journey --command 'bun tools/check-primitives.ts --count' --files ${file}`,
+  ]);
+});
+
+test('the count of invariants with no journey cannot rise above the ratchet', async () => {
+  const second = `
+  - id: export-data
+    summary: A team can always export its data.
+    docs: [docs/intent.md#hard-invariants]
+    journey: not-written
+`;
+  const files = {
+    ...projects,
+    [file]: `${withJourney('    journey: not-written\n')}${second}`,
+    '.clutch/ratchets.json': ratchets({ [file]: 1 }),
+  };
+  expect(await inRepo(files, journeyCount)).toEqual([`${file}:2`]);
+  expect(await inRepo(files, checkPrimitives)).toEqual([
+    `${file}: \`invariants\` has 2 entries with \`journey: not-written\`, but the \`invariants-without-journey\` ratchet allows 1. The count only goes down. Write the journey of each new invariant first.`,
   ]);
 });

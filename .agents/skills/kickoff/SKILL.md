@@ -192,7 +192,11 @@ Write the registry entries as the owner agrees to each part:
 3. A `languages` entry for each other shared language, with the folders that
    may import it. React, React Native, Effect and Drizzle already have one.
 4. An `invariants` entry for each hard invariant from phase 1. Its `docs` list
-   links `docs/contributing/project-intent.md#hard-invariants`.
+   links `docs/contributing/project-intent.md#hard-invariants`. Its `journey`
+   names the id of the journey that proves it. Write `journey: not-written`
+   until that journey file exists. `check-primitives` then asks for the
+   `invariants-without-journey` ratchet, which holds that count. The count only
+   goes down.
 
 Run `mise exec -- bun tools/check-primitives.ts` after each change to the
 registry.
