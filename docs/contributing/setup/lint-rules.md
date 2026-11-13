@@ -252,16 +252,17 @@ The `repo-layout` plugin,
 one rule. [`tools/lint/layout-policy.test.ts`](../../../tools/lint/layout-policy.test.ts)
 proves it with code that passes and code that fails.
 
-| Rule                | Rejects                                                                                                                                                                                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `no-viewport-reads` | `window.innerWidth`, `outerWidth`, `screen.width`, `screen.availWidth`, `matchMedia` with a width query, `matchMedia` or the window under a local name, and `useWindowDimensions()` and `Dimensions.get()` from React Native, in client code |
+| Rule                | Rejects                                                                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `no-viewport-reads` | `window.innerWidth`, `outerWidth`, `screen.width`, `screen.availWidth`, `matchMedia` with a width query, and `useWindowDimensions()` and `Dimensions.get()` from React Native, in client code |
 
 A component responds to its container, so only the app shell reads the
 window width. The rule's `shell` option in `oxlint.config.ts` lists the shell
 files: the root layout, `apps/app/app/_layout+ssg.tsx`. Tests and `testing/`
 are exempt. A query that does not read the width passes, such as
 `(prefers-reduced-motion: reduce)`. A query that is not a string literal
-fails, because lint cannot read it. See
+fails, because lint cannot read it. A `matchMedia` or a window under a local
+name fails too, because lint follows no local name. See
 [mobile first](../../principles/mobile-first.md).
 
 A project that takes this rule with old call sites ratchets them, as it does
