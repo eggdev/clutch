@@ -105,6 +105,9 @@ change that loosens one.
   [decision record 0002](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
 - The list itself is not in the one-way-door tier. A change to it merges as
   any other change, see [decision record 0005](./decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
+- In a session, a change to a guardrail file comes from the owner, or the
+  owner allows the session to make it. See
+  [decision record 0006](./decisions/0006-no-cap-on-the-blocking-checks.md).
 - `check-guardrail-coverage` finds the tool scripts that the root targets,
   the lint config and the hook configs run. It follows their `@tools/`
   imports, and reads each file path in them. It fails when no guardrail
