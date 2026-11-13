@@ -212,7 +212,7 @@ lists them.
 `proveClaims` in `packages/sync/testing/claims.ts` takes the contract and the
 local changes of a package, as `runtime/client.ts` holds them. It makes inputs
 from the declared fields, runs each command on an object pool, and checks the
-claims. Each package calls it from `runtime/contract-claims.test.ts`, under
+claims. A package calls it from `runtime/contract-claims.test.ts`, under
 `bun test`:
 
 ```ts
