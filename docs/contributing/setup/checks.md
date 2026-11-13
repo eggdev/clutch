@@ -248,12 +248,16 @@ mock to hide output. A blanket mock hides the next regression too.
 
 ## Time is reported, and a count blocks
 
-A check that blocks a change uses a count. `check-bundle` counts the modules
-before the first paint, and `check-file-size` counts the lines in a file. A
-count gives the same answer on each machine, so it cannot fail a good change by
-chance. Time changes with the load on the runner. So time is reported, and it
-does not block. Do not add a check that blocks on time. No check covers this
-rule, so review keeps it.
+This rule is for the time that a check or a CI run takes on a runner. A check
+that blocks a change uses a count where it can. `check-bundle` counts the
+modules before the first paint, and `check-file-size` counts the lines in a
+file. A count gives the same answer on each machine, so it cannot fail a good
+change by chance. The time of a run changes with the load on the runner. So
+that time is reported, and it does not block. Do not add a check that blocks
+on the time of a run. No check covers this rule, so review keeps it.
+
+A performance budget of the product is another case. It measures the app, and
+it follows [performance budgets](#performance-budgets).
 
 - `validate --changed` prints its time and warns above `changedBudgetSeconds`
   in `tools/validate.ts`. The warning never fails the run.
