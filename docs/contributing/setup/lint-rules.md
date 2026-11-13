@@ -262,8 +262,10 @@ files: the root layout, `apps/app/app/_layout+ssg.tsx`. Tests and `testing/`
 are exempt. A query that does not read the width passes, such as
 `(prefers-reduced-motion: reduce)`. A query that is not a string literal
 fails, because lint cannot read it. A `matchMedia` or a window under a local
-name fails too, because lint follows no local name. See
-[mobile first](../../principles/mobile-first.md).
+name fails too, because lint follows no local name. A type cast and `.bind`
+hide nothing. The rule sees a direct name only: it does not follow a value
+through a call, an object or an array. Review flags a read that the rule
+does not see. See [mobile first](../../principles/mobile-first.md).
 
 A project that takes this rule with old call sites ratchets them, as it does
 for [the design-system rule](#ratchet-a-rule). The rule skips each file that

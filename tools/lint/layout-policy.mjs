@@ -96,6 +96,36 @@ const isAliased = (node) =>
 const isWidthField = (owner, name) =>
   owner === 'screen' ? screenFields.has(name) : widthFields.has(name);
 
+/** Nodes that hold one expression and do not change its value: `window as Window`, `window!`, `(window)`. */
+const wrappers = new Set([
+  'TSAsExpression',
+  'TSNonNullExpression',
+  'TSSatisfiesExpression',
+  'TSTypeAssertion',
+  'ParenthesizedExpression',
+]);
+/** `node`, or the outermost wrapper around it, so a type cast hides nothing. */
+function outermost(node) {
+  let current = node;
+  while (wrappers.has(current.parent?.type) && current.parent.expression === current) {
+    current = current.parent;
+  }
+  return current;
+}
+/** Whether code reads a member of `node`, such as `matchMedia.bind`. */
+const hasMember = (node) => node.parent?.type === 'MemberExpression' && node.parent.object === node;
+/**
+ * What code does with a `matchMedia` that is not a call with a query: a
+ * local name, or a member such as `.bind`, hides the query from lint.
+ */
+function mediaUse(reference) {
+  const media = outermost(reference);
+  if (isCallee(media)) {
+    return { call: media.parent };
+  }
+  return isAliased(media) || hasMember(media) ? { alias: media.parent, name: 'matchMedia' } : null;
+}
+
 /**
  * What code reads from the global object `owner` through `node`. Each item is
  * a width field, `{ node, read }`, a call to `matchMedia`, `{ call }`, or a
@@ -103,7 +133,8 @@ const isWidthField = (owner, name) =>
  * `window.innerWidth`, `window.screen.width` and `const { innerWidth } = window`
  * each read a width field.
  */
-function fieldReads(node, owner) {
+function fieldReads(reference, owner) {
+  const node = outermost(reference);
   const { parent } = node;
   if (parent?.type === 'MemberExpression' && parent.object === node) {
     const name = propertyOf(parent);
@@ -116,10 +147,8 @@ function fieldReads(node, owner) {
     if (owner === 'screen' || name !== 'matchMedia') {
       return [];
     }
-    if (isCallee(parent)) {
-      return [{ call: parent.parent }];
-    }
-    return isAliased(parent) ? [{ alias: parent, name: 'matchMedia' }] : [];
+    const use = mediaUse(parent);
+    return use ? [use] : [];
   }
   if (isAliased(node)) {
     return [{ alias: parent, name: owner }];
@@ -264,14 +293,13 @@ const noViewportReads = {
           const { name } = identifier;
           if (widthFields.has(name)) {
             report(identifier, name);
-          } else if (name === 'matchMedia' && isCallee(identifier)) {
-            checkQuery(identifier.parent);
-          } else if (name === 'matchMedia' && isAliased(identifier)) {
-            context.report({
-              node: identifier.parent,
-              messageId: 'alias',
-              data: { name: 'matchMedia' },
-            });
+          } else if (name === 'matchMedia') {
+            const use = mediaUse(identifier);
+            if (use?.call) {
+              checkQuery(use.call);
+            } else if (use) {
+              context.report({ node: use.alias, messageId: 'alias', data: { name: use.name } });
+            }
           } else if (globals.has(name)) {
             checkObject(identifier, name);
           } else if (name === 'screen') {
