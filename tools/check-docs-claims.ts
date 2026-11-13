@@ -136,9 +136,97 @@ export function findClaims(file: string, content: string, enforcers: Enforcers):
   return claims;
 }
 
+export const principlesIndex = 'docs/principles/index.md';
+const reviewPage = 'docs/contributing/review.md';
+const reviewOnly = 'Review only';
+
+const cellsOf = (row: string) =>
+  row
+    .trim()
+    .replace(/^\|/u, '')
+    .replace(/\|$/u, '')
+    .split('|')
+    .map((cell) => cell.trim());
+
+/**
+ * The principles index maps each principle page to what holds it. Each page
+ * needs a row. Each `Held by` cell names enforcers that exist, or says
+ * `Review only`, and the review page then links the principle.
+ */
+export function findPrincipleGaps(
+  pages: ReadonlyArray<string>,
+  index: string,
+  review: string,
+  enforcers: Enforcers,
+): Array<string> {
+  const problems: Array<string> = [];
+  const rows = new Set<string>();
+  let heldBy = -1;
+  for (const [number, line] of index.split('\n').entries()) {
+    if (!line.trimStart().startsWith('|')) {
+      heldBy = -1;
+      continue;
+    }
+    const cells = cellsOf(line);
+    if (cells[0] === 'Principle') {
+      heldBy = cells.indexOf('Held by');
+      continue;
+    }
+    const page = /^\[[^\]]*\]\(\.\/([\w-]+\.md)\)$/u.exec(cells[0] ?? '')?.[1];
+    if (!page) {
+      continue;
+    }
+    rows.add(page);
+    const where = `${principlesIndex}:${number + 1}: ${page}`;
+    const cell = heldBy === -1 ? '' : (cells[heldBy] ?? '');
+    const names = [...cell.matchAll(/`([^`]+)`/gu)].map((match) => match[1]);
+    if (cell === reviewOnly) {
+      if (!review.includes(`principles/${page}`)) {
+        problems.push(
+          `${where} is \`${reviewOnly}\`, so ${reviewPage} needs its rule and a link to its page.`,
+        );
+      }
+    } else if (!names.length) {
+      problems.push(
+        `${where} has an empty \`Held by\` cell. Name the check, lint rule or test that holds it, in backticks, or write \`${reviewOnly}\`.`,
+      );
+    }
+    for (const name of names.filter((reference) => !exists(enforcers, reference))) {
+      problems.push(
+        `${where}: \`${name}\` in its \`Held by\` cell is not a check target, lint rule, test file or agent hook.`,
+      );
+    }
+  }
+  for (const page of pages.filter((file) => !rows.has(file))) {
+    problems.push(
+      `${principlesIndex}: docs/principles/${page} has no row. Add one with its \`Held by\` cell.`,
+    );
+  }
+  return problems;
+}
+
+async function checkPrinciples(root: string, enforcers: Enforcers): Promise<Array<string>> {
+  const index = await readText(path.join(root, principlesIndex));
+  if (!index) {
+    return [];
+  }
+  const pages: Array<string> = [];
+  for await (const file of new Bun.Glob('*.md').scan({ cwd: path.join(root, 'docs/principles') })) {
+    if (file !== 'index.md') {
+      pages.push(file);
+    }
+  }
+  return findPrincipleGaps(
+    pages.toSorted(),
+    index,
+    await readText(path.join(root, reviewPage)),
+    enforcers,
+  );
+}
+
 export async function checkDocsClaims(root: string): Promise<Array<string>> {
   const enforcers = await enforcersOf(root);
-  const problems: Array<string> = [];
+  const problems: Array<string> = await checkPrinciples(root, enforcers);
   for (const file of await listDocs(root)) {
     for (const claim of findClaims(file, await readDoc(root, file), enforcers)) {
       problems.push(`${claim.file}:${claim.line}: ${claim.problem}`);

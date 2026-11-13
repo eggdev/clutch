@@ -111,6 +111,30 @@ Flag a script or workflow that deletes a cloud resource with no name guard in
 the same function. That finding is `blocking`. See
 [previews](./setup/previews.md#destructive-automation-checks-the-name-first).
 
+## Principles that no check holds
+
+The [principles index](../principles/index.md) marks these principles
+`Review only`. Review is the only thing that stops a change that breaks one.
+Each finding below is `blocking`.
+
+- **Single-page app.** Flag a route that renders on the server when the PR
+  gives neither reason. One reason is content that a person sees without the
+  app. The other is HTML that is ready sooner than the browser can make it.
+  Also flag a server render of a screen that reads the account's records. See
+  [single-page app](../principles/single-page-app.md).
+- **Keyboard first.** Flag a key that a file outside the shortcut registry
+  binds. Flag a new common action with no shortcut, and a menu item or tooltip
+  that does not show its shortcut. Also flag a single-key shortcut that fires
+  in a text field. See [keyboard first](../principles/keyboard-first.md).
+- **Mobile first.** Flag a style for desktop that a phone class then undoes,
+  and a component that reads the viewport width. Flag an action that the phone
+  layout removes, and an action that only hover shows. Also flag a touch
+  target smaller than 44 by 44 px. See
+  [mobile first](../principles/mobile-first.md).
+- **Fix the root bottleneck.** Flag a timeout, a fallback, a degraded mode or
+  a cache that hides slowness, unless the same change links an issue for the
+  root fix. See [fix the root bottleneck](../principles/fix-the-root-bottleneck.md).
+
 ## Tests
 
 Flag a fake that is not typed against the vendor SDK. See
