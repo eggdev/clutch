@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.0 (2026-11-13)
+
+### Features
+
+- feat(sync): prove contract claims on generated inputs (CL-532)
+
 ## 1.12.1 (2026-11-13)
 
 ### Fixes and maintenance
