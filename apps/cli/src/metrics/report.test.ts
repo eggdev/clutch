@@ -38,6 +38,13 @@ test('the report reads only gh api GET routes and fills every field', async () =
       labels: { 'size/S': 0, 'size/M': 2, 'size/L': 0, 'size/XL': 0 },
     },
     dryRunAgreement: { verdicts: 2, wouldMerge: 1, agreed: 1, unanswered: 1, streak: 1 },
+    loop: {
+      pullRequest: {
+        validateSeconds: { p50: 90, count: 1, previousP50: 60, change: 0.5, rise: true },
+        runSeconds: { p50: 300, count: 1, previousP50: 240, change: 0.25, rise: true },
+      },
+      push: { runSeconds: { p50: null, count: 0, change: null, rise: false } },
+    },
     watch: {
       noHumanBelowTarget: true,
       revertsOverLimit: true,
@@ -47,9 +54,13 @@ test('the report reads only gh api GET routes and fills every field', async () =
   });
   expect(Object.keys(report.unavailable)).toEqual([]);
   expect(renderMetrics(report)).toContain(
-    'no human action 50%, under the 80% target; reverts 50%, over the 2% limit; main red 75 min; tighten #7',
+    'no human action 50%, under the 80% target; reverts 50%, over the 2% limit; main red 75 min; tighten #7; Validate step, PRs up 50%; CI run, PRs up 25%',
   );
   expect(renderMetrics(report)).toContain('Main red');
+  expect(renderMetrics(report)).toContain(
+    'Validate step, PRs, p50      90 s (1 runs), was 60 s: +50%, a rise over 20%',
+  );
+  expect(renderMetrics(report)).toContain('CI run, main, p50            n/a (no passed runs)');
   expect(renderMetrics(report)).toContain('1 agreed, 0 disagreed, 1 unanswered of 2; streak 1');
 });
 

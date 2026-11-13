@@ -10,6 +10,7 @@ import { verdictReasons } from '@/metrics/compute';
 import type { FactoryPull } from '@/metrics/factory';
 import { factoryReader, toPullCommit } from '@/metrics/factory-reader';
 import type { ApiPullCommit } from '@/metrics/factory-reader';
+import { loopReader } from '@/metrics/loop-reader';
 import { enabledMarker } from '@/metrics/pulls';
 import type { PullShape } from '@/metrics/pulls';
 
@@ -328,6 +329,8 @@ export function githubReader(gh: Gh, repo: string, concurrency = 8) {
         ),
       );
     },
+
+    ...loopReader(repo, get, list, limit),
 
     /** The workflow runs created on or after `since`, a date. */
     async workflowRuns(since: string): Promise<Array<WorkflowRun>> {

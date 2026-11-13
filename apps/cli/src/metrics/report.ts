@@ -11,6 +11,8 @@ import {
 } from '@/metrics/compute';
 import { factoryMetrics, withAgentReview } from '@/metrics/factory';
 import type { FactoryMetrics } from '@/metrics/factory';
+import { loopMetrics, loopRows, loopRuns, riseLimit, stepRunsToRead } from '@/metrics/loop';
+import type { LoopMetrics, LoopTrend } from '@/metrics/loop';
 import { agentBranchShare, byStep, prSize } from '@/metrics/pulls';
 
 /**
@@ -51,6 +53,7 @@ function watchOf(
   revertPulls: number,
   redMinutes: number | null,
   tighten: Array<{ number: number; title: string; url: string }> | null,
+  loop: LoopMetrics | null,
 ) {
   const revertRate = flow.merged === 0 ? null : revertPulls / flow.merged;
   const noHumanShare = flow.noHumanAction.share;
@@ -61,6 +64,11 @@ function watchOf(
     revertsOverLimit: revertRate !== null && revertRate > watchTargets.revertRate,
     mainRedMinutes: redMinutes,
     tighten,
+    loopRises: loop
+      ? loopRows(loop)
+          .filter(([, trend]) => trend.rise)
+          .map(([name, trend]) => ({ name, change: trend.change }))
+      : [],
   };
 }
 
@@ -126,6 +134,21 @@ export async function metricsReport(options: Options) {
     unavailable.ci = reason(error);
   }
 
+  // The period before is as long as this one, so each median has a baseline.
+  let loop: LoopMetrics | null = null;
+  try {
+    const before = new Date(now.getTime() - 2 * days * 86_400_000).toISOString();
+    const fetched = await reader.loopRuns(before.slice(0, 10));
+    const runs = loopRuns(
+      fetched.filter((run) => run.createdAt >= before),
+      since,
+    );
+    const steps = await reader.stepSeconds(stepRunsToRead(runs).map((run) => run.id));
+    loop = loopMetrics(runs, steps);
+  } catch (error) {
+    unavailable.loop = reason(error);
+  }
+
   let agreement: ReturnType<typeof dryRunAgreement> | null = null;
   try {
     agreement = dryRunAgreement(await reader.dryRunVerdicts(since, options.owner));
@@ -182,7 +205,8 @@ export async function metricsReport(options: Options) {
     issuesDone,
     prSize: prSize(pulls, options.sizeExclude ?? []),
     dryRunAgreement: agreement,
-    watch: watchOf(flow, revertPulls, mainRed?.minutes ?? null, tighten),
+    loop,
+    watch: watchOf(flow, revertPulls, mainRed?.minutes ?? null, tighten, loop),
     unavailable,
   };
 }
@@ -215,7 +239,21 @@ function factoryRows(factory: FactoryMetrics): Array<[string, string]> {
   ];
 }
 
-/** One line: each P2 target that misses, main-red minutes and the open tighten issues. */
+/** A loop median against the period before, such as `52 s (40 runs), was 48 s: +8.3%`. */
+function loopValue(trend: LoopTrend) {
+  if (trend.p50 === null) {
+    return 'n/a (no passed runs)';
+  }
+  const median = `${Math.round(trend.p50)} s (${trend.count} runs)`;
+  if (trend.previousP50 === null || trend.change === null) {
+    return `${median}, no runs in the period before`;
+  }
+  const sign = trend.change > 0 ? '+' : '';
+  const mark = trend.rise ? `, a rise over ${percent(riseLimit)}` : '';
+  return `${median}, was ${Math.round(trend.previousP50)} s: ${sign}${percent(trend.change)}${mark}`;
+}
+
+/** One line: each P2 target that misses, main-red minutes, the open tighten issues and each loop time that rose. */
 function watchLine(watch: MetricsReport['watch']) {
   const flags = [
     watch.noHumanBelowTarget
@@ -228,6 +266,7 @@ function watchLine(watch: MetricsReport['watch']) {
     watch.tighten && watch.tighten.length > 0
       ? `tighten ${watch.tighten.map((issue) => `#${issue.number}`).join(' ')}`
       : null,
+    ...watch.loopRises.map((item) => `${item.name} up ${percent(item.change)}`),
   ].filter(Boolean);
   return flags.length > 0 ? flags.join('; ') : 'nothing';
 }
@@ -286,6 +325,12 @@ export function renderMetrics(report: MetricsReport) {
         ? `${report.ci.runs}, ${percent(report.ci.failureRate)} failed, ${spread(report.ci.durationMinutes, ' min')}`
         : 'n/a',
     ],
+    ...(report.loop
+      ? loopRows(report.loop).map(([name, trend]): [string, string] => [
+          `${name}, p50`,
+          loopValue(trend),
+        ])
+      : [['Loop time', 'n/a'] as [string, string]]),
     ['Issues done', show(report.issuesDone)],
     [
       'Dry-run agreement',
