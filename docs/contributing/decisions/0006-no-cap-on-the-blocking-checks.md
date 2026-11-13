@@ -7,7 +7,7 @@
 
 [Exact](https://github.com/expo/exact) lets six checks block a change, and a seventh needs one deleted in the same change. Its `rules/DEFERRED.md` is a binding list of work that it does not do yet. CL-527 asked whether Clutch takes both.
 
-On 2026-11-13, Clutch blocked on 45 targets: 7 in `tools/validate.ts` and 38 under `checks` in `package.json`. About 8 of them hold prose. The plan asked for more: the exit metric of phase P4 said "Friction turns into at least one new check a month."
+On 2026-11-13, Clutch blocked on 44 targets: 7 in `tools/validate.ts` and 38 under `checks` in `package.json`, with `skill-tests` in both lists. About 8 of them hold prose. The plan asked for more: the exit metric of phase P4 said "Friction turns into at least one new check a month."
 
 The owner compared the two projects. Exact is built so that its own form removes many mistakes of ordinary application development. Clutch builds on ordinary tools, so its checks do that work.
 
