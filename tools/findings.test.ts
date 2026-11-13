@@ -1,7 +1,33 @@
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
-import { clearFindings, formatFinding, readFindings, writeFindings } from '@tools/findings';
+import {
+  clearFindings,
+  findingChecks,
+  formatFinding,
+  readFindings,
+  writeFindings,
+} from '@tools/findings';
 import { inRepo } from '@tools/testing/in-repo';
+
+test('the list of finding checks names each check that writes findings', () => {
+  const writers = [...new Bun.Glob('check-*.ts').scanSync({ cwd: import.meta.dir })]
+    .filter((file) => !file.endsWith('.test.ts'))
+    .filter((file) =>
+      readFileSync(path.join(import.meta.dir, file), 'utf-8').includes('writeFindings('),
+    )
+    .map((file) => file.slice(0, -'.ts'.length));
+  expect(writers.toSorted()).toEqual(findingChecks.toSorted());
+});
+
+test('a findings file that does not parse is left out, so its check reads as missing', async () => {
+  const read = await inRepo({ 'tmp/check-findings/check-x.json': '[{"id":' }, (root) => {
+    writeFindings(root, 'check-y', []);
+    return readFindings(root);
+  });
+  expect(read).toEqual({ 'check-y': [] });
+});
 
 const finding = {
   id: 'check-x/too-long',

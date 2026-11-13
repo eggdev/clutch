@@ -1,7 +1,7 @@
 import { availableParallelism } from 'node:os';
 
 import { changedFiles, findBase } from '@tools/check-base';
-import { clearFindings, readFindings } from '@tools/findings';
+import { clearFindings, findingChecks, readFindings } from '@tools/findings';
 import type { Finding } from '@tools/findings';
 import { isDocsOnly } from '@tools/hooks/paths.mjs';
 
@@ -68,13 +68,19 @@ export function runTargets(targets: Array<string>, env: Record<string, string | 
 /**
  * The document that `validate --json` prints. `checks` names each check that
  * reported findings as data in this run, so a reader knows what the list
- * covers. A check that has not moved to findings yet prints only text, and
- * `exitCode` still counts it.
+ * covers. `missing` names each check of `expected` that wrote no findings: it
+ * stopped before the end, so it did not find nothing. A check that has not
+ * moved to findings yet prints only text, and `exitCode` still counts it.
  */
-export function findingsDocument(exitCode: number, byCheck: Record<string, Array<Finding>>) {
+export function findingsDocument(
+  exitCode: number,
+  byCheck: Record<string, Array<Finding>>,
+  expected: ReadonlyArray<string> = findingChecks,
+) {
   return {
     exitCode,
     checks: Object.keys(byCheck),
+    missing: expected.filter((check) => !(check in byCheck)),
     findings: Object.values(byCheck).flat(),
   };
 }

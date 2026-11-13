@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import type { ManifestChange } from '@repo/sync/contract/change-doors';
 import type { Manifest } from '@repo/sync/contract/manifest';
-import { checkContract, writeSnapshot } from '@tools/check-contract';
+import { checkContract, failureText, writeSnapshot } from '@tools/check-contract';
 import { snapshotProblems } from '@tools/contract-snapshot';
 import type { Snapshot } from '@tools/contract-snapshot';
 import { formatFinding } from '@tools/findings';
@@ -333,6 +333,8 @@ test('a one-way change passes only when the snapshot names it', () => {
     '  command-removed:notes/archive: notes/archive is gone.',
     '  Keep the old shape, or add the new one beside it. When the owner agreed to the break, run `mise exec -- bun tools/check-contract.ts --write --accept-breaks`.',
   ]);
+  // The count is the number of lines, as it was when each line was a problem of its own.
+  expect(failureText(text(unnamed)).split('\n')[0]).toBe('Contract check failed (3).');
   expect(snapshotProblems(now, snapshot(now, 'aaaa', [removed.id]), base, [removed])).toEqual([]);
 });
 
