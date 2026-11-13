@@ -327,6 +327,21 @@ export async function writeSnapshot(
   return found.problems.map(formatFinding);
 }
 
+/**
+ * The text of a failed run. The count is the number of lines, so a finding of
+ * several lines counts as it did when each line was a problem of its own.
+ */
+export function failureText(problems: ReadonlyArray<string>): string {
+  const lines = problems.flatMap((problem) => problem.split('\n'));
+  return [
+    `Contract check failed (${lines.length}).`,
+    `\`${snapshotFile}\` is what the app offers on the wire. Change a contract, then run \`${write}\`.`,
+    'See docs/contributing/architecture/contract.md.',
+    '',
+    ...lines,
+  ].join('\n');
+}
+
 if (import.meta.main) {
   const root = process.cwd();
   let problems: Array<string>;
@@ -338,15 +353,7 @@ if (import.meta.main) {
     problems = findings.map(formatFinding);
   }
   if (problems.length) {
-    console.error(
-      [
-        `Contract check failed (${problems.length}).`,
-        `\`${snapshotFile}\` is what the app offers on the wire. Change a contract, then run \`${write}\`.`,
-        'See docs/contributing/architecture/contract.md.',
-        '',
-        ...problems,
-      ].join('\n'),
-    );
+    console.error(failureText(problems));
     process.exitCode = 1;
   } else {
     console.log('The contract snapshot matches the contracts, and each app lists each contract.');

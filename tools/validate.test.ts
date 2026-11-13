@@ -60,6 +60,17 @@ test('validate --json lists each finding of each check that reported, with the e
   expect(findingsDocument(1, { 'check-contract': [], 'check-file-size': [finding] })).toEqual({
     exitCode: 1,
     checks: ['check-contract', 'check-file-size'],
+    missing: [],
     findings: [finding],
+  });
+});
+
+test('validate --json names a check that wrote no findings as missing', () => {
+  // A check that stops before the end writes no file. It did not find nothing.
+  expect(findingsDocument(1, { 'check-file-size': [] })).toEqual({
+    exitCode: 1,
+    checks: ['check-file-size'],
+    missing: ['check-contract'],
+    findings: [],
   });
 });
