@@ -71,7 +71,7 @@ numbers that set the order:
 | P1    | Measure, and prepare delegated merge.      | Flow metrics have a baseline. The auto-merge dry-run matches Brendan on 20 PRs in a row.              |
 | P2    | Turn on delegated merge.                   | 80% or more of the PRs merge with no human action. Reverts stay under 2%.                             |
 | P3    | Fast checks and parallel lanes.            | The local check meets its measured budget. Three or more lanes run at once without collisions.        |
-| P4    | Learning loops.                            | Main-red minutes and flaky reruns go down. Friction turns into at least one new check a month.        |
+| P4    | Learning loops.                            | Main-red minutes and flaky reruns go down. The owner reviews the friction that agents record.         |
 | P5    | Platform contracts, and ready for a team.  | No break reaches a project without a warning release. A new engineer keeps merges per engineer level. |
 | later | Backlog, or work that waits for a trigger. | The issue names its trigger.                                                                          |
 
