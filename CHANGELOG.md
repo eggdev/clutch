@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.3 (2026-11-13)
+
+### Fixes and maintenance
+
+- docs(decisions): keep the checks with no cap or monthly target (CL-527)
+
 ## 1.9.2 (2026-11-13)
 
 ### Fixes and maintenance
