@@ -5,6 +5,11 @@
       "pattern": "\\bas (unknown as|any\\b)",
       "files": "{apps,packages,features,tools}/**/*.{ts,tsx,mts}",
       "counts": {}
+    },
+    "invariants-without-journey": {
+      "command": "bun tools/check-primitives.ts --count",
+      "files": "docs/contributing/architecture/primitives.yaml",
+      "counts": {}
     }
   }
 }

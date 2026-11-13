@@ -18,11 +18,16 @@
 #               transactionSafe (a package only: the Context.Service keys that
 #               a server change may use; check-transaction-safe reads it)
 #   languages:  shared languages: imports, where, primitives, packagePaths, files
-#   invariants: id, summary, docs
+#   invariants: id, summary, docs, journey (the id of the journey that
+#               proves it, from features/<feature>/journeys/<id>.*, or
+#               not-written until that journey exists. The ratchet
+#               invariants-without-journey in .clutch/ratchets.json counts the
+#               not-written ones, and the count only goes down.)
 #   exceptions: rule, file, imports, reason. See
 #               docs/contributing/import-boundaries.md#exceptions.
 #
 # Kickoff adds the product primitives, and fills `languages` and `invariants`.
+# Kickoff gives each invariant the journey that proves it.
 #
 # Risk levels. A PR names the highest level that applies. See
 # .agents/skills/pr-recap/SKILL.md.

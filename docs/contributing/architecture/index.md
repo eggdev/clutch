@@ -15,7 +15,10 @@ The [primitives registry](./primitives.yaml) is the list of primitives. Each
 entry names its group, its kind (package, feature, app or tool), the folders
 it owns, its docs and, for a package, its vendors. `check-primitives` rejects a
 registry entry that names a missing path, and an Nx project that no primitive
-owns. The import policy reads the vendor owners and the languages from it.
+owns. It also rejects an invariant with no `journey`, and an invariant whose
+journey has no file. An invariant may say `journey: not-written`. The ratchet
+`invariants-without-journey` in `.clutch/ratchets.json` counts those, and the
+count only goes down. The import policy reads the vendor owners and the languages from it.
 
 The registry never records dependencies between primitives. Nx derives them
 from the imports. Run `mise exec -- bun nx graph` to see them.
