@@ -149,6 +149,10 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | Which app a web journey drives, with several web apps                                            | `clutch.yaml`, `journeys.webApp`                                                               |
 | Lockfiles, snapshots and `.clutch/` out of the size count                                        | `apps/cli/src/labels/compute.ts`, `sizeExcluded` (a guardrail file)                            |
 | A revert rehearsal kept out of the revert metric and the tighten issue                           | The `drill` label on the reverted PR, in its timeline; `tools/github/revert.ts`                |
+| The iOS lane of CI, which is off until a repository turns it on                                  | `.github/workflows/ci.yml`, the `if` of `native-ios`: the variable `CLUTCH_IOS_LANE`           |
+
+The value of `CLUTCH_IOS_LANE` is a GitHub setting, not a file. The review sees a
+change to the `if`, and it does not see a change to the value.
 
 <!-- kickoff: The GitHub handle or team that owns the guardrail files. Replace @eggdev with it in .github/CODEOWNERS; tools/codeowners.ts keeps it when it regenerates the file. -->
 
