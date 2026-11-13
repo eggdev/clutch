@@ -94,6 +94,10 @@ Each entry names one `bun test` test, or one screenshot of a web journey:
   same PR. Its phase is the `FLAKE_ISSUE_PHASE` repository variable, `later` when
   unset. The release bot opens the PR, so CI runs on it. The hunt uses no agent.
   While its PR is open, the next hunt skips.
+- The same flake hunt runs each web journey 20 times on each device, with no
+  retry, and counts the first runs of each journey that failed. It only
+  measures, and never quarantines a journey. See
+  [flake hunt](./end-to-end-testing.md#flake-hunt).
 
 ## Slow tests
 

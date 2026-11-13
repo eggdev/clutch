@@ -3,6 +3,9 @@
 # goes into the quarantine, tools/flaky-tests.json, with a new issue that owns
 # its fix, in one pull request. The hunt uses no agent and spends no tokens.
 # See docs/contributing/testing.md#flaky-tests.
+# The journeys job runs each web journey 20 times on each device with no retry,
+# and counts the first runs that failed. It only measures.
+# See docs/contributing/end-to-end-testing.md#flake-hunt.
 name: Flake hunt
 
 on:
@@ -104,3 +107,48 @@ jobs:
             > "$RUNNER_TEMP/body.md"
           GH_TOKEN="$PUSH_TOKEN" gh pr create --repo "$GITHUB_REPOSITORY" --head "$branch" \
             --title "$title" --body-file "$RUNNER_TEMP/body.md"
+
+  # Each web journey 20 times on each device, with no retry. The blocking
+  # journeys check in ci.yml keeps its one retry, so a journey that passes only
+  # on the retry stays hidden there. The step summary counts the first runs of
+  # each journey that failed. It quarantines no journey and opens no PR, so
+  # this job needs no hunt PR check and no bot token. See
+  # docs/contributing/end-to-end-testing.md#flake-hunt.
+  journeys:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile
+      # The same Chromium cache as the journeys job in ci.yml.
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+      - name: Install the Chromium system libraries
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+      # A failed journey is data, so this step passes. It fails only when
+      # Playwright wrote no report, because then nothing was counted.
+      - name: Run the journeys 20 times
+        run: bun tools/journeys/run.ts --hunt 20
+      - name: Keep the report and the traces of each failed run
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journey-hunt-traces
+          path: test-results/journeys
+          if-no-files-found: ignore
+          retention-days: 14
