@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.1 (2026-11-13)
+
+### Fixes and maintenance
+
+- fix(lint): fail matchMedia or the window under a local name (CL-550)
+
 ## 1.11.0 (2026-11-13)
 
 ### Features
