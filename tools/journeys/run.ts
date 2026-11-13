@@ -1,12 +1,11 @@
-import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 import { missingJourneys } from '@tools/check-journeys';
 import { devApps, isUp, urlOf } from '@tools/dev';
 import type { DevApp } from '@tools/dev';
 import { isCore, unprovenCore } from '@tools/journeys/core-proof';
-import { countFirstRuns, huntLines, huntSummary, huntWarnings } from '@tools/journeys/hunt';
-import type { Report } from '@tools/journeys/hunt';
+import { hunt } from '@tools/journeys/hunt';
 import { budgetOf, inboxCommandOf, journeys, webDevices } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
 import {
@@ -235,6 +234,10 @@ function select(all: ReadonlyArray<Journey>, id: string | undefined): Array<Jour
   return [journey];
 }
 
+/** The time budget of a run: the budgets of its journeys added up, in seconds. */
+const budgetSum = (root: string, selected: ReadonlyArray<Journey>) =>
+  selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
+
 type Budgets = Exclude<ReturnType<typeof budgetsOf>, string>;
 
 async function runJourneys(
@@ -245,7 +248,7 @@ async function runJourneys(
   sink: Sink,
   fileFlake: FileFlake,
 ) {
-  const budget = selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
+  const budget = budgetSum(root, selected);
   const dir = runsDir(root);
   const code = await runPlaywright(
     root,
@@ -273,64 +276,6 @@ async function runJourneys(
     sink.error(problem);
   }
   return unproven.length > 0 ? 1 : 0;
-}
-
-/** The JSON report of a hunt. Each hunt writes it again. */
-const huntReport = (root: string) => path.join(root, 'test-results/journeys/hunt.json');
-
-/**
- * Runs each selected journey `repeat` times on each device with no retry,
- * and reports the first-run failures of each one: a log line, a warning for
- * each journey that failed a run, and a table in the step summary. Returns 0
- * when Playwright wrote its report, whatever the journeys did.
- */
-async function hunt(
-  root: string,
-  selected: ReadonlyArray<Journey>,
-  url: string,
-  budgets: Budgets,
-  repeat: number,
-  sink: Sink,
-) {
-  const budget = selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
-  const report = huntReport(root);
-  rmSync(report, { force: true });
-  await runPlaywright(
-    root,
-    selected.map((journey) => journey.file),
-    url,
-    budget,
-    {
-      JOURNEY_REPORT: report,
-      JOURNEY_BUDGETS: JSON.stringify(budgets),
-      JOURNEY_INBOX: JSON.stringify(inboxCommandOf(root) ?? []),
-    },
-    {
-      args: ['--retries', '0', '--repeat-each', String(repeat)],
-      tries: webDevices.length * repeat,
-    },
-  );
-  if (!existsSync(report)) {
-    sink.error(
-      'The hunt wrote no report, so nothing was counted. Read the Playwright output above.',
-    );
-    return 1;
-  }
-  const data = JSON.parse(readFileSync(report, 'utf-8')) as Report;
-  const devices = webDevices.map((device) => device.name);
-  const counts = countFirstRuns(root, data, selected, devices);
-  const errors = (data.errors ?? []).map((error) => error.message ?? 'An unnamed error.');
-  sink.log(`First-run failures out of ${repeat} runs on each device, with no retry:`);
-  for (const line of [...huntLines(counts), ...huntWarnings(counts, repeat)]) {
-    sink.log(line);
-  }
-  for (const error of errors) {
-    sink.error(error);
-  }
-  if (sink.env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(sink.env.GITHUB_STEP_SUMMARY, huntSummary(counts, devices, repeat, errors));
-  }
-  return 0;
 }
 
 /** Runs only the core journeys against a deployed URL. No core journey means no proof. */
@@ -408,7 +353,16 @@ export async function main(
   try {
     const url = urls.get(web.name) ?? '';
     return id === '--hunt'
-      ? await hunt(root, selected, url, budgets, repeat ?? 0, sink)
+      ? await hunt(root, selected, repeat ?? 0, sink, (env, args, tries) =>
+          runPlaywright(
+            root,
+            selected.map((journey) => journey.file),
+            url,
+            budgetSum(root, selected),
+            { ...env, JOURNEY_BUDGETS: JSON.stringify(budgets) },
+            { args, tries },
+          ),
+        )
       : await runJourneys(root, selected, url, budgets, sink, fileFlake);
   } finally {
     if (started) {

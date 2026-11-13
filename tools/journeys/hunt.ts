@@ -1,5 +1,7 @@
+import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
+import { inboxCommandOf, webDevices } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
 
 /**
@@ -23,7 +25,7 @@ export type Report = {
 };
 
 /** The first runs of one journey on one device. A skipped run counts as neither. */
-export type DeviceCount = { device: string; runs: number; failed: number };
+type DeviceCount = { device: string; runs: number; failed: number };
 
 export type JourneyCount = { journey: Journey; devices: Array<DeviceCount> };
 
@@ -128,4 +130,68 @@ export function huntSummary(
     );
   }
   return `${lines.join('\n')}\n`;
+}
+
+/** Where the hunt writes its lines: the console and the process environment, or a test's capture. */
+type Sink = {
+  env: Record<string, string | undefined>;
+  log: (line: string) => void;
+  error: (line: string) => void;
+};
+
+/**
+ * Starts Playwright on the selected journeys with these extra environment
+ * variables and arguments, and a time limit of `tries` journey budgets.
+ * Resolves to the exit code.
+ */
+type RunPlaywright = (
+  env: Record<string, string>,
+  args: ReadonlyArray<string>,
+  tries: number,
+) => Promise<number>;
+
+/** The JSON report of a hunt. Each hunt writes it again. */
+const huntReport = (root: string) => path.join(root, 'test-results/journeys/hunt.json');
+
+/**
+ * Runs each selected journey `repeat` times on each device with no retry,
+ * and reports the first-run failures of each one: a log line, a warning for
+ * each journey that failed a run, and a table in the step summary. Returns 0
+ * when Playwright wrote its report, whatever the journeys did.
+ */
+export async function hunt(
+  root: string,
+  selected: ReadonlyArray<Journey>,
+  repeat: number,
+  sink: Sink,
+  run: RunPlaywright,
+): Promise<number> {
+  const report = huntReport(root);
+  rmSync(report, { force: true });
+  await run(
+    { JOURNEY_REPORT: report, JOURNEY_INBOX: JSON.stringify(inboxCommandOf(root) ?? []) },
+    ['--retries', '0', '--repeat-each', String(repeat)],
+    webDevices.length * repeat,
+  );
+  if (!existsSync(report)) {
+    sink.error(
+      'The hunt wrote no report, so nothing was counted. Read the Playwright output above.',
+    );
+    return 1;
+  }
+  const data = JSON.parse(readFileSync(report, 'utf-8')) as Report;
+  const devices = webDevices.map((device) => device.name);
+  const counts = countFirstRuns(root, data, selected, devices);
+  const errors = (data.errors ?? []).map((error) => error.message ?? 'An unnamed error.');
+  sink.log(`First-run failures out of ${repeat} runs on each device, with no retry:`);
+  for (const line of [...huntLines(counts), ...huntWarnings(counts, repeat)]) {
+    sink.log(line);
+  }
+  for (const error of errors) {
+    sink.error(error);
+  }
+  if (sink.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(sink.env.GITHUB_STEP_SUMMARY, huntSummary(counts, devices, repeat, errors));
+  }
+  return 0;
 }
