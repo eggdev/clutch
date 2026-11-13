@@ -286,7 +286,15 @@ lane only when a native app declares that platform's app ID. The ID is
 `expo.ios.bundleIdentifier` for iOS, or `expo.android.package` for Android,
 in app.json.
 The template declares iOS only. The `native-ios` job builds the app with
-`native:build --fresh`. A project that ships Android adds its package, then
+`native:build --fresh`.
+
+The iOS lane also needs the repository variable `CLUTCH_IOS_LANE` set to `on`.
+Without it, CI skips the `native-ios` job, and a skipped job holds no merge.
+The template leaves the variable unset. The first native build does not fit
+the 25 minutes of the job on a GitHub runner (CL-469). Until the lane can pass,
+run the iOS journeys through a [device host](./setup/native.md#device-host).
+
+A project that ships Android adds its package, then
 fills the build line of `native-android` in `.github/workflows/ci.yml`. Until it
 does, that line fails.
 
