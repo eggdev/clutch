@@ -25,6 +25,7 @@ async function workspace(): Promise<Tree> {
     'oxlint.config.ts',
     'apps/app/app/index.tsx',
     'apps/app/package.json',
+    'apps/app/vite.config.ts',
     'apps/api/package.json',
   ]) {
     tree.write(file, await readFile(path.join(root, file), 'utf-8'));

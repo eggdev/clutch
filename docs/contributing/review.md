@@ -98,6 +98,16 @@ touches a hard invariant when its PR shows no passing run of that invariant's
 journey. That finding is `blocking`. A change to what an invariant says is an
 `owner` finding. See [proof gates code](../principles/proof-gates-code.md).
 
+## Single-page app
+
+`check-structure` fails a route that renders on the server when
+`tools/server-rendered-routes.yaml` does not name it with a reason. It also
+fails a Vite config whose default render mode it cannot read. Review
+holds the rest of the principle. Flag a server render of a screen that reads
+the account's records. Also flag a listed reason that is not true for the
+route. Each finding is `blocking`. See
+[single-page app](../principles/single-page-app.md).
+
 ## One door for each decision
 
 Flag a change that checks access, a plan limit, a flag or the acting user
@@ -129,11 +139,6 @@ The [principles index](../principles/index.md) marks these principles
 `Review only`. Review is the only thing that stops a change that breaks one.
 Each finding below is `blocking`.
 
-- **Single-page app.** Flag a route that renders on the server when the PR
-  gives neither reason. One reason is content that a person sees without the
-  app. The other is HTML that is ready sooner than the browser can make it.
-  Also flag a server render of a screen that reads the account's records. See
-  [single-page app](../principles/single-page-app.md).
 - **Keyboard first.** Flag a key that a file outside the shortcut registry
   binds. Flag a new common action with no shortcut, and a menu item or tooltip
   that does not show its shortcut. Also flag a single-key shortcut that fires

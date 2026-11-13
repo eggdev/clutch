@@ -14,6 +14,7 @@
     "tools/check-*.ts",
     "tools/file-size-budgets.json",
     "tools/dependency-overrides.yaml",
+    "tools/server-rendered-routes.yaml",
     "tools/guardrail-files.json",
     "tools/codeowners.ts",
     "tools/agent-hooks/**",

@@ -10,6 +10,11 @@ files:
   # Shared tooling and agent setup.
   - path: tools/
     rule: managed
+  # The routes of the project that render on the server, with their reasons. check-structure
+  # reads it, and the project owns it after sync adds it once.
+  - path: tools/server-rendered-routes.yaml
+    rule: seed
+    add_on_sync: true
   # The accessibility check that each web journey, and the feature journey template, imports.
   - path: packages/journeys/
     rule: managed
