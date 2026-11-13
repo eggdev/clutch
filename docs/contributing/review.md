@@ -101,7 +101,8 @@ journey. That finding is `blocking`. A change to what an invariant says is an
 ## Single-page app
 
 `check-structure` fails a route that renders on the server when
-`tools/server-rendered-routes.yaml` does not name it with a reason. Review
+`tools/server-rendered-routes.yaml` does not name it with a reason. It also
+fails a Vite config whose default render mode it cannot read. Review
 holds the rest of the principle. Flag a server render of a screen that reads
 the account's records. Also flag a listed reason that is not true for the
 route. Each finding is `blocking`. See

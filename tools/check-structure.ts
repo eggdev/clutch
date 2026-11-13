@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { ignoredByGit } from '@tools/check-file-size';
 import { sections } from '@tools/lint/import-policy.mjs';
-import { parse } from 'yaml';
+import { YAMLParseError, parse } from 'yaml';
 
 /**
  * The shape of each package and feature. A package has only section folders
@@ -100,31 +100,98 @@ export const serverRoutesList = 'tools/server-rendered-routes.yaml';
 /** The two reasons of docs/principles/single-page-app.md for a server render. */
 export const serverRenderReasons = ['seen without the app', 'ready sooner'] as const;
 
-const renderMode = /\+(api|ssg|ssr|spa)$/u;
-const routeFile = /^(?!.*\.d\.ts$)(?!.*\.test\.[jt]sx?$).+\.[jt]sx?$/u;
+const principle = 'See docs/principles/single-page-app.md.';
+const spaFix = "Set `web: { defaultRenderMode: 'spa' }` as a string literal.";
 
-/** Whether `text` names a package as a dependency. */
+/*
+ * The rules below copy One 1.27.1. Each route is a `.ts` or `.tsx` file
+ * (`ROUTE_GLOB_PATTERN` in `router/glob-patterns.mjs`). The web build leaves
+ * out `.native`, `.ios` and `.android` files (`ROUTE_WEB_EXCLUSION_GLOB_PATTERNS`).
+ * The router skips `.d.ts` files and the top `+html` file (`getRoutes.mjs`).
+ * Test files are routes, unless the config sets `router.ignoredRouteFiles`.
+ * The mode suffixes come from `matchFileRenderMode` and
+ * `directoryRenderModeRe` in `router/matchers.mjs`.
+ */
+const routeFile = /\.tsx?$/u;
+const notRouteFile = [/\.d\.ts$/u, /\.(?:native|ios|android)\.tsx?$/u];
+const topHtmlFile = /^\+html\.[jt]sx?$/u;
+const fileRenderMode = /\+(api|ssg|ssr|spa)\.(?:\w+\.)?[jt]sx?$/u;
+const folderRenderMode = /^(.+)\+(api|ssg|ssr|spa)$/u;
+
+/** Whether `text` names a package as a dependency or a dev dependency. */
 const dependsOn = (text: string, name: string) => {
-  const manifest = JSON.parse(text) as { dependencies?: Record<string, string> };
-  return Object.hasOwn(manifest.dependencies ?? {}, name);
+  const manifest = JSON.parse(text) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  return [manifest.dependencies, manifest.devDependencies].some((deps) =>
+    Object.hasOwn(deps ?? {}, name),
+  );
 };
 
-/**
- * The render mode that One gives each page route. A suffix on the file, such
- * as `_layout+ssg.tsx`, wins. A suffix on a folder, such as `blog+ssr/`, sets
- * the mode of the routes in it. Other routes take `web.defaultRenderMode` from
- * the Vite config, which is `ssg` when the config does not set it.
- */
-function routeModes(root: string, app: string): Map<string, string> {
-  const modes = new Map<string, string>();
-  let config = '';
-  try {
-    config = readFileSync(path.join(root, app, 'vite.config.ts'), 'utf-8');
-  } catch {
-    // One's own default applies.
+/** `source` with its `//` and `/* *\/` comments removed. String literals stay. */
+export function withoutComments(source: string): string {
+  let out = '';
+  let index = 0;
+  while (index < source.length) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (char === '/' && next === '/') {
+      const end = source.indexOf('\n', index);
+      index = end === -1 ? source.length : end;
+    } else if (char === '/' && next === '*') {
+      const end = source.indexOf('*/', index + 2);
+      index = end === -1 ? source.length : end + 2;
+      out += ' ';
+    } else if (char === "'" || char === '"' || char === '`') {
+      let end = index + 1;
+      while (end < source.length && source[end] !== char) {
+        end += source[end] === '\\' ? 2 : 1;
+      }
+      out += source.slice(index, end + 1);
+      index = end + 1;
+    } else {
+      out += char;
+      index += 1;
+    }
   }
-  const fallback = /defaultRenderMode:\s*['"](\w+)['"]/u.exec(config)?.[1] ?? 'ssg';
-  const walk = (folder: string, inherited: string) => {
+  return out;
+}
+
+/**
+ * The default render mode that the Vite config of an app sets, or a problem
+ * when the check cannot read it. The check reads the mode only when the code
+ * names `defaultRenderMode` once, with a string literal as its value.
+ */
+function defaultMode(root: string, app: string): { mode: string } | { problem: string } {
+  const file = `${app}/vite.config.ts`;
+  let config;
+  try {
+    config = withoutComments(readFileSync(path.join(root, file), 'utf-8'));
+  } catch {
+    return {
+      problem: `${file}: does not exist, so One renders each route on the server by default. Create it. ${spaFix} ${principle}`,
+    };
+  }
+  const named = config.match(/\bdefaultRenderMode\b/gu) ?? [];
+  const literal = /\bdefaultRenderMode\s*:\s*(['"`])(ssg|ssr|spa)\1/u.exec(config);
+  if (named.length !== 1 || !literal) {
+    return {
+      problem: `${file}: the check cannot read the default render mode. It reads one \`defaultRenderMode\` with a string literal value. ${spaFix} ${principle}`,
+    };
+  }
+  return { mode: literal[2] };
+}
+
+/**
+ * The render mode of each route of an app. A suffix on the file, such as
+ * `_layout+ssg.tsx`, wins. A suffix on a folder, such as `blog+ssr/`, sets the
+ * mode of the routes in it. Other routes take the default mode, which is
+ * `undefined` here.
+ */
+function routeModes(root: string, app: string): Map<string, string | undefined> {
+  const modes = new Map<string, string | undefined>();
+  const walk = (folder: string, inherited: string | undefined, top: boolean) => {
     let found;
     try {
       found = readdirSync(path.join(root, folder), { withFileTypes: true });
@@ -137,67 +204,140 @@ function routeModes(root: string, app: string): Map<string, string> {
         continue;
       }
       if (entry.isDirectory()) {
-        walk(file, renderMode.exec(entry.name)?.[1] ?? inherited);
-      } else if (routeFile.test(entry.name)) {
-        const stem = entry.name.replace(/(?:\.(?:web|native|ios|android))?\.[jt]sx?$/u, '');
-        modes.set(file, renderMode.exec(stem)?.[1] ?? inherited);
+        walk(file, folderRenderMode.exec(entry.name)?.[2] ?? inherited, false);
+      } else if (
+        routeFile.test(entry.name) &&
+        !notRouteFile.some((pattern) => pattern.test(entry.name)) &&
+        !(top && topHtmlFile.test(entry.name))
+      ) {
+        modes.set(file, fileRenderMode.exec(entry.name)?.[1] ?? inherited);
       }
     }
   };
-  walk(`${app}/app`, fallback);
+  walk(`${app}/app`, undefined, true);
   return modes;
+}
+
+const serverMode = (mode: string | undefined) => mode === 'ssr' || mode === 'ssg';
+
+/**
+ * The routes of each One app under `apps/`, as repository paths. `server`
+ * renders on the server. `unknown` takes a default mode that the check cannot
+ * read. `byDefault` holds, for each config with a server default, the routes
+ * that take it. `problems` names each config that the check cannot read.
+ */
+function appRoutes(root: string) {
+  const server: Array<string> = [];
+  const unknown: Array<string> = [];
+  const byDefault = new Map<string, { mode: string; routes: Array<string> }>();
+  const problems: Array<string> = [];
+  const apps = projects(root, 'apps').filter((app) =>
+    dependsOn(readFileSync(path.join(root, app, 'package.json'), 'utf-8'), 'one'),
+  );
+  for (const app of apps) {
+    const fallback = defaultMode(root, app);
+    if ('problem' in fallback) {
+      problems.push(fallback.problem);
+    }
+    const takesDefault: Array<string> = [];
+    for (const [file, mode] of routeModes(root, app)) {
+      if (mode === undefined) {
+        takesDefault.push(file);
+      } else if (serverMode(mode)) {
+        server.push(file);
+      }
+    }
+    if (!('mode' in fallback)) {
+      unknown.push(...takesDefault);
+    } else if (serverMode(fallback.mode) && takesDefault.length > 0) {
+      server.push(...takesDefault);
+      byDefault.set(`${app}/vite.config.ts`, { mode: fallback.mode, routes: takesDefault });
+    }
+  }
+  return { server, unknown, byDefault, problems };
 }
 
 /** Each route of a One app under `apps/` that renders on the server, as a repository path. */
 export function serverRoutes(root: string): Array<string> {
-  return projects(root, 'apps')
-    .filter((app) => dependsOn(readFileSync(path.join(root, app, 'package.json'), 'utf-8'), 'one'))
-    .flatMap((app) => [...routeModes(root, app)])
-    .filter(([, mode]) => mode === 'ssr' || mode === 'ssg')
-    .map(([file]) => file);
+  return appRoutes(root).server;
 }
 
-type ServerRoute = { route?: unknown; reason?: unknown };
-
-/** The entries of the list. A project with no server render needs no list file. */
-function listedRoutes(root: string): Array<ServerRoute> | null {
-  let text = '';
+/** The entries of the list, or a problem with the file as a whole. */
+function listedRoutes(root: string): Array<unknown> | string {
+  let text;
   try {
     text = readFileSync(path.join(root, serverRoutesList), 'utf-8');
   } catch {
+    // A project with no server render needs no list file.
     return [];
   }
-  const list: unknown = parse(text) ?? [];
-  return Array.isArray(list) ? (list as Array<ServerRoute>) : null;
+  let list: unknown;
+  try {
+    list = parse(text) ?? [];
+  } catch (error) {
+    const line = error instanceof YAMLParseError ? error.linePos?.[0].line : undefined;
+    return `${serverRoutesList}: not valid YAML${line ? ` (line ${line})` : ''}. Fix the syntax. Write one \`- route:\` entry for each route.`;
+  }
+  return Array.isArray(list)
+    ? list
+    : `${serverRoutesList}: not a list. Write one \`- route:\` entry for each route.`;
 }
 
 function serverRenderProblems(root: string): Array<string> {
-  const found = new Set(serverRoutes(root));
+  const { server, unknown, byDefault, problems } = appRoutes(root);
+  const found = new Set(server);
+  const maybe = new Set(unknown);
   const listed = listedRoutes(root);
-  if (!listed) {
-    return [`${serverRoutesList}: not a list. Write one \`- route:\` entry for each route.`];
+  if (typeof listed === 'string') {
+    return [...problems, listed];
   }
-  const names = new Set(listed.map((entry) => entry.route));
   const reasons = serverRenderReasons.map((reason) => `\`${reason}\``).join(' or ');
-  const problems = [...found]
-    .filter((route) => !names.has(route))
-    .map(
-      (route) =>
-        `${route}: renders on the server, but ${serverRoutesList} does not name it. Make it render in the browser, or add it to the list with the reason ${reasons}. See docs/principles/single-page-app.md.`,
-    );
-  for (const entry of listed) {
-    const route = String(entry.route);
-    if (!found.has(route)) {
+  const counts = new Map<string, number>();
+  for (const [index, entry] of listed.entries()) {
+    const position = `${serverRoutesList}: entry ${index + 1}`;
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      problems.push(
+        `${position} is not an entry. Write it as \`- route: <file>\` with a \`reason:\` line.`,
+      );
+      continue;
+    }
+    const { route, reason } = entry as { route?: unknown; reason?: unknown };
+    if (typeof route !== 'string') {
+      problems.push(`${position} has no \`route\`. Give it the path of the route file.`);
+      continue;
+    }
+    counts.set(route, (counts.get(route) ?? 0) + 1);
+    if (!found.has(route) && !maybe.has(route)) {
       problems.push(
         `${serverRoutesList}: ${route} is not a route that renders on the server. Delete its entry.`,
       );
-    } else if (!(serverRenderReasons as ReadonlyArray<unknown>).includes(entry.reason)) {
+    } else if (!(serverRenderReasons as ReadonlyArray<unknown>).includes(reason)) {
       problems.push(
-        `${serverRoutesList}: ${route} has the reason \`${String(entry.reason)}\`. Give it ${reasons}. See docs/principles/single-page-app.md.`,
+        `${serverRoutesList}: ${route} has the reason \`${String(reason)}\`. Give it ${reasons}. ${principle}`,
       );
     }
   }
-  return problems;
+  for (const [route, count] of counts) {
+    if (count > 1) {
+      problems.push(
+        `${serverRoutesList}: ${route} has ${count} entries. Keep one entry for each route.`,
+      );
+    }
+  }
+  const unlisted = new Set([...found].filter((route) => !counts.has(route)));
+  for (const route of unlisted) {
+    problems.push(
+      `${route}: renders on the server, but ${serverRoutesList} does not name it. Make it render in the browser, or add it to the list with the reason ${reasons}. ${principle}`,
+    );
+  }
+  for (const [config, { mode, routes }] of byDefault) {
+    if (routes.some((route) => unlisted.has(route))) {
+      problems.push(
+        `${config}: sets the default render mode to \`${mode}\`, so each route without a mode renders on the server. ${spaFix} ${principle}`,
+      );
+    }
+  }
+  return [...new Set(problems)];
 }
 
 export function checkStructure(root: string): Array<string> {

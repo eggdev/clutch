@@ -7,7 +7,9 @@ device already has, not from HTML that a server made.
 ## Rules
 
 - **The browser renders each route.** A new route needs no setting to render
-  in the browser. That is the default in every web profile.
+  in the browser. That is the default in every web profile. The Vite config
+  of each One app sets `defaultRenderMode: 'spa'` as one string literal, so
+  `check-structure` can read it.
 - **The root document is the one static file.** It holds `<html>`, `<head>`,
   the inline shell CSS and the boot script. In `apps/app`, it is the root layout
   in `apps/app/app/_layout+ssg.tsx`, which One renders once at build time. A deep
