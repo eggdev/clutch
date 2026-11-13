@@ -109,9 +109,14 @@ test('a query that lint cannot read fails', async () => {
         'declare const query: string;',
         'export const a = matchMedia(query);',
         `export const b = window.matchMedia(\`(min-width: \${query})\`);`,
+        'export const { matchMedia: media } = window;',
       ].join('\n'),
     }),
-  ).toEqual(['features/notes/ui/query.tsx 2', 'features/notes/ui/query.tsx 3']);
+  ).toEqual([
+    'features/notes/ui/query.tsx 2',
+    'features/notes/ui/query.tsx 3',
+    'features/notes/ui/query.tsx 4',
+  ]);
 });
 
 test('the app shell, tests and testing helpers pass', async () => {

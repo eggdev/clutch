@@ -111,9 +111,13 @@ function fieldReads(node, owner) {
     parent.init === node &&
     parent.id.type === 'ObjectPattern'
   ) {
-    return patternKeys(parent.id)
+    const keys = patternKeys(parent.id);
+    const reads = keys
       .filter((name) => isWidthField(owner, name))
       .map((name) => ({ node: parent, read: `${owner}.${name}` }));
+    return owner !== 'screen' && keys.includes('matchMedia')
+      ? [...reads, { alias: parent }]
+      : reads;
   }
   return [];
 }
@@ -154,6 +158,8 @@ const noViewportReads = {
         '`{{read}}` reads the window width. A component responds to its container: use `@container` and container variants such as `@md:`. Only the app shell reads the window width. See docs/principles/mobile-first.md.',
       query:
         '`matchMedia` needs a string literal, so lint can tell whether the query reads the window width. See docs/principles/mobile-first.md.',
+      alias:
+        '`matchMedia` under a local name hides its query from lint. Call `matchMedia` or `window.matchMedia` with a string literal. See docs/principles/mobile-first.md.',
     },
   },
   create(context) {
@@ -179,6 +185,8 @@ const noViewportReads = {
       for (const item of fieldReads(node, owner)) {
         if (item.call) {
           checkQuery(item.call);
+        } else if (item.alias) {
+          context.report({ node: item.alias, messageId: 'alias' });
         } else {
           report(item.node, item.read);
         }

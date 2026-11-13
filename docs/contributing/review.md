@@ -108,11 +108,14 @@ or tool with no declaration. See
 ## Mobile first
 
 The lint rule `repo-layout/no-viewport-reads` fails a component that reads the
-window width. Review holds the rest of the principle. Flag a style for desktop
-that a phone class then undoes. Flag an action that the phone layout removes,
-and an action that only hover shows. Also flag a touch target smaller than 44
-by 44 px. Each finding is `blocking`. See
-[mobile first](../principles/mobile-first.md).
+window width in code. Review holds the rest of the principle. Flag a viewport
+breakpoint class in a component, such as `lg:flex-row`, and a width `@media`
+query in its styles. Flag a width read that the rule does not see, such as
+`document.documentElement.clientWidth`, `visualViewport.width` or a `resize`
+listener. Flag a style for desktop that a phone class then undoes. Flag an
+action that the phone layout removes, and an action that only hover shows.
+Also flag a touch target smaller than 44 by 44 px. Each finding is `blocking`.
+See [mobile first](../principles/mobile-first.md).
 
 ## Destructive automation
 
