@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.1 (2026-11-13)
+
+### Fixes and maintenance
+
+- fix(tools): keep the count of the contract check, and name a check that wrote no findings (CL-547)
+
 ## 1.9.0 (2026-11-13)
 
 ### Features
