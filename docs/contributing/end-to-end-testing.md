@@ -61,10 +61,16 @@ device, with no retry.
 - The step summary has a table with one row for each journey and one column for
   each device. A cell such as `2 of 20` counts the first runs that failed.
   `no run` means the journey did not run on that device.
-- A journey that failed a run also gets a warning in the run.
-- The job passes when a journey fails, because it only measures. It fails only
-  when Playwright wrote no report. It quarantines no journey, files no friction
-  entry, writes no measures file and opens no PR. It never blocks a PR.
+- A journey that failed a run gets a warning in the run. A journey that did not
+  run on a device gets another one.
+- The job passes when a journey fails, because it only measures. It fails when
+  it measured nothing for a journey: Playwright wrote no report, a journey file
+  did not load, or a journey ran on no device.
+- It quarantines no journey, files no friction entry, writes no measures file
+  and opens no PR. It never blocks a PR.
+- The job has a limit of 45 minutes, and Playwright writes the report at the
+  end. A hunt that passes the limit leaves no table. Lower the count or raise
+  the limit when the journeys grow.
 - The report and the trace of each failed run are in the `journey-hunt-traces`
   artifact for 14 days.
 - When the hunt names a journey, file one issue for it with the cause. File an

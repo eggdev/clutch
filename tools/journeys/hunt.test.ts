@@ -1,6 +1,9 @@
 import { expect, test } from 'bun:test';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
-import { countFirstRuns, huntLines, huntSummary, huntWarnings } from '@tools/journeys/hunt';
+import { countFirstRuns, hunt, huntLines, huntSummary, huntWarnings } from '@tools/journeys/hunt';
 import type { Report } from '@tools/journeys/hunt';
 import type { Journey } from '@tools/journeys/journeys';
 
@@ -78,6 +81,12 @@ test('names each journey with its count on each device, and says when one did no
   expect(huntWarnings(counts, 20)[0]).toStartWith(
     '::warning title=Journey failed a first run::notes-sync',
   );
+  expect(huntWarnings(counts, 20)[1]).toStartWith(
+    '::warning title=Journey did not run::pay-invoice',
+  );
+  expect(huntSummary(counts, devices, 20, [])).toContain(
+    'The hunt did not measure `pay-invoice` on each device.',
+  );
 });
 
 test('the step summary has a row for each journey and a column for each device', () => {
@@ -103,4 +112,61 @@ test('a clean hunt says that no journey failed', () => {
   const counts = countFirstRuns(root, clean, [notes], devices);
   expect(huntWarnings(counts, 1)).toEqual([]);
   expect(huntSummary(counts, devices, 1, [])).toContain('No journey failed a first run.');
+});
+
+/** Runs `hunt` in a scratch repository, with a Playwright that writes the report that `write` makes. */
+async function huntWith(write: (scratch: string) => Report | undefined) {
+  const scratch = mkdtempSync(path.join(tmpdir(), 'hunt-'));
+  const errors: Array<string> = [];
+  try {
+    const code = await hunt(
+      scratch,
+      [notes],
+      1,
+      { env: {}, log: () => {}, error: (line) => errors.push(line) },
+      (env) => {
+        const written = write(scratch);
+        if (written !== undefined) {
+          mkdirSync(path.dirname(env.JOURNEY_REPORT ?? ''), { recursive: true });
+          writeFileSync(env.JOURNEY_REPORT ?? '', JSON.stringify(written));
+        }
+        return Promise.resolve(1);
+      },
+    );
+    return { code, errors };
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+test('the hunt passes when a journey fails a run, because it only measures', async () => {
+  const result = await huntWith((scratch) => ({
+    config: { rootDir: path.join(scratch, 'features') },
+    suites: [
+      {
+        file: 'notes/journeys/notes-sync.journey.ts',
+        specs: [
+          { tests: [run('Phone', 'failed'), run('Tablet', 'passed'), run('Desktop', 'passed')] },
+        ],
+      },
+    ],
+  }));
+  expect(result).toEqual({ code: 0, errors: [] });
+});
+
+test('the hunt fails when Playwright wrote no report', async () => {
+  const result = await huntWith(() => {});
+  expect(result.code).toBe(1);
+  expect(result.errors[0]).toContain('wrote no report');
+});
+
+test('the hunt fails when a journey file did not load, so nothing ran', async () => {
+  const result = await huntWith((scratch) => ({
+    config: { rootDir: path.join(scratch, 'features') },
+    suites: [],
+    errors: [{ message: 'Cannot find module ./missing' }],
+  }));
+  expect(result.code).toBe(1);
+  expect(result.errors.at(-1)).toContain('1 error(s) outside the journeys');
+  expect(result.errors.at(-1)).toContain('1 journey(s) with no run');
 });

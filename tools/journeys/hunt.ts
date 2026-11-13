@@ -87,14 +87,30 @@ export function huntLines(counts: ReadonlyArray<JourneyCount>): Array<string> {
   );
 }
 
-/** A warning annotation for each journey that failed a first run, or that did not run on a device. */
+/** The journeys that ran on no device. The hunt measured nothing for them. */
+export const notRun = (counts: ReadonlyArray<JourneyCount>) =>
+  counts.filter(({ devices }) => devices.every((count) => count.runs === 0));
+
+/**
+ * The warning annotations of a hunt. A journey that failed a first run gets
+ * one, and a journey with a device that it did not run on gets another one.
+ */
 export function huntWarnings(counts: ReadonlyArray<JourneyCount>, repeat: number): Array<string> {
-  return counts
-    .filter(({ devices }) => devices.some((count) => count.failed > 0 || count.runs === 0))
-    .map(
-      ({ journey, devices }) =>
-        `::warning title=Journey failed a first run::${journey.id} (${journey.file}) failed first runs out of ${repeat} with no retry: ${devices.map((count) => `${count.device} ${cell(count)}`).join(', ')}.`,
-    );
+  return counts.flatMap(({ journey, devices }) => {
+    const cells = devices.map((count) => `${count.device} ${cell(count)}`).join(', ');
+    const warnings: Array<string> = [];
+    if (devices.some((count) => count.failed > 0)) {
+      warnings.push(
+        `::warning title=Journey failed a first run::${journey.id} (${journey.file}) failed first runs out of ${repeat} with no retry: ${cells}.`,
+      );
+    }
+    if (devices.some((count) => count.runs === 0)) {
+      warnings.push(
+        `::warning title=Journey did not run::${journey.id} (${journey.file}) did not run on each device, so the hunt did not measure it there: ${cells}.`,
+      );
+    }
+    return warnings;
+  });
 }
 
 /** The step summary: a table with one row for each journey and one column for each device. */
@@ -105,6 +121,7 @@ export function huntSummary(
   errors: ReadonlyArray<string>,
 ): string {
   const failed = counts.filter(({ devices: list }) => list.some((count) => count.failed > 0));
+  const unmeasured = counts.filter(({ devices: list }) => list.some((count) => count.runs === 0));
   const lines = [
     '## Journey first-run failures',
     '',
@@ -121,6 +138,12 @@ export function huntSummary(
       ? 'No journey failed a first run.'
       : `${failed.length} journey(s) failed a first run. File one issue for each, with the cause. See docs/contributing/end-to-end-testing.md#flake-hunt.`,
   ];
+  if (unmeasured.length > 0) {
+    lines.push(
+      '',
+      `The hunt did not measure ${unmeasured.map(({ journey }) => `\`${journey.id}\``).join(', ')} on each device. A cell with \`no run\` is not a pass.`,
+    );
+  }
   if (errors.length > 0) {
     lines.push(
       '',
@@ -157,7 +180,9 @@ const huntReport = (root: string) => path.join(root, 'test-results/journeys/hunt
  * Runs each selected journey `repeat` times on each device with no retry,
  * and reports the first-run failures of each one: a log line, a warning for
  * each journey that failed a run, and a table in the step summary. Returns 0
- * when Playwright wrote its report, whatever the journeys did.
+ * when each journey ran, whatever its runs did. Returns 1 when the hunt
+ * measured nothing for a journey: Playwright wrote no report, it reported an
+ * error outside the journeys, or a journey ran on no device.
  */
 export async function hunt(
   root: string,
@@ -192,6 +217,13 @@ export async function hunt(
   }
   if (sink.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(sink.env.GITHUB_STEP_SUMMARY, huntSummary(counts, devices, repeat, errors));
+  }
+  const missing = notRun(counts);
+  if (errors.length > 0 || missing.length > 0) {
+    sink.error(
+      `The hunt did not measure each journey: ${errors.length} error(s) outside the journeys, and ${missing.length} journey(s) with no run. Read the Playwright output above.`,
+    );
+    return 1;
   }
   return 0;
 }
