@@ -76,6 +76,11 @@ target on the root project. [`tools/docs-checks.test.ts`](../../../tools/docs-ch
 tests the docs checks. [`tools/repo-checks.test.ts`](../../../tools/repo-checks.test.ts)
 tests the workflow and dependency checks.
 
+A check stays only when it stops a mistake that an agent makes for real. The
+pull request of a new check target names the check that it replaces, or it
+says why none can go. No check covers these two rules, so review keeps them.
+See [decision record 0006](../decisions/0006-no-cap-on-the-blocking-checks.md).
+
 | Target                       | Rejects                                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `lint`                       | Oxlint rules, including the [import boundaries](../import-boundaries.md), and the [CSS lint](./lint-rules.md#css)                                                                                                                                                                                                                                                                       |

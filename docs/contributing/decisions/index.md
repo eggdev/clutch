@@ -58,6 +58,7 @@ A record amended more than once lists each amending record:
 - [0002](./0002-merge-most-prs-with-no-human.md): 80% of PRs merge with no human. No person reviews a change outside the hard core unless a deterministic check finds a weaker journey or budget.
 - [0004](./0004-no-design-canvas-tool-for-proposals.md): no design canvas tool, such as Pencil or Paper. Design proposals render in the app, on the real design system.
 - [0005](./0005-the-owner-signs-off-what-cannot-be-paid-back.md): the owner signs off a major change, a contract break, a credential, auth, access, identity and a migration that can lose data. Other changes merge on proof, and the owner pays a problem back.
+- [0006](./0006-no-cap-on-the-blocking-checks.md): no cap on the blocking checks, no not-doing list and no monthly target for checks. A check stays only when it stops a real mistake, and in a session a rule changes on the owner's word.
 
 ## Historical
 
