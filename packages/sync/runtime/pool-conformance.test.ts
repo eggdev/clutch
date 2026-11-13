@@ -9,6 +9,8 @@ import { sameJson } from '@repo/sync/runtime/tables';
 import { testCommand, testGroup, testModel, testStamps } from '@repo/sync/testing/pool-state';
 import { referencePool } from '@repo/sync/testing/reference-pool';
 import type { ReferencePool } from '@repo/sync/testing/reference-pool';
+import { pick, seeded } from '@repo/sync/testing/seeded';
+import type { Random } from '@repo/sync/testing/seeded';
 import type { Change, Delta, Outcome } from '@repo/sync/types/protocol';
 
 /**
@@ -54,24 +56,6 @@ type Harness = {
 
 /** What one step did, for the message of a failure, and whether it made a new pool. */
 type Step = { readonly label: string; readonly reloads: boolean };
-
-type Random = () => number;
-
-/** A seeded generator, so a failing seed runs the same steps again. */
-function mulberry32(seed: number): Random {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d_2b_79_f5) >>> 0;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
-  };
-}
-
-function pick<Item>(random: Random, items: ReadonlyArray<Item>): Item {
-  return items[Math.floor(random() * items.length)];
-}
 
 /** A sync ID that moves on, or, one time in seven, an old one that the pool must ignore. */
 function nextSyncId(random: Random, harness: Harness): number {
@@ -261,7 +245,7 @@ function differences(harness: Harness): Array<string> {
  * It throws at the first step where the two disagree.
  */
 function runSeed(seed: number, steps: number): number {
-  const random = mulberry32(seed);
+  const random = seeded(seed);
   const stamps = testStamps();
   const harness: Harness = {
     pool: createPool(changes, declared, { stamps }),

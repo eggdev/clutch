@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { compareManifests } from '@repo/sync/contract/compatibility';
@@ -81,6 +81,29 @@ function contractFiles(root: string, name: string): Array<string> {
     .map((file) => path.join(folder, file));
 }
 
+/** The module that holds the proof of the claims of a contract, and its function. */
+const claimsModule = '@repo/sync/testing/claims';
+const claimsCall = 'proveClaims(';
+
+/** The test files of one package, at any depth, but none in `node_modules`. */
+function testFiles(folder: string): Array<string> {
+  return readdirSync(folder, { recursive: true, encoding: 'utf-8' })
+    .filter((file) => /\.test\.tsx?$/u.test(file) && !file.split(path.sep).includes('node_modules'))
+    .map((file) => path.join(folder, file));
+}
+
+/**
+ * Whether a test file of the package calls the proof of its claims. It reads
+ * the files on disk and runs no test: a file that imports the proof and calls
+ * it counts.
+ */
+function provesClaims(root: string, name: string): boolean {
+  return testFiles(path.join(root, 'packages', name)).some((file) => {
+    const source = readFileSync(file, 'utf-8');
+    return source.includes(claimsModule) && source.includes(claimsCall);
+  });
+}
+
 /** The lines of the message of an error from a module that failed to load. */
 const errorLines = (error: unknown) =>
   (error instanceof Error ? error.message : String(error)).split('\n');
@@ -97,6 +120,8 @@ async function exportsOf(file: string): Promise<Array<unknown>> {
 async function loadContracts(root: string, engine: Engine) {
   const contracts: Array<Contract> = [];
   const problems: Array<Finding> = [];
+  // A claim with no proof does not make the manifest wrong, so it does not stop the snapshot check.
+  const unproven: Array<Finding> = [];
   for (const name of folders(root, 'packages')) {
     const files = name === 'sync' ? [] : contractFiles(root, name);
     const exported: Array<unknown> = [];
@@ -153,9 +178,17 @@ async function loadContracts(root: string, engine: Engine) {
         });
       }
     }
+    if (found.length && !provesClaims(root, name)) {
+      unproven.push({
+        id: `${check}/claims-not-proven`,
+        file: `packages/${name}/`,
+        problem: 'has a contract, and no test calls `proveClaims` on it.',
+        fix: `Add \`runtime/contract-claims.test.ts\` that calls \`proveClaims(${name}Client)\` from \`${claimsModule}\`.`,
+      });
+    }
     contracts.push(...found);
   }
-  return { contracts, problems };
+  return { contracts, problems, unproven };
 }
 
 /**
@@ -228,12 +261,12 @@ async function inspect(root: string, options: Options) {
   if (!engine) {
     return null;
   }
-  const { contracts, problems } = await loadContracts(root, engine);
+  const { contracts, problems, unproven } = await loadContracts(root, engine);
   if (problems.length) {
     // The manifest of wrong contracts is wrong, so the snapshot waits. The apps
     // are still read, so one run reports each problem that it can.
     return {
-      problems: [...problems, ...(await appProblems(root, engine, contracts))],
+      problems: [...problems, ...unproven, ...(await appProblems(root, engine, contracts))],
       manifest: null,
       base: null,
       changes: [],
@@ -244,7 +277,7 @@ async function inspect(root: string, options: Options) {
     options.baseCommit === undefined ? findBase(root, process.env.CHECK_BASE) : options.baseCommit;
   const base = baseCommit ? snapshotAt(root, baseCommit) : null;
   return {
-    problems: await appProblems(root, engine, contracts),
+    problems: [...unproven, ...(await appProblems(root, engine, contracts))],
     manifest,
     base,
     changes: base ? engine.compareManifests(base, manifest) : [],

@@ -187,6 +187,10 @@ test('a package, a command and a feature pass lint, the structure check and the 
   expect(tree.read('packages/billing/runtime/client.ts', 'utf-8')).toContain(
     'export const billingClient = clientPackage(billingContract, [openInvoiceLocal]);',
   );
+  // Each package with a contract proves its claims, so check-contract passes on a new package.
+  expect(tree.read('packages/billing/runtime/contract-claims.test.ts', 'utf-8')).toContain(
+    'proveClaims(billingClient)',
+  );
   const server = tree.read('packages/billing/runtime/server.server.ts', 'utf-8') ?? '';
   expect(server).toContain(
     'export const billingServer = serverPackage(billingContract, {\n  changes: [archiveInvoiceServer, openInvoiceServer],\n  jobs: [sendInvoice],\n  routes: [],\n  migrate: migrateBilling,\n});',
