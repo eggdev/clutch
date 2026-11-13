@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.4 (2026-11-13)
+
+### Fixes and maintenance
+
+- docs(principles): show the check that holds each principle (CL-531)
+
 ## 1.7.3 (2026-11-13)
 
 ### Fixes and maintenance
