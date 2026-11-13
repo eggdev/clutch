@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.0 (2026-11-13)
+
+### Features
+
+- feat(primitives): name the journey of each invariant (CL-536)
+
 ## 1.9.3 (2026-11-13)
 
 ### Fixes and maintenance
