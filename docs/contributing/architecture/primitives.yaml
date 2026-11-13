@@ -19,10 +19,12 @@
 #               a server change may use; check-transaction-safe reads it)
 #   languages:  shared languages: imports, where, primitives, packagePaths, files
 #   invariants: id, summary, docs, journey (the id of the journey that
-#               proves it, from features/<feature>/journeys/<id>.*, or
-#               not-written until that journey exists. The ratchet
-#               invariants-without-journey in .clutch/ratchets.json counts the
-#               not-written ones, and the count only goes down.)
+#               proves it: a file <id>.pw.ts, <id>.maestro.yaml or
+#               <id>.journey.ts in features/<feature>/journeys/. Or
+#               not-written until that journey exists. check-primitives then
+#               asks for the ratchet invariants-without-journey in
+#               .clutch/ratchets.json. It counts the not-written ones, and
+#               the count only goes down.)
 #   exceptions: rule, file, imports, reason. See
 #               docs/contributing/import-boundaries.md#exceptions.
 #
