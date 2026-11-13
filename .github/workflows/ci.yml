@@ -164,7 +164,8 @@ jobs:
   # tools/journeys/reach.ts. Native journeys run on a PR that touches a native
   # app, a native journey, the native tooling or shared runtime code, and on
   # each push to main. A sensitive path alone reaches web only.
-  # A platform's lane runs only when a native app declares its app ID. See
+  # A platform's lane runs only when a native app declares its app ID. The iOS
+  # lane also needs the repository variable CLUTCH_IOS_LANE set to `on`. See
   # docs/contributing/end-to-end-testing.md#native-journeys.
   reach:
     runs-on: ubuntu-26.04
@@ -194,9 +195,13 @@ jobs:
 
   # Each native journey on an iPhone 16 simulator. CI boots the device on its
   # own runner. The local device host finds it, and installs the build on it.
+  # The lane is off until a repository sets the variable CLUTCH_IOS_LANE to
+  # `on`. A first native build does not fit the time limit of this job on a
+  # hosted runner (CL-469). CI then skips the job, and a skipped job holds no
+  # merge.
   native-ios:
     needs: reach
-    if: needs.reach.outputs.ios == 'true'
+    if: needs.reach.outputs.ios == 'true' && vars.CLUTCH_IOS_LANE == 'on'
     runs-on: macos-15
     timeout-minutes: 25
     env:

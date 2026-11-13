@@ -156,7 +156,8 @@ owner.
 
 The `native-ios` and `native-android` jobs in `.github/workflows/ci.yml` run
 each native journey on a simulator and an emulator. `native-ios` runs when a
-native app declares an iOS app ID in its app.json. `native-android` runs when a
+native app declares an iOS app ID in its app.json, and the repository variable
+`CLUTCH_IOS_LANE` is `on`. `native-android` runs when a
 native app declares an Android package. The `native-ios` job starts the dev
 servers, then runs `native:build --fresh`. The `native-android` job still has a
 placeholder build line, which fails until a project fills it at kickoff. A CI
