@@ -105,6 +105,15 @@ outside the one function that owns that decision. Also flag a new route, job
 or tool with no declaration. See
 [one door for each decision](../principles/one-door-for-each-decision.md).
 
+## Mobile first
+
+The lint rule `repo-layout/no-viewport-reads` fails a component that reads the
+window width. Review holds the rest of the principle. Flag a style for desktop
+that a phone class then undoes. Flag an action that the phone layout removes,
+and an action that only hover shows. Also flag a touch target smaller than 44
+by 44 px. Each finding is `blocking`. See
+[mobile first](../principles/mobile-first.md).
+
 ## Destructive automation
 
 Flag a script or workflow that deletes a cloud resource with no name guard in
@@ -126,11 +135,6 @@ Each finding below is `blocking`.
   binds. Flag a new common action with no shortcut, and a menu item or tooltip
   that does not show its shortcut. Also flag a single-key shortcut that fires
   in a text field. See [keyboard first](../principles/keyboard-first.md).
-- **Mobile first.** Flag a style for desktop that a phone class then undoes,
-  and a component that reads the viewport width. Flag an action that the phone
-  layout removes, and an action that only hover shows. Also flag a touch
-  target smaller than 44 by 44 px. See
-  [mobile first](../principles/mobile-first.md).
 - **Fix the root bottleneck.** Flag a timeout, a fallback, a degraded mode or
   a cache that hides slowness, unless the same change links an issue for the
   root fix. See [fix the root bottleneck](../principles/fix-the-root-bottleneck.md).
