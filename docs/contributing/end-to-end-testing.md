@@ -64,8 +64,8 @@ device, with no retry.
 - A journey that failed a run gets a warning in the run. A journey that did not
   run on a device gets another one.
 - The job passes when a journey fails, because it only measures. It fails when
-  it measured nothing for a journey: Playwright wrote no report, a journey file
-  did not load, or a journey ran on no device.
+  it measured nothing for a journey. That is the case when Playwright wrote no
+  report, when a journey file did not load, and when a journey ran on no device.
 - It quarantines no journey, files no friction entry, writes no measures file
   and opens no PR. It never blocks a PR.
 - The job has a limit of 45 minutes, and Playwright writes the report at the

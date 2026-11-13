@@ -88,7 +88,7 @@ export function huntLines(counts: ReadonlyArray<JourneyCount>): Array<string> {
 }
 
 /** The journeys that ran on no device. The hunt measured nothing for them. */
-export const notRun = (counts: ReadonlyArray<JourneyCount>) =>
+const notRun = (counts: ReadonlyArray<JourneyCount>) =>
   counts.filter(({ devices }) => devices.every((count) => count.runs === 0));
 
 /**

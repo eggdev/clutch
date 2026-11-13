@@ -140,8 +140,9 @@ jobs:
       - name: Install the Chromium system libraries
         if: steps.browsers.outputs.cache-hit == 'true'
         run: bunx playwright install-deps chromium
-      # A failed journey is data, so this step passes. It fails only when
-      # Playwright wrote no report, because then nothing was counted.
+      # A failed journey is data, so this step passes. It fails when it
+      # measured nothing for a journey: no report, a journey file that did
+      # not load, or a journey that ran on no device.
       - name: Run the journeys 20 times
         run: bun tools/journeys/run.ts --hunt 20
       - name: Keep the report and the traces of each failed run
