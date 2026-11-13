@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.0 (2026-11-13)
+
+### Features
+
+- feat(lint): fail a component that reads the window width (CL-541)
+
 ## 1.10.0 (2026-11-13)
 
 ### Features
