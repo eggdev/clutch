@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.0 (2026-11-13)
+
+### Features
+
+- feat(tools): give check findings stable ids and a JSON form (CL-534)
+
 ## 1.7.4 (2026-11-13)
 
 ### Fixes and maintenance
