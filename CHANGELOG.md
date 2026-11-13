@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.3 (2026-11-13)
+
+### Fixes and maintenance
+
+- docs(ci): list the iOS lane variable in the escape hatch table (CL-485)
+
 ## 1.7.2 (2026-11-13)
 
 ### Fixes and maintenance
