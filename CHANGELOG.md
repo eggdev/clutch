@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.2 (2026-11-14)
+
+### Fixes and maintenance
+
+- chore(clutch): file the findings of the factory council review
+
 ## 1.13.1 (2026-11-14)
 
 ### Fixes and maintenance
