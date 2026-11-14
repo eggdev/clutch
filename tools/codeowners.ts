@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { guardrailPatterns } from '@tools/guardrail-files';
+import { guardrailPatterns } from '@tools/agent-hooks/guard-guardrails';
 import { parse } from 'yaml';
 
 /**

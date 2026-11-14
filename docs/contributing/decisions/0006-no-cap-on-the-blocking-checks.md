@@ -27,7 +27,7 @@ In a session, a change to a rule comes from the owner, or the owner allows the s
 
 The count of checks can grow, and the time of `validate` grows with it. `clutch metrics` reports that time, and no check blocks on it.
 
-The rule for a session depends on the agent today. On 2026-11-14 the owner removed the hook that asked before an edit to a guardrail file. The merge judge holds such a change instead, see decision record 0005 (CL-494). CL-916 closes the other gaps after the P5 work.
+The rule for a session depends on the agent today. The hook `tools/agent-hooks/guard-guardrails.ts` asks the owner before an edit to a guardrail file. A shell command gets past it, and it lets each edit through while `KICKOFF.md` exists. CL-916 closes these gaps after the P5 work.
 
 No list tells an agent what not to build. The contract, the principles and these records do that work.
 

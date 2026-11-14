@@ -14,7 +14,7 @@ const tracker = '.clutch/TRACKER.md';
 const clutch = (...args: Array<string>) => ['bun', 'tools/clutch.ts', ...args];
 
 /** The prefix of an agent's branch: `pr.branchPrefix` in clutch.yaml, or `clutch/cl-`. */
-export async function branchPrefix(root: string) {
+async function branchPrefix(root: string) {
   const file = Bun.file(path.join(root, 'clutch.yaml'));
   const config = (await file.exists())
     ? (Bun.YAML.parse(await file.text()) as { pr?: { branchPrefix?: unknown } } | null)
@@ -213,7 +213,7 @@ async function trackedIssues(run: Run): Promise<Array<Tracked>> {
  * The issue that a branch works on, by the branch prefix: `clutch/cl-123-x` is
  * CL-123. Undefined when the name carries no id.
  */
-export function issueOf(branch: string, prefix: string) {
+function issueOf(branch: string, prefix: string) {
   const escaped = prefix.replaceAll(/[$()*+.?[\\\]^{|}]/gu, '\\$&');
   const match = new RegExp(`^${escaped}(\\d{3}[a-z]?)(?:-|$)`, 'iu').exec(branch);
   return match ? `CL-${match[1].toLowerCase()}` : undefined;

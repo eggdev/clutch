@@ -1,5 +1,5 @@
 {
-  "description": "Files that configure a check, a lint rule, a budget, a test rule or an agent hook. `held` is the part that the merge judge holds: an agent pull request that changes one of these files waits, unless the issue of its branch names the file in its `## Files` section on the default branch. The owner's approval also lifts the hold. A new file, a test file and a change that only makes this list stronger do not hold. See tools/github/guardrail-hold.ts and decision record 0005. Agent review flags a pull request that makes any guardrail file weaker as an owner finding. check-guardrail-coverage fails when a file that a check, a lint plugin or a hook reads matches no pattern here. `exempt` lists files that tooling reads but that set no rule. See docs/contributing/harness-engineering.md#guardrail-files.",
+  "description": "Files that configure a check, a lint rule, a budget, a test rule or an agent hook. After kickoff, an agent edit to one of them needs a person's approval in the session. Agent review flags a PR that makes one weaker as an owner finding, which reports and holds nothing. This list itself is not held: a change to it merges as any other change, see decision record 0005. check-guardrail-coverage fails when a file that a check, a lint plugin or a hook reads matches no pattern here. `exempt` lists files that tooling reads but that set no rule. See docs/contributing/harness-engineering.md#guardrail-files.",
   "patterns": [
     "tools/deploy.ts",
     "oxlint.config.ts",
@@ -16,7 +16,6 @@
     "tools/dependency-overrides.yaml",
     "tools/server-rendered-routes.yaml",
     "tools/guardrail-files.json",
-    "tools/guardrail-files.ts",
     "tools/codeowners.ts",
     "tools/agent-hooks/**",
     "tools/hooks/**",
@@ -79,26 +78,6 @@
     "packages/sync/contract/**",
     "apps/*/src/packages.ts",
     "apps/*/lib/packages.ts"
-  ],
-  "held": [
-    "tools/check-*.ts",
-    "tools/lint/**",
-    "oxlint.config.ts",
-    "stylelint.config.ts",
-    "knip.jsonc",
-    "tools/file-size-budgets.json",
-    "tools/test-budget.ts",
-    ".clutch/ratchets.json",
-    "tools/validate.ts",
-    "tools/agent-hooks/**",
-    ".agents/hooks/**",
-    ".claude/settings.json",
-    ".codex/hooks.json",
-    ".githooks/**",
-    "tools/hooks/**",
-    "tools/guardrail-files.json",
-    "tools/guardrail-files.ts",
-    "tools/github/guardrail-hold.ts"
   ],
   "exempt": {
     "AGENTS.md": "check-file-size measures the length of each AGENTS.md file, check-structure allows one in a package, and the doc checks read it as a doc. It sets no rule.",

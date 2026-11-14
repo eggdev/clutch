@@ -3,10 +3,17 @@ import path from 'node:path';
 
 import { afterEdit } from '@tools/agent-hooks/after-edit';
 import { endOfTurn } from '@tools/agent-hooks/end-of-turn';
+import { guardGuardrails, guardrailList } from '@tools/agent-hooks/guard-guardrails';
 import { editedFiles } from '@tools/agent-hooks/payload';
 import type { Run } from '@tools/agent-hooks/payload';
+import { inRepo } from '@tools/testing/in-repo';
 
 const repo = path.resolve(import.meta.dir, '../..');
+const list = JSON.stringify({ patterns: ['oxlint.config.ts', 'tools/lint/**'] });
+
+/** The hook-specific part of a hook's JSON answer. */
+const decision = (stdout = '') => JSON.parse(stdout).hookSpecificOutput;
+
 /** A runner that records each command and answers from `answers`, in order. */
 function fakeRunner(answers: Array<{ exitCode: number; output: string }>) {
   const commands: Array<string> = [];
@@ -38,6 +45,26 @@ test('edited files come from Claude Code file paths and Codex patches, inside th
   expect(
     editedFiles({ tool_name: 'Edit', tool_input: { file_path: '/elsewhere/x.ts' } }, '/repo'),
   ).toEqual([]);
+});
+
+test('a guardrail edit asks in Claude Code and is refused in Codex, only after kickoff', async () => {
+  const payload = { tool_name: 'Edit', tool_input: { file_path: 'tools/lint/class-policy.mjs' } };
+  const during = await inRepo({ [guardrailList]: list, 'KICKOFF.md': '' }, (root) =>
+    guardGuardrails({ ...payload, cwd: root }, { agent: 'claude', root }),
+  );
+  expect(during).toEqual({ exitCode: 0 });
+  const after = await inRepo({ [guardrailList]: list }, (root) => ({
+    claude: guardGuardrails({ ...payload, cwd: root }, { agent: 'claude', root }),
+    codex: guardGuardrails({ ...payload, cwd: root }, { agent: 'codex', root }),
+    other: guardGuardrails(
+      { tool_name: 'Edit', tool_input: { file_path: 'tools/check-x.ts' }, cwd: root },
+      { agent: 'claude', root },
+    ),
+  }));
+  expect(decision(after.claude.stdout).permissionDecision).toBe('ask');
+  expect(decision(after.codex.stdout).permissionDecision).toBe('deny');
+  expect(decision(after.codex.stdout).permissionDecisionReason).toContain('wait for their answer');
+  expect(after.other).toEqual({ exitCode: 0 });
 });
 
 test('after an edit, a lint problem goes back to the agent with exit 2, and a clean file is silent', () => {
@@ -91,21 +118,35 @@ test('the end of a turn runs the checks once, and never loops', () => {
   expect(outcome.stderr).toContain('check-terms failed');
 });
 
-/** Runs a real entry script in the repository with the payload on stdin. */
-function hook(name: string, agent: string, payload: object) {
+/** Runs a real entry script in `cwd` with the payload on stdin. */
+function hook(name: string, agent: string, payload: object, cwd = repo) {
   const result = Bun.spawnSync(['bun', path.join(repo, '.agents/hooks', `${name}.ts`), agent], {
-    cwd: repo,
+    cwd,
     stdin: new TextEncoder().encode(JSON.stringify(payload)),
   });
   return { exitCode: result.exitCode, stdout: result.stdout.toString() };
 }
 
-test('the end-of-turn entry script reads stdin for each tool', () => {
+test('the entry scripts read stdin and answer each tool in its own format', async () => {
   for (const agent of ['claude', 'codex']) {
     expect(hook('end-of-turn', agent, { hook_event_name: 'Stop', stop_hook_active: true })).toEqual(
       { exitCode: 0, stdout: '' },
     );
   }
+  const answers = await inRepo({ [guardrailList]: list }, (root) =>
+    ['claude', 'codex'].map((agent) =>
+      hook(
+        'guard-guardrails',
+        agent,
+        { tool_name: 'Edit', tool_input: { file_path: path.join(root, 'oxlint.config.ts') } },
+        root,
+      ),
+    ),
+  );
+  expect(
+    answers.map((answer) => JSON.parse(answer.stdout).hookSpecificOutput.permissionDecision),
+  ).toEqual(['ask', 'deny']);
+  expect(answers.map((answer) => answer.exitCode)).toEqual([0, 0]);
 });
 
 test('the dev-server entry script denies a direct start for both tools', () => {

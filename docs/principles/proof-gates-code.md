@@ -94,12 +94,6 @@ A migration also needs its rehearsal on a branch of the production database.
 A journey cannot show that a copy survives or rolls back. See
 [two-way and one-way doors](./two-way-doors.md#rules-for-stored-shapes).
 
-A PR also cannot change a check to pass it. The judge holds an agent PR that
-changes a check script, a lint rule, a budget or a hook, as `held` in
-`tools/guardrail-files.json` lists them. The issue of its branch lifts the hold
-when its `## Files` section on the default branch names the file. The owner's
-approval lifts it too. See `tools/github/guardrail-hold.ts`.
-
 ## Grow the journeys you have
 
 Most changes add a step or an assertion to a journey that already walks the

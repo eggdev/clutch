@@ -26,7 +26,7 @@ The code and the rules of the merge gate, the decision records and the policy do
 
 ## Consequences
 
-An agent can change this policy with no person, and the digest shows it (CL-472). A guardrail change holds unless its issue names the file: the owner changed this on 2026-11-14 (CL-494).
+An agent can change a check, a lint rule or this policy with no person. The owner accepts that risk, and reads such changes after the fact in the weekly digest (CL-472).
 
 On the same 100 PRs, the rule holds 16. Fifteen of them are workflow lines that give a grant. A leaked credential is the reason that this hold stays.
 

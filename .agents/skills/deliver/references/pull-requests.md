@@ -80,7 +80,7 @@ agent PR, so the owner approves it on GitHub like any other PR from another auth
 drifts. After a change to the one-way-door tier, run
 `mise exec -- bun tools/codeowners.ts --write`.
 
-Five kinds of PR wait for the owner without a GitHub approval rule:
+Four kinds of PR wait for the owner without a GitHub approval rule:
 
 - A rule with `lines`, such as a workflow line that gives a write grant. CODEOWNERS cannot express it, so auto-merge holds
   the PR by its `one-way-door` tier.
@@ -92,18 +92,13 @@ Five kinds of PR wait for the owner without a GitHub approval rule:
 - A major change. Its title has `!` before the colon, or a changeset in its
   diff names a major bump. Auto-merge holds it, whatever its tier, and
   `pr status` names why and reports the PR as not ready.
-- A PR that changes a held guardrail file that its issue does not name under
-  `## Files` on the default branch. Auto-merge holds it, by
-  `tools/github/guardrail-hold.ts`. This hold needs no owner: take the change
-  out, or first merge a change to the issue that names the file, then merge
-  the default branch into the branch.
 
 Do not merge any of these kinds with `pr merge` until the owner says so. A model
 finding holds neither `pr status` nor `pr merge`. The session still answers it.
 
 The owner's approval is the last step. When `automerge.owner` in `clutch.yaml`
 approves the head commit, an `on` run of Auto-merge passes an agent PR at any
-tier, and lifts a weaker journey, a contract break, a major change and a guardrail change. The bot rule still holds a bot
+tier, and lifts a weaker journey, a contract break and a major change. The bot rule still holds a bot
 PR, and a PR that a person opened is still refused. The required checks, a
 native journey job that failed or still runs, a draft, the base branch and a
 red `main` still hold any PR (`tools/github/auto-merge-rules.ts`). The
@@ -358,9 +353,6 @@ At each step, the PR also needs all of these:
 - It is not a major change. A PR with `!` in its title, or with a changeset
   that names a major bump, waits for the owner's sign-off. The owner's
   approval of the head lifts this.
-- It changes no held guardrail file that its issue does not name under
-  `## Files` on the default branch. A new file and a test file do not count.
-  The owner's approval of the head lifts this.
 - No native journey job failed or is running on its head.
 
 The workflow runs only from the default branch, with the default branch's
