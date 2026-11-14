@@ -94,6 +94,7 @@
     ".clutch/TRACKER.md": "The release workflow generates it on main from the issue files with clutch issues --write. A pull request never commits it. It sets no rule.",
     "CHANGELOG.md": "The release workflow writes it from the changesets, and tools/release/changeset.ts reads it to add a section. It sets no rule.",
     ".data/dev-run.json": "tools/dev.ts writes the dev servers that a run started here, and reads it to stop them. Git ignores the folder, so no pull request holds it. It sets no rule.",
+    "test-results/journeys/hunt.json": "The Playwright JSON report that tools/journeys/run.ts --hunt writes, and that tools/journeys/hunt.ts reads to count the first-run failures of each journey. Git ignores the folder, so no pull request holds it. It sets no rule.",
     "docs/principles/index.md": "check-docs-claims reads its Held by column to check that each principle page has a row and that each name in a cell exists. The column describes checks, and it sets no rule."
   }
 }
