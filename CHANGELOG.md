@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.1 (2026-11-14)
+
+### Fixes and maintenance
+
+- ci(flake-hunt): count first-run failures of each journey (CL-533)
+
 ## 1.13.0 (2026-11-13)
 
 ### Features
