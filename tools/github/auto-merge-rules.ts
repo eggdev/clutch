@@ -58,6 +58,12 @@ export type Facts = {
    * change, so it holds the PR for the owner, whatever its risk tier.
    */
   major: Array<string>;
+  /**
+   * Why the PR holds for a guardrail change, from `guardrailHolds`: it changes
+   * a held guardrail file that the issue of its branch does not name on the
+   * default branch. Empty for a Renovate, sync or revert PR.
+   */
+  guardrails: Array<string>;
   /** Why a bot PR fails its bot rule: a diff that is more than a version, or a revert that may not merge. Empty for an agent PR. */
   botProblems: Array<string>;
   /** Each required check that failed on the default branch's latest commit. */
@@ -66,7 +72,7 @@ export type Facts = {
    * Whether `automerge.owner` approved the head commit, and gave no later
    * review that asks for changes. The owner's approval is the review that a
    * one-way-door PR waits for, so it lifts the tier, a weaker journey, a
-   * contract break and a major change.
+   * contract break, a major change and a guardrail change.
    * The checks, a draft, the base and a red main still hold the PR.
    */
   ownerApproved: boolean;
@@ -170,6 +176,7 @@ export function blockers(facts: Facts, step: Step): Array<string> {
     for (const name of facts.breaks) {
       reasons.push(`The contract snapshot names the break ${name}. The owner agrees to a break.`);
     }
+    reasons.push(...facts.guardrails);
     if (facts.major.length > 0) {
       reasons.push(
         `The change is major: ${facts.major.join(', and ')}. The owner signs off a major change.`,

@@ -149,3 +149,84 @@ test('a failed or running native journey holds, and a skipped one does not', () 
     'The native journey native-ios is failure.',
   ]);
 });
+
+/** The default branch holds the check scripts, and the PR changes `tools/check-scope.ts`. */
+const changesCheck: Array<[string, Partial<Result>]> = [
+  [
+    'git show origin/main:tools/guardrail-files.json',
+    { out: JSON.stringify({ patterns: ['tools/check-*.ts'], held: ['tools/check-*.ts'] }) },
+  ],
+  ['git merge-base', { out: 'b4se\n' }],
+  ['git diff --name-status', { out: 'M\ttools/check-scope.ts\n' }],
+];
+
+/** CL-123, the issue of the PR's branch, with `files` under `## Files`. */
+const issueWith = (...files: Array<string>) =>
+  `# CL-123: Docs\n\n## Files\n\n${files.map((file) => `- \`${file}\``).join('\n')}\n\n## Verify\n`;
+
+test('a changed check that the issue does not name holds, with both ways out', async () => {
+  const gh = fake([
+    ...changesCheck,
+    ['git show origin/main:.clutch/issues/CL-123.md', { out: issueWith('docs/a.md') }],
+  ]);
+  const [verdict = ''] = await decide(gh, { mode: 'on', step: 'medium' });
+  expect(verdict).toContain(
+    "- The PR changes the guardrail file `tools/check-scope.ts`, which sets a check, a lint rule, a budget or a hook, and the `## Files` section of CL-123 on main does not name it. Take the change out of this PR, or first merge a change to CL-123 that names it under `## Files`, then merge main into this branch. The owner's approval also lifts this hold.",
+  );
+  expect(merges(gh.calls)).toEqual([]);
+});
+
+test('a changed check that the issue on the default branch names merges', async () => {
+  const gh = fake([
+    ...changesCheck,
+    ['git show origin/main:.clutch/issues/CL-123.md', { out: issueWith('tools/check-scope.ts') }],
+  ]);
+  expect(await decide(gh, { mode: 'on', step: 'medium' })).toEqual([
+    'Would auto-merge at the step medium.\nQueued the merge.',
+  ]);
+});
+
+test('an issue file that only the pull request changes does not lift the hold', async () => {
+  const gh = fake([
+    changesCheck[0],
+    changesCheck[1],
+    ['git diff --name-status', { out: 'A\t.clutch/issues/CL-123.md\nM\ttools/check-scope.ts\n' }],
+    [
+      'git show origin/main:.clutch/issues/CL-123.md',
+      { ok: false, err: 'fatal: path not in main' },
+    ],
+    [`git show ${head}:.clutch/issues/CL-123.md`, { out: issueWith('tools/check-scope.ts') }],
+  ]);
+  const [verdict = ''] = await decide(gh, { mode: 'on', step: 'medium' });
+  expect(verdict).toContain('`tools/check-scope.ts`');
+  expect(verdict).toContain('CL-123 is not on main.');
+  expect(gh.calls.some((call) => call.startsWith(`git show ${head}:.clutch/issues`))).toBe(false);
+  expect(merges(gh.calls)).toEqual([]);
+});
+
+test("the owner's approval lifts a guardrail hold", async () => {
+  const gh = fake([
+    ...changesCheck,
+    ['gh api --paginate repos/eggdev/clutch/pulls/7/reviews', { out: `APPROVED\t${head}\n` }],
+  ]);
+  expect(await decide(gh, { mode: 'on', step: 'medium', owner: 'eggdev' })).toEqual([
+    'Would auto-merge at the step medium. The owner approved this head.\nQueued the merge.',
+  ]);
+  const held = facts({ guardrails: ['The PR changes the guardrail file `tools/check-scope.ts`.'] });
+  expect(blockers(held, 'medium')).toHaveLength(1);
+  expect(blockers({ ...held, ownerApproved: true }, 'medium')).toEqual([]);
+});
+
+test('a revert that changes a check takes the bot path, with no guardrail hold', async () => {
+  const gh = fake(
+    [
+      ...changesCheck,
+      ['gh api --paginate repos/eggdev/clutch/issues/5/comments', { out: '901\n' }],
+    ],
+    { headRefName: 'revert/5', author: app },
+  );
+  expect(await decide(gh, { mode: 'on', step: 'medium' })).toEqual([
+    'Would auto-merge at the step medium.\nQueued the merge.',
+  ]);
+  expect(gh.calls.some((call) => call.includes(':tools/guardrail-files.json'))).toBe(false);
+});

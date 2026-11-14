@@ -42,7 +42,7 @@ owner tests the work by hand after it deploys. A PR that adds a screen must stat
 `goal:` is optional too. It names a user goal from project intent. A PR that adds
 a feature must state it, after kickoff.
 
-The body follows the frontmatter: `# CL-NNN: <title>`, then Goal, Context, Steps, Files, Acceptance criteria, Verify, and Gate for gate issues. Add `## Notes` and `## Blocked` sections at the end as needed.
+The body follows the frontmatter: `# CL-NNN: <title>`, then Goal, Context, Steps, Files, Acceptance criteria, Verify, and Gate for gate issues. Add `## Notes` and `## Blocked` sections at the end as needed. The merge judge reads Files from the default branch. Name each held guardrail file that the work changes there, before the PR, see [guardrail files](../docs/contributing/harness-engineering.md#guardrail-files).
 
 ## Status values
 
