@@ -234,8 +234,8 @@ only. It does not run axe or check the object pool. Read the
 stays in the script form, and `tools/check-journeys.ts` rejects a `Core:` line in
 a `.journey.ts` file.
 
-A PR that loses a proving step, or moves one into `webOnly`, waits for the
-owner. See [proof gates code](../principles/proof-gates-code.md#proof-decides-the-rest).
+A PR that loses a step other than a `tap`, `fill` or `submit`, or moves one
+into `webOnly`, waits for the owner. See [proof gates code](../principles/proof-gates-code.md#proof-decides-the-rest).
 
 ## Native journeys
 

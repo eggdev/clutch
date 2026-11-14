@@ -154,14 +154,14 @@ test('a deleted see step of a data journey is weaker, and the reason names the j
   const head = steps.replace("  see(heading('General', 1)),\n", '');
   expect(head).not.toBe(steps);
   expect(weakerJourney(notes, steps, head)).toEqual([
-    `${notes}: it no longer proves the step \`see(heading('General', 1))\`.`,
+    `${notes}: it loses the step \`see(heading('General', 1))\`.`,
   ]);
 });
 
 test('one of two equal see steps is still a lost step', () => {
   const head = steps.replace("  see(button('Open notes')),\n", '');
   expect(weakerJourney(notes, steps, head)).toEqual([
-    `${notes}: it no longer proves the step \`see(button('Open notes'))\`.`,
+    `${notes}: it loses the step \`see(button('Open notes'))\`.`,
   ]);
 });
 
@@ -171,17 +171,18 @@ test('a proving step that expects something else is weaker', () => {
     "serverHolds(notesOf, 'general', 'title', [agent])",
   );
   expect(weakerJourney(notes, steps, head)).toEqual([
-    `${notes}: it no longer proves the step \`serverHolds(notesOf, 'general', 'title', [agent, offlineTitle])\`.`,
+    `${notes}: it loses the step \`serverHolds(notesOf, 'general', 'title', [agent, offlineTitle])\`.`,
   ]);
 });
 
-test('a changed string constant changes each step that proves with it', () => {
+test('a changed string constant changes each step that uses it', () => {
   const head = steps.replace("const agent = 'Agent note';", "const agent = 'A';");
   expect(weakerJourney(notes, steps, head)).toEqual([
-    `${notes}: it no longer proves the step \`see(fieldWith(noteTitle, agent))\`.`,
-    `${notes}: it no longer proves the step \`serverHolds(notesOf, 'general', 'title', [agent, offlineTitle])\`.`,
-    `${notes}: it no longer proves the step \`onSecond(see(fieldWith(noteTitle, agent)))\`.`,
-    `${notes}: it no longer proves the step \`holds(noteRecord, 'title', [agent, offlineTitle])\`.`,
+    `${notes}: it loses the step \`tool(createNote, { spaceId: 'general', title: agent })\`.`,
+    `${notes}: it loses the step \`see(fieldWith(noteTitle, agent))\`.`,
+    `${notes}: it loses the step \`serverHolds(notesOf, 'general', 'title', [agent, offlineTitle])\`.`,
+    `${notes}: it loses the step \`onSecond(see(fieldWith(noteTitle, agent)))\`.`,
+    `${notes}: it loses the step \`holds(noteRecord, 'title', [agent, offlineTitle])\`.`,
   ]);
 });
 
@@ -200,6 +201,28 @@ test('a new label in a tap step, new formatting or a new webOnly reason is not w
     .replace("tap(button('Add'))", "tap(button('Add note'))")
     .replace("see(heading('General', 1))", 'see(heading("General", 1,))')
     .replace("const axe = 'axe reads a web page';", "const axe = 'axe needs a page';");
+  expect(head).not.toBe(steps);
+  expect(weakerJourney(notes, steps, head)).toEqual([]);
+});
+
+test('a deleted offline step is weaker, since the journey then proves less', () => {
+  const head = steps.replace('  offline(true),\n', '');
+  expect(head).not.toBe(steps);
+  expect(weakerJourney(notes, steps, head)).toEqual([
+    `${notes}: it loses the step \`offline(true)\`.`,
+  ]);
+});
+
+test('a step of a kind that the check does not know is compared', () => {
+  const before = "journey('a', [later('x'), see(button('A'))]);";
+  const after = "journey('a', [see(button('A'))]);";
+  expect(weakerJourney(notes, before, after)).toEqual([
+    `${notes}: it loses the step \`later('x')\`.`,
+  ]);
+});
+
+test('a deleted tap step is not compared, since its next see step then fails', () => {
+  const head = steps.replace("  tap(button('Add')),\n", '');
   expect(head).not.toBe(steps);
   expect(weakerJourney(notes, steps, head)).toEqual([]);
 });
@@ -233,6 +256,6 @@ test('a changed data journey is compared with its base copy', async () => {
     ],
   ]);
   expect(await weakerJourneys(gh.run, 'main', 'h3ad')).toEqual([
-    `${notes}: it no longer proves the step \`settled()\`.`,
+    `${notes}: it loses the step \`settled()\`.`,
   ]);
 });

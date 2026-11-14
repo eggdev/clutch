@@ -8,7 +8,8 @@ import { parse } from 'yaml';
  * compares each changed journey and `budgets:` of `clutch.yaml` with the merge
  * base of the PR. A journey is weaker when it loses an outcome, changes what an
  * outcome expects, or has fewer assertions. A data journey is weaker when it
- * loses a step that proves something, or when such a step moves into `webOnly`.
+ * loses a step other than a `tap`, `fill` or `submit`, or when such a step
+ * moves into `webOnly`.
  * A budget is weaker when it rises or goes. A renamed button or a moved field
  * changes none of these, so it passes.
  * It also holds a change to the commands of the CI journeys job, or to a
@@ -65,19 +66,15 @@ function nativeShape(body: string): Shape {
 const shapeOf = (file: string, body: string) =>
   file.endsWith('.pw.ts') ? webShape(body) : nativeShape(body);
 
-/** The steps of `packages/journeys/testing/steps.ts` that prove something. The rest only act. */
-const proving = new Set([
-  'see',
-  'gone',
-  'outcome',
-  'shot',
-  'accessible',
-  'settled',
-  'holds',
-  'serverHolds',
-]);
+/**
+ * The steps of `packages/journeys/testing/steps.ts` that act on a label. A
+ * rename may change that label, and a journey without the action fails its
+ * next `see`, so the check does not compare them. It compares each other step,
+ * also a kind that the kit adds later.
+ */
+const relabelled = new Set(['tap', 'fill', 'submit']);
 
-type DataStep = { key: string; text: string; proves: boolean; native: boolean };
+type DataStep = { key: string; text: string; compared: boolean; native: boolean };
 
 /** The name that a call calls, such as `see` in `see(x)`, or '' when it is no plain call. */
 const callee = (node: ts.Node) =>
@@ -136,7 +133,7 @@ function dataSteps(body: string): Array<DataStep> {
         while (callee(step) === 'onSecond') {
           step = wrapped(step);
         }
-        steps.push({ key, text, proves: proving.has(callee(step)), native });
+        steps.push({ key, text, compared: !relabelled.has(callee(step)), native });
       }
     }
     ts.forEachChild(node, walk);
@@ -145,19 +142,20 @@ function dataSteps(body: string): Array<DataStep> {
   return steps;
 }
 
-/** How many proving steps of `steps` have each key. */
+/** How many compared steps of `steps` have each key. */
 function counts(steps: Array<DataStep>) {
   const found = new Map<string, number>();
-  for (const step of steps.filter((item) => item.proves)) {
+  for (const step of steps.filter((item) => item.compared)) {
     found.set(step.key, (found.get(step.key) ?? 0) + 1);
   }
   return found;
 }
 
 /**
- * Why the head steps of a data journey are weaker than the base steps. A
- * proving step that is gone, or that expects something else, is lost. A step
- * that only acts, such as a `tap` with a new label, changes nothing.
+ * Why the head steps of a data journey are weaker than the base steps. A step
+ * that is gone, or that expects or sets something else, is lost: a `see`, and
+ * also an `offline(true)`, without which the journey proves less. A `tap`,
+ * `fill` or `submit` with a new label changes nothing.
  */
 function weakerSteps(file: string, base: string, head: string) {
   const before = dataSteps(base);
@@ -168,7 +166,7 @@ function weakerSteps(file: string, base: string, head: string) {
   for (const [key, count] of counts(before)) {
     const text = before.find((step) => step.key === key)?.text ?? key;
     if ((all.get(key) ?? 0) < count) {
-      reasons.push(`${file}: it no longer proves the step \`${text}\`.`);
+      reasons.push(`${file}: it loses the step \`${text}\`.`);
     } else if ((native.get(key) ?? 0) < (nativeBefore.get(key) ?? 0)) {
       reasons.push(
         `${file}: the step \`${text}\` moves into \`webOnly\`, so the native run no longer proves it.`,

@@ -19,9 +19,10 @@ function results(rules: Array<Rule>, ctx: Context) {
 /**
  * The status of one capability. Every `detect` rule passes: present. Some
  * pass and one fails, or only `partial_if` rules pass: partial. None pass:
- * missing. Every `detect` rule is unknown, or the rules that did not pass are
- * all unknown: unknown. So a capability whose last proof needs `--remote` is
- * unknown without it, and never looks present from its files alone.
+ * missing, with the reasons that the failed rules give. Every `detect` rule
+ * is unknown, or the rules that did not pass are all unknown: unknown. So a
+ * capability whose last proof needs `--remote` is unknown without it, and
+ * never looks present from its files alone.
  */
 async function detectOne(entry: CapabilityEntry, ctx: Context): Promise<Detection> {
   const main = await results(entry.detect, ctx);
@@ -43,7 +44,11 @@ async function detectOne(entry: CapabilityEntry, ctx: Context): Promise<Detectio
   const partial = extra.filter((result) => result.outcome === 'pass');
   return partial.length > 0
     ? { id: entry.id, status: 'partial', evidence: partial.flatMap((result) => result.evidence) }
-    : { id: entry.id, status: 'missing', evidence: [] };
+    : {
+        id: entry.id,
+        status: 'missing',
+        evidence: main.flatMap((result) => (result.outcome === 'fail' ? result.evidence : [])),
+      };
 }
 
 /** Detects each capability in `root`. Git lists the tracked files once for the whole run. */
