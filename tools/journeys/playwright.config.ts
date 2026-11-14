@@ -41,8 +41,9 @@ const use = (device: Device) => ({
  * `mise exec -- bun run journey <id>`, which sets the base URL, the time
  * budget and the quality budgets. Each journey runs on each device in
  * `webDevices`, with one worker. A failed journey runs once more: the runner
- * files a pass on the retry as a flake. See
- * docs/contributing/end-to-end-testing.md#devices.
+ * files a pass on the retry as a flake. The nightly flake hunt passes
+ * `--retries 0` and `--repeat-each` on the command line, and names a JSON
+ * report in `JOURNEY_REPORT`. See docs/contributing/end-to-end-testing.md#devices.
  */
 export default defineConfig({
   testDir: path.resolve(import.meta.dirname, '../../features'),
@@ -56,7 +57,9 @@ export default defineConfig({
   // CI. A missing baseline fails, so `visual pull` adds it from the CI shots.
   snapshotPathTemplate: '{testDir}/{testFileDir}/__screenshots__/{arg}{ext}',
   updateSnapshots: 'none',
-  reporter: 'list',
+  reporter: process.env.JOURNEY_REPORT
+    ? [['list'], ['json', { outputFile: process.env.JOURNEY_REPORT }]]
+    : 'list',
   timeout: Number(process.env.JOURNEY_BUDGET_MS ?? 60_000),
   expect: { timeout: 10_000 },
   use: {

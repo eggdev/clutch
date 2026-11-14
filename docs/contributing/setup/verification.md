@@ -171,6 +171,10 @@ They run in these places:
 - The pre-push hook runs the `journeys` target when a push changes code.
 - CI runs `bun run journey --all` in the `journeys` job. The job caches
   Chromium for each Playwright version.
+- The nightly flake hunt runs `bun run journey --hunt 20`. Each web journey
+  runs 20 times on each device with no retry, and the step summary counts the
+  first runs that failed. See
+  [flake hunt](../end-to-end-testing.md#flake-hunt).
 
 A web journey runs against the web app. `journeys.webApp` in `clutch.yaml`
 names it, as `apps/app`. Without the key, it is the one app under `apps/` with

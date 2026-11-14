@@ -51,6 +51,33 @@ use Maestro.
   any try fails the check, also when the retry passes.
 - Fix a flaky journey. Do not make it wait longer, and do not add retries.
 
+## Flake hunt
+
+The retry hides a journey that fails at random. The `journeys` job of the
+nightly [flake hunt](../../.github/workflows/flake-hunt.yml) shows it. It runs
+`bun tools/journeys/run.ts --hunt 20`: each web journey runs 20 times on each
+device, with no retry.
+
+- The step summary has a table with one row for each journey and one column for
+  each device. A cell such as `2 of 20` counts the first runs that failed.
+  `no run` means the journey did not run on that device.
+- A journey that failed a run gets a warning in the run. A journey that did not
+  run on a device gets another one.
+- The job passes when a journey fails, because it only measures. It fails when
+  it measured nothing for a journey. That is the case when Playwright wrote no
+  report, when a journey file did not load, and when a journey ran on no device.
+- It quarantines no journey, files no friction entry, writes no measures file
+  and opens no PR. It never blocks a PR.
+- The job has a limit of 45 minutes, and Playwright writes the report at the
+  end. A hunt that passes the limit leaves no table. Lower the count or raise
+  the limit when the journeys grow.
+- The report and the trace of each failed run are in the `journey-hunt-traces`
+  artifact for 14 days.
+- When the hunt names a journey, file one issue for it with the cause. File an
+  issue that gives more journeys the clock only when the cause is timing.
+- The blocking `journeys` check keeps its one retry.
+- Run it locally with a smaller count: `mise exec -- bun run journey --hunt 3`.
+
 ## Devices
 
 Each web journey runs on three devices, on every PR. They are the three

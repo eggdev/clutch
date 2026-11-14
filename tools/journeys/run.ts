@@ -5,6 +5,7 @@ import { missingJourneys } from '@tools/check-journeys';
 import { devApps, isUp, urlOf } from '@tools/dev';
 import type { DevApp } from '@tools/dev';
 import { isCore, unprovenCore } from '@tools/journeys/core-proof';
+import { hunt } from '@tools/journeys/hunt';
 import { budgetOf, inboxCommandOf, journeys, webDevices } from '@tools/journeys/journeys';
 import type { Journey } from '@tools/journeys/journeys';
 import {
@@ -35,7 +36,11 @@ import type { Platform } from '@tools/native/device-host';
  * Each journey writes its measures file.
  * With no web journey, `--all` passes and says so: a warning annotation and a
  * line in the step summary. `--native <ios|android>` runs each native journey
- * on the booted device of the device host.
+ * on the booted device of the device host. `--hunt <count>` is the nightly
+ * flake hunt: it runs each web journey `count` times on each device with no
+ * retry, and prints the first-run failures of each journey. It passes when
+ * the journeys fail, because it only measures. It files no flake and writes
+ * no measures.
  * See docs/contributing/end-to-end-testing.md#devices.
  */
 
@@ -149,6 +154,8 @@ async function runPlaywright(
   baseUrl: string,
   budgetSeconds: number,
   env: Record<string, string>,
+  // Each journey may run on each device twice: once, and once more on a failure.
+  { args = [] as ReadonlyArray<string>, tries = webDevices.length * 2 } = {},
 ) {
   const run = Bun.spawn(
     [
@@ -156,6 +163,7 @@ async function runPlaywright(
       'test',
       '--config',
       'tools/journeys/playwright.config.ts',
+      ...args,
       ...files,
     ],
     {
@@ -170,8 +178,6 @@ async function runPlaywright(
       stderr: 'inherit',
     },
   );
-  // Each journey may run on each device twice: once, and once more on a failure.
-  const tries = webDevices.length * 2;
   const late = setTimeout(() => run.kill('SIGKILL'), budgetSeconds * 1000 * tries + overheadMs);
   const code = await run.exited;
   clearTimeout(late);
@@ -209,9 +215,9 @@ async function collect(
   return { runsOf: (journey: Journey) => runs.get(journey.id) ?? [], failed };
 }
 
-/** The journeys that `id` selects: one by its ID, or each web journey for `--all`. */
+/** The journeys that `id` selects: one by its ID, or each web journey for `--all` and `--hunt`. */
 function select(all: ReadonlyArray<Journey>, id: string | undefined): Array<Journey> | string {
-  if (id === '--production') {
+  if (id === '--production' || id === '--hunt') {
     return all.filter((item) => item.platform === 'web');
   }
   if (id === '--all') {
@@ -228,6 +234,10 @@ function select(all: ReadonlyArray<Journey>, id: string | undefined): Array<Jour
   return [journey];
 }
 
+/** The time budget of a run: the budgets of its journeys added up, in seconds. */
+const budgetSum = (root: string, selected: ReadonlyArray<Journey>) =>
+  selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
+
 type Budgets = Exclude<ReturnType<typeof budgetsOf>, string>;
 
 async function runJourneys(
@@ -238,7 +248,7 @@ async function runJourneys(
   sink: Sink,
   fileFlake: FileFlake,
 ) {
-  const budget = selected.reduce((sum, journey) => sum + budgetOf(root, journey), 0);
+  const budget = budgetSum(root, selected);
   const dir = runsDir(root);
   const code = await runPlaywright(
     root,
@@ -298,10 +308,15 @@ export async function main(
   sink: Sink = consoleSink,
   fileFlake: FileFlake = frictionFlake(root),
   productionUrl?: string,
+  repeat?: number,
 ): Promise<number> {
   const found = select(journeys(root), id);
   if (typeof found === 'string') {
     sink.error(found);
+    return 1;
+  }
+  if (id === '--hunt' && !(Number.isInteger(repeat) && (repeat ?? 0) > 0)) {
+    sink.error('--hunt needs a whole number of runs, such as `--hunt 20`.');
     return 1;
   }
   if (id === '--production' && !productionUrl) {
@@ -336,7 +351,19 @@ export async function main(
   const urls = new Map(apps.map((app) => [app.name, urlOf(root, app.name)]));
   const started = (await allUp(apps, urls)) ? null : await startServers(root, apps, urls);
   try {
-    return await runJourneys(root, selected, urls.get(web.name) ?? '', budgets, sink, fileFlake);
+    const url = urls.get(web.name) ?? '';
+    return id === '--hunt'
+      ? await hunt(root, selected, repeat ?? 0, sink, (env, args, tries) =>
+          runPlaywright(
+            root,
+            selected.map((journey) => journey.file),
+            url,
+            budgetSum(root, selected),
+            { ...env, JOURNEY_BUDGETS: JSON.stringify(budgets) },
+            { args, tries },
+          ),
+        )
+      : await runJourneys(root, selected, url, budgets, sink, fileFlake);
   } finally {
     if (started) {
       await stopServers(started);
@@ -356,6 +383,7 @@ if (import.meta.main) {
             undefined,
             undefined,
             first === '--production' ? platform : undefined,
+            first === '--hunt' ? Number(platform) : undefined,
           );
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);

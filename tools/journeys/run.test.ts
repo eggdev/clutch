@@ -72,6 +72,20 @@ test('production with no core journey fails, since it has no proof', async () =>
   );
 });
 
+test('--hunt with no whole number of runs fails, and names the form', async () => {
+  await inRepo(
+    {
+      'package.json': JSON.stringify({ name: 'shop' }),
+      'features/billing/journeys/pay-invoice.pw.ts': journey,
+    },
+    async (root) => {
+      const { sink, lines } = capture({});
+      expect(await main(root, '--hunt', sink, undefined, undefined, Number.NaN)).toBe(1);
+      expect(lines.join('\n')).toContain('`--hunt 20`');
+    },
+  );
+});
+
 test('no journey ran while a feature ships a screen fails, and names the feature', async () => {
   await inRepo(
     {
