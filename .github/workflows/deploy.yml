@@ -1,7 +1,9 @@
 # Deploys each green main to production, then proves it: the core journeys run
 # on the live URL. A project names its command and URL in `deploy:` of
 # clutch.yaml, which kickoff fills. A project that names none deploys nothing.
-# Each deploy runs in order. See docs/principles/proof-gates-code.md.
+# Each deploy runs in order. When production fails twice after an auto-merged
+# PR, the job starts its revert, as Auto-revert does for a red CI run. See
+# docs/principles/proof-gates-code.md.
 name: Deploy
 
 on:
@@ -23,8 +25,13 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      # One question for the owner when production fails twice.
+      # One question for the owner when production fails twice and no revert
+      # can start.
       issues: write
+      # The run list and the Revert workflow dispatch after a failed proof.
+      actions: write
+      # The revert label and the comment on the merged PR.
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -145,7 +145,9 @@ Each journey proves its outcome as the weakest real user meets it:
   merge.
 - A skipped deploy is red.
 - The core journeys run on production after each deploy. A second failure marks
-  the deploy red, and opens one `needs-owner` question that names the commit.
+  the deploy red. When auto-merge merged the change, its revert starts with no
+  person. Otherwise one `needs-owner` question names the commit. See
+  [auto-revert](../contributing/operations/rollback.md#auto-revert).
 
 ## Example
 
