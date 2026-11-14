@@ -7,8 +7,10 @@ import { parse } from 'yaml';
  * The deterministic check that replaces a model's "weaker check" call. It
  * compares each changed journey and `budgets:` of `clutch.yaml` with the merge
  * base of the PR. A journey is weaker when it loses an outcome, changes what an
- * outcome expects, or has fewer assertions. A budget is weaker when it rises or
- * goes. A renamed button or a moved field changes none of these, so it passes.
+ * outcome expects, or has fewer assertions. A data journey is weaker when it
+ * loses a step that proves something, or when such a step moves into `webOnly`.
+ * A budget is weaker when it rises or goes. A renamed button or a moved field
+ * changes none of these, so it passes.
  * It also holds a change to the commands of the CI journeys job, or to a
  * `coreJourneys` decision, since either can remove the proof without touching a
  * journey. A change to the journey kit holds too, since a no-op `outcome()` would
@@ -18,7 +20,10 @@ import { parse } from 'yaml';
 
 const journeyKit = /^(?:packages\/journeys\/testing|tools\/journeys)\//u;
 
-const journeyFile = /^features\/[^/]+\/journeys\/.+\.(?:pw\.ts|maestro\.yaml)$/u;
+const journeyFile = /^features\/[^/]+\/journeys\/.+\.(?:pw\.ts|maestro\.yaml|journey\.ts)$/u;
+
+/** The form of a journey file: a script, a native flow or a list of steps. */
+const formOf = (file: string) => /\.(?:pw\.ts|maestro\.yaml|journey\.ts)$/u.exec(file)?.[0];
 
 /** A file that users reach: a feature's screen, or a route of an app. */
 const userFacing =
@@ -60,8 +65,124 @@ function nativeShape(body: string): Shape {
 const shapeOf = (file: string, body: string) =>
   file.endsWith('.pw.ts') ? webShape(body) : nativeShape(body);
 
+/** The steps of `packages/journeys/testing/steps.ts` that prove something. The rest only act. */
+const proving = new Set([
+  'see',
+  'gone',
+  'outcome',
+  'shot',
+  'accessible',
+  'settled',
+  'holds',
+  'serverHolds',
+]);
+
+type DataStep = { key: string; text: string; proves: boolean; native: boolean };
+
+/** The name that a call calls, such as `see` in `see(x)`, or '' when it is no plain call. */
+const callee = (node: ts.Node) =>
+  ts.isCallExpression(node) && ts.isIdentifier(node.expression) ? node.expression.text : '';
+
+/** The step that a wrapper such as `webOnly(step, why)` or `onSecond(step)` holds. */
+const wrapped = (node: ts.Node) => (ts.isCallExpression(node) && node.arguments[0]) || node;
+
+/**
+ * The steps of a data journey: the array that it passes to `journey()`. The
+ * key of a step is its text with no spaces or comments, and with each
+ * top-level string constant written as its value, so a changed label is a
+ * changed step. `webOnly(step, why)` is the step, left out of the native run.
+ */
+function dataSteps(body: string): Array<DataStep> {
+  const source = ts.createSourceFile('journey.ts', body, ts.ScriptTarget.Latest, true);
+  const constants = new Map<string, string>();
+  for (const statement of source.statements) {
+    if (ts.isVariableStatement(statement)) {
+      for (const item of statement.declarationList.declarations) {
+        if (
+          ts.isIdentifier(item.name) &&
+          item.initializer &&
+          ts.isStringLiteralLike(item.initializer)
+        ) {
+          constants.set(item.name.text, item.initializer.text);
+        }
+      }
+    }
+  }
+  const keyOf = (node: ts.Node): string => {
+    if (ts.isStringLiteralLike(node)) {
+      return JSON.stringify(node.text);
+    }
+    if (ts.isIdentifier(node)) {
+      const value = constants.get(node.text);
+      return value === undefined ? node.text : JSON.stringify(value);
+    }
+    const children = node.getChildren(source);
+    return children.length === 0
+      ? node.getText(source)
+      : children
+          .map(keyOf)
+          .join('')
+          .replaceAll(/,(?=[)\]}])/gu, '');
+  };
+  const steps: Array<DataStep> = [];
+  const walk = (node: ts.Node) => {
+    const list = ts.isCallExpression(node) ? node.arguments[1] : undefined;
+    if (callee(node) === 'journey' && list && ts.isArrayLiteralExpression(list)) {
+      for (const element of list.elements) {
+        const native = callee(element) !== 'webOnly';
+        let step = native ? element : wrapped(element);
+        const text = step.getText(source).replaceAll(/\s+/gu, ' ');
+        const key = keyOf(step);
+        while (callee(step) === 'onSecond') {
+          step = wrapped(step);
+        }
+        steps.push({ key, text, proves: proving.has(callee(step)), native });
+      }
+    }
+    ts.forEachChild(node, walk);
+  };
+  walk(source);
+  return steps;
+}
+
+/** How many proving steps of `steps` have each key. */
+function counts(steps: Array<DataStep>) {
+  const found = new Map<string, number>();
+  for (const step of steps.filter((item) => item.proves)) {
+    found.set(step.key, (found.get(step.key) ?? 0) + 1);
+  }
+  return found;
+}
+
+/**
+ * Why the head steps of a data journey are weaker than the base steps. A
+ * proving step that is gone, or that expects something else, is lost. A step
+ * that only acts, such as a `tap` with a new label, changes nothing.
+ */
+function weakerSteps(file: string, base: string, head: string) {
+  const before = dataSteps(base);
+  const after = dataSteps(head);
+  const [all, native] = [counts(after), counts(after.filter((step) => step.native))];
+  const nativeBefore = counts(before.filter((step) => step.native));
+  const reasons: Array<string> = [];
+  for (const [key, count] of counts(before)) {
+    const text = before.find((step) => step.key === key)?.text ?? key;
+    if ((all.get(key) ?? 0) < count) {
+      reasons.push(`${file}: it no longer proves the step \`${text}\`.`);
+    } else if ((native.get(key) ?? 0) < (nativeBefore.get(key) ?? 0)) {
+      reasons.push(
+        `${file}: the step \`${text}\` moves into \`webOnly\`, so the native run no longer proves it.`,
+      );
+    }
+  }
+  return reasons;
+}
+
 /** Why the head copy of a journey is weaker than the base copy. */
 export function weakerJourney(file: string, base: string, head: string) {
+  if (file.endsWith('.journey.ts')) {
+    return weakerSteps(file, base, head);
+  }
   const before = shapeOf(file, base);
   const after = shapeOf(file, head);
   const reasons: Array<string> = [];
@@ -148,7 +269,13 @@ export async function weakerJourneys(run: Run, defaultBranch: string, sha: strin
     } else if (status === 'D' && journeyFile.test(before)) {
       reasons.push(`${before}: the PR deletes this journey.`);
     } else if (status !== 'A' && status !== 'D' && journeyFile.test(before)) {
-      reasons.push(...weakerJourney(after, await show(base, before), await show(sha, after)));
+      reasons.push(
+        ...(formOf(before) === formOf(after)
+          ? weakerJourney(after, await show(base, before), await show(sha, after))
+          : [
+              `${after}: the PR moves the journey ${before} to another form, so no check compares them.`,
+            ]),
+      );
     } else if (status === 'M' && before === 'clutch.yaml') {
       const [old, now] = [await show(base, before), await show(sha, before)];
       reasons.push(...weakerBudgets(old, now), ...weakerCore(old, now));
