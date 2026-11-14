@@ -900,9 +900,20 @@ Each rule checks the files that git tracks. An untracked file never counts.
 | `factory: check`                      | The factory tree has an agent and passes `clutch factory --check`.        |
 | `any` and `all`                       | They combine rules. An unknown rule inside `any` is skipped.              |
 
+The `remote: protected_main` probe passes when GitHub asks for pull requests
+and the `validate` check on the default branch. When
+`.github/rulesets/main.json` exists and GitHub has a ruleset with its name,
+that ruleset must also match the file, as `clutch ruleset` compares them. Any
+difference fails the probe, such as a missing check, no code owner review, or
+an extra bypass actor. The report names each difference and the fix,
+`mise exec -- bun run clutch ruleset --apply`. When the session cannot read
+the ruleset, the probe is unknown. Without the file, or without a ruleset of
+that name on GitHub, the classic branch protection still counts.
+
 A capability is present when every `detect` rule passes. It is partial when
 some pass and one fails, or when only `partial_if` rules pass. It is missing
-when none pass. It is unknown when the rules that did not pass are all
+when none pass, and the report shows the reasons that the failed rules give.
+It is unknown when the rules that did not pass are all
 unknown, such as remote rules without `--remote`. The registry is a guardrail
 file: agent review gives a change that weakens it an `owner` finding, and auto-merge leaves that PR for the owner.
 
