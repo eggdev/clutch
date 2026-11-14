@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.0 (2026-11-14)
+
+### Features
+
+- feat(deploy): revert an auto-merged PR when production fails (CL-495)
+
 ## 1.14.1 (2026-11-14)
 
 ### Fixes and maintenance
