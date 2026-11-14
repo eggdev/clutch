@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.1 (2026-11-14)
+
+### Fixes and maintenance
+
+- fix(journeys): fail a journey on its first failed run
+
 ## 1.14.0 (2026-11-14)
 
 ### Features
