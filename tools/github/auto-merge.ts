@@ -21,6 +21,7 @@ import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rul
 import { autoMerged } from '@tools/github/auto-revert';
 import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
 import type { ChangedFile } from '@tools/github/bot-rule';
+import { branchPrefix, issueOf } from '@tools/github/branch';
 import { retrying } from '@tools/github/command';
 import { contractBreaks } from '@tools/github/contract-breaks';
 import { majorChange } from '@tools/github/major-change';
@@ -35,8 +36,10 @@ import type { Run } from '@tools/github/stack';
  * check is red on the default branch, except for a revert. `dry-run` and `on`
  * comment a verdict once for each head commit of an agent PR, so the owner can
  * grade it: at the step for `dry-run`, and at the next step for `on`. `off` only
- * prints. The approval of `automerge.owner` on the head lifts the tier, a weaker
- * journey and a contract break, so a PR that waits for the owner merges once they approve. The Auto-merge workflow runs it from the base branch, so a pull request
+ * prints. A change to a held guardrail file that the branch's issue does not
+ * name holds, see tools/github/guardrail-hold.ts. The approval of
+ * `automerge.owner` on the head lifts the tier, a weaker journey, a contract
+ * break and a guardrail change, so a PR that waits for the owner merges once they approve. The Auto-merge workflow runs it from the base branch, so a pull request
  * cannot change the rules that judge it. See .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 const usage = [
@@ -192,6 +195,21 @@ async function redOn(run: Run, repo: string, branch: string, names: Array<string
   return names.filter((name) => red.has(checks[name]));
 }
 
+/** Bots whose PRs the bot rule judges line by line, so the guardrail hold skips them. */
+const versionBots = new Set(['renovate', 'clutch-sync', 'revert']);
+
+/** Why the PR holds for a guardrail change. The issue comes from the branch name. */
+async function guardrailFacts(run: Run, defaultBranch: string, pr: Pr) {
+  const bot = botKind(pr.headRefName);
+  if (bot && versionBots.has(bot)) {
+    return [];
+  }
+  const issue = issueOf(pr.headRefName, await branchPrefix(root));
+  // Loaded here because `pr status` imports this file, and the hold reads the guardrail list outside tools/github.
+  const { guardrailHolds } = await import('@tools/github/guardrail-hold');
+  return guardrailHolds(run, defaultBranch, pr.headRefOid, issue);
+}
+
 /**
  * Hands a merge to the workflow's merge job, which alone may use the release
  * bot's key. Without it, the run enables auto-merge itself.
@@ -273,6 +291,7 @@ export async function runAutoMerge(
     weakerJourneys: await weaker(run, defaultBranch, pr.headRefOid),
     breaks: await contractBreaks(run, repo, changed, pr.headRefOid),
     major: await majorChange(run, repo, values.pr, changed),
+    guardrails: await guardrailFacts(run, defaultBranch, pr),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
     ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),

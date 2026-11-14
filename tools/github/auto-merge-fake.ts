@@ -27,6 +27,7 @@ export const facts = (fields: Partial<Facts> = {}, pr: Partial<Facts['pr']> = {}
   weakerJourneys: [],
   breaks: [],
   major: [],
+  guardrails: [],
   botProblems: [],
   mainRed: [],
   ownerApproved: false,

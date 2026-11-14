@@ -249,9 +249,9 @@ Set up the guardrails for agents:
 1. Replace the owner handle in `.github/CODEOWNERS` with the project's owner
    or team. Each guardrail file in `tools/guardrail-files.json` needs a
    review from that owner.
-2. Tell the owner that deleting `KICKOFF.md` turns on the guardrail guard.
-   After that, an agent asks before it edits a guardrail file. See
-   [agent hooks](../../../docs/contributing/harness-engineering.md#agent-hooks).
+2. Tell the owner that the merge judge holds an agent PR that changes a
+   guardrail file of `held`, unless its issue names the file. See
+   [guardrail files](../../../docs/contributing/harness-engineering.md#guardrail-files).
 3. Ask the owner to trust the project hooks in Codex with `/hooks`, if they
    use Codex.
 4. Set up the scheduled agent that runs the
@@ -289,8 +289,7 @@ registrations) once the first product package exists.
 
 1. Fill the slots in `AGENTS.md` and `docs/contributing/index.md`. Rewrite
    `README.md` for the product. Rename the root project in `package.json`.
-2. Delete `KICKOFF.md` and its line in `AGENTS.md`. This turns on the
-   guardrail guard.
+2. Delete `KICKOFF.md` and its line in `AGENTS.md`.
 3. Run `mise exec -- bun run validate`. The slot check is strict now. Each
    slot that is left belongs to a phase. Fill it from evidence or a default,
    ask the owner the open product question, or delete it when it does not
