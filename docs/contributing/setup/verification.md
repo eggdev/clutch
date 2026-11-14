@@ -53,9 +53,8 @@ mise exec -- bun run journey --all
 The runner uses the dev servers that already run. When a server is down, it
 starts the missing ones through `tools/dev.ts`. It stops only the servers that
 it started. Each web journey runs on a phone, a tablet and a desktop. A
-journey that runs past its budget fails. A failed journey runs once more, and
-a pass on the retry files a `flake` friction entry. A layout shift, click
-budget or axe failure on any try still fails the run. A `Core:` journey also
+journey that runs past its budget fails. A journey runs once on each device,
+with no retry, so a failed run fails. A `Core:` journey also
 fails when its run on a device passed but did not record each outcome. That
 is `signed-up` first, then every outcome that its catalog section names. Each journey writes its
 [measures](../end-to-end-testing.md#measures) to

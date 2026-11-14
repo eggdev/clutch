@@ -12,12 +12,10 @@ import {
   budgetsOf,
   deviceRuns,
   failedRuns,
-  frictionFlake,
-  reportFlakes,
   webAttempts,
   writeMeasures,
 } from '@tools/journeys/measures';
-import type { DeviceRun, FileFlake } from '@tools/journeys/measures';
+import type { DeviceRun } from '@tools/journeys/measures';
 import { nativeMain } from '@tools/journeys/native';
 import { webAppOf } from '@tools/journeys/web-app';
 import type { Platform } from '@tools/native/device-host';
@@ -30,17 +28,14 @@ import type { Platform } from '@tools/native/device-host';
  * `webDevices`. Running servers are used again. When
  * a server is down, the runner starts the missing ones through `tools/dev.ts`,
  * then stops only what it started. A journey that runs past its budget fails.
- * A failed journey runs once more. A pass on the retry passes, and files a
- * `flake` friction entry. A measured budget that fails on any try (a layout
- * shift, a click budget or axe) fails the run, even when the retry passes.
+ * A journey runs once on each device, with no retry, so a failed run fails.
  * Each journey writes its measures file.
  * With no web journey, `--all` passes and says so: a warning annotation and a
  * line in the step summary. `--native <ios|android>` runs each native journey
  * on the booted device of the device host. `--hunt <count>` is the nightly
  * flake hunt: it runs each web journey `count` times on each device with no
  * retry, and prints the first-run failures of each journey. It passes when
- * the journeys fail, because it only measures. It files no flake and writes
- * no measures.
+ * the journeys fail, because it only measures. It writes no measures.
  * See docs/contributing/end-to-end-testing.md#devices.
  */
 
@@ -154,8 +149,8 @@ async function runPlaywright(
   baseUrl: string,
   budgetSeconds: number,
   env: Record<string, string>,
-  // Each journey may run on each device twice: once, and once more on a failure.
-  { args = [] as ReadonlyArray<string>, tries = webDevices.length * 2 } = {},
+  // Each journey runs once on each device.
+  { args = [] as ReadonlyArray<string>, tries = webDevices.length as number } = {},
 ) {
   const run = Bun.spawn(
     [
@@ -191,25 +186,17 @@ async function runPlaywright(
 }
 
 /**
- * Writes the measures file of each journey that ran, and reports each flake.
- * Returns the runs of each journey, and a line for each device run that
- * failed. Playwright passes a run whose retry passed, so these lines are how a
- * measured budget that failed on the first try still fails the run.
+ * Writes the measures file of each journey that ran. Returns the runs of each
+ * journey, and a line for each device run that failed, which names a measured
+ * budget that failed.
  */
-async function collect(
-  root: string,
-  selected: ReadonlyArray<Journey>,
-  dir: string,
-  sink: Sink,
-  fileFlake: FileFlake,
-) {
+function collect(root: string, selected: ReadonlyArray<Journey>, dir: string) {
   const runs = new Map<string, Array<DeviceRun>>();
   const failed: Array<string> = [];
   for (const journey of selected) {
     const list = deviceRuns('web', webAttempts(dir, journey));
     runs.set(journey.id, list);
     const where = writeMeasures(root, journey, list);
-    await reportFlakes(journey, list, where, fileFlake, sink.log);
     failed.push(...failedRuns(journey, list, where));
   }
   return { runsOf: (journey: Journey) => runs.get(journey.id) ?? [], failed };
@@ -246,7 +233,6 @@ async function runJourneys(
   url: string,
   budgets: Budgets,
   sink: Sink,
-  fileFlake: FileFlake,
 ) {
   const budget = budgetSum(root, selected);
   const dir = runsDir(root);
@@ -261,7 +247,7 @@ async function runJourneys(
       JOURNEY_INBOX: JSON.stringify(inboxCommandOf(root) ?? []),
     },
   );
-  const { runsOf, failed } = await collect(root, selected, dir, sink, fileFlake);
+  const { runsOf, failed } = collect(root, selected, dir);
   for (const line of failed) {
     sink.error(line);
   }
@@ -279,13 +265,7 @@ async function runJourneys(
 }
 
 /** Runs only the core journeys against a deployed URL. No core journey means no proof. */
-function runProduction(
-  root: string,
-  found: ReadonlyArray<Journey>,
-  url: string,
-  sink: Sink,
-  fileFlake: FileFlake,
-) {
+function runProduction(root: string, found: ReadonlyArray<Journey>, url: string, sink: Sink) {
   const selected = found.filter((journey) => isCore(root, journey));
   const budgets = budgetsOf(root);
   if (typeof budgets === 'string') {
@@ -298,7 +278,7 @@ function runProduction(
     );
     return 1;
   }
-  return runJourneys(root, selected, url, budgets, sink, fileFlake);
+  return runJourneys(root, selected, url, budgets, sink);
 }
 
 /** Runs the selected journeys. Returns the exit code. Exported for the runner's tests. */
@@ -306,7 +286,6 @@ export async function main(
   root: string,
   id: string | undefined,
   sink: Sink = consoleSink,
-  fileFlake: FileFlake = frictionFlake(root),
   productionUrl?: string,
   repeat?: number,
 ): Promise<number> {
@@ -324,7 +303,7 @@ export async function main(
     return 1;
   }
   if (productionUrl) {
-    return runProduction(root, found, productionUrl, sink, fileFlake);
+    return runProduction(root, found, productionUrl, sink);
   }
   const selected = found;
   const budgets = budgetsOf(root);
@@ -363,7 +342,7 @@ export async function main(
             { args, tries },
           ),
         )
-      : await runJourneys(root, selected, url, budgets, sink, fileFlake);
+      : await runJourneys(root, selected, url, budgets, sink);
   } finally {
     if (started) {
       await stopServers(started);
@@ -380,7 +359,6 @@ if (import.meta.main) {
         : await main(
             process.cwd(),
             first,
-            undefined,
             undefined,
             first === '--production' ? platform : undefined,
             first === '--hunt' ? Number(platform) : undefined,

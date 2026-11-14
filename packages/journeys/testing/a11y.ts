@@ -9,8 +9,7 @@ import { markFailure, measureOf } from '@repo/journeys/testing/measure';
  * `outcome()` calls it after each outcome holds. It runs axe on the whole page
  * and fails on any violation, `minor` included, because a journey has no
  * accessibility error. It has no way to skip a rule: fix the defect. It keeps
- * each result in the measures of the run. A failure there fails the run, also
- * when the retry passes. See
+ * each result in the measures of the run. A failure there fails the run. See
  * https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/a11y-checks.md.
  */
 

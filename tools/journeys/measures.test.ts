@@ -8,7 +8,6 @@ import {
   budgetsOf,
   deviceRuns,
   failedRuns,
-  reportFlakes,
   writeMeasures,
 } from '@tools/journeys/measures';
 import type { Attempt } from '@tools/journeys/measures';
@@ -34,21 +33,18 @@ const attempt = (
   ...(failure === undefined ? {} : { failure }),
 });
 
-test('a pass on the retry is flaky, a pass on the first try passes, and a failed retry fails', () => {
+test('a pass on the first try passes, and a failed try fails the run, also when a later try passed', () => {
   const runs = deviceRuns('web', [
     attempt('Phone', 1, 'passed'),
     attempt('Phone', 0, 'failed'),
     attempt('Desktop', 0, 'passed'),
   ]);
   expect(runs.map(({ device, result }) => ({ device, result }))).toEqual([
-    { device: 'Phone', result: 'flaky' },
+    { device: 'Phone', result: 'failed' },
     { device: 'Desktop', result: 'passed' },
   ]);
   expect(runs[0]?.attempts.map((item) => item.retry)).toEqual([0, 1]);
-  const failed = deviceRuns('ios', [
-    attempt('iPhone 16', 0, 'failed'),
-    attempt('iPhone 16', 1, 'failed'),
-  ]);
+  const failed = deviceRuns('ios', [attempt('iPhone 16', 0, 'failed')]);
   expect(failed[0]?.result).toBe('failed');
 });
 
@@ -56,12 +52,7 @@ test('the runner and the journey kit name the same measured budgets', () => {
   expect([...budgetFailures]).toEqual([...kitBudgetFailures]);
 });
 
-test('a pass on the retry is flaky by its retry index, also when the first try wrote no file', () => {
-  const [run] = deviceRuns('web', [attempt('Phone', 1, 'passed')]);
-  expect(run?.result).toBe('flaky');
-});
-
-test('a measured budget that fails on the first try fails the run, though the retry passes', () => {
+test('a failed run names the measured budget that it failed, and a crash names only the device', () => {
   const crash = { kind: 'crash' as const, message: 'page.goto: net::ERR_CONNECTION_RESET' };
   const shift = {
     kind: 'layout-shift' as const,
@@ -69,45 +60,21 @@ test('a measured budget that fails on the first try fails the run, though the re
   };
   const runs = deviceRuns('web', [
     attempt('Phone', 0, 'failed', shift),
-    attempt('Phone', 1, 'passed', null),
     attempt('Tablet', 0, 'failed', { kind: 'axe', message: 'axe found violations' }),
-    attempt('Tablet', 1, 'passed', null),
     attempt('Desktop', 0, 'failed', crash),
-    attempt('Desktop', 1, 'passed', null),
   ]);
   expect(runs.map(({ device, result }) => ({ device, result }))).toEqual([
     { device: 'Phone', result: 'failed' },
     { device: 'Tablet', result: 'failed' },
-    { device: 'Desktop', result: 'flaky' },
+    { device: 'Desktop', result: 'failed' },
   ]);
-  expect(runs[0]?.budgetFailure).toEqual({ retry: 0, ...shift });
+  expect(runs[0]?.budgetFailure).toEqual(shift);
+  expect(runs[2]?.budgetFailure).toBeUndefined();
   expect(failedRuns(journey, runs, 'sign-up.json')).toEqual([
-    'features/account/journeys/sign-up.pw.ts failed its layout-shift budget on Phone, on try 1. A retry does not cover a measured budget. The layout shift on / is 0.2, at or over the budget of 0.01. See sign-up.json.',
-    'features/account/journeys/sign-up.pw.ts failed its axe budget on Tablet, on try 1. A retry does not cover a measured budget. axe found violations See sign-up.json.',
+    'features/account/journeys/sign-up.pw.ts failed its layout-shift budget on Phone. The layout shift on / is 0.2, at or over the budget of 0.01. See sign-up.json.',
+    'features/account/journeys/sign-up.pw.ts failed its axe budget on Tablet. axe found violations See sign-up.json.',
+    'features/account/journeys/sign-up.pw.ts failed on Desktop. See sign-up.json.',
   ]);
-});
-
-test('a flaky run files a flake friction entry with the journey and the platform, and warns', async () => {
-  const filed: Array<string> = [];
-  const lines: Array<string> = [];
-  const runs = deviceRuns('android', [
-    attempt('pixel-7-api-35', 0, 'failed'),
-    attempt('pixel-7-api-35', 1, 'passed'),
-  ]);
-  await reportFlakes(
-    journey,
-    runs,
-    'test-results/journeys/measures/sign-up.android.json',
-    (text) => {
-      filed.push(text);
-      return Promise.resolve();
-    },
-    (line) => lines.push(line),
-  );
-  const text =
-    'Journey sign-up failed, then passed on the retry, on android (pixel-7-api-35). See test-results/journeys/measures/sign-up.android.json.';
-  expect(filed).toEqual([text]);
-  expect(lines).toEqual([`::warning title=Flaky journey::${text}`]);
 });
 
 test('each journey writes one measures file, and a native one names its platform', async () => {

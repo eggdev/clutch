@@ -29,7 +29,7 @@ export type MeasuredTry = {
 /** One device run: its result and each of its tries. */
 export type MeasuredRun = {
   device: string;
-  result: 'passed' | 'failed' | 'flaky';
+  result: 'passed' | 'failed';
   attempts: Array<MeasuredTry>;
 };
 
@@ -59,8 +59,6 @@ function runLines(run: MeasuredRun): Array<string> {
   let result: string = run.result;
   if (run.result === 'failed' && failure) {
     result = `failed (${failure.kind}): ${failure.message}`;
-  } else if (run.result === 'flaky') {
-    result = 'passed on the retry';
   }
   const lines = [`  ${run.device}: ${result}`];
   const outcomes = last?.outcomes?.map((outcome) => outcome.name) ?? [];

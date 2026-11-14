@@ -48,43 +48,36 @@ function run(
   return inRepo(files, async (root) => {
     const { fake, ran } = host(codes, booted, readable);
     const lines: Array<string> = [];
-    const filed: Array<string> = [];
     const exitCode = await nativeMain(root, 'android', {
       host: fake,
       tool: fingerprintOf(sources),
       lock: path.join(root, '.lock'),
       log: (line) => lines.push(line),
-      fileFlake: (text) => {
-        filed.push(text);
-        return Promise.resolve();
-      },
     });
     const file = path.join(root, 'test-results/journeys/measures/sign-up.android.json');
     const measures = booted && ran.length > 0 ? JSON.parse(readFileSync(file, 'utf-8')) : null;
-    return { exitCode, ran, lines, filed, measures };
+    return { exitCode, ran, lines, measures };
   });
 }
 
-test('a native journey that passes on the retry passes, files a flake, and writes its measures', async () => {
+test('a native journey that fails its first run fails, runs no retry, and writes its measures', async () => {
   const result = await run([1, 0]);
-  expect(result.exitCode).toBe(0);
-  expect(result.ran).toHaveLength(2);
-  expect(result.filed).toEqual([
-    'Journey sign-up failed, then passed on the retry, on android (pixel-7-api-35). See test-results/journeys/measures/sign-up.android.json.',
-  ]);
+  expect(result.exitCode).toBe(1);
+  expect(result.ran).toHaveLength(1);
+  expect(result.lines).toContain(
+    'features/account/journeys/sign-up.maestro.yaml failed on pixel-7-api-35. See test-results/journeys/measures/sign-up.android.json.',
+  );
   expect(result.measures.runs[0]).toMatchObject({
     platform: 'android',
     device: 'pixel-7-api-35',
-    result: 'flaky',
+    result: 'failed',
   });
 });
 
-test('a native journey that fails twice fails, and one that passes runs once', async () => {
-  const failed = await run([1, 1]);
-  expect(failed.exitCode).toBe(1);
-  expect(failed.measures.runs[0].result).toBe('failed');
+test('a native journey that passes runs once, and passes', async () => {
   const passed = await run([0]);
-  expect([passed.exitCode, passed.ran.length, passed.filed]).toEqual([0, 1, []]);
+  expect([passed.exitCode, passed.ran.length]).toEqual([0, 1]);
+  expect(passed.measures.runs[0].result).toBe('passed');
 });
 
 test('with no booted device, the run fails and asks for one', async () => {
@@ -152,16 +145,16 @@ test('a data journey compiles to a flow, runs it, and records each outcome with 
   expect(result.measures.runs[0].attempts[0].outcomes).toEqual([{ name: 'signed-up', clicks: 1 }]);
 });
 
-test('a data journey whose outcome is over the click budget of its core journey fails, even on the retry', async () => {
+test('a data journey whose outcome is over the click budget of its core journey fails', async () => {
   const file = 'features/account/journeys/sign-up.journey.ts';
   const taps = "tap(button('Next')), tap(button('Next')), tap(button('Next')), ";
   const body = `${taps}${welcome}`;
-  const result = await run([0, 0], true, {
+  const result = await run([0], true, {
     ...app('com.example'),
     [file]: journeyFile(body, ' * Core: sign-up\n'),
   });
   expect(result.exitCode).toBe(1);
-  expect(result.ran).toHaveLength(2);
+  expect(result.ran).toHaveLength(1);
   expect(result.measures.runs[0].result).toBe('failed');
   expect(result.measures.runs[0].budgetFailure).toMatchObject({ kind: 'click-budget' });
   expect(result.measures.runs[0].budgetFailure.message).toContain(

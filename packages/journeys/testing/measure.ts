@@ -45,9 +45,8 @@ type AxeMark = {
 };
 
 /**
- * What failed a try. A measured budget, `layout-shift`, `click-budget` or
- * `axe`, fails the run even when the retry passes. The retry covers only a
- * `crash`, a `timeout` or an `assertion` that throws.
+ * What failed a try: a measured budget, `layout-shift`, `click-budget` or
+ * `axe`, or a `crash`, a `timeout` or an `assertion` that throws.
  */
 export type FailureKind =
   | 'layout-shift'
@@ -57,7 +56,7 @@ export type FailureKind =
   | 'assertion'
   | 'crash';
 
-/** The failures that a retry does not cover. `tools/journeys/measures.ts` keeps the same set, and its test compares the two. */
+/** The failures of a measured budget. `tools/journeys/measures.ts` keeps the same set, and its test compares the two. */
 export const budgetFailures: ReadonlySet<FailureKind> = new Set([
   'layout-shift',
   'click-budget',
