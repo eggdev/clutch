@@ -142,3 +142,97 @@ test('a change to the journey kit holds', async () => {
     'tools/journeys/x.ts: the PR changes the journey kit that proves every journey.',
   ]);
 });
+
+const notes = 'features/notes/journeys/notes-sync.journey.ts';
+const steps = await Bun.file(new URL(`../../${notes}`, import.meta.url)).text();
+
+test('the same steps of a data journey are not weaker', () => {
+  expect(weakerJourney(notes, steps, steps)).toEqual([]);
+});
+
+test('a deleted see step of a data journey is weaker, and the reason names the journey', () => {
+  const head = steps.replace("  see(heading('General', 1)),\n", '');
+  expect(head).not.toBe(steps);
+  expect(weakerJourney(notes, steps, head)).toEqual([
+    `${notes}: it no longer proves the step \`see(heading('General', 1))\`.`,
+  ]);
+});
+
+test('one of two equal see steps is still a lost step', () => {
+  const head = steps.replace("  see(button('Open notes')),\n", '');
+  expect(weakerJourney(notes, steps, head)).toEqual([
+    `${notes}: it no longer proves the step \`see(button('Open notes'))\`.`,
+  ]);
+});
+
+test('a proving step that expects something else is weaker', () => {
+  const head = steps.replace(
+    "serverHolds(notesOf, 'general', 'title', [agent, offlineTitle])",
+    "serverHolds(notesOf, 'general', 'title', [agent])",
+  );
+  expect(weakerJourney(notes, steps, head)).toEqual([
+    `${notes}: it no longer proves the step \`serverHolds(notesOf, 'general', 'title', [agent, offlineTitle])\`.`,
+  ]);
+});
+
+test('a changed string constant changes each step that proves with it', () => {
+  const head = steps.replace("const agent = 'Agent note';", "const agent = 'A';");
+  expect(weakerJourney(notes, steps, head)).toEqual([
+    `${notes}: it no longer proves the step \`see(fieldWith(noteTitle, agent))\`.`,
+    `${notes}: it no longer proves the step \`serverHolds(notesOf, 'general', 'title', [agent, offlineTitle])\`.`,
+    `${notes}: it no longer proves the step \`onSecond(see(fieldWith(noteTitle, agent)))\`.`,
+    `${notes}: it no longer proves the step \`holds(noteRecord, 'title', [agent, offlineTitle])\`.`,
+  ]);
+});
+
+test('a step that moves into webOnly is weaker', () => {
+  const head = steps.replace(
+    '  see(fieldWith(noteTitle, renamed)),\n',
+    "  webOnly(see(fieldWith(noteTitle, renamed)), 'no device'),\n",
+  );
+  expect(weakerJourney(notes, steps, head)).toEqual([
+    `${notes}: the step \`see(fieldWith(noteTitle, renamed))\` moves into \`webOnly\`, so the native run no longer proves it.`,
+  ]);
+});
+
+test('a new label in a tap step, new formatting or a new webOnly reason is not weaker', () => {
+  const head = steps
+    .replace("tap(button('Add'))", "tap(button('Add note'))")
+    .replace("see(heading('General', 1))", 'see(heading("General", 1,))')
+    .replace("const axe = 'axe reads a web page';", "const axe = 'axe needs a page';");
+  expect(head).not.toBe(steps);
+  expect(weakerJourney(notes, steps, head)).toEqual([]);
+});
+
+test('a deleted data journey holds, and one moved to another form is not compared', async () => {
+  const gh = fake([
+    ['git merge-base', { out: 'b4se\n' }],
+    [
+      'git diff --name-status',
+      { out: `D\t${notes}\nR060\tfeatures/a/journeys/b.pw.ts\tfeatures/a/journeys/b.journey.ts\n` },
+    ],
+  ]);
+  expect(await weakerJourneys(gh.run, 'main', 'h3ad')).toEqual([
+    `${notes}: the PR deletes this journey.`,
+    'features/a/journeys/b.journey.ts: the PR moves the journey features/a/journeys/b.pw.ts to another form, so no check compares them.',
+  ]);
+});
+
+test('a changed data journey is compared with its base copy', async () => {
+  const gh = fake([
+    ['git merge-base', { out: 'b4se\n' }],
+    ['git diff --name-status', { out: `M\t${notes}\n` }],
+    [`git show b4se:${notes}`, { out: steps }],
+    [
+      `git show h3ad:${notes}`,
+      {
+        out: steps
+          .replace('  settled(),\n', '')
+          .replace('webOnly(settled(), poolOfThePage),\n', ''),
+      },
+    ],
+  ]);
+  expect(await weakerJourneys(gh.run, 'main', 'h3ad')).toEqual([
+    `${notes}: it no longer proves the step \`settled()\`.`,
+  ]);
+});
