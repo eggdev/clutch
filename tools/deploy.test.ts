@@ -13,8 +13,9 @@ const configured = 'deploy:\n  command: [bun, ship]\n  url: https://x.test\n';
 /** The environment of the Deploy run 500 on main. */
 const actions = { GITHUB_REPOSITORY: 'acme/shop', GITHUB_RUN_ID: '500', GITHUB_REF_NAME: 'main' };
 
-const asked = (gh: ReturnType<typeof fake>) =>
-  gh.calls.some((c) => c.startsWith('gh issue create'));
+/** How many questions the run opened for the owner. A failed proof opens one at most. */
+const questions = (gh: ReturnType<typeof fake>) =>
+  gh.calls.filter((c) => c.startsWith('gh issue create')).length;
 const revertStarted = (gh: ReturnType<typeof fake>) =>
   gh.calls.some((c) => c.startsWith('gh workflow run revert.yml'));
 
@@ -68,7 +69,7 @@ test('two production failures outside a Deploy run mark it red and ask the owner
     ['gh issue create', { out: 'https://github.com/a/b/issues/9\n' }],
   ]);
   expect(await prove(root, gh.run, 'abc1234', () => {}, {})).toBe(1);
-  expect(asked(gh)).toBe(true);
+  expect(questions(gh)).toBe(1);
   expect(revertStarted(gh)).toBe(false);
 });
 
@@ -132,7 +133,7 @@ test('two production failures after an auto-merged PR revert it and ask no one',
   const comment = gh.calls.find((c) => c.startsWith('gh pr comment 42'));
   expect(comment).toContain('Production failed its core journeys twice');
   expect(comment).toContain('actions/runs/500');
-  expect(asked(gh)).toBe(false);
+  expect(questions(gh)).toBe(0);
   expect(lines.at(-1)).toContain('Started its revert');
 });
 
@@ -141,7 +142,7 @@ test('two production failures after a PR that a person merged ask the owner, and
   const { code, lines } = await proveFailed(gh);
   expect(code).toBe(1);
   expect(revertStarted(gh)).toBe(false);
-  expect(asked(gh)).toBe(true);
+  expect(questions(gh)).toBe(1);
   expect(lines).toContain(
     'No automatic revert: a person merged #42, so it gets no automatic revert.',
   );
@@ -164,7 +165,7 @@ test('two production failures after a revert ask the owner, and start no second 
   expect(code).toBe(1);
   expect(revertStarted(gh)).toBe(false);
   expect(gh.calls.some((c) => c.includes('labels[]=revert'))).toBe(false);
-  expect(asked(gh)).toBe(true);
+  expect(questions(gh)).toBe(1);
   expect(lines.at(-1)).toContain('#42 is itself a revert');
 });
 
@@ -183,11 +184,11 @@ test('when the deploy before was not proven, or the revert cannot start, the own
   const before = await proveFailed(unproven);
   expect(before.lines.at(-1)).toContain('was not proven');
   expect(revertStarted(unproven)).toBe(false);
-  expect(asked(unproven)).toBe(true);
+  expect(questions(unproven)).toBe(1);
   const refused = failedTwice([['gh workflow run', { ok: false, err: 'HTTP 403' }]]);
   const failed = await proveFailed(refused);
   expect(failed.lines.at(-1)).toContain('the revert could not start');
-  expect(asked(refused)).toBe(true);
+  expect(questions(refused)).toBe(1);
 });
 
 test('a revert that already started for the PR asks no one again', async () => {
@@ -195,6 +196,6 @@ test('a revert that already started for the PR asks no one again', async () => {
   const gh = failedTwice([['gh api repos/acme/shop/issues/42/labels', { out: 'revert\n' }]]);
   const { lines } = await proveFailed(gh);
   expect(revertStarted(gh)).toBe(false);
-  expect(asked(gh)).toBe(false);
+  expect(questions(gh)).toBe(0);
   expect(lines.at(-1)).toContain('The revert of #42 already started');
 });
