@@ -46,8 +46,8 @@ async function findingsOf(page: Page, measure: Measure): Promise<ScreenFindings>
  * - each layout problem of the last page, as shown and at the largest text
  *   size. A passed try records them, and they never fail it.
  *
- * A measured budget that fails on any try fails the run, even when the retry
- * passes. The measures file names the kind of each failure. A journey takes
+ * A journey runs once on each device, with no retry, so a failed budget fails
+ * the run. The measures file names the kind of each failure. A journey takes
  * `test` from here, and `expect` from `@playwright/test`. See
  * https://github.com/eggdev/clutch/blob/main/docs/contributing/end-to-end-testing.md#measures.
  */

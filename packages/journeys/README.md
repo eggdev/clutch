@@ -4,8 +4,8 @@ What web journeys share. A journey in `features/<feature>/journeys/*.pw.ts`
 takes `test` from `@repo/journeys/testing/test`. It runs each journey on each
 device, and measures its layout shifts, clicks, keys, axe results and timings.
 A layout shift at the budget fails the run, and names the element that moved.
-A layout shift, click budget or axe failure on any try fails the run, also
-when the retry passes.
+A journey runs once on each device, with no retry, so any failure fails the
+run.
 See [budgets](https://github.com/eggdev/clutch/blob/main/docs/contributing/end-to-end-testing.md#budgets).
 
 A journey imports `accessible` from `@repo/journeys/testing/a11y`. `accessible(page, where)` runs axe and fails on

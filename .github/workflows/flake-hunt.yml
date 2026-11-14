@@ -108,10 +108,10 @@ jobs:
           GH_TOKEN="$PUSH_TOKEN" gh pr create --repo "$GITHUB_REPOSITORY" --head "$branch" \
             --title "$title" --body-file "$RUNNER_TEMP/body.md"
 
-  # Each web journey 20 times on each device, with no retry. The blocking
-  # journeys check in ci.yml keeps its one retry, so a journey that passes only
-  # on the retry stays hidden there. The step summary counts the first runs of
-  # each journey that failed. It quarantines no journey and opens no PR, so
+  # Each web journey 20 times on each device, with no retry. The journeys config
+  # sets no retry, so the hunt needs no flag for it. The blocking journeys check
+  # in ci.yml fails on one failed run, and the hunt shows how often each journey
+  # fails. The step summary counts the first runs of each journey that failed. It quarantines no journey and opens no PR, so
   # this job needs no hunt PR check and no bot token. See
   # docs/contributing/end-to-end-testing.md#flake-hunt.
   journeys:

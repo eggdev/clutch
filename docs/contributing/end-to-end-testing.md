@@ -38,25 +38,23 @@ use Maestro.
   write separate tests for a loading state or a transition.
 - Use real input values. Keep credentials and email addresses fake and local.
 
-## Server health and retries
+## Server health and no retry
 
 - Before each test, probe the server health route. When the server is dead,
-  fail at once with a named error. Do not spend retries on a refused
-  connection.
-- The runner runs a failed journey once more. A journey that passes on the
-  retry passes the check. The runner then files a `flake` friction entry that
-  names the journey and the platform, and CI shows a warning.
-- The retry covers a crash, a timeout or an assertion that throws. It does not
-  cover a measured budget. A layout shift, a click budget or an axe failure on
-  any try fails the check, also when the retry passes.
+  fail at once with a named error.
+- A journey runs once on each device, with no retry. A failed run fails the
+  check, so one commit gets one verdict.
+- A crash, a timeout, an assertion, a layout shift, a click budget and an axe
+  failure each fail the check.
 - Fix a flaky journey. Do not make it wait longer, and do not add retries.
+  The [flake hunt](#flake-hunt) counts how often each journey fails.
 
 ## Flake hunt
 
-The retry hides a journey that fails at random. The `journeys` job of the
-nightly [flake hunt](../../.github/workflows/flake-hunt.yml) shows it. It runs
-`bun tools/journeys/run.ts --hunt 20`: each web journey runs 20 times on each
-device, with no retry.
+A journey that fails at random can pass one PR and fail the next. The
+`journeys` job of the nightly [flake hunt](../../.github/workflows/flake-hunt.yml)
+shows it. It runs `bun tools/journeys/run.ts --hunt 20`: each web journey runs
+20 times on each device, with no retry.
 
 - The step summary has a table with one row for each journey and one column for
   each device. A cell such as `2 of 20` counts the first runs that failed.
@@ -75,7 +73,8 @@ device, with no retry.
   artifact for 14 days.
 - When the hunt names a journey, file one issue for it with the cause. File an
   issue that gives more journeys the clock only when the cause is timing.
-- The blocking `journeys` check keeps its one retry.
+- The blocking `journeys` check has no retry either, so a failed run there
+  fails the PR.
 - Run it locally with a smaller count: `mise exec -- bun run journey --hunt 3`.
 
 ## Devices
@@ -124,8 +123,8 @@ The [core journey catalog](./journeys/core.md#budgets) names them.
   violation, `minor` included. `outcome()` runs axe after each outcome holds,
   and the test runs it once more on the last page.
 
-A failure of one of these budgets on any try fails the run. The retry does not
-cover it. The measures file names the kind of each failure.
+A failure of one of these budgets fails the run. The measures file names the
+kind of each failure.
 
 The runner does not check `timeToValue` yet. Each outcome records its time
 from the start of the test, so a later tool can check it.
@@ -140,8 +139,8 @@ Each journey writes one JSON file, which the council review reads:
 - `test-results/journeys/measures/<id>.json` for a web journey
 - `test-results/journeys/measures/<id>.<ios|android>.json` for a native journey
 
-The file has a run for each device. Each run has its result, `passed`,
-`failed` or `flaky`, and each try. A web try has these measures:
+The file has a run for each device. Each run has its result, `passed` or
+`failed`, and its try. A web try has these measures:
 
 | Field                   | What it holds                                                               |
 | ----------------------- | --------------------------------------------------------------------------- |
@@ -157,9 +156,9 @@ The file has a run for each device. Each run has its result, `passed`,
 | `durationMs`, `budgets` | The time of the try, and the budgets that it used                           |
 
 The `failure` kind is `layout-shift`, `click-budget` or `axe` for a measured
-budget. It is `timeout`, `assertion` or `crash` for a failure that the retry
-covers. A device run that failed a measured budget also has `budgetFailure`,
-with the try that failed it.
+budget. It is `timeout`, `assertion` or `crash` for any other failure. A device
+run that failed a measured budget also has `budgetFailure`, with its kind and
+its message.
 
 The measures read the top document only. A click or a layout shift inside an
 iframe, such as a payment or captcha frame, is not counted. A native try has only its result and its time. CI keeps the files as the

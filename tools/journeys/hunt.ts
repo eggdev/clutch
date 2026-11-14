@@ -138,7 +138,7 @@ export function huntSummary(
   const lines = [
     '## Journey first-run failures',
     '',
-    `Each web journey ran ${repeat} times on each device, with no retry. A cell counts the runs that failed out of the runs that ran. The blocking \`journeys\` check keeps its one retry.`,
+    `Each web journey ran ${repeat} times on each device, with no retry. A cell counts the runs that failed out of the runs that ran.`,
     '',
     `| Journey | ${devices.join(' | ')} |`,
     `| --- | ${devices.map(() => '---').join(' | ')} |`,
@@ -208,7 +208,7 @@ export async function hunt(
   rmSync(report, { force: true });
   await run(
     { JOURNEY_REPORT: report, JOURNEY_INBOX: JSON.stringify(inboxCommandOf(root) ?? []) },
-    ['--retries', '0', '--repeat-each', String(repeat)],
+    ['--repeat-each', String(repeat)],
     webDevices.length * repeat,
   );
   if (!existsSync(report)) {

@@ -40,10 +40,11 @@ const use = (device: Device) => ({
  * The Playwright config for web journeys. Run a journey through
  * `mise exec -- bun run journey <id>`, which sets the base URL, the time
  * budget and the quality budgets. Each journey runs on each device in
- * `webDevices`, with one worker. A failed journey runs once more: the runner
- * files a pass on the retry as a flake. The nightly flake hunt passes
- * `--retries 0` and `--repeat-each` on the command line, and names a JSON
- * report in `JOURNEY_REPORT`. See docs/contributing/end-to-end-testing.md#devices.
+ * `webDevices`, with one worker. A journey runs once on each device, with no
+ * retry, so a failed run fails the check. Fix a journey that fails at random.
+ * The nightly flake hunt counts its failed runs: it passes
+ * `--repeat-each` on the command line, and names a JSON report in
+ * `JOURNEY_REPORT`. See docs/contributing/end-to-end-testing.md#devices.
  */
 export default defineConfig({
   testDir: path.resolve(import.meta.dirname, '../../features'),
@@ -51,7 +52,7 @@ export default defineConfig({
   outputDir: path.resolve(import.meta.dirname, '../../test-results/journeys'),
   fullyParallel: false,
   workers: 1,
-  retries: 1,
+  retries: 0,
   forbidOnly: true,
   // `snap` in @repo/journeys/testing/visual compares with these baselines in
   // CI. A missing baseline fails, so `visual pull` adds it from the CI shots.

@@ -10,15 +10,7 @@ import { fieldOf, headerOf, isDataJourney, journeys } from '@tools/journeys/jour
 import type { Journey } from '@tools/journeys/journeys';
 import { toMaestro } from '@tools/journeys/maestro';
 import type { FlowOptions, MaestroFlow } from '@tools/journeys/maestro';
-import {
-  budgetsOf,
-  deviceRuns,
-  failedRuns,
-  frictionFlake,
-  reportFlakes,
-  writeMeasures,
-} from '@tools/journeys/measures';
-import type { Attempt, FileFlake } from '@tools/journeys/measures';
+import { budgetsOf, deviceRuns, failedRuns, writeMeasures } from '@tools/journeys/measures';
 import { appIdOfApp, expoFingerprint, recordName } from '@tools/native/build';
 import type { Fingerprint, FingerprintTool } from '@tools/native/build';
 import { DeviceHostError, deviceHost, lockFile, withDevice } from '@tools/native/device-host';
@@ -259,10 +251,9 @@ async function readFlows(
  * Runs each native journey with Maestro on the booted device of the device
  * host: `mise exec -- bun run journey --native <ios|android>`. CI runs it on an
  * iPhone 16 simulator with `DEVICE_HOST=local`, and on a Pixel 7 emulator with
- * `DEVICE_HOST=ci` once a project has an Android app. A failed
- * journey runs once more. A pass on the retry passes, and files a `flake`
- * friction entry. Each journey writes `<id>.<platform>.json` to the measures
- * folder. See docs/contributing/end-to-end-testing.md#native-journeys.
+ * `DEVICE_HOST=ci` once a project has an Android app. A journey runs once,
+ * with no retry, so a failed run fails. Each journey writes
+ * `<id>.<platform>.json` to the measures folder. See docs/contributing/end-to-end-testing.md#native-journeys.
  */
 
 export type NativeOptions = {
@@ -270,7 +261,6 @@ export type NativeOptions = {
   /** The fingerprint tool of a native app. A test gives a fake. */
   tool?: (appRoot: string) => Promise<FingerprintTool>;
   lock?: string;
-  fileFlake?: FileFlake;
   log?: (line: string) => void;
 };
 
@@ -306,29 +296,22 @@ export async function nativeMain(
       async (device) => {
         let failed = flows.length - ready.length;
         for (const { journey, prepared } of ready) {
-          const attempts: Array<Attempt> = [];
-          for (let retry = 0; retry < 2; retry += 1) {
-            const start = Date.now();
-            const result = await host.runFlow(device, prepared.file);
-            log(result.output);
-            // The flow is linear, so a click budget that its outcomes go over fails each try that passes the flow.
-            const failure = result.exitCode === 0 ? prepared.failure : undefined;
-            const status = result.exitCode === 0 && failure === undefined ? 'passed' : 'failed';
-            attempts.push({
+          const start = Date.now();
+          const result = await host.runFlow(device, prepared.file);
+          log(result.output);
+          // The flow is linear, so a click budget that its outcomes go over fails a run that passes the flow.
+          const failure = result.exitCode === 0 ? prepared.failure : undefined;
+          const runs = deviceRuns(platform, [
+            {
               device: device.name,
-              retry,
-              status,
+              retry: 0,
+              status: result.exitCode === 0 && failure === undefined ? 'passed' : 'failed',
               durationMs: Date.now() - start,
               outcomes: prepared.outcomes.map(({ name, clicks }) => ({ name, clicks })),
               failure: failure ?? null,
-            });
-            if (status === 'passed') {
-              break;
-            }
-          }
-          const runs = deviceRuns(platform, attempts);
+            },
+          ]);
           const where = writeMeasures(root, journey, runs);
-          await reportFlakes(journey, runs, where, options.fileFlake ?? frictionFlake(root), log);
           const lines = failedRuns(journey, runs, where);
           for (const line of lines) {
             log(line);

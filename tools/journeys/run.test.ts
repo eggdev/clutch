@@ -66,7 +66,7 @@ test('production with no core journey fails, since it has no proof', async () =>
     { 'package.json': JSON.stringify({ name: 'shop' }), 'apps/web/package.json': app },
     async (root) => {
       const { sink, lines } = capture({});
-      expect(await main(root, '--production', sink, undefined, 'https://x.test')).toBe(1);
+      expect(await main(root, '--production', sink, 'https://x.test')).toBe(1);
       expect(lines.join('\n')).toContain('No core journey exists');
     },
   );
@@ -80,7 +80,7 @@ test('--hunt with no whole number of runs fails, and names the form', async () =
     },
     async (root) => {
       const { sink, lines } = capture({});
-      expect(await main(root, '--hunt', sink, undefined, undefined, Number.NaN)).toBe(1);
+      expect(await main(root, '--hunt', sink, undefined, Number.NaN)).toBe(1);
       expect(lines.join('\n')).toContain('`--hunt 20`');
     },
   );
@@ -138,6 +138,50 @@ test('several web apps and no journeys.webApp fail before any server starts', as
       expect(lines).toEqual([
         'Several apps under apps/ have a web entry: apps/admin, apps/web. Name the app that the web journeys drive in clutch.yaml with `journeys: { webApp: apps/<name> }`.',
       ]);
+    },
+  );
+});
+
+/** The repository that holds this test, for the real Playwright binary and the real journeys config. */
+const repo = path.resolve(import.meta.dirname, '../..');
+
+test('a journey that fails its first run fails the run on each device, with no retry', async () => {
+  // The real journeys config, with only its folders and its reporter moved to a scratch folder.
+  const config = [
+    "import path from 'node:path';",
+    `import config from '${repo}/tools/journeys/playwright.config.ts';`,
+    'const here = import.meta.dirname;',
+    "export default { ...config, testDir: here, testMatch: ['*.pw.ts'], outputDir: path.join(here, 'out'),",
+    "  reporter: [['json', { outputFile: path.join(here, 'report.json') }]] };",
+  ].join('\n');
+  // It fails on its first run, and passes on any later run.
+  const journeyFile = [
+    `import { expect, test } from '${repo}/node_modules/@playwright/test/index.mjs';`,
+    "test('passes only on a retry', ({}, info) => {",
+    '  expect(info.retry).toBeGreaterThan(0);',
+    '});',
+  ].join('\n');
+  await inRepo(
+    {
+      'package.json': JSON.stringify({ type: 'module' }),
+      'config.ts': config,
+      'once.pw.ts': journeyFile,
+    },
+    async (root) => {
+      const run = Bun.spawn(
+        [path.join(repo, 'node_modules/.bin/playwright'), 'test', '--config', 'config.ts'],
+        { cwd: root, stdout: 'ignore', stderr: 'ignore' },
+      );
+      expect(await run.exited).toBe(1);
+      const report = (await Bun.file(path.join(root, 'report.json')).json()) as {
+        suites: Array<{ specs: Array<{ tests: Array<{ results: Array<{ status: string }> }> }> }>;
+      };
+      const runs = report.suites.flatMap((suite) =>
+        suite.specs.flatMap((spec) =>
+          spec.tests.map((item) => item.results.map((result) => result.status)),
+        ),
+      );
+      expect(runs).toEqual([['failed'], ['failed'], ['failed']]);
     },
   );
 });
