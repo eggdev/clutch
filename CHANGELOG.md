@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.5 (2026-11-14)
+
+### Fixes and maintenance
+
+- fix(merge): compare each data journey step but a tap (CL-490)
+
 ## 1.13.4 (2026-11-14)
 
 ### Fixes and maintenance
