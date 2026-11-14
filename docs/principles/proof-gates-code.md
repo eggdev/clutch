@@ -79,7 +79,13 @@ The judge reads its rules from the default branch. A PR that changes the journey
 kit holds for the owner, so a PR cannot weaken what proves it. When a PR changes a journey, its own copy must pass,
 and a check compares the named outcomes of the two copies. A renamed button
 or a moved field passes that check. A removed or changed outcome, or a looser
-budget, entry or platform, is a weaker journey, and it goes to the owner. A
+budget, entry or platform, is a weaker journey, and it goes to the owner.
+For a data journey, a `*.journey.ts` file, the check compares the steps that
+prove something: `see`, `gone`, `outcome`, `shot`, `accessible`, `settled`,
+`holds` and `serverHolds`. A lost step, a step that expects something else, or
+a step that moves into `webOnly` is a weaker journey. A new label in a `tap`,
+`fill` or `submit` step passes. A journey that moves to another form, such as
+from `*.pw.ts` to `*.journey.ts`, goes to the owner too. A
 PR that removes a screen or a route goes to the owner too. So a PR cannot weaken the proof or the gate
 that judges it. A path stays held for the owner until its journeys exist. The required
 `journeys` check proves them on each PR.
