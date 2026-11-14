@@ -4,7 +4,8 @@ import { notes } from '@repo/notes/repo/schema';
 import type { NoteRow } from '@repo/notes/repo/schema';
 import { upsertChange } from '@repo/sync/contract/change';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
-import { and, desc, eq } from 'drizzle-orm';
+import { storedRow } from '@repo/sync/service/stored-row';
+import { and, desc, eq, getTableName } from 'drizzle-orm';
 import { Effect } from 'effect';
 
 /** The public record of a row. The table shape stays inside this package. */
@@ -56,14 +57,15 @@ export function insertNote(db: DrizzleDatabase, row: NoteRow) {
     .insert(notes)
     .values(row)
     .returning()
-    .pipe(Effect.map((rows) => rows[0] ?? row));
+    .pipe(Effect.flatMap(storedRow(getTableName(notes))));
 }
 
+/** Fails with `RowNotStored` when the note is no longer in the database. */
 export function updateTitle(db: DrizzleDatabase, row: NoteRow, title: string, at: Date) {
   return db
     .update(notes)
     .set({ title, updatedAt: at })
     .where(and(eq(notes.id, row.id), eq(notes.organizationId, row.organizationId)))
     .returning()
-    .pipe(Effect.map((rows) => rows[0] ?? { ...row, title, updatedAt: at }));
+    .pipe(Effect.flatMap(storedRow(getTableName(notes))));
 }

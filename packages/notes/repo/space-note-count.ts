@@ -4,7 +4,8 @@ import { notes, spaceNoteCounts } from '@repo/notes/repo/schema';
 import type { SpaceNoteCountRow } from '@repo/notes/repo/schema';
 import { upsertChange } from '@repo/sync/contract/change';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
-import { and, count, eq } from 'drizzle-orm';
+import { storedRow } from '@repo/sync/service/stored-row';
+import { and, count, eq, getTableName } from 'drizzle-orm';
 import { Effect } from 'effect';
 
 /** The public record of a count row. The ID is the space ID. */
@@ -43,5 +44,5 @@ export function saveCount(db: DrizzleDatabase, row: SpaceNoteCountRow) {
       set: { noteCount: row.noteCount, updatedAt: row.updatedAt },
     })
     .returning()
-    .pipe(Effect.map((rows) => rows[0] ?? row));
+    .pipe(Effect.flatMap(storedRow(getTableName(spaceNoteCounts))));
 }

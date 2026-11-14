@@ -4,7 +4,8 @@ import { memberships } from '@repo/access/repo/schema';
 import type { MembershipRow } from '@repo/access/repo/schema';
 import { deleteChange, upsertChange } from '@repo/sync/contract/change';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
-import { and, eq } from 'drizzle-orm';
+import { storedRow } from '@repo/sync/service/stored-row';
+import { and, eq, getTableName } from 'drizzle-orm';
 import { Effect } from 'effect';
 
 export function toRecord(row: MembershipRow): Membership {
@@ -60,7 +61,7 @@ export function insertMembership(db: DrizzleDatabase, row: MembershipRow) {
     .insert(memberships)
     .values(row)
     .returning()
-    .pipe(Effect.map((rows) => rows[0] ?? row));
+    .pipe(Effect.flatMap(storedRow(getTableName(memberships))));
 }
 
 export function deleteMembership(db: DrizzleDatabase, row: MembershipRow) {
