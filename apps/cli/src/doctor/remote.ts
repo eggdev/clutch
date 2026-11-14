@@ -1,5 +1,6 @@
 import type { RuleResult } from '@/doctor/rules';
 import { git } from '@/git';
+import { compareRulesets } from '@/ruleset/ruleset';
 
 /** Runs `gh` with these arguments. Probes only ever pass `api <path>`, which is a GET. */
 export type Gh = (args: Array<string>) => Promise<{ ok: boolean; out: string; err: string }>;
@@ -29,6 +30,9 @@ export async function originRepo(root: string) {
   const url = await git(root, 'remote', 'get-url', 'origin');
   return /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/u.exec(url.out)?.[1];
 }
+
+/** The ruleset file for the default branch, which sync brings to each project. */
+const mainRulesetFile = '.github/rulesets/main.json';
 
 type Rule = { type: string; parameters?: { required_status_checks?: Array<{ context: string }> } };
 
@@ -113,6 +117,23 @@ export function remoteProber(options: { root: string; repo?: string; gh: Gh }) {
       checks: body.required_status_checks?.contexts ?? [],
     };
   };
+  /**
+   * How GitHub's ruleset compares with the default branch's ruleset file, as
+   * `clutch ruleset` compares it. Nothing when the repository has no such
+   * file. A reason when this session cannot read the ruleset.
+   */
+  const mainRuleset = async () => {
+    const name = await repo();
+    if (!name) {
+      return 'no GitHub origin remote';
+    }
+    try {
+      const states = await compareRulesets(options.root, name, options.gh);
+      return states.find((item) => item.file === mainRulesetFile);
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  };
   const securitySetting = async (key: 'secret_scanning' | 'secret_scanning_push_protection') => {
     const response = await settings();
     if (response.status !== 200) {
@@ -179,16 +200,38 @@ export function remoteProber(options: { root: string; repo?: string; gh: Gh }) {
       const hit = (logins ?? '').split('|').find((login) => seen.has(login));
       return hit ? pass(`${hit} reviewed a recent pull request`) : fail;
     },
+    /**
+     * GitHub requires pull requests and the validate check on the default
+     * branch. When the ruleset file exists and GitHub has a ruleset with its
+     * name, that ruleset must also match the file: each required check, the
+     * code owner's review and only the bypass actors that the file names.
+     */
     protected_main: async () => {
       const rules = await branchRules();
       if (typeof rules === 'string') {
         return unknown(rules);
       }
+      const file = await mainRuleset();
+      if (typeof file === 'string') {
+        return unknown(file);
+      }
+      if (file?.state === 'differs') {
+        return {
+          outcome: 'fail',
+          evidence: [
+            `GitHub ruleset ${file.name} differs from ${file.file}: ${file.differences.join('; ')}. Run: mise exec -- bun run clutch ruleset --apply`,
+          ],
+        };
+      }
       if (
         rules.some((rule) => rule.type === 'pull_request') &&
         requiredChecks(rules).includes('validate')
       ) {
-        return pass('GitHub ruleset: pull requests and the validate check');
+        return pass(
+          file?.state === 'matches'
+            ? `GitHub ruleset ${file.name} matches ${file.file}`
+            : 'GitHub ruleset: pull requests and the validate check',
+        );
       }
       const older = await classic();
       if (typeof older === 'string') {

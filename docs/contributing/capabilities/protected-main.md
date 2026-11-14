@@ -10,6 +10,8 @@ Clutch adds this practice, so it has no rank in the research data. When many age
 
 `clutch doctor` reports this capability as present when the `protected_main` remote probe passes. Doctor checks the probe on GitHub only with `--remote`. Without that flag, it reports the capability as unknown. See the `protected_main` entry in [the registry](./registry.yaml).
 
+The probe needs pull requests and the `validate` check on the default branch. When `.github/rulesets/main.json` exists and GitHub has a ruleset with its name, the probe also compares them, as `clutch ruleset` does. Any difference makes the capability missing. Examples are a missing required check, no code owner review, or an extra bypass actor. The report names each difference and the fix: `mise exec -- bun run clutch ruleset --apply`. When the session cannot read the ruleset, the capability is unknown.
+
 ## Adopt
 
 Keep the ruleset in `.github/rulesets/main.json`, so a change to branch
