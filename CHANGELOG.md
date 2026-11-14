@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.0 (2026-11-14)
+
+### Features
+
+- feat(merge): hold a guardrail change that no issue names (CL-494)
+
 ## 1.13.5 (2026-11-14)
 
 ### Fixes and maintenance
