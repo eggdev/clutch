@@ -1,8 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import { guardrailList } from '@tools/guardrail-files';
-import type { GuardrailList } from '@tools/guardrail-files';
+import { guardrailList } from '@tools/agent-hooks/guard-guardrails';
 
 /**
  * Each file that a check, a lint plugin or a hook reads must be a guardrail
@@ -18,6 +17,8 @@ const toolScript = /\btools\/[\w./-]+\.(?:ts|mjs)\b/gu;
 const hookScript = /\.agents\/hooks\/[\w-]+\.ts\b/gu;
 const toolImport = /\bfrom\s+['"]@tools\/([^'"]+)['"]/gu;
 const literal = /(['"`])([^'"`\s${}*?]+)\1/gu;
+
+type GuardrailList = { patterns: Array<string>; exempt?: Record<string, string> };
 
 const isFile = (root: string, file: string) =>
   existsSync(path.join(root, file)) && statSync(path.join(root, file)).isFile();

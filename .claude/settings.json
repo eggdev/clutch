@@ -3,6 +3,16 @@
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && mise exec -- bun .agents/hooks/guard-guardrails.ts claude",
+            "timeout": 30
+          }
+        ]
+      },
+      {
         "matcher": "Bash|mcp__Claude_Code_iOS_Simulator__.*",
         "hooks": [
           {

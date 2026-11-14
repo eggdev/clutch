@@ -64,12 +64,21 @@ scripts are in `.agents/hooks/`, and their logic is in `tools/agent-hooks/`.
 
 | Hook                | Runs                                            | Does                                                                                                                                                                                                                              |
 | ------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `guard-guardrails`  | Before an edit                                  | Asks a person before an edit to a guardrail file                                                                                                                                                                                  |
 | `guard-dev-servers` | Before a shell command or a simulator tool call | Refuses a command that starts a dev server, a simulator or a native build directly. Hints at the `bun run pr` command that replaces a raw `gh pr checks`, `gh pr merge`, `gh stack merge` or `gh run view --log`, and lets it run |
 | `after-edit`        | After an edit                                   | Lints the edited files, and sends each problem back to the agent                                                                                                                                                                  |
 | `end-of-turn`       | When the agent ends its turn                    | Runs the typecheck, the lint and the repository checks on a changed tree                                                                                                                                                          |
 
-No hook asks a person before an edit to a guardrail file. The merge judge
-holds such a change instead, see [guardrail files](#guardrail-files).
+A guardrail file configures a check, a lint rule, a budget or an agent hook.
+[`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them.
+The guard starts when kickoff deletes `KICKOFF.md`.
+
+- In Claude Code, the guard shows the user a permission prompt.
+- Codex cannot ask from a hook. `guard-guardrails` refuses the edit, and the
+  agent asks the user.
+- A shell command that writes a file does not trigger the guard. Agent review
+  is the control that reports it. A change that weakens a guardrail file gets an
+  advisory `owner` finding, and the session must answer it.
 
 The end-of-turn hook prints nothing when the checks pass. On a failure, the
 agent continues and fixes it. A turn that the hook already continued ends,
@@ -91,22 +100,11 @@ change that loosens one.
 
 - [`tools/guardrail-files.json`](../../tools/guardrail-files.json) lists them.
   Agent review gives a change that makes one weaker an advisory `owner` finding.
-  The [weekly digest](https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/factory-observability.md#weekly-digest) lists each `owner` finding of a merged pull request.
-- The merge judge holds an agent pull request that changes a file of `held` in
-  the list. The check scripts, the lint rules and their config, the budgets,
-  the hooks and the list itself are in `held`.
-- The issue of the branch lifts the hold when its `## Files` section names the
-  file. The judge reads the issue and the list from the default branch, so a
-  pull request cannot allow itself. The owner's approval also lifts the hold.
-- A held agent gets back on track with no person. It takes the change out of
-  the pull request. Or it first merges a change to its issue that names the
-  file, then merges the default branch into its branch.
-- A new file, a test file and a change that only makes the list stronger do
-  not hold. `tools/github/guardrail-hold.ts` holds the rule, see
-  [decision record 0005](./decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
-- A file that common work changes, such as `package.json` or a workflow, is
-  in `patterns` but not in `held`. On 2026-11-14, `held` would have held 20 of
-  the last 99 agent pull requests, and the full list 73.
+  The [weekly digest](https://github.com/eggdev/clutch/blob/main/docs/contributing/capabilities/factory-observability.md#weekly-digest) lists each `owner` finding of a merged pull request. A change that makes one stronger
+  merges like any other. See
+  [decision record 0002](https://github.com/eggdev/clutch/blob/main/docs/contributing/decisions/0002-merge-most-prs-with-no-human.md).
+- The list itself is not in the one-way-door tier. A change to it merges as
+  any other change, see [decision record 0005](./decisions/0005-the-owner-signs-off-what-cannot-be-paid-back.md).
 - In a session, a change to a guardrail file comes from the owner, or the
   owner allows the session to make it. See
   [decision record 0006](./decisions/0006-no-cap-on-the-blocking-checks.md).
@@ -130,7 +128,6 @@ Each escape hatch lives in a guardrail file, so the review sees it:
 | A migration line that loses no data: `DROP CONSTRAINT`, `DEFAULT`, `NOT NULL`, `INDEX`           | `.clutch/risk.yaml`, the migration `lines` rule                                                |
 | A file that the PR size limit does not count: the tracker, lockfiles, screenshots                | `tools/check-scope.ts`, `alwaysExcluded`                                                       |
 | A knip ignore or entry                                                                           | `knip.jsonc`                                                                                   |
-| A change to a held guardrail file                                                                | `## Files` of the branch's issue on the default branch; `tools/github/guardrail-hold.ts`       |
 | An import exception                                                                              | `primitives.yaml`, `exceptions`                                                                |
 | A transaction-safe service                                                                       | `primitives.yaml`, `transactionSafe`                                                           |
 | A dependency override                                                                            | `tools/dependency-overrides.yaml`                                                              |
