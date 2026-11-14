@@ -5,6 +5,11 @@
       "pattern": "\\bas (unknown as|any\\b)",
       "files": "{apps,packages,features,tools}/**/*.{ts,tsx,mts}",
       "counts": {}
+    },
+    "no-made-up-rows": {
+      "pattern": "\\?\\?\\s*(\\{\\s*\\.\\.\\.\\s*)?row\\b",
+      "files": "packages/*/repo/**/*.ts",
+      "counts": {}
     }
   }
 }

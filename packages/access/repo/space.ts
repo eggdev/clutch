@@ -4,7 +4,8 @@ import { spaces } from '@repo/access/repo/schema';
 import type { SpaceRow } from '@repo/access/repo/schema';
 import { upsertChange } from '@repo/sync/contract/change';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
-import { and, eq } from 'drizzle-orm';
+import { storedRow } from '@repo/sync/service/stored-row';
+import { and, eq, getTableName } from 'drizzle-orm';
 import { Effect } from 'effect';
 
 /** The public record of a row. The table shape stays inside this package. */
@@ -46,5 +47,5 @@ export function insertSpace(db: DrizzleDatabase, row: SpaceRow) {
     .insert(spaces)
     .values(row)
     .returning()
-    .pipe(Effect.map((rows) => rows[0] ?? row));
+    .pipe(Effect.flatMap(storedRow(getTableName(spaces))));
 }

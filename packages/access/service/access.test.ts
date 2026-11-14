@@ -41,6 +41,23 @@ test('every actor loads its organization and user groups at once, and each of it
   expect(result.left.lazy).toEqual(['space:general']);
 });
 
+test('a repeated create or join returns the stored rows, and changes nothing', async () => {
+  const result = await Effect.runPromise(
+    Effect.gen(function* () {
+      const db = yield* Database;
+      const create = (name: string) =>
+        createSpaceServer.run({ id: 'design', name, at }, { db, actor: owner });
+      const join = () => joinSpaceServer.run({ spaceId: 'design', at }, { db, actor: other });
+      const created = [yield* create('Design'), yield* create('Other')];
+      const joined = [yield* join(), yield* join()];
+      return { created, joined };
+    }).pipe(Effect.provide(AccessTest())),
+  );
+  expect(result.created[1]).toEqual([result.created[0]?.[0]]);
+  expect(result.created[1]?.[0]?.data).toMatchObject({ name: 'Design' });
+  expect(result.joined[1]).toEqual(result.joined[0]);
+});
+
 test('no one can leave the general space, and only a member can leave a space', async () => {
   const reasons = await Effect.runPromise(
     Effect.gen(function* () {
