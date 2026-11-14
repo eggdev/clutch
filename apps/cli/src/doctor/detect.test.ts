@@ -55,6 +55,22 @@ test('present, partial, missing and unknown follow the status rules, and git run
   expect(lists).toBe(1);
 });
 
+const failingProbe = () =>
+  Promise.resolve({ outcome: 'fail' as const, evidence: ['the ruleset lacks journeys'] });
+
+test('a missing capability keeps the reason that its failed rule gives', async () => {
+  await using repo = await gitRepo({ 'AGENTS.md': '#\n' });
+  const [found] = await detect(repo.root, [entry('protected', [{ remote: 'protected_main' }])], {
+    remote: true,
+    probe: failingProbe,
+  });
+  expect(found).toEqual({
+    id: 'protected',
+    status: 'missing',
+    evidence: ['the ruleset lacks journeys'],
+  });
+});
+
 test('detection on the template tree gives one result for each capability', async () => {
   const root = path.resolve(import.meta.dir, '../../../..');
   const registry = await loadRegistry(root);

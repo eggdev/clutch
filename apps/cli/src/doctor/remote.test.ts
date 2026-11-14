@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 
 import { remoteProber } from '@/doctor/remote';
 import type { Gh } from '@/doctor/remote';
+import { gitRepo } from '@/testing/git-repo';
 
 /** A fake `gh`. It answers `api <route>` from `routes`, records each call, and fails on anything else. */
 function fakeGh(routes: Record<string, unknown | number>) {
@@ -37,13 +38,14 @@ const ruleset = [
   { type: 'merge_queue' },
 ];
 
-test('a ruleset with pull requests and the validate check protects main', async () => {
+test('without a ruleset file, pull requests and the validate check protect main', async () => {
+  await using bare = await gitRepo({}, { git: false });
   const { gh, calls } = fakeGh({
     [`repos/${repo}`]: settings(),
     [`repos/${repo}/rules/branches/main`]: ruleset,
     [`repos/${repo}/branches/main/protection`]: 404,
   });
-  const probe = remoteProber({ root: '.', repo, gh });
+  const probe = remoteProber({ root: bare.root, repo, gh });
   expect(await outcomeOf(probe, 'protected_main')).toBe('pass');
   expect(await outcomeOf(probe, 'merge_queue')).toBe('pass');
   expect(await outcomeOf(probe, 'required_check:validate')).toBe('pass');
@@ -52,6 +54,7 @@ test('a ruleset with pull requests and the validate check protects main', async 
 });
 
 test('classic branch protection counts, and a 404 means main is not protected', async () => {
+  await using bare = await gitRepo({}, { git: false });
   const protectedRepo = fakeGh({
     [`repos/${repo}`]: settings(),
     [`repos/${repo}/rules/branches/main`]: [],
@@ -61,7 +64,10 @@ test('classic branch protection counts, and a 404 means main is not protected', 
     },
   });
   expect(
-    await outcomeOf(remoteProber({ root: '.', repo, gh: protectedRepo.gh }), 'protected_main'),
+    await outcomeOf(
+      remoteProber({ root: bare.root, repo, gh: protectedRepo.gh }),
+      'protected_main',
+    ),
   ).toBe('pass');
 
   const open = fakeGh({
@@ -69,9 +75,109 @@ test('classic branch protection counts, and a 404 means main is not protected', 
     [`repos/${repo}/rules/branches/main`]: [],
     [`repos/${repo}/branches/main/protection`]: 404,
   });
-  expect(await outcomeOf(remoteProber({ root: '.', repo, gh: open.gh }), 'protected_main')).toBe(
-    'fail',
+  expect(
+    await outcomeOf(remoteProber({ root: bare.root, repo, gh: open.gh }), 'protected_main'),
+  ).toBe('fail');
+});
+
+type BypassActor = { actor_type: string; actor_id: string | number; bypass_mode: string };
+const appActor: BypassActor = {
+  actor_type: 'Integration',
+  actor_id: 'vars.CLUTCH_APP_ID',
+  bypass_mode: 'always',
+};
+
+/** A ruleset file like the template's: a bypass actor from a variable, a code owner, two checks. */
+const mainFile = {
+  name: 'main',
+  bypass_actors: [appActor],
+  rules: [
+    { type: 'pull_request', parameters: { require_code_owner_review: true } },
+    {
+      type: 'required_status_checks',
+      parameters: { required_status_checks: [{ context: 'validate' }, { context: 'journeys' }] },
+    },
+  ],
+};
+
+/** GitHub's side of `mainFile`, with the app id 42, after `change` edits it. */
+function liveMain(change: (live: typeof mainFile) => void = () => {}) {
+  const live = structuredClone(mainFile);
+  live.bypass_actors[0].actor_id = 42;
+  change(live);
+  return {
+    [`repos/${repo}`]: settings(),
+    [`repos/${repo}/rules/branches/main`]: live.rules,
+    [`repos/${repo}/branches/main/protection`]: 404,
+    [`repos/${repo}/actions/variables/CLUTCH_APP_ID`]: { value: '42' },
+    [`repos/${repo}/rulesets?per_page=100`]: [{ id: 7, name: 'main' }],
+    [`repos/${repo}/rulesets/7`]: { id: 7, ...live },
+  };
+}
+
+async function protectedMain(routes: Record<string, unknown>) {
+  await using project = await gitRepo(
+    { '.github/rulesets/main.json': JSON.stringify(mainFile) },
+    { git: false },
   );
+  return await remoteProber({ root: project.root, repo, gh: fakeGh(routes).gh })('protected_main');
+}
+
+test('a ruleset that matches its file protects main', async () => {
+  expect(await protectedMain(liveMain())).toEqual({
+    outcome: 'pass',
+    evidence: ['GitHub ruleset main matches .github/rulesets/main.json'],
+  });
+});
+
+test('a ruleset without a check of the file fails, and names the check and the fix', async () => {
+  const result = await protectedMain(
+    liveMain((live) => {
+      live.rules[1].parameters = { required_status_checks: [{ context: 'validate' }] };
+    }),
+  );
+  expect(result.outcome).toBe('fail');
+  expect(result.evidence).toHaveLength(1);
+  expect(result.evidence[0]).toContain('missing journeys');
+  expect(result.evidence[0]).toContain('Run: mise exec -- bun run clutch ruleset --apply');
+});
+
+test('a ruleset with an extra bypass actor or no code owner review fails', async () => {
+  const extraActor = await protectedMain(
+    liveMain((live) => {
+      live.bypass_actors.push({ actor_type: 'RepositoryRole', actor_id: 5, bypass_mode: 'always' });
+    }),
+  );
+  expect(extraActor.outcome).toBe('fail');
+  expect(extraActor.evidence[0]).toContain('bypass_actors: extra RepositoryRole:5');
+  const noOwner = await protectedMain(
+    liveMain((live) => {
+      live.rules[0].parameters = { require_code_owner_review: false };
+    }),
+  );
+  expect(noOwner.outcome).toBe('fail');
+  expect(noOwner.evidence[0]).toContain('require_code_owner_review: false, want true');
+});
+
+test('an unreadable ruleset is unknown, and a ruleset GitHub lacks keeps the older checks', async () => {
+  const hidden = await protectedMain({
+    ...liveMain(),
+    [`repos/${repo}/rulesets?per_page=100`]: 403,
+  });
+  expect(hidden.outcome).toBe('unknown');
+  const classic = await protectedMain({
+    ...liveMain(),
+    [`repos/${repo}/rules/branches/main`]: [],
+    [`repos/${repo}/rulesets?per_page=100`]: [],
+    [`repos/${repo}/branches/main/protection`]: {
+      required_pull_request_reviews: {},
+      required_status_checks: { contexts: ['validate'] },
+    },
+  });
+  expect(classic).toEqual({
+    outcome: 'pass',
+    evidence: ['GitHub branch protection: pull requests and the validate check'],
+  });
 });
 
 test('security settings pass when enabled, fail when disabled, and are unknown when hidden', async () => {
@@ -113,13 +219,16 @@ test('a 403, a failed gh and an unknown probe are unknown, never missing', async
 });
 
 test('every probe only reads: gh never gets a method, a field or an input', async () => {
+  await using project = await gitRepo(
+    { '.github/rulesets/main.json': JSON.stringify(mainFile) },
+    { git: false },
+  );
   const { gh, calls } = fakeGh({
+    ...liveMain(),
     [`repos/${repo}`]: settings({ security_and_analysis: {}, allow_auto_merge: false }),
-    [`repos/${repo}/rules/branches/main`]: [],
-    [`repos/${repo}/branches/main/protection`]: 404,
     [`repos/${repo}/code-scanning/default-setup`]: { state: 'not-configured' },
   });
-  const probe = remoteProber({ root: '.', repo, gh });
+  const probe = remoteProber({ root: project.root, repo, gh });
   for (const name of [
     'protected_main',
     'secret_scanning',
@@ -135,6 +244,7 @@ test('every probe only reads: gh never gets a method, a field or an input', asyn
     .flat()
     .filter((arg) => /^(-X|--method|-f|-F|--field|--raw-field|--input)$/u.test(arg));
   expect(writes).toEqual([]);
+  expect(calls.map((args) => args[1])).toContain(`repos/${repo}/rulesets/7`);
   expect(calls.every((args) => args.length === 2 && args[0] === 'api')).toBe(true);
 });
 

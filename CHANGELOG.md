@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.13.4 (2026-11-14)
+
+### Fixes and maintenance
+
+- fix(doctor): compare the live ruleset with the ruleset file (CL-493)
+
+## 1.13.3 (2026-11-14)
+
+### Fixes and maintenance
+
+- fix(merge): hold a PR that weakens a data-form journey (CL-490)
+
 ## 1.13.2 (2026-11-14)
 
 ### Fixes and maintenance
