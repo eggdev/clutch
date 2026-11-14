@@ -20,7 +20,8 @@ import type { Run } from '@tools/github/stack';
  * `pr merge` runs the same rules from the session that merged, while the
  * Auto-revert workflow stays as the net for a session that stopped. Both may
  * act on the same failure, so a rerun that already started and a revert that
- * already started are not errors. See
+ * already started are not errors. `tools/deploy.ts prove` starts the same
+ * revert when production fails its core journeys twice after a deploy. See
  * docs/contributing/operations/rollback.md#auto-revert.
  */
 const usage =
@@ -58,27 +59,56 @@ export async function autoMerged(run: Run, repo: string, pr: string) {
   return out.length > 0;
 }
 
-/**
- * Whether `pr` is an agent's PR: its branch is `clutch/cl-NNN-<slug>`, which
- * only an agent's task makes. The release bot opens it, or the user's token
- * when the bot is not set up. Its session may have merged it with
- * `pr merge --owner`, on the owner's word, so it carries no enabled marker.
- */
-async function agentPr(run: Run, repo: string, pr: string) {
+export type Pull = Pick<Pr, 'headRefName' | 'author'> & { title?: string };
+
+/** The head branch, the author and the title of `pr`. */
+export async function pullOf(run: Run, repo: string, pr: string) {
   const out = await must(run, [
     'gh',
     'api',
     `repos/${repo}/pulls/${pr}`,
     '--jq',
-    '{headRefName: .head.ref, author: {login: .user.login, is_bot: (.user.type == "Bot")}}',
+    '{headRefName: .head.ref, title: .title, author: {login: .user.login, is_bot: (.user.type == "Bot")}}',
   ]);
-  // The judge's own rule, so the two cannot disagree on who is an agent.
-  return isAgentPr(JSON.parse(out) as Pick<Pr, 'headRefName' | 'author'>);
+  return JSON.parse(out) as Pull;
 }
 
-/** Whether the net may revert `pr`: auto-merge merged it, or it is an agent's PR. */
-async function revertable(run: Run, repo: string, pr: string) {
-  return (await autoMerged(run, repo, pr)) || agentPr(run, repo, pr);
+/**
+ * Whether the net may revert `pr`: auto-merge merged it, or it is an agent's
+ * PR. An agent's branch is `clutch/cl-NNN-<slug>`, which only an agent's task
+ * makes. Its session may have merged it with `pr merge --owner`, on the
+ * owner's word, so it carries no enabled marker. The judge's own rule decides
+ * who is an agent, so the two cannot disagree.
+ */
+export async function revertable(run: Run, repo: string, pr: string, pull?: Pull) {
+  return (await autoMerged(run, repo, pr)) || isAgentPr(pull ?? (await pullOf(run, repo, pr)));
+}
+
+/**
+ * The merged PR whose merge commit is `sha`, or the merge before it when `sha`
+ * is the release commit, which CI and the deploy also run on. `pr` is empty
+ * when the commit is not the merge of a PR.
+ */
+export async function mergedPr(run: Run, repo: string, sha: string) {
+  const commit = JSON.parse(
+    await must(run, [
+      'gh',
+      'api',
+      `repos/${repo}/commits/${sha}`,
+      '--jq',
+      '{message: .commit.message, parents: [.parents[].sha]}',
+    ]),
+  ) as { message: string; parents: Array<string> };
+  const merge =
+    releaseCommit.test(commit.message) && commit.parents.length === 1 ? commit.parents[0] : sha;
+  const pr = await must(run, [
+    'gh',
+    'api',
+    `repos/${repo}/commits/${merge}/pulls`,
+    '--jq',
+    `[.[] | select(.merged_at != null and .merge_commit_sha == "${merge}")][0].number // empty`,
+  ]);
+  return { merge, pr };
 }
 
 type CiRun = { headSha: string; conclusion: string; status: string };
@@ -169,7 +199,7 @@ async function rerunOnce(
 }
 
 /** Whether `pr` already carries the `revert` label, so its revert already started. */
-async function revertStarted(run: Run, repo: string, pr: string) {
+export async function revertStarted(run: Run, repo: string, pr: string) {
   const labels = await must(run, [
     'gh',
     'api',
@@ -184,18 +214,20 @@ async function revertStarted(run: Run, repo: string, pr: string) {
  * Labels `pr` `revert` and starts the Revert workflow, which opens the revert
  * PR. A revert that already started is left alone.
  */
-async function startRevert(
+export async function startRevert(
   run: Run,
   options: {
     repo: string;
     pr: string;
     branch: string;
-    sha: string;
-    runId: string;
+    /** The comment on the PR: why it is reverted. */
+    comment: string;
+    /** The log line once the revert started. */
+    started: string;
     log: (text: string) => void;
   },
 ) {
-  const { repo, pr, branch, sha, runId, log } = options;
+  const { repo, pr, branch, comment, started, log } = options;
   if (await revertStarted(run, repo, pr)) {
     log(`The revert of #${pr} already started. Drive its revert PR, revert/${pr}, to the merge.`);
     return;
@@ -240,17 +272,8 @@ async function startRevert(
     '-f',
     `pr=${pr}`,
   ]);
-  await must(run, [
-    'gh',
-    'pr',
-    'comment',
-    pr,
-    '--repo',
-    repo,
-    '--body',
-    `CI failed on \`${branch}\` at ${sha.slice(0, 7)} twice after auto-merge merged this PR, and it was green before. The Revert workflow opens the revert PR. Run: https://github.com/${repo}/actions/runs/${runId}`,
-  ]);
-  log(`Auto-merge merged #${pr}, and ${branch} went red after it. Started its revert.`);
+  await must(run, ['gh', 'pr', 'comment', pr, '--repo', repo, '--body', comment]);
+  log(started);
 }
 
 /** Runs the check. Returns the exit code. */
@@ -330,25 +353,7 @@ export async function runAutoRevert(
     await rerunOnce(run, { repo, runId, at: `${branch} at ${sha.slice(0, 7)}`, log, reran });
     return 0;
   }
-  const commit = JSON.parse(
-    await must(run, [
-      'gh',
-      'api',
-      `repos/${repo}/commits/${sha}`,
-      '--jq',
-      '{message: .commit.message, parents: [.parents[].sha]}',
-    ]),
-  ) as { message: string; parents: Array<string> };
-  // CI also runs on the release commit, whose parent is the merge.
-  const merge =
-    releaseCommit.test(commit.message) && commit.parents.length === 1 ? commit.parents[0] : sha;
-  const pr = await must(run, [
-    'gh',
-    'api',
-    `repos/${repo}/commits/${merge}/pulls`,
-    '--jq',
-    `[.[] | select(.merged_at != null and .merge_commit_sha == "${merge}")][0].number // empty`,
-  ]);
+  const { merge, pr } = await mergedPr(run, repo, sha);
   if (!pr) {
     log(`${merge.slice(0, 7)} is not the merge of a pull request. No revert.`);
     return 0;
@@ -359,7 +364,14 @@ export async function runAutoRevert(
     );
     return 0;
   }
-  await startRevert(run, { repo, pr, branch, sha, runId, log });
+  await startRevert(run, {
+    repo,
+    pr,
+    branch,
+    comment: `CI failed on \`${branch}\` at ${sha.slice(0, 7)} twice after auto-merge merged this PR, and it was green before. The Revert workflow opens the revert PR. Run: https://github.com/${repo}/actions/runs/${runId}`,
+    started: `Auto-merge merged #${pr}, and ${branch} went red after it. Started its revert.`,
+    log,
+  });
   return 0;
 }
 

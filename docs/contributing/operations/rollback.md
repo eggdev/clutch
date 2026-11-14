@@ -124,6 +124,33 @@ auto-revert only, so a failed health check reverts the PR that broke it. Neither
 auto-merge nor the red-main metric reads the list. See
 [clutch.yaml](../../../apps/cli/README.md#clutchyaml).
 
+#### After a failed production proof
+
+The [Deploy workflow](../../../.github/workflows/deploy.yml) runs the core
+journeys on production after each deploy. `tools/deploy.ts prove` runs them once
+more on a failure, so one flaky run reverts nothing. After a second failure, the
+deploy is red, and the job applies the same rules to the deployed commit:
+
+1. It finds the merged PR. A release commit blames the merge before it.
+2. When auto-merge merged that PR, or it is an agent's PR, the job starts its
+   revert as above. It asks no one.
+3. A revert that already started is left alone. It asks no one again.
+
+The job asks the owner one `needs-owner` question in each of these cases. The
+question says why no revert started.
+
+- A person merged the PR.
+- The PR is itself a revert: a `revert/<number>` branch, or a title that starts
+  with "revert". A second revert would loop.
+- The commit is not the merge of a PR.
+- The last finished deploy before it failed. Production was already broken, so
+  no single PR broke it.
+- The revert could not start, such as when a GitHub call failed.
+
+The revert PR merges as the revert section above says. Its merge deploys like
+any other, and the core journeys run on production again. When that proof fails
+too, the job asks the owner, because the PR is a revert.
+
 The revert PR merges as the revert section above says. When `pr merge` reports
 a red `main` after a merge, the session drives the revert PR to the merge before
 it reports the task. After a merge that the owner made, it tells the owner and
