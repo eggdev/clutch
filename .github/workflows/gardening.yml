@@ -67,8 +67,11 @@ jobs:
       # The pass reads the friction log through clutch, which needs mise and the dependencies.
       - if: steps.open.outputs.run == 'true'
         uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      # Without scripts, so the repository's Git hooks stay off. The push below
+      # would run the journeys in the pre-push hook, and this job has no browser.
+      # CI runs the same checks on the pull request.
       - if: steps.open.outputs.run == 'true'
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
       - name: Do the gardening pass
         id: garden
         if: steps.open.outputs.run == 'true'
