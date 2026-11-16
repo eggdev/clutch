@@ -40,6 +40,12 @@ const ids = (findings: Array<Finding>) => findings.map((finding) => finding.id);
 /** The text that the check prints for each finding. */
 const text = (findings: Array<Finding>) => findings.map(formatFinding);
 
+/** A test of the billing package that proves its claims. The check reads it and never runs it. */
+const proven = {
+  'packages/billing/runtime/contract-claims.test.ts':
+    "import { proveClaims } from '@repo/sync/testing/claims';\nproveClaims(billingClient);\n",
+};
+
 const billing = (contract: string, command = `${contract}/pay`) => `
 import { command } from '@repo/sync/contract/command';
 import { defineContract } from '@repo/sync/contract/define';
@@ -69,7 +75,10 @@ test('a repository with the engine and no contract yet passes without a snapshot
 });
 
 test('the snapshot is written from the contracts, and then the check passes', async () => {
-  const folder = await repository({ 'packages/billing/contract/billing.ts': billing('billing') });
+  const folder = await repository({
+    'packages/billing/contract/billing.ts': billing('billing'),
+    ...proven,
+  });
   const missing = await checkContract(folder, here);
   expect(ids(missing)).toEqual(['check-contract/snapshot-missing']);
   expect(text(missing)).toEqual([
@@ -105,7 +114,10 @@ export const billingContract = defineContract('billing', {
 `;
 
 test('a job and a route of a contract are written to the snapshot, and a changed payload is refused', async () => {
-  const folder = await repository({ 'packages/billing/contract/billing.ts': withJob('integer') });
+  const folder = await repository({
+    'packages/billing/contract/billing.ts': withJob('integer'),
+    ...proven,
+  });
   expect(await writeSnapshot(folder, false, here)).toEqual([]);
   const written = JSON.parse(await readFile(path.join(folder, 'contract.json'), 'utf-8'));
   expect(written.jobs).toEqual([
@@ -122,6 +134,7 @@ test('a job and a route of a contract are written to the snapshot, and a changed
   // A module loads once per path, so the changed payload goes in a repository of its own.
   const changed = await repository({
     'packages/billing/contract/billing.ts': withJob('string'),
+    ...proven,
     'contract.json': await readFile(path.join(folder, 'contract.json'), 'utf-8'),
   });
   const stale = await checkContract(changed, here);
@@ -129,6 +142,22 @@ test('a job and a route of a contract are written to the snapshot, and a changed
   expect(text(stale)).toEqual([
     'contract.json: does not match the contracts. Run `mise exec -- bun tools/check-contract.ts --write`, read the diff, and commit it.',
   ]);
+});
+
+test('a package with a contract and no test that calls proveClaims fails, whatever other tests it has', async () => {
+  const unproven = await repository({ 'packages/billing/contract/billing.ts': billing('billing') });
+  // A claim with no proof does not stop the snapshot check.
+  const findings = await checkContract(unproven, here);
+  expect(ids(findings)).toEqual([
+    'check-contract/claims-not-proven',
+    'check-contract/snapshot-missing',
+  ]);
+  // tools/contract-claims.test.ts tests the text of the finding.
+  const other = await repository({
+    'packages/billing/contract/billing.ts': billing('billing'),
+    'packages/billing/runtime/pay.test.ts': "test('pays', () => {});\n",
+  });
+  expect(ids(await checkContract(other, here))).toContain('check-contract/claims-not-proven');
 });
 
 test('a contract folder of plain values declares nothing, so it needs no contract', async () => {
@@ -157,6 +186,7 @@ export const refund = command('billing/refund', {
   ]);
   const unlisted = await repository({
     'packages/billing/contract/billing.ts': billing('billing'),
+    ...proven,
     'packages/billing/contract/refund.ts': loose,
   });
   expect(ids(await checkContract(unlisted, here))).toEqual(['check-contract/part-not-in-contract']);
@@ -165,6 +195,7 @@ export const refund = command('billing/refund', {
   ]);
   const misnamed = await repository({
     'packages/billing/contract/billing.ts': billing('payments'),
+    ...proven,
   });
   expect(ids(await checkContract(misnamed, here))).toEqual(['check-contract/contract-misnamed']);
   expect(text(await checkContract(misnamed, here))).toEqual([
@@ -175,6 +206,7 @@ export const refund = command('billing/refund', {
 test('a package with two contracts fails', async () => {
   const twice = await repository({
     'packages/billing/contract/billing.ts': billing('billing'),
+    ...proven,
     'packages/billing/contract/more.ts': billing('billing', 'billing/refund').replaceAll(
       'billingContract',
       'moreContract',
@@ -212,6 +244,7 @@ export const ledgerContract = defineContract('ledger', {
   const folder = await repository({
     'packages/ledger/contract/ledger.ts': broken,
     'packages/billing/contract/billing.ts': billing('payments'),
+    ...proven,
     'apps/web/src/packages.ts': 'export const packages = [];\n',
     // A real app list imports each package, so the broken one stops it as it loads.
     'apps/api/src/packages.ts':
@@ -237,6 +270,7 @@ export const ledgerContract = defineContract('ledger', {
 test('an app that lists packages lists each contract', async () => {
   const folder = await repository({
     'packages/billing/contract/billing.ts': billing('billing'),
+    ...proven,
     'apps/web/src/packages.ts': 'export const packages = [];\n',
     // A native app keeps its list in `lib/`.
     'apps/app/lib/packages.ts': 'export const packages = [];\n',
@@ -260,6 +294,7 @@ test('an app that lists packages lists each contract', async () => {
 test('an app list with no `packages` fails, and a file that lists no package is not an app list', async () => {
   const folder = await repository({
     'packages/billing/contract/billing.ts': billing('billing'),
+    ...proven,
     'apps/api/src/packages.ts': 'export const serverChanges = [];\n',
     // The command list of a command-line app: it lists no package.
     'apps/cli/src/commands.ts': 'export const commands = [];\n',

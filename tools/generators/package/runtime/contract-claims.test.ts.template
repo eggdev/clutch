@@ -1,0 +1,10 @@
+import { expect, test } from 'bun:test';
+
+import { <%= propertyName %>Client } from '@repo/<%= fileName %>/runtime/client';
+import { proveClaims } from '@repo/sync/testing/claims';
+
+test('each command of the <%= title %> contract keeps the claims that the contract makes', () => {
+  // Each command has at least two checks: a valid input is taken, and each limit refuses.
+  const report = proveClaims(<%= propertyName %>Client);
+  expect(report.checked.length).toBeGreaterThanOrEqual(<%= propertyName %>Client.contract.commands.length * 2);
+});

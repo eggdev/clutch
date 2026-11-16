@@ -119,8 +119,9 @@ function addContract(tree: Tree, directory: string, name: ReturnType<typeof name
 
 /**
  * The runtime section: `runtime/client.ts` and `runtime/server.server.ts`, which
- * list the package's contract with an empty list of each half. The sync
- * generator adds the package to each app's list. A package with `repo/` runs
+ * list the package's contract with an empty list of each half, and
+ * `runtime/contract-claims.test.ts`, which proves the claims of the contract.
+ * The sync generator adds the package to each app's list. A package with `repo/` runs
  * its migrations from the server half.
  */
 function addRuntime(
