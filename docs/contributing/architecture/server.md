@@ -98,6 +98,10 @@ Layer reads it when it builds. Use `Config.String`, `Config.Port`,
 - No repo knows which driver runs. Both give the same `Database` service.
 - A repo maps each row to its public record. A record type comes from the
   contract, never from a table. A round-trip test proves the mapping.
+- A write returns the row that the database holds. It ends with
+  `.returning()` and `storedRow` from `packages/sync/service/stored-row.ts`.
+  When no row comes back, it fails with `RowNotStored`. It never returns its
+  input. The `no-made-up-rows` ratchet fails a new `?? row` in a repo.
 - `apps/api/src/server.ts` runs each package's migrations before the server
   takes a request. See [migrations](../setup/migrations.md).
 

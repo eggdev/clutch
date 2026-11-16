@@ -61,6 +61,20 @@ test('the server changes write the owner record and return the change for client
   expect(stored?.title).toBe('Final');
 });
 
+test('a repeated create returns the stored note, and keeps its first title', async () => {
+  const [first, repeat] = await server(
+    Effect.gen(function* () {
+      const db = yield* Database;
+      const actor = testActor;
+      const run = (title: string) =>
+        createNoteServer.run({ id: 'n1', spaceId: 'general', title, at }, { db, actor });
+      return [yield* run('Draft'), yield* run('Other')];
+    }),
+  );
+  expect(repeat).toEqual(first);
+  expect(repeat[0]?.data).toMatchObject({ title: 'Draft' });
+});
+
 test('the server rejects a rename of a missing note and a title that is too long', async () => {
   const reasons = await server(
     Effect.gen(function* () {
