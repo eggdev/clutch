@@ -143,6 +143,26 @@ test('a major change holds a PR at any tier for the owner, and the owner approva
   );
 });
 
+// Guards the revert of #282, which held a medium PR that changed a check script
+// unless its issue named the file. The judge reads the tier, not the file, so
+// such a PR merges at the step medium.
+test('a medium PR that changes a check script merges with no guardrail hold', async () => {
+  const gh = fake(
+    [
+      ['bun tools/clutch.ts risk', { out: '{"tier":"medium"}' }],
+      [
+        'gh api --paginate repos/eggdev/clutch/pulls/7/files',
+        { out: JSON.stringify({ filename: 'tools/check-scope.ts', patch: '-a\n+b' }) },
+      ],
+    ],
+    { headRefName: 'clutch/cl-123-check-scope', author: agent },
+  );
+  expect(await decide(gh, { mode: 'on', step: 'medium' })).toEqual([
+    'Would auto-merge at the step medium.\nQueued the merge.',
+  ]);
+  expect(merges(gh.calls)).toEqual([`gh pr merge 7 --auto --merge --match-head-commit ${head}`]);
+});
+
 test('a failed or running native journey holds, and a skipped one does not', () => {
   expect(blockers(facts({ native: { 'native-ios': 'skipped' } }), 'medium')).toEqual([]);
   expect(blockers(facts({ native: { 'native-ios': 'failure' } }), 'medium')).toEqual([
