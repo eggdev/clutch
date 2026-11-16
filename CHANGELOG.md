@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.0 (2026-11-16)
+
+### Features
+
+- feat(tools): fail a package whose contract has no proof (CL-552)
+
 ## 1.15.2 (2026-11-16)
 
 ### Fixes and maintenance
