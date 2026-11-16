@@ -6,7 +6,7 @@
     "clsx": "2.1.1",
     "react": "19.2.3",
     "react-native": "0.86.3",
-    "react-native-safe-area-context": "~5.7.0",
+    "react-native-safe-area-context": "5.7.0",
     "tailwind-merge": "3.7.0"
   },
   "devDependencies": {
