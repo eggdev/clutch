@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.2 (2026-11-16)
+
+### Fixes and maintenance
+
+- fix(repo): return the stored row or fail (CL-492)
+
 ## 1.15.1 (2026-11-14)
 
 ### Fixes and maintenance
