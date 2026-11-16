@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.1 (2026-11-16)
+
+### Fixes and maintenance
+
+- fix(ci): push bot branches without the local push hook (CL-496)
+
 ## 1.16.0 (2026-11-16)
 
 ### Features
