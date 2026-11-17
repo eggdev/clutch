@@ -12,21 +12,45 @@ export type FlakyTest = {
   readonly file: string;
   readonly name: string;
   readonly issue: string;
+  /** The first day of the quarantine. It never moves, so a quarantine cannot be renewed. */
+  readonly since: string;
   readonly until: string;
   readonly reason: string;
 };
 
-/** The entries of the registry at `root`. A repository without the file has none. */
-export function quarantined(root: string): Array<FlakyTest> {
+/** A flaky test that was deleted because its cause was not found in its quarantine. */
+export type RemovedTest = {
+  readonly file: string;
+  readonly name: string;
+  readonly removed: string;
+  readonly reason: string;
+  readonly issue: string;
+};
+
+export type Registry = { readonly tests: Array<FlakyTest>; readonly removed: Array<RemovedTest> };
+
+/** The registry in `text`, the contents of the registry file. A list that is not there is empty. */
+export function parseRegistry(text: string): Registry {
+  const data = JSON.parse(text) as { tests?: Array<FlakyTest>; removed?: Array<RemovedTest> };
+  return {
+    tests: Array.isArray(data.tests) ? data.tests : [],
+    removed: Array.isArray(data.removed) ? data.removed : [],
+  };
+}
+
+/** The registry at `root`. A repository without the file has empty lists. */
+export function registry(root: string): Registry {
   let text: string;
   try {
     text = readFileSync(path.join(root, registryFile), 'utf-8');
   } catch {
-    return [];
+    return { tests: [], removed: [] };
   }
-  const data = JSON.parse(text) as { tests?: Array<FlakyTest> };
-  return Array.isArray(data.tests) ? data.tests : [];
+  return parseRegistry(text);
 }
+
+/** The quarantine entries of the registry at `root`. */
+export const quarantined = (root: string): Array<FlakyTest> => registry(root).tests;
 
 /** A web journey file, whose `snap` names may be quarantined too. */
 export const journeyFile = /(?:^|\/)journeys\/[^/]+\.pw\.ts$/u;

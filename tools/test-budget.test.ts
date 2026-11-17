@@ -39,6 +39,7 @@ test('a bun test run leaves out the quarantined tests, and any other command is 
       file: 'tools/a.test.ts',
       name: 'slow one',
       issue: 'CL-128',
+      since: '2026-11-01',
       until: '2026-11-20',
       reason: 'x',
     },

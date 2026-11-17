@@ -80,6 +80,7 @@ export function entryFor(flake: Tally, issue: string, today: string, runUrl: str
     file: flake.file,
     name: flake.name,
     issue,
+    since: today,
     until: addDays(today, quarantineDays),
     reason: `The flake hunt on ${today} saw it fail ${flake.failed} of ${runs} runs on the same code (${runUrl}).`,
   };
