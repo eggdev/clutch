@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.0 (2026-11-17)
+
+### Features
+
+- feat(babysit): ask the owner after three failed fixes (CL-557)
+
 ## 1.20.0 (2026-11-17)
 
 ### Features
