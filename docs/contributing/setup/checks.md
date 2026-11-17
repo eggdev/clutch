@@ -75,6 +75,13 @@ Lint fixes run before formatting, because a lint fix can leave code unformatted.
 Never skip a hook with `--no-verify`. When `pre-commit` or `pre-push` fails,
 fix what it found. When a hook is wrong, fix the hook in its own change.
 
+A workflow that pushes a branch runs no Git hook. The release, security,
+Clutch sync, revert, flake hunt and gardening workflows install with
+`--ignore-scripts`, so the hooks stay off. The gardening workflow also turns
+them off before its push, because its `validate` step installs again. CI runs
+the same checks on the pull request of that branch. The
+[escape hatch table](../harness-engineering.md#guardrail-files) lists this.
+
 ## Checks
 
 Each repository check is a standalone script in `tools/check-*.ts`, with a
@@ -163,6 +170,12 @@ one warning with its target name and the reason. A crash, a signal and the time
 limit print a warning too. The time limit is 5 minutes for each check. In CI,
 the warning is an annotation on the run. An observed check never changes the
 exit code of `validate`.
+
+A pull request that moves a blocking check back to `observedTargets` makes
+that check weaker. `check-scope` does not stop it. Agent review gives it an
+`owner` finding, as for each weaker check. The
+[escape hatch table](../harness-engineering.md#guardrail-files) lists the
+observed list.
 
 A later pull request moves the check to the `dependsOn` list of `checks`. That
 pull request says what the check reported while it was observed. It says that
