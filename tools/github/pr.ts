@@ -30,7 +30,7 @@ import {
 import type { Run } from '@tools/github/stack';
 import { prStatus, renderStatus, waitForChecks } from '@tools/github/status';
 import type { PrStatus } from '@tools/github/status';
-import { recordVerification } from '@tools/github/verification-record';
+import { recordBody, recordVerification } from '@tools/github/verification-record';
 import type { OpenOptions } from '@tools/github/verification-record';
 import { conventionalProblem } from '@tools/hooks/commit-msg';
 import { bumpOf, changesetDir, changesetText, packageName } from '@tools/release/changeset';
@@ -43,7 +43,7 @@ import { bumpOf, changesetDir, changesetText, packageName } from '@tools/release
 export const usage = [
   'Usage: bun run pr doctor [--fix]',
   '       bun run pr open --title TEXT --body-file FILE [--base BRANCH] [--force] [--unverified REASON]',
-  '       bun run pr body <number> <file>',
+  '       bun run pr body <number> <file> [--unverified REASON]',
   '       bun run pr status <number> [--json]',
   '       bun run pr wait <number> [--timeout 30m] [--json]',
   '       bun run pr failures <number>',
@@ -216,7 +216,7 @@ async function open(run: Run, options: OpenOptions, write: Write, clock: Clock) 
       `Switch to the branch for this PR. The current branch is ${branch || 'detached'}.`,
     );
   }
-  await recordVerification(run, root, { base, bodyFile, reason: options.unverified });
+  await recordVerification(run, root, { base, bodyFile, reason: options.unverified, gate: true });
   await ensureChangeset(run, write, base, branch, title);
   // The PR's link is known only once the PR exists, so a first open marks the issue done without it.
   const existing = await prWithHead(run, branch);
@@ -310,6 +310,7 @@ export async function runPr(
     body: [
       2,
       async ([number, file]) => {
+        await recordBody(run, root, { number, bodyFile: file, reason: values.unverified });
         await setBody(run, number, file);
         return 0;
       },

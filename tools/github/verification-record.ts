@@ -2,58 +2,82 @@ import { readFile, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
+import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
 
 /**
- * The verification record of a PR: the flows whose receipts passed on the
- * tree that `pr open` pushes, and the flows that the feature map asks for and
- * that have no such receipt. It comes from the receipts of
- * tools/verification/verify.py, never from text that the agent writes. See
- * docs/contributing/delivery.md.
+ * The verification record of a PR: the flows that the feature map asks for,
+ * and those of them with a passing receipt that counts for the head. It comes
+ * from the receipts of tools/verification/verify.py, never from text that the
+ * agent writes. See .agents/skills/deliver/references/pull-requests.md.
  */
 export type VerificationRecord = {
+  /** The flows that the map at the base or at the head names for a changed file that is not Markdown. */
+  due: Array<string>;
+  /** The due flows with a receipt that counts. */
   verified: Array<string>;
-  missing: Array<string>;
   /** Each changed file is Markdown, so no flow is due. */
   docsOnly: boolean;
-  /** Why the change goes out unverified, from `--unverified`. */
+  /** Why the change goes out with a missing flow, from `--unverified`. */
   reason?: string;
 };
 
-/** What the gate does with a change that has a missing flow. Set in clutch.yaml as `verification.gate`. */
+/** What the gate does with a change that has a missing flow, from the weakest to the strictest. */
 const gateModes = ['off', 'observe', 'enforce'] as const;
 export type GateMode = (typeof gateModes)[number];
 
-/** The first line of the record, which tools read from the PR body. */
+/** Each line of a PR body that starts with this is a record. */
 const recordPrefix = 'Verified: ';
+/** The start of each record of a PR that is not fully verified. The query in the docs searches for it. */
+export const incompletePrefix = `${recordPrefix}incomplete (`;
 
 const isDoc = (file: string) => /\.mdx?$/u.test(file);
+const treeId = /^[0-9a-f]{40,64}$/u;
 
 /** The verify config. A project generates its own verify skill, so the file can be missing. */
 const verificationFile = '.agents/skills/verify/verification.json';
 
-type Flow = { paths?: Array<string> };
-type Config = { name: string; flows: Record<string, Flow> };
+type Config = { name?: string; flows?: Record<string, { paths?: Array<string> }> };
 
-/** The paths of each flow: `paths` in the verify config. A journey flow without them covers its feature folder. */
-function flowPaths(root: string, config: Config): Map<string, Array<string>> {
-  const map = new Map<string, Array<string>>();
-  for (const [name, flow] of Object.entries(config.flows)) {
-    const [journey] = new Bun.Glob(`features/*/journeys/${name}.*`).scanSync({ cwd: root });
-    const feature = journey?.split('/')[1];
-    map.set(name, flow.paths ?? (feature ? [`features/${feature}/**`] : []));
-  }
-  return map;
+/** A file at a commit, or '' when the commit has no such file. */
+async function show(run: Run, ref: string, file: string) {
+  const shown = await run(['git', 'show', `${ref}:${file}`]);
+  return shown.ok ? shown.out : '';
 }
 
-/** The flows that the map asks for: each flow with a path that matches a changed file that is not Markdown. */
-function requiredFlows(files: Array<string>, map: Map<string, Array<string>>) {
-  const code = files.filter((file) => !isDoc(file));
-  return [...map]
-    .filter(([, globs]) =>
-      globs.some((glob) => code.some((file) => new Bun.Glob(glob).match(file))),
-    )
-    .map(([name]) => name);
+async function readConfig(run: Run, ref: string): Promise<Config> {
+  const text = await show(run, ref, verificationFile);
+  return text.trim() ? (JSON.parse(text) as Config) : {};
+}
+
+/** The paths of each flow: `paths` in the verify config. A journey flow without them covers its feature folder. */
+function flowPaths(root: string, config: Config, into: Map<string, Array<string>>) {
+  for (const [name, flow] of Object.entries(config.flows ?? {})) {
+    const [journey] = new Bun.Glob(`features/*/journeys/${name}.*`).scanSync({ cwd: root });
+    const feature = journey?.split('/')[1];
+    const globs = flow.paths ?? (feature ? [`features/${feature}/**`] : []);
+    into.set(name, [...(into.get(name) ?? []), ...globs]);
+  }
+}
+
+/** Whether a glob of a flow matches one of the files. A Markdown file never matches. */
+const covers = (globs: Array<string>, files: Array<string>) =>
+  files.some((file) => !isDoc(file) && globs.some((glob) => new Bun.Glob(glob).match(file)));
+
+/** The files that the branch changes against `origin/<base>`. Throws when Git cannot tell. */
+async function changedFiles(run: Run, base: string) {
+  const ref = `origin/${base}`;
+  const found = await run(['git', 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+  if (!found.ok) {
+    throw new Error(
+      `Cannot find ${ref}, so the verification record cannot know which files changed. Run git fetch origin ${base}, or pass the right --base.`,
+    );
+  }
+  const diff = await run(['git', 'diff', '--name-only', `${ref}...HEAD`]);
+  if (!diff.ok) {
+    throw new Error(`git diff against ${ref} failed, so no record is possible. ${diff.err.trim()}`);
+  }
+  return diff.out.split('\n').filter(Boolean);
 }
 
 /** The part of a receipt that the record reads. */
@@ -61,7 +85,9 @@ type Receipt = {
   action?: string;
   flow?: string;
   status?: string;
+  stale?: boolean;
   revision?: { tree?: string | null };
+  revisionAfter?: { tree?: string | null };
 };
 
 /** Each receipt under the evidence root of the project. A receipt that does not parse is skipped. */
@@ -80,117 +106,124 @@ async function readReceipts(folder: string): Promise<Array<Receipt>> {
 }
 
 /**
- * The flows with a passing receipt that counts for `headTree`. A receipt counts
- * when its tree is the head's tree, or differs from it only in Markdown, such
- * as the changeset and the issue file that `pr open` commits.
+ * The due flows with a passing receipt that counts. It counts when its flow
+ * covers no file that differs between its tree and the head's tree, and its
+ * tree is in the repository and did not change during the run.
  */
-async function verifiedFlows(run: Run, receipts: Array<Receipt>, headTree: string) {
-  if (!/^[0-9a-f]{40,64}$/u.test(headTree)) {
-    return [];
-  }
-  const counts = new Map<string, boolean>();
-  const matches = async (tree: string) => {
-    if (tree === headTree) {
-      return true;
-    }
-    if (!counts.has(tree)) {
-      const diff = await run(['git', 'diff', '--name-only', tree, headTree]);
-      counts.set(tree, diff.ok && diff.out.split('\n').every((file) => !file || isDoc(file)));
-    }
-    return counts.get(tree) === true;
-  };
+async function verifiedFlows(run: Run, receipts: Array<Receipt>, due: Map<string, Array<string>>) {
+  const parsed = await run(['git', 'rev-parse', 'HEAD^{tree}']);
+  const head = parsed.out.trim();
   const flows = new Set<string>();
-  for (const receipt of receipts) {
-    const tree = receipt.revision?.tree;
+  for (const { flow = '', ...receipt } of treeId.test(head) ? receipts : []) {
+    const tree = String(receipt.revision?.tree);
+    const globs = due.get(flow);
     if (
       receipt.action === 'run' &&
       receipt.status === 'passed' &&
-      receipt.flow &&
-      typeof tree === 'string' &&
-      /^[0-9a-f]{40,64}$/u.test(tree) &&
-      (await matches(tree))
+      receipt.stale !== true &&
+      globs &&
+      treeId.test(tree) &&
+      (receipt.revisionAfter === undefined || receipt.revisionAfter.tree === tree)
     ) {
-      flows.add(receipt.flow);
+      const diff = await run(['git', 'diff', '--name-only', tree, head]);
+      if (diff.ok && !covers(globs, diff.out.split('\n'))) {
+        flows.add(flow);
+      }
     }
   }
   return [...flows].toSorted();
 }
 
-/** Builds the record of the branch against `origin/<base>`. */
+/**
+ * Builds the record of the branch against `origin/<base>`. A flow is due when
+ * the map at the base or the map at the head names it for a changed file. So
+ * a PR can add coverage, and cannot remove it for itself.
+ */
 export async function buildRecord(
   run: Run,
   root: string,
   base: string,
   options: { evidenceRoot?: string; reason?: string } = {},
 ): Promise<VerificationRecord> {
-  let config: Config = { name: '', flows: {} };
-  try {
-    config = JSON.parse(await readFile(path.join(root, verificationFile), 'utf-8')) as Config;
-  } catch {
-    // No verify config: no flow is due, and no receipt is read.
+  const files = await changedFiles(run, base);
+  const configs = await Promise.all([readConfig(run, `origin/${base}`), readConfig(run, 'HEAD')]);
+  const map = new Map<string, Array<string>>();
+  for (const config of configs) {
+    flowPaths(root, config, map);
   }
-  const [diff, head] = await Promise.all([
-    run(['git', 'diff', '--name-only', `origin/${base}...HEAD`]),
-    run(['git', 'rev-parse', 'HEAD^{tree}']),
-  ]);
-  const files = diff.out.split('\n').filter(Boolean);
+  const due = new Map([...map].filter(([, globs]) => covers(globs, files)));
+  const name = configs[1].name || configs[0].name;
   const evidenceRoot =
     options.evidenceRoot ??
     process.env.DELIVERY_EVIDENCE_ROOT ??
     path.join(homedir(), '.local/share/delivery/evidence');
-  const receipts = config.name ? await readReceipts(path.join(evidenceRoot, config.name)) : [];
-  const verified = await verifiedFlows(run, receipts, head.out.trim());
-  const required = requiredFlows(files, flowPaths(root, config));
+  const receipts = name && due.size > 0 ? await readReceipts(path.join(evidenceRoot, name)) : [];
+  const verified = await verifiedFlows(run, receipts, due);
+  const reason = options.reason?.replaceAll(/\s+/gu, ' ').trim();
   return {
+    due: [...due.keys()].toSorted(),
     verified,
-    missing: required.filter((flow) => !verified.includes(flow)),
-    docsOnly: files.every(isDoc),
-    ...(options.reason ? { reason: options.reason.replaceAll(/\s+/gu, ' ').trim() } : {}),
+    docsOnly: files.length > 0 && files.every(isDoc),
+    ...(reason && verified.length < due.size ? { reason } : {}),
   };
 }
 
-/** The one line that holds the record, such as `Verified: notes-sync, installer`. */
+const missingOf = (record: VerificationRecord) =>
+  record.due.filter((flow) => !record.verified.includes(flow));
+
+/** The one line that holds the record. The docs list each form. */
 export function renderRecord(record: VerificationRecord) {
-  const { verified, missing, docsOnly, reason } = record;
-  let line = recordPrefix + (verified.join(', ') || 'none');
-  if (verified.length === 0 && missing.length === 0) {
-    line += docsOnly ? ' (docs only)' : ' (no flow covers these files)';
+  const { due, verified, docsOnly, reason } = record;
+  const missing = missingOf(record);
+  if (docsOnly) {
+    return `${recordPrefix}docs-only`;
   }
-  if (missing.length > 0) {
-    line += `; missing: ${missing.join(', ')}`;
+  if (due.length > 0 && missing.length === 0) {
+    return recordPrefix + verified.join(', ');
   }
-  return reason ? `${line}; unverified because: ${reason}` : line;
+  const parts =
+    due.length === 0
+      ? ['no flow covers these files']
+      : [
+          ...(verified.length > 0 ? [`passed: ${verified.join(', ')}`] : []),
+          `missing: ${missing.join(', ')}`,
+        ];
+  return `${incompletePrefix}${[...parts, ...(reason ? [`unverified because: ${reason}`] : [])].join('; ')})`;
 }
 
 /**
- * Writes the record as the first line of the "Verification" section, and
- * removes an older record, so a second `pr open` leaves one record.
+ * Writes the record as the first line of the "Verification" section. It
+ * removes each other line that starts like a record, so a second run leaves
+ * one record, and a line that the agent wrote cannot stand as one.
  */
 export function stampBody(body: string, line: string) {
-  const lines = body.split('\n');
+  const eol = body.includes('\r\n') ? '\r\n' : '\n';
+  const lines = body
+    .replaceAll('\r\n', '\n')
+    .split('\n')
+    .filter((text) => !text.startsWith(recordPrefix));
   const heading = lines.findIndex((text) => text.trim() === '## Verification');
   if (heading === -1) {
-    return `${body.trimEnd()}\n\n## Verification\n\n${line}\n`;
+    return `${lines.join('\n').trimEnd()}\n\n## Verification\n\n${line}\n`.replaceAll('\n', eol);
   }
-  const next = lines.findIndex((text, index) => index > heading && text.startsWith('## '));
-  const end = next === -1 ? lines.length : next;
-  const section = lines.slice(heading + 1, end).filter((text) => !text.startsWith(recordPrefix));
-  while (section[0]?.trim() === '') {
-    section.shift();
+  const rest = lines.slice(heading + 1);
+  while (rest[0]?.trim() === '') {
+    rest.shift();
   }
-  return [...lines.slice(0, heading + 1), '', line, '', ...section, ...lines.slice(end)].join('\n');
+  return [...lines.slice(0, heading + 1), '', line, '', ...rest].join(eol);
 }
 
 /**
- * What the gate does with a record. A change that is not docs only and has a
- * missing flow is one that the gate blocks. `observe` prints a notice,
- * `enforce` refuses it unless the record has a reason, and `off` does nothing.
+ * What the gate does with a record that has a missing flow. `observe` prints
+ * a notice, `enforce` refuses it unless the record has a reason, and `off`
+ * does nothing.
  */
 export function gateDecision(mode: GateMode, record: VerificationRecord) {
-  if (mode === 'off' || record.docsOnly || record.missing.length === 0) {
+  const missing = missingOf(record);
+  if (mode === 'off' || missing.length === 0) {
     return {};
   }
-  const flows = record.missing.join(', ');
+  const flows = missing.join(', ');
   const run = `Run each with: python3 tools/verification/verify.py --config ${verificationFile} run <flow>.`;
   if (mode === 'observe') {
     return {
@@ -205,12 +238,30 @@ export function gateDecision(mode: GateMode, record: VerificationRecord) {
   };
 }
 
-/** `verification.gate` in clutch.yaml. observe is the default. */
-async function gateMode(root: string): Promise<GateMode> {
-  const text = await readFile(path.join(root, 'clutch.yaml'), 'utf-8').catch(() => '');
-  const { verification } = (Bun.YAML.parse(text) ?? {}) as { verification?: { gate?: unknown } };
-  const gate = verification?.gate;
-  return gateModes.find((mode) => mode === gate) ?? 'observe';
+/** `verification.gate` in clutch.yaml at a commit. observe is the default. A value that is not a mode throws. */
+async function gateAt(run: Run, ref: string): Promise<GateMode> {
+  const parsed = Bun.YAML.parse(await show(run, ref, 'clutch.yaml')) as {
+    verification?: { gate?: unknown };
+  } | null;
+  const gate = parsed?.verification?.gate ?? 'observe';
+  const mode = gateModes.find((each) => each === gate);
+  if (!mode) {
+    throw new Error(
+      `verification.gate in clutch.yaml is ${JSON.stringify(gate)}. Use ${gateModes.join(', ')}.`,
+    );
+  }
+  return mode;
+}
+
+/**
+ * The gate for the PR: the stricter of the base and the head, so a PR cannot
+ * weaken it for itself. A bad value at the base counts as enforce, so a PR
+ * can still fix it.
+ */
+async function gateMode(run: Run, base: string) {
+  const head = await gateAt(run, 'HEAD');
+  const atBase = await gateAt(run, `origin/${base}`).catch(() => 'enforce' as const);
+  return gateModes[Math.max(gateModes.indexOf(head), gateModes.indexOf(atBase))];
 }
 
 /** The options of `bun run pr open`. */
@@ -219,24 +270,43 @@ export type OpenOptions = Partial<
 >;
 
 /**
- * Writes the record into the body file, and applies the gate of clutch.yaml.
- * A missing body file is left for gh to report.
+ * Writes the record into the body file. With `gate`, it first applies the
+ * gate of clutch.yaml. A missing body file is left for gh to report.
  */
 export async function recordVerification(
   run: Run,
   root: string,
-  options: { base: string; bodyFile: string; reason?: string },
+  options: { base: string; bodyFile: string; reason?: string; gate: boolean },
 ) {
   const record = await buildRecord(run, root, options.base, { reason: options.reason });
-  const decision = gateDecision(await gateMode(root), record);
-  if (decision.refuse) {
-    throw new Error(decision.refuse);
-  }
-  if (decision.notice) {
-    console.log(decision.notice);
+  if (options.gate) {
+    const decision = gateDecision(await gateMode(run, options.base), record);
+    if (decision.refuse) {
+      throw new Error(decision.refuse);
+    }
+    if (decision.notice) {
+      console.log(decision.notice);
+    }
   }
   const file = Bun.file(path.resolve(root, options.bodyFile));
   if (await file.exists()) {
     await Bun.write(file, stampBody(await file.text(), renderRecord(record)));
   }
+}
+
+/** `bun run pr body`: writes the record of the PR's branch into the body file, with no gate. */
+export async function recordBody(
+  run: Run,
+  root: string,
+  options: { number: string; bodyFile: string; reason?: string },
+) {
+  const view = ['gh', 'pr', 'view', options.number, '--json', 'baseRefName,headRefName'];
+  const pr = JSON.parse(await must(run, view)) as Record<string, string>;
+  // The record describes the local branch, so it must be the PR's head.
+  if (pr.headRefName !== (await must(run, ['git', 'branch', '--show-current']))) {
+    throw new Error(
+      `Switch to ${pr.headRefName}, the branch of PR ${options.number}, to set its body.`,
+    );
+  }
+  await recordVerification(run, root, { ...options, base: pr.baseRefName, gate: false });
 }

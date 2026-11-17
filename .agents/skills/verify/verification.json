@@ -105,7 +105,14 @@
         "packages/notes/**",
         "packages/sync/**",
         "apps/app/**",
-        "apps/api/**"
+        "apps/api/**",
+        "packages/access/**",
+        "packages/identity/**",
+        "packages/design-system/**",
+        "packages/app-build/**",
+        "packages/journeys/**",
+        "tools/journeys/**",
+        "tools/dev.ts"
       ],
       "ownsStack": true,
       "timeoutSeconds": 300,

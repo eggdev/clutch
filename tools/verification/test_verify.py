@@ -268,6 +268,9 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(code, 0)
         # The receipt names the tree that a commit of the verified work tree gets.
         receipt = json.loads((Path(result['evidence']) / 'receipt.json').read_text())
+        old = subprocess.run(['git', 'rev-parse', 'HEAD^{tree}'], cwd=self.repo, check=True, capture_output=True)
+        # The run was on uncommitted work, so its tree is that work, not the tree of HEAD.
+        self.assertNotEqual(receipt['revision']['tree'], old.stdout.decode().strip())
         git = ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'core.hooksPath=/dev/null']
         subprocess.run([*git, 'commit', '-qam', 'verified'], cwd=self.repo, check=True, capture_output=True)
         head = subprocess.run(['git', 'rev-parse', 'HEAD^{tree}'], cwd=self.repo, check=True, capture_output=True)
