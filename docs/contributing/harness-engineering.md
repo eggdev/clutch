@@ -269,8 +269,10 @@ The pass:
     owner. See the [design-proposal](../../.agents/skills/design-proposal/SKILL.md)
     skill.
 11. Run `mise exec -- bun run validate`, and fix what it reports. The
-    workflow formats the edits and runs it again before the commit. When it
-    fails, the job fails and opens no PR.
+    `check-changeset` target fails in that run, because the workflow writes the
+    changeset later, from the PR title. The pass writes no changeset. The
+    workflow formats the edits and runs `validate` again before the commit.
+    When it fails, the job fails and opens no PR.
 
 A gardening PR that adds a rule to `review.md`, or changes a guardrail file,
 waits for the owner's approval of its head. A PR that only deletes a rule can
