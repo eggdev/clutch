@@ -15,7 +15,8 @@ export function renovateChangeset(data, name) {
   const summary = title.join(' ').trim() || 'Update dependencies';
   return {
     file: `.changeset/${slug || 'renovate'}.md`,
-    text: `---\n"${name}": patch\n---\n\n${summary}\n`,
+    // Single quotes, as the formatter keeps them. See changesetText in changeset.ts.
+    text: `---\n'${name}': patch\n---\n\n${summary}\n`,
   };
 }
 

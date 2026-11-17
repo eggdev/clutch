@@ -203,9 +203,8 @@ never the only record of a leftover. Report a bug with the
 Once a week, `.github/workflows/gardening.yml` runs an agent for one short
 pass. The agent edits files only. The workflow commits the edits to a
 `gardening/<date>` branch and opens one pull request. It never pushes to the
-default branch, and it skips the week while a gardening PR is open. A person
-reviews the PR. The PR opens with the release bot's token when the
-`CLUTCH_APP_ID` variable is set. A PR that the default token opens starts no
+default branch, and it skips the week while a gardening PR is open. The PR
+opens with the release bot's token when the `CLUTCH_APP_ID` variable is set. A PR that the default token opens starts no
 CI or agent review. See [the release bot](./setup/releases.md#the-release-bot).
 The agent runs on the model that the `CLUTCH_AGENT_MODEL` repository variable
 names, or on `claude-haiku-5-5` when it is unset. The workflow adds a
@@ -215,33 +214,61 @@ owner has not graded. See
 [grade the verdicts](../../.agents/skills/deliver/references/pull-requests.md#grade-the-verdicts).
 The pass:
 
-1. Read the review comments of the week's merged PRs. Find a comment that
-   repeats. Read delivery records for repeated owner interventions and rework.
-2. When a comment or an intervention repeats and a guardrail would stop it for
-   real, propose one in the PR body. Use the strongest cheap kind from
-   [promote learning into enforcement](#promote-learning-into-enforcement).
-   A week with no such repeat needs no guardrail.
-3. Delete stale guidance from `docs/contributing/`, and tighten unclear steps.
-4. Delete each rule from [`review.md`](./review.md) that a check covers.
-5. Close each cleanup issue whose "Ready when" criterion is true, in the PR
+1. Read the review comments of the week's merged PRs, and the reverts. Find a
+   mistake that repeats. Read delivery records for repeated owner
+   interventions and rework.
+2. Turn a repeated mistake into a candidate rule only with evidence. The same
+   mistake occurs in at least 2 PRs, as review comments or reverts. It has a
+   trigger that you can read from a diff. Name both PRs and the trigger. A
+   week with no such repeat needs no rule.
+3. Make 3 independent attempts to disprove each candidate, one for each angle.
+   Use one subagent for each attempt. Drop the candidate when one attempt
+   succeeds.
+   - Find merged PRs of the last 30 days that the rule flags, though they were
+     right.
+   - Find a check, a lint rule or a review rule that already covers the
+     mistake.
+   - Argue that the pattern is not a mistake, or that a cheaper fix removes its
+     cause.
+4. Add each candidate that survives to [`review.md`](./review.md), in the form
+   that its section "Add or remove a rule" asks for. Add it only when no
+   check, lint rule or type can hold the rule. When one can, propose that
+   guardrail in the PR body, as
+   [promote learning into enforcement](#promote-learning-into-enforcement)
+   says.
+   The PR body has a section "Candidate rules". For each candidate, it gives
+   the rule text, the trigger, the 2 PRs and the result of each attempt. A
+   dropped candidate is listed too.
+5. Delete stale guidance from `docs/contributing/`, and tighten unclear steps.
+6. Delete each rule from [`review.md`](./review.md) that a check covers.
+7. Close each cleanup issue whose "Ready when" criterion is true, in the PR
    that removes the leftover.
-6. Take the reverts first. For each revert of the week, a merged PR whose head
+8. Take the reverts first. For each revert of the week, a merged PR whose head
    branch starts with `revert/`, add a regression test. Its test fails on the
    reverted change and passes on `main`. Name the reverted PR in a comment above
    it. List each revert under "Reverts" in the body, with its test and a 2-3 line
    re-land plan.
-7. Read the week's friction with `clutch friction list --since 7d --json`,
+9. Read the week's friction with `clutch friction list --since 7d --json`,
    and [`tools/flaky-tests.json`](../../tools/flaky-tests.json) for tests that
-   expire within 7 days. Fix at most 3 items in all, the reverts from step 6
-   included, and the ones that cost the most or repeat. A fixed friction entry leaves `.clutch/friction.jsonl` in the same
-   PR, and the body names it by its `at` time. A fixed flaky test leaves the
-   quarantine.
-8. Find the stale design proposals in `docs/design/proposals/`, as
-   `bun tools/check-proposals.ts --stale` lists them. An `adopted` record whose
-   issue is `done` becomes `current`, and its prototype goes. List each
-   `proposed` record older than 14 days in the PR body, as waiting for the
-   owner. See the [design-proposal](../../.agents/skills/design-proposal/SKILL.md)
-   skill.
+   expire within 7 days. Fix at most 3 items in all, the reverts from step 8
+   included, and the ones that cost the most or repeat. A fixed friction entry
+   leaves `.clutch/friction.jsonl` in the same PR, and the body names it by its
+   `at` time. An expiring flaky test is fixed or deleted, as
+   [flaky tests](./testing.md#flaky-tests) says. Either way, it leaves the quarantine.
+10. Find the stale design proposals in `docs/design/proposals/`, as
+    `bun tools/check-proposals.ts --stale` lists them. An `adopted` record whose
+    issue is `done` becomes `current`, and its prototype goes. List each
+    `proposed` record older than 14 days in the PR body, as waiting for the
+    owner. See the [design-proposal](../../.agents/skills/design-proposal/SKILL.md)
+    skill.
+11. Run `mise exec -- bun run validate`, and fix what it reports. The
+    workflow formats the edits and runs it again before the commit. When it
+    fails, the job fails and opens no PR.
+
+A gardening PR that adds a rule to `review.md`, or changes a guardrail file,
+waits for the owner's approval of its head. A PR that only deletes a rule can
+merge with no person. See
+[auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
 
 Many small cleanups cost less than one large rewrite.
 

@@ -65,7 +65,7 @@ test('a merged PR is reverted on revert/<n> with a changeset, pushed with the bo
   expect(written).toEqual([
     [
       '.changeset/revert-75.md',
-      `---\n"${await packageName(process.cwd())}": patch\n---\n\nrevert: docs(skills): add x (CL-119)\n`,
+      `---\n'${await packageName(process.cwd())}': patch\n---\n\nrevert: docs(skills): add x (CL-119)\n`,
     ],
   ]);
   expect(gh.calls).toContain(

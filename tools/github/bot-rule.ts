@@ -3,15 +3,20 @@
  * `bots` step of auto-merge. A Renovate PR may when its diff changes only
  * dependency versions, lockfiles and changesets. Renovate already waits out
  * the 3-day release age (`minimumReleaseAge` in renovate.json). A gardening
- * PR may when its risk tier is low. A Clutch sync PR may when it changes only
- * what `clutch sync` writes.
+ * PR may when its risk tier is low or medium, and it proposes no rule, or the
+ * owner approved its head. A Clutch sync PR may when it changes only what
+ * `clutch sync` writes.
  * A revert PR is judged in auto-merge.ts,
  * since it needs the reverted PR. See
  * .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 
-/** One changed file of a pull request, as `gh api repos/<repo>/pulls/<n>/files` gives it. */
-export type ChangedFile = { filename: string; patch?: string };
+/**
+ * One changed file of a pull request, from `gh api repos/<repo>/pulls/<n>/files`.
+ * GitHub gives no patch for a large file, a binary file or a pure rename.
+ * `previous` is the old path of a renamed file.
+ */
+export type ChangedFile = { filename: string; patch?: string; previous?: string };
 
 /**
  * The bot whose pull request this is, from its head branch, or null. The
@@ -163,4 +168,60 @@ export function syncProblems(files: Array<ChangedFile>, managed: ReadonlySet<str
     }
     return [`${file.filename} is not a file that clutch sync writes.`];
   });
+}
+
+/** The page of review rules. A gardening PR that adds a line to it proposes a rule. */
+const reviewRules = 'docs/contributing/review.md';
+
+/**
+ * An added line of a patch that is not blank. The patch of the files listing
+ * starts at the first hunk and has no `+++` file line, so each line that
+ * starts with `+` is an added line. The space class leaves out the line end,
+ * so a blank added line never counts.
+ */
+const addsLine = /^\+[^\S\n]*\S/mu;
+
+/** Why a gardening PR waits for the owner when it proposes a rule. */
+export const ruleHold = 'The gardening pass proposes a rule. The owner approves a new rule.';
+
+/**
+ * Why a gardening PR may not merge without a person. Its risk tier must be low
+ * or medium. It proposes a rule when it adds a line to the review rules, or
+ * changes a file that `guardrails` (the patterns of tools/guardrail-files.json)
+ * matches. Such a PR waits until the owner approves its head. A PR that only
+ * deletes rules merges as before.
+ */
+export function gardeningProblems(
+  files: Array<ChangedFile>,
+  tier: string,
+  guardrails: Array<string>,
+  ownerApproved: boolean,
+) {
+  const problems: Array<string> = [];
+  if (!['low', 'medium'].includes(tier)) {
+    problems.push(`The gardening PR's risk tier is ${tier}, not low or medium.`);
+  }
+  if (ownerApproved) {
+    return problems;
+  }
+  const globs = guardrails.map((pattern) => new Bun.Glob(pattern));
+  const guardrail = (name: string) => globs.some((glob) => glob.match(name));
+  const rules = files.filter((file) => {
+    // A rename away from a rule file removes that rule, so the old path counts too.
+    if (
+      file.previous === reviewRules ||
+      (file.previous !== undefined && guardrail(file.previous))
+    ) {
+      return true;
+    }
+    if (file.filename === reviewRules) {
+      // With no patch, the PR may add a rule that this code cannot see.
+      return file.patch === undefined || addsLine.test(file.patch);
+    }
+    return guardrail(file.filename);
+  });
+  if (rules.length > 0) {
+    problems.push(`${ruleHold} It changes ${rules.map((file) => file.filename).join(', ')}.`);
+  }
+  return problems;
 }

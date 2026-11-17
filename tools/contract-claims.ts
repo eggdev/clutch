@@ -22,16 +22,38 @@ function testFiles(folder: string): Array<string> {
     .map((file) => path.join(folder, file));
 }
 
+/** Whether a test file imports the proof of the claims and calls it. */
+function callsProof(file: string): boolean {
+  const source = readFileSync(file, 'utf-8');
+  return source.includes(claimsModule) && source.includes(claimsCall);
+}
+
 /**
  * Whether a test file of the package calls the proof of its claims. It reads
  * the files on disk and runs no test: a file that imports the proof and calls
  * it counts.
  */
 function provesClaims(root: string, name: string): boolean {
-  return testFiles(path.join(root, 'packages', name)).some((file) => {
-    const source = readFileSync(file, 'utf-8');
-    return source.includes(claimsModule) && source.includes(claimsCall);
-  });
+  return testFiles(path.join(root, 'packages', name)).some(callsProof);
+}
+
+/**
+ * Each test file that proves the claims of a package contract, sorted, from
+ * the root. The engine in `packages/sync` has no contract, so its own proof
+ * tests are not in the list. The nightly hunt in tools/claims-hunt.ts runs
+ * these files, so a new package with a contract joins it with no edit.
+ */
+export function proofFiles(root: string): Array<string> {
+  const packages = path.join(root, 'packages');
+  if (!existsSync(packages)) {
+    return [];
+  }
+  return readdirSync(packages, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== 'sync')
+    .flatMap((entry) => testFiles(path.join(packages, entry.name)))
+    .filter(callsProof)
+    .map((file) => path.relative(root, file))
+    .toSorted();
 }
 
 /** A package folder name in camel case, as the generator names its exports: `demo-pad` is `demoPad`. */

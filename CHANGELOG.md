@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.18.1 (2026-11-17)
+
+### Fixes and maintenance
+
+- fix(merge): count each added line of a gardening rule patch (CL-561)
+
+## 1.18.0 (2026-11-17)
+
+### Features
+
+- feat(sync): prove the contract claims nightly with a new seed (CL-555)
+
+## 1.17.0 (2026-11-17)
+
+### Features
+
+- feat(merge): the owner approves a rule that gardening proposes (CL-554)
+
+## 1.16.3 (2026-11-17)
+
+### Fixes and maintenance
+
+- fix(release): write a changeset that passes the format check (CL-560)
+
+## 1.16.2 (2026-11-17)
+
+### Fixes and maintenance
+
+- test(merge): guard the revert of the guardrail hold (#282)
+
 ## 1.16.1 (2026-11-16)
 
 ### Fixes and maintenance
