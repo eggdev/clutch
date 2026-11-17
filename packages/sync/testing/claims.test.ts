@@ -126,6 +126,56 @@ test('the seed comes from CLAIMS_SEED when the test names none', () => {
   }
 });
 
+/** Runs `body` with `CLAIMS_RUNS` set to `value`, and puts the old value back. */
+function withRuns(value: string, body: () => void) {
+  const saved = process.env.CLAIMS_RUNS;
+  process.env.CLAIMS_RUNS = value;
+  try {
+    body();
+  } finally {
+    if (saved === undefined) {
+      delete process.env.CLAIMS_RUNS;
+    } else {
+      process.env.CLAIMS_RUNS = saved;
+    }
+  }
+}
+
+test('the run count comes from CLAIMS_RUNS when the test names none', () => {
+  withRuns('7', () => {
+    expect(proveClaims(keeps, { seed: 532 }).checked).toContain(
+      'cards/rename: idempotent (7 runs)',
+    );
+    expect(proveClaims(keeps, { seed: 532, runs: 3 }).checked).toContain(
+      'cards/rename: idempotent (3 runs)',
+    );
+  });
+});
+
+test('a CLAIMS_RUNS that is not a whole number above zero is refused', () => {
+  for (const value of ['0', '-4', '2.5', 'many']) {
+    withRuns(value, () => {
+      expect(() => proveClaims(keeps, { seed: 532 })).toThrow(
+        `CLAIMS_RUNS is "${value}". Set it to a whole number above zero`,
+      );
+    });
+  }
+});
+
+test('the line to run a failure again names CLAIMS_RUNS when the count is not the default', () => {
+  const changesTwice = cards((draft, input) => {
+    const current = draft.get(card, input.id);
+    if (current) {
+      draft.put(card, { ...current, title: `${current.title}!`.slice(0, 20) });
+    }
+  });
+  withRuns('5', () => {
+    expect(() => proveClaims(changesTwice, { seed: 7 })).toThrow(
+      'Run the same inputs again with CLAIMS_SEED=7 CLAIMS_RUNS=5.',
+    );
+  });
+});
+
 test('a local change that throws fails the claim of its run, with the input, and not as no valid input', () => {
   const throws = cards((draft, input) => {
     if (draft.get(card, input.id)) {

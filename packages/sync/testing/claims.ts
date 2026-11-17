@@ -8,6 +8,9 @@ import type { Pool } from '@repo/sync/runtime/pool';
 import {
   NoValidInputError,
   breaches,
+  claimsRuns,
+  claimsSeed,
+  defaultRuns,
   validInput,
   validRecord,
   words,
@@ -24,12 +27,6 @@ import type { Random } from '@repo/sync/testing/seeded';
  * contract: nothing here lists them. See
  * https://github.com/eggdev/clutch/blob/main/docs/contributing/architecture/contract.md#claims.
  */
-
-/** The seed of a run that names none. A person sets another with `CLAIMS_SEED`. */
-const defaultClaimsSeed = 532;
-
-/** The runs of each command with valid inputs, unless a test names another count. */
-const defaultRuns = 40;
 
 /** The time that the pool stamps on each run, so each run of a seed gives the same records. */
 const runTime = '2026-01-01T00:00:00.000Z';
@@ -321,16 +318,15 @@ function proveRuns(
 /**
  * Proves the claims of each command of a contract. It throws one error that
  * names each broken claim, with the seed and the input that broke it. The
- * seed is `options.seed`, then `CLAIMS_SEED`, then `defaultClaimsSeed`.
+ * seed is `options.seed`, then `CLAIMS_SEED`, then 532. The run count
+ * is `options.runs`, then `CLAIMS_RUNS`, then `defaultRuns`.
  */
 export function proveClaims(
   proven: Proven,
   options: { readonly seed?: number; readonly runs?: number } = {},
 ): ClaimsReport {
-  const named = process.env.CLAIMS_SEED;
-  const fromEnvironment = named ? Math.trunc(Number(named)) : Number.NaN;
-  const seed =
-    options.seed ?? (Number.isNaN(fromEnvironment) ? defaultClaimsSeed : fromEnvironment);
+  const seed = claimsSeed(options.seed);
+  const runCount = claimsRuns(options.runs);
   const failures: Array<string> = [];
   // The first failing run of each claim of one command, and how many runs broke it.
   let broken = new Map<string, { text: string; runs: number }>();
@@ -360,7 +356,7 @@ export function proveClaims(
     // A generator per command, so the inputs of one command do not move when another is added.
     const random = seededFor(seed, command.name);
     try {
-      proveRuns(random, proven, command, options.runs ?? defaultRuns, check);
+      proveRuns(random, proven, command, runCount, check);
       proveLimits(random, proven, command, check);
     } catch (error) {
       if (!(error instanceof NoValidInputError)) {
@@ -388,7 +384,7 @@ export function proveClaims(
       [
         `The contract ${proven.contract.name} breaks its claims (seed ${seed}).`,
         ...failures,
-        `Run the same inputs again with CLAIMS_SEED=${seed}. See https://github.com/eggdev/clutch/blob/main/docs/contributing/architecture/contract.md#claims.`,
+        `Run the same inputs again with CLAIMS_SEED=${seed}${runCount === defaultRuns ? '' : ` CLAIMS_RUNS=${runCount}`}. See https://github.com/eggdev/clutch/blob/main/docs/contributing/architecture/contract.md#claims.`,
       ].join('\n'),
     );
   }

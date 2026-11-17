@@ -16,6 +16,37 @@ import type { Random } from '@repo/sync/testing/seeded';
  */
 export const words: ReadonlyArray<string> = ['k1', 'k2', 'k3'];
 
+/** The seed of a run that names none. A person sets another with `CLAIMS_SEED`. */
+const defaultClaimsSeed = 532;
+
+/** The runs of each command with valid inputs, unless a test or `CLAIMS_RUNS` names another count. */
+export const defaultRuns = 40;
+
+/** The seed of a proof: `option`, then `CLAIMS_SEED`, then `defaultClaimsSeed`. */
+export function claimsSeed(option: number | undefined): number {
+  const named = process.env.CLAIMS_SEED;
+  const fromEnvironment = named ? Math.trunc(Number(named)) : Number.NaN;
+  return option ?? (Number.isNaN(fromEnvironment) ? defaultClaimsSeed : fromEnvironment);
+}
+
+/**
+ * The run count of each command: `option`, then `CLAIMS_RUNS`, then
+ * `defaultRuns`. A count that is not a whole number above zero is refused.
+ */
+export function claimsRuns(option: number | undefined): number {
+  const named = process.env.CLAIMS_RUNS;
+  if (option !== undefined || !named) {
+    return option ?? defaultRuns;
+  }
+  const runs = Number(named);
+  if (!Number.isSafeInteger(runs) || runs < 1) {
+    throw new Error(
+      `CLAIMS_RUNS is ${JSON.stringify(named)}. Set it to a whole number above zero, such as CLAIMS_RUNS=400.`,
+    );
+  }
+  return runs;
+}
+
 /** The error of a kind that no value fits. The proof reports it as a command with no valid input. */
 export class NoValidInputError extends Error {
   override name = 'NoValidInputError';

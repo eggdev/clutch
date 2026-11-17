@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { claimsFindings } from '@tools/contract-claims';
+import { claimsFindings, proofFiles } from '@tools/contract-claims';
 import { formatFinding } from '@tools/findings';
 
 const scratch: Array<string> = [];
@@ -63,5 +63,19 @@ test('a test file at any depth that imports the proof and calls it proves the cl
   });
   expect(claimsFindings(named, 'demo-pad', 'demoPadContract').map((item) => item.id)).toEqual([
     'check-contract/claims-not-proven',
+  ]);
+});
+
+test('the proof files are each package test that calls the proof, but none of the engine', async () => {
+  const proof = "import { proveClaims } from '@repo/sync/testing/claims';\nproveClaims(x);\n";
+  const folder = await repository({
+    'packages/notes/runtime/contract-claims.test.ts': proof,
+    'packages/notes/runtime/other.test.ts': 'test();\n',
+    'packages/access/runtime/contract-claims.test.ts': proof,
+    'packages/sync/testing/claims.test.ts': proof,
+  });
+  expect(proofFiles(folder)).toEqual([
+    'packages/access/runtime/contract-claims.test.ts',
+    'packages/notes/runtime/contract-claims.test.ts',
   ]);
 });

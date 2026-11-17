@@ -77,6 +77,10 @@ shows it. It runs `bun tools/journeys/run.ts --hunt 20`: each web journey runs
   fails the PR.
 - Run it locally with a smaller count: `mise exec -- bun run journey --hunt 3`.
 
+The same workflow has a `claims` job. It proves the contract claims of each
+package with a new seed each night. Unlike the `journeys` job, it fails when
+a claim breaks. See [Claims](./architecture/contract.md#claims).
+
 ## Devices
 
 Each web journey runs on three devices, on every PR. They are the three
