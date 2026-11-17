@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.22.1 (2026-11-17)
+
+### Fixes and maintenance
+
+- fix(docs): one reviewer in the adopt steps, and an even seed (CL-563)
+
 ## 1.22.0 (2026-11-17)
 
 ### Features
