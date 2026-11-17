@@ -173,8 +173,13 @@ export function syncProblems(files: Array<ChangedFile>, managed: ReadonlySet<str
 /** The page of review rules. A gardening PR that adds a line to it proposes a rule. */
 const reviewRules = 'docs/contributing/review.md';
 
-/** An added line of a patch that is not blank. The space class leaves out the line end, so a blank added line never counts. */
-const addsLine = /^\+(?!\+\+ )[^\S\n]*\S/mu;
+/**
+ * An added line of a patch that is not blank. The patch of the files listing
+ * starts at the first hunk and has no `+++` file line, so each line that
+ * starts with `+` is an added line. The space class leaves out the line end,
+ * so a blank added line never counts.
+ */
+const addsLine = /^\+[^\S\n]*\S/mu;
 
 /** Why a gardening PR waits for the owner when it proposes a rule. */
 export const ruleHold = 'The gardening pass proposes a rule. The owner approves a new rule.';
