@@ -18,10 +18,13 @@ export const huntRuns = 20_000;
 /** The time limit of one proof test in milliseconds. The default of `bun test` is 5 seconds. */
 const testTimeout = 600_000;
 
-/** A new seed from 1 to 2^31 - 1. */
+/**
+ * A new seed from 1 to 2^31 - 1. A shift drops one bit of the random value.
+ * A modulo would make some seeds more likely than others. A zero becomes 1.
+ */
 export function newSeed(): number {
-  const [value] = crypto.getRandomValues(new Uint32Array(1));
-  return (value % 2_147_483_647) + 1;
+  const [value = 0] = crypto.getRandomValues(new Uint32Array(1));
+  return value >>> 1 || 1;
 }
 
 /** One broken claim that the output of a failed proof names. */
