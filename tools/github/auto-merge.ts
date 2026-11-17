@@ -153,6 +153,24 @@ async function riskTier(run: Run, defaultBranch: string, sha: string) {
   return (JSON.parse(out) as { tier: string }).tier;
 }
 
+/**
+ * One line of the files listing as a `ChangedFile`. The listing gives `null`
+ * for a patch or an old path that GitHub left out, and a rule that asks for
+ * "no patch" must see none.
+ */
+function changedFile(line: string): ChangedFile {
+  const file = JSON.parse(line) as {
+    filename: string;
+    patch?: string | null;
+    previous_filename?: string | null;
+  };
+  return {
+    filename: file.filename,
+    ...(typeof file.patch === 'string' ? { patch: file.patch } : {}),
+    ...(file.previous_filename ? { previous: file.previous_filename } : {}),
+  };
+}
+
 /** The changed files of a pull request, with their diffs. */
 export async function changedFiles(
   run: Run,
@@ -165,12 +183,9 @@ export async function changedFiles(
     '--paginate',
     `repos/${repo}/pulls/${pr}/files?per_page=100`,
     '--jq',
-    '.[] | {filename, patch}',
+    '.[] | {filename, patch, previous_filename}',
   );
-  return out
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as ChangedFile);
+  return out.split('\n').filter(Boolean).map(changedFile);
 }
 
 /**

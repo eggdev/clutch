@@ -203,8 +203,8 @@ never the only record of a leftover. Report a bug with the
 Once a week, `.github/workflows/gardening.yml` runs an agent for one short
 pass. The agent edits files only. The workflow commits the edits to a
 `gardening/<date>` branch and opens one pull request. It never pushes to the
-default branch, and it skips the week while a gardening PR is open. The PR opens with the release bot's token when the
-`CLUTCH_APP_ID` variable is set. A PR that the default token opens starts no
+default branch, and it skips the week while a gardening PR is open. The PR
+opens with the release bot's token when the `CLUTCH_APP_ID` variable is set. A PR that the default token opens starts no
 CI or agent review. See [the release bot](./setup/releases.md#the-release-bot).
 The agent runs on the model that the `CLUTCH_AGENT_MODEL` repository variable
 names, or on `claude-haiku-5-5` when it is unset. The workflow adds a
@@ -219,8 +219,8 @@ The pass:
    interventions and rework.
 2. Turn a repeated mistake into a candidate rule only with evidence. The same
    mistake occurs in at least 2 PRs, as review comments or reverts. It has a
-   trigger that you can read from a diff. Name both PRs and the trigger. A week with no such
-   repeat needs no rule.
+   trigger that you can read from a diff. Name both PRs and the trigger. A
+   week with no such repeat needs no rule.
 3. Make 3 independent attempts to disprove each candidate, one for each angle.
    Use one subagent for each attempt. Drop the candidate when one attempt
    succeeds.
@@ -231,9 +231,11 @@ The pass:
    - Argue that the pattern is not a mistake, or that a cheaper fix removes its
      cause.
 4. Add each candidate that survives to [`review.md`](./review.md), in the form
-   that its section "Add or remove a rule" asks for. Use the strongest cheap
-   kind from
-   [promote learning into enforcement](#promote-learning-into-enforcement).
+   that its section "Add or remove a rule" asks for. Add it only when no
+   check, lint rule or type can hold the rule. When one can, propose that
+   guardrail in the PR body, as
+   [promote learning into enforcement](#promote-learning-into-enforcement)
+   says.
    The PR body has a section "Candidate rules". For each candidate, it gives
    the rule text, the trigger, the 2 PRs and the result of each attempt. A
    dropped candidate is listed too.
@@ -260,8 +262,8 @@ The pass:
     owner. See the [design-proposal](../../.agents/skills/design-proposal/SKILL.md)
     skill.
 11. Run `mise exec -- bun run validate`, and fix what it reports. The
-    workflow runs it again before the commit. When it fails, the job fails and
-    opens no PR.
+    workflow formats the edits and runs it again before the commit. When it
+    fails, the job fails and opens no PR.
 
 A gardening PR that adds a rule to `review.md`, or changes a guardrail file,
 waits for the owner's approval of its head. A PR that only deletes a rule can

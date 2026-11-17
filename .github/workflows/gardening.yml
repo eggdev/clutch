@@ -44,7 +44,7 @@ jobs:
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
-      # One gardening PR at a time. A person reviews the open one first.
+      # One gardening PR at a time. The open one merges or closes first.
       - name: Find an open gardening pull request
         id: open
         if: steps.credential.outputs.run == 'true'
@@ -126,7 +126,9 @@ jobs:
                Drop the candidate when one attempt succeeds.
             4. Add each candidate that survives to
                `docs/contributing/review.md`, in the form that its section
-               "Add or remove a rule" asks for. The body has a section
+               "Add or remove a rule" asks for. Add it only when no check,
+               lint rule or type can hold the rule. When one can, propose that
+               guardrail in the body and leave the page as it is. The body has a section
                "Candidate rules". For each candidate, also a dropped one, give
                the rule text, the trigger, the 2 pull requests and the result
                of each attempt.
@@ -205,13 +207,14 @@ jobs:
             echo "::error title=Gardening gave no result::The gardening step returned no structured output. Read its log."
             exit 1
           fi
-          title="$(printf '%s' "$RESULT" | jq -r '.title')"
+          # A result with no title gives an empty text here, not the word "null".
+          title="$(printf '%s' "$RESULT" | jq -r '.title // empty')"
           if [ -z "$title" ] || [ -z "$(git status --porcelain)" ]; then
             echo "::notice title=Gardening found nothing::The pass made no edits this week."
             exit 0
           fi
           printf '%s' "$title" > "$RUNNER_TEMP/gardening-title.txt"
-          printf '%s' "$RESULT" | jq -r '.body' > "$RUNNER_TEMP/gardening-body.md"
+          printf '%s' "$RESULT" | jq -r '.body // empty' > "$RUNNER_TEMP/gardening-body.md"
           # Each PR carries a changeset, as tools/github/pr.ts writes it: feat is
           # a minor bump, "!" is a major one, and the rest are a patch.
           bump='patch'
@@ -219,14 +222,18 @@ jobs:
             *'!:'*) bump=major ;;
             feat*) bump=minor ;;
           esac
-          printf -- '---\n"%s": %s\n---\n\n%s\n' "$(jq -r .name package.json)" "$bump" "$title" \
+          # Single quotes around the name, as the formatter keeps them.
+          printf -- "---\n'%s': %s\n---\n\n%s\n" "$(jq -r .name package.json)" "$bump" "$title" \
             > ".changeset/gardening-$(date -u +%Y-%m-%d).md"
           echo "edits=true" >> "$GITHUB_OUTPUT"
       # The agent may skip or miss a check. A red pass fails here with the
-      # output and opens no pull request, since no session would fix one.
-      - name: Run the checks on the edits
+      # output and opens no pull request, since no session would fix one. The
+      # agent has no format command, so the formatter runs first.
+      - name: Format the edits and run the checks
         if: steps.prepare.outputs.edits == 'true'
-        run: mise exec -- bun run validate
+        run: |
+          mise exec -- bun run format
+          mise exec -- bun run validate
       - name: Open the gardening pull request
         if: steps.prepare.outputs.edits == 'true'
         env:

@@ -11,8 +11,12 @@
  * .agents/skills/deliver/references/pull-requests.md#auto-merge.
  */
 
-/** One changed file of a pull request, as `gh api repos/<repo>/pulls/<n>/files` gives it. */
-export type ChangedFile = { filename: string; patch?: string };
+/**
+ * One changed file of a pull request, from `gh api repos/<repo>/pulls/<n>/files`.
+ * GitHub gives no patch for a large file, a binary file or a pure rename.
+ * `previous` is the old path of a renamed file.
+ */
+export type ChangedFile = { filename: string; patch?: string; previous?: string };
 
 /**
  * The bot whose pull request this is, from its head branch, or null. The
@@ -169,6 +173,9 @@ export function syncProblems(files: Array<ChangedFile>, managed: ReadonlySet<str
 /** The page of review rules. A gardening PR that adds a line to it proposes a rule. */
 const reviewRules = 'docs/contributing/review.md';
 
+/** An added line of a patch that is not blank. The space class leaves out the line end, so a blank added line never counts. */
+const addsLine = /^\+(?!\+\+ )[^\S\n]*\S/mu;
+
 /** Why a gardening PR waits for the owner when it proposes a rule. */
 export const ruleHold = 'The gardening pass proposes a rule. The owner approves a new rule.';
 
@@ -193,11 +200,21 @@ export function gardeningProblems(
     return problems;
   }
   const globs = guardrails.map((pattern) => new Bun.Glob(pattern));
-  const rules = files.filter((file) =>
-    file.filename === reviewRules
-      ? file.patch === undefined || /^\+(?!\+\+ )\s*\S/mu.test(file.patch)
-      : globs.some((glob) => glob.match(file.filename)),
-  );
+  const guardrail = (name: string) => globs.some((glob) => glob.match(name));
+  const rules = files.filter((file) => {
+    // A rename away from a rule file removes that rule, so the old path counts too.
+    if (
+      file.previous === reviewRules ||
+      (file.previous !== undefined && guardrail(file.previous))
+    ) {
+      return true;
+    }
+    if (file.filename === reviewRules) {
+      // With no patch, the PR may add a rule that this code cannot see.
+      return file.patch === undefined || addsLine.test(file.patch);
+    }
+    return guardrail(file.filename);
+  });
   if (rules.length > 0) {
     problems.push(`${ruleHold} It changes ${rules.map((file) => file.filename).join(', ')}.`);
   }

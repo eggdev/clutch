@@ -155,11 +155,24 @@ test('a gardening PR that adds a review rule or changes a guardrail file waits f
   expect(gardeningProblems([{ filename: review }], 'low', guardrails, false)).toHaveLength(1);
 });
 
+test('a gardening PR that renames a rule file away waits for the owner', () => {
+  const moved = [{ filename: 'tools/old/docs.ts', previous: 'tools/check-docs.ts' }];
+  expect(gardeningProblems(moved, 'low', guardrails, false)).toEqual([
+    `${ruleHold} It changes tools/old/docs.ts.`,
+  ]);
+  const page = [{ filename: 'docs/old-review.md', previous: review }];
+  expect(gardeningProblems(page, 'low', guardrails, false)).toHaveLength(1);
+  expect(gardeningProblems(moved, 'low', guardrails, true)).toEqual([]);
+});
+
 test('a gardening PR that only deletes a review rule, or changes other files, merges as before', () => {
   const deleted = [
     { filename: review, patch: '@@ -1,3 +1,2 @@\n line\n-- Trigger: an old rule.\n+' },
   ];
   expect(gardeningProblems(deleted, 'low', guardrails, false)).toEqual([]);
+  // A blank added line with a kept line after it adds no rule.
+  const blank = [{ filename: review, patch: '@@ -1,3 +1,3 @@\n-- Trigger: old.\n+\n kept line' }];
+  expect(gardeningProblems(blank, 'low', guardrails, false)).toEqual([]);
   expect(
     gardeningProblems([{ filename: 'docs/x.md', patch: '+text' }], 'medium', guardrails, false),
   ).toEqual([]);

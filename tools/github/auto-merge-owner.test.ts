@@ -140,4 +140,32 @@ test('on holds a gardening PR that adds a review rule, until the owner approves 
   expect(await decide(approvedHead, config)).toEqual([
     'Would auto-merge at the step bots. The owner approved this head.\nQueued the merge.',
   ]);
+  // GitHub leaves out the patch of a large file, and the listing then says `null`.
+  const noPatch = fake(
+    [
+      [
+        'gh api --paginate repos/eggdev/clutch/pulls/7/files',
+        { out: '{"filename":"docs/contributing/review.md","patch":null,"previous_filename":null}' },
+      ],
+    ],
+    gardening,
+  );
+  const [held] = await decide(noPatch, config);
+  expect(held).toContain('The gardening pass proposes a rule.');
+  expect(merges(noPatch.calls)).toEqual([]);
+  // A rename of a check script away from its guardrail path is a changed rule too.
+  const renamed = fake(
+    [
+      [
+        'gh api --paginate repos/eggdev/clutch/pulls/7/files',
+        {
+          out: '{"filename":"tools/old/scope.ts","patch":null,"previous_filename":"tools/check-scope.ts"}',
+        },
+      ],
+    ],
+    gardening,
+  );
+  const [moved] = await decide(renamed, config);
+  expect(moved).toContain('It changes tools/old/scope.ts.');
+  expect(merges(renamed.calls)).toEqual([]);
 });
