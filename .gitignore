@@ -32,6 +32,8 @@ node_modules
 .env.*.local
 playwright-report/
 test-results/
+# The Playwright browser tool writes its log here; oxfmt --check reads it
+.playwright-mcp/
 
 # Python skill helpers
 __pycache__/
