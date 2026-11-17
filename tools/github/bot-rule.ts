@@ -3,8 +3,9 @@
  * `bots` step of auto-merge. A Renovate PR may when its diff changes only
  * dependency versions, lockfiles and changesets. Renovate already waits out
  * the 3-day release age (`minimumReleaseAge` in renovate.json). A gardening
- * PR may when its risk tier is low. A Clutch sync PR may when it changes only
- * what `clutch sync` writes.
+ * PR may when its risk tier is low or medium, and it proposes no rule, or the
+ * owner approved its head. A Clutch sync PR may when it changes only what
+ * `clutch sync` writes.
  * A revert PR is judged in auto-merge.ts,
  * since it needs the reverted PR. See
  * .agents/skills/deliver/references/pull-requests.md#auto-merge.
@@ -163,4 +164,42 @@ export function syncProblems(files: Array<ChangedFile>, managed: ReadonlySet<str
     }
     return [`${file.filename} is not a file that clutch sync writes.`];
   });
+}
+
+/** The page of review rules. A gardening PR that adds a line to it proposes a rule. */
+const reviewRules = 'docs/contributing/review.md';
+
+/** Why a gardening PR waits for the owner when it proposes a rule. */
+export const ruleHold = 'The gardening pass proposes a rule. The owner approves a new rule.';
+
+/**
+ * Why a gardening PR may not merge without a person. Its risk tier must be low
+ * or medium. It proposes a rule when it adds a line to the review rules, or
+ * changes a file that `guardrails` (the patterns of tools/guardrail-files.json)
+ * matches. Such a PR waits until the owner approves its head. A PR that only
+ * deletes rules merges as before.
+ */
+export function gardeningProblems(
+  files: Array<ChangedFile>,
+  tier: string,
+  guardrails: Array<string>,
+  ownerApproved: boolean,
+) {
+  const problems: Array<string> = [];
+  if (!['low', 'medium'].includes(tier)) {
+    problems.push(`The gardening PR's risk tier is ${tier}, not low or medium.`);
+  }
+  if (ownerApproved) {
+    return problems;
+  }
+  const globs = guardrails.map((pattern) => new Bun.Glob(pattern));
+  const rules = files.filter((file) =>
+    file.filename === reviewRules
+      ? file.patch === undefined || /^\+(?!\+\+ )\s*\S/mu.test(file.patch)
+      : globs.some((glob) => glob.match(file.filename)),
+  );
+  if (rules.length > 0) {
+    problems.push(`${ruleHold} It changes ${rules.map((file) => file.filename).join(', ')}.`);
+  }
+  return problems;
 }

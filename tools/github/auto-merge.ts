@@ -19,7 +19,7 @@ import {
 } from '@tools/github/auto-merge-rules';
 import type { Config, Facts, Mode, Pr, Step } from '@tools/github/auto-merge-rules';
 import { autoMerged } from '@tools/github/auto-revert';
-import { botKind, renovateProblems, syncProblems } from '@tools/github/bot-rule';
+import { botKind, gardeningProblems, renovateProblems, syncProblems } from '@tools/github/bot-rule';
 import type { ChangedFile } from '@tools/github/bot-rule';
 import { retrying } from '@tools/github/command';
 import { contractBreaks } from '@tools/github/contract-breaks';
@@ -173,6 +173,15 @@ export async function changedFiles(
     .map((line) => JSON.parse(line) as ChangedFile);
 }
 
+/**
+ * The patterns of tools/guardrail-files.json in the base checkout, so a PR
+ * cannot change the list that judges it. None without the file.
+ */
+async function guardrails(): Promise<Array<string>> {
+  const file = Bun.file(path.join(root, 'tools/guardrail-files.json'));
+  return (await file.exists()) ? ((await file.json()) as { patterns: Array<string> }).patterns : [];
+}
+
 /** The managed files that `.clutch/lineage.json` lists at `sha`, from the checkout. None without one. */
 async function syncedFiles(run: Run, sha: string) {
   const lineage = await run(['git', 'show', `${sha}:.clutch/lineage.json`]);
@@ -250,13 +259,14 @@ export async function runAutoMerge(
   const tier = await riskTier(run, defaultBranch, pr.headRefOid);
   // Read once: the bot rule, the contract breaks and the major change judge the same files.
   const changed = await changedFiles(run, repo, values.pr);
+  const approved = await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner);
   let botProblems: Array<string> = [];
   if (bot === 'renovate') {
     botProblems = renovateProblems(changed);
   } else if (bot === 'clutch-sync') {
     botProblems = syncProblems(changed, await syncedFiles(run, pr.headRefOid));
-  } else if (bot === 'gardening' && !['low', 'medium'].includes(tier)) {
-    botProblems = [`The gardening PR's risk tier is ${tier}, not low or medium.`];
+  } else if (bot === 'gardening') {
+    botProblems = gardeningProblems(changed, tier, await guardrails(), approved);
   } else if (bot === 'revert') {
     botProblems = await revertProblems(pr.headRefName, tier, (n) => autoMerged(run, repo, n));
   }
@@ -275,7 +285,7 @@ export async function runAutoMerge(
     major: await majorChange(run, repo, values.pr, changed),
     botProblems,
     mainRed: await redOn(run, repo, defaultBranch, names),
-    ownerApproved: await ownerApproved(run, repo, values.pr, pr.headRefOid, config.owner),
+    ownerApproved: approved,
   };
   const reasons = blockers(facts, step);
   const verdict = verdictText(reasons, step, facts.ownerApproved);
