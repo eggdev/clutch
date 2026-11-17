@@ -95,6 +95,24 @@ jobs:
         run: |
           git diff --no-color "$BASE_SHA"...HEAD > "$RUNNER_TEMP/pr.diff"
           echo "Full diff: $(grep -c '^diff --git ' "$RUNNER_TEMP/pr.diff") files, $(wc -l < "$RUNNER_TEMP/pr.diff") lines."
+      - if: steps.credential.outputs.present == 'true'
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          install_args: bun
+      # The reviewer applies only the rules of review.md whose triggers the diff matches. The default branch's copy of the tool selects them, so a PR cannot change which rules review it. Any failure falls back to every rule.
+      - name: Select the review rules
+        if: steps.credential.outputs.present == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          out="$RUNNER_TEMP/review-rules.md"
+          if git show "$BASE_SHA:tools/github/review-rules.ts" > "$RUNNER_TEMP/review-rules.ts" 2>/dev/null \
+            && bun "$RUNNER_TEMP/review-rules.ts" "$RUNNER_TEMP/pr.diff" docs/contributing/review.md > "$out"; then
+            head -n 3 "$out"
+          else
+            echo "::notice title=Every review rule applies::The rules could not be selected for this diff, so the review applies every rule of docs/contributing/review.md."
+            echo "Apply every rule of docs/contributing/review.md." > "$out"
+          fi
       # Each head starts the review with no memory of the earlier heads, so their owner findings are listed here and the review checks them against the diff again.
       - name: Collect earlier owner findings
         if: steps.credential.outputs.present == 'true'
@@ -157,11 +175,15 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Review this pull request against docs/contributing/review.md.
+            Review this pull request against the rules of docs/contributing/review.md
+            that its diff triggers.
             The PR branch is checked out in the current working directory.
 
-            1. Read docs/contributing/review.md. Its rules are the only rules
-               for this review. Do not add rules of your own.
+            1. Read `${{ runner.temp }}/review-rules.md`. It holds the finding
+               levels, the owner findings and the rules of review.md that this
+               diff triggers. Those rules are the only rules for this review.
+               Do not add rules of your own. If the file says to apply every
+               rule, read docs/contributing/review.md and apply each rule.
             2. Read the full diff from the file at `${{ runner.temp }}/pr.diff`,
                and the description with `gh pr view`. Use `gh pr diff` only
                when the file is missing. The file can be longer than one Read,

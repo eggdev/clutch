@@ -59,7 +59,7 @@
     "packages/sync/testing/claims.ts",
     "packages/sync/testing/claim-inputs.ts",
     "docs/contributing/review.md",
-    ".cursor/BUGBOT.md",
+    "tools/github/review-rules.ts",
     "tools/journeys/**",
     "packages/journeys/**",
     "docs/contributing/journeys/core.md",

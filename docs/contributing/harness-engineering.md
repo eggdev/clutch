@@ -186,9 +186,9 @@ The checks in `tools/` catch most drift on each change. They find:
 - undocumented dependency overrides
 
 [Review](./review.md) holds the rules that no check catches yet. An agent
-reviews each PR against it in `.github/workflows/agent-review.yml`. Cursor
-Bugbot reads the same page through `.cursor/BUGBOT.md`. When a check covers a
-rule, delete the rule from `review.md`.
+reviews each PR against it in `.github/workflows/agent-review.yml`. Agent
+review is the one reviewer. When a check covers a rule, delete the rule from
+`review.md`.
 
 Record follow-up work as an issue. Leftovers from a migration follow
 [delete what is off the common path](../principles/delete-off-the-common-path.md).
