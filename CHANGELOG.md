@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.22.0 (2026-11-17)
+
+### Features
+
+- feat(tools): start a new check in observe mode (CL-559)
+
+### Fixes and maintenance
+
+- fix(ci): push the gardening branch with the Git hooks off (CL-562)
+
 ## 1.21.0 (2026-11-17)
 
 ### Features
