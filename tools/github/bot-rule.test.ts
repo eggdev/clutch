@@ -153,6 +153,11 @@ test('a gardening PR that adds a review rule or changes a guardrail file waits f
     gardeningProblems([{ filename: 'tools/check-docs.ts', patch: '' }], 'low', guardrails, false),
   ).toEqual([`${ruleHold} It changes tools/check-docs.ts.`]);
   expect(gardeningProblems([{ filename: review }], 'low', guardrails, false)).toHaveLength(1);
+  // The patch has no `+++` file line, so an added line that starts with `++ ` is a rule too.
+  const plus = [
+    { filename: review, patch: '@@ -1,1 +1,2 @@\n line\n+++ a rule with two plus signs' },
+  ];
+  expect(gardeningProblems(plus, 'low', guardrails, false)).toHaveLength(1);
 });
 
 test('a gardening PR that renames a rule file away waits for the owner', () => {
