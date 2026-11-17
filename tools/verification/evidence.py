@@ -4,6 +4,7 @@ import hashlib
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 
 
 def digest(path):
@@ -11,10 +12,24 @@ def digest(path):
         return hashlib.file_digest(source, 'sha256').hexdigest()
 
 
+def tree(root, excludes):
+    """The Git tree id of the work tree, so `pr open` can match a receipt to the tree it pushes."""
+    with tempfile.TemporaryDirectory() as folder:
+        env = {**os.environ, 'GIT_INDEX_FILE': str(Path(folder) / 'index')}
+        # An excluded path keeps its HEAD content. git add refuses an ignored pathspec, so reset it after.
+        steps = [['git', 'read-tree', 'HEAD'], ['git', 'add', '--all']]
+        if excludes:
+            steps.append(['git', 'reset', '-q', 'HEAD', '--', *map(str, excludes)])
+        for argv in steps:
+            subprocess.run(argv, cwd=root, env=env, capture_output=True, check=True)
+        return subprocess.run(['git', 'write-tree'], cwd=root, env=env, capture_output=True,
+                              check=True).stdout.decode().strip()
+
+
 def revision(root, excludes):
     head = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=root, capture_output=True)
     if head.returncode:
-        return {'sha': None, 'dirtySha256': None, 'versioned': False}
+        return {'sha': None, 'dirtySha256': None, 'tree': None, 'versioned': False}
     paths = ['.', *[':(exclude)' + str(p) for p in excludes]]
     changed = subprocess.run(['git', 'diff', 'HEAD', '--binary', '--', *paths], cwd=root,
                              capture_output=True, check=True).stdout
@@ -32,7 +47,7 @@ def revision(root, excludes):
             raise RuntimeError('Cannot fingerprint an untracked source entry')
         state.update(name + b'\0' + value.encode() + b'\0')
     return {'sha': head.stdout.decode().strip(), 'dirtySha256': state.hexdigest() if changed or names else None,
-            'versioned': True}
+            'tree': tree(root, excludes), 'versioned': True}
 
 
 def below(root, value):

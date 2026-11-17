@@ -37,6 +37,8 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - After you rebase your own branch, run `open` again with `--force`. It pushes
   with `--force-with-lease`, which refuses when someone else pushed to the branch.
 - To change only the body, run `bun run pr body <number> <file>`.
+- `open` writes the verification record as the first line of the
+  "Verification" section. See [verification record](#verification-record).
 - `open` asks the release bot to open a new PR. See
   [who opens the pull request](#who-opens-the-pull-request).
 - `open` marks the branch's issue `done` in the PR head, before it pushes. A
@@ -47,6 +49,44 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - `bun run pr ready <id> <number>` is optional. It adds the PR link to the
   issue, once the PR exists. It makes no commit when the issue already says
   `done` with that link.
+
+### Verification record
+
+`open` builds the record from the receipts of the verify runner, never from
+text that the agent writes. It does these steps:
+
+1. It finds the flows that `paths` in `.agents/skills/verify/verification.json`
+   names for the files that the branch changes. A Markdown file needs no flow.
+   A journey flow with no `paths` covers its feature folder.
+2. It reads each passing receipt under `$DELIVERY_EVIDENCE_ROOT`. Each receipt
+   holds the Git tree id of the files that the flow ran on. A receipt counts
+   when that tree is the tree of the head. A later change to Markdown only,
+   such as the changeset, keeps it.
+3. It writes one line, and replaces the line on each later `open`.
+
+The line is one of these forms:
+
+- `Verified: notes-sync, installer`: each flow that is due passed on this tree.
+- `Verified: none; missing: installer`: a flow that is due has no receipt.
+- `Verified: none (docs only)`: the change is Markdown only.
+- `Verified: none (no flow covers these files)`: no flow maps the change.
+
+`verification.gate` in `clutch.yaml` sets what a missing flow does. It applies
+to a change that is not docs only.
+
+- `observe`, the default: `open` prints that the gate would block the PR, and
+  goes on. The records are the log.
+- `enforce`: `open` refuses the PR and names the flows to run.
+  `--unverified "<reason>"` lets it through, and the record ends with
+  `unverified because: <reason>`.
+- `off`: `open` writes the record and does nothing else.
+
+Move the gate from `observe` to `enforce` when the owner has read some weeks of
+records and found no wrong block. To list the merged PRs with no verified flow:
+
+```sh
+gh pr list --state merged --limit 100 --search 'in:body "Verified: none" -"docs only"'
+```
 
 ### Who opens the pull request
 

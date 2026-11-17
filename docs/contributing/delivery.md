@@ -75,6 +75,10 @@ review. A PR that builds on another open PR joins its linear GitHub stack.
 and reach the states needed for review. Each acceptance criterion needs an
 observed result at the tested revision. Automated tests, runtime exercises and
 craft reviews answer different questions; none substitutes for all the others.
+Running the app end to end matters more than tests. `pr open` writes a
+verification record on each PR from the verify receipts. The gate in
+`clutch.yaml` starts in `observe` mode. See
+[verification record](../../.agents/skills/deliver/references/pull-requests.md#verification-record).
 
 A UI review produces findings. The agent fixes confirmed defects inside the
 brief and rechecks their behavior. Unrelated improvements stay in the queue.

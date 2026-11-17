@@ -12,7 +12,7 @@
 
 ## Verification
 
-<!-- Map acceptance criteria to observed results at the tested revision. Include commands such as `mise exec -- bun run validate`, their results, artifacts and any unverified criteria. -->
+<!-- `bun run pr open` writes the first line, `Verified: ...`, from the verify receipts. Do not write it yourself. Below it, map acceptance criteria to observed results at the tested revision. Include commands such as `mise exec -- bun run validate`, their results, artifacts and any unverified criteria. -->
 
 ## Flows checked on the preview
 

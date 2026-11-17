@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 
 import { capabilityRegistry } from '@/clutch-checkout';
 import { loadClutchConfig } from '@/clutch-config/load';
+import type { ClutchConfig } from '@/clutch-config/schema';
 import { baselineFile, nextBaseline, readBaseline, writeBaseline } from '@/doctor/baseline';
 import { coreJourneyFindings } from '@/doctor/core-journeys';
 import { detect } from '@/doctor/detect';
@@ -73,6 +74,10 @@ function rulesetFindings(states: Array<RulesetState> | string) {
       message: `ruleset drift: GitHub's ruleset ${item.name} ${item.state === 'missing' ? 'does not exist' : 'differs from'} ${item.file}. Run: mise exec -- bun run clutch ruleset --apply`,
     }));
 }
+
+/** The verification gate of `bun run pr open`. observe is the default. */
+const gateLine = (config?: ClutchConfig) =>
+  `Verification gate: ${config?.verification?.gate ?? 'observe'}`;
 
 async function run(args: Array<string>, cwd: string): Promise<number> {
   const { values } = parseArgs({
@@ -177,6 +182,7 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
   } else {
     console.log(renderReport(report));
     console.log(renderSast(sast));
+    console.log(gateLine(config));
     if (typeof rulesets === 'string') {
       console.log(`Rulesets: unknown (${rulesets})`);
     } else if (rulesets) {

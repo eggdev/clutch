@@ -8,7 +8,9 @@ import {
   readDeploy,
   readFactory,
   readJourneys,
+  readVerification,
 } from '@/clutch-config/optional-keys';
+import type { verificationGates } from '@/clutch-config/optional-keys';
 
 const capabilityStatuses = ['adopted', 'waived', 'n/a'] as const;
 const modes = ['sync', 'doctor'] as const;
@@ -60,6 +62,11 @@ export type ClutchConfig = {
    * scanning takes results and Semgrep elsewhere.
    */
   sast?: (typeof sastEngines)[number];
+  /**
+   * What `pr open` does with a change that has no passing receipt for a flow
+   * that the feature map asks for. observe, the default, prints a notice.
+   */
+  verification?: { gate: (typeof verificationGates)[number] };
   /** When `clutch labels` warns about a large PR, and when a PR must split. */
   pr_size?: { warn: number; max?: number; exclude: Array<string> };
   /** Whether the project has each core journey. See docs/contributing/journeys/core.md. */
@@ -92,6 +99,7 @@ const topKeys = [
   'fleet',
   'sast',
   'pr_size',
+  'verification',
   'agentReview',
   'journeys',
   'coreJourneys',
@@ -341,6 +349,7 @@ const optionalSections: Record<string, (value: unknown, errors: Errors) => unkno
   pr: readPr,
   fleet: readFleet,
   pr_size: readPrSize,
+  verification: readVerification,
   journeys: readJourneys,
   coreJourneys: readCoreJourneys,
   budgets: readBudgets,
