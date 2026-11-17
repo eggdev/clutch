@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.23.0 (2026-11-17)
+
+### Features
+
+- feat(github): record how each pull request was verified (CL-558)
+
+### Fixes and maintenance
+
+- docs(harness): list two escape hatches in the table (CL-564)
+
 ## 1.22.1 (2026-11-17)
 
 ### Fixes and maintenance
