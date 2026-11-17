@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.3 (2026-11-17)
+
+### Fixes and maintenance
+
+- fix(release): write a changeset that passes the format check (CL-560)
+
 ## 1.16.2 (2026-11-17)
 
 ### Fixes and maintenance
