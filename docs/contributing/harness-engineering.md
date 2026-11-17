@@ -44,6 +44,10 @@ failure mode.
 
 If reviewers repeat the same comment twice, encode it.
 
+A new check starts as an observed check. It prints a warning and blocks
+nothing, so its false positives show first. A later pull request makes it
+block. See [observed checks](./setup/checks.md#observed-checks).
+
 ## Make failures teach the fix
 
 A failure message is the first doc an agent reads. Each check, lint rule and
