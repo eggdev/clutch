@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.1 (2026-11-17)
+
+### Fixes and maintenance
+
+- fix(merge): count each added line of a gardening rule patch (CL-561)
+
 ## 1.18.0 (2026-11-17)
 
 ### Features
