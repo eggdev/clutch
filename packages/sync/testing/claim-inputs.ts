@@ -22,6 +22,9 @@ const defaultClaimsSeed = 532;
 /** The runs of each command with valid inputs, unless a test or `CLAIMS_RUNS` names another count. */
 export const defaultRuns = 40;
 
+/** The most runs that `CLAIMS_RUNS` may name. A larger count runs until the job stops it. */
+const maxRuns = 1_000_000;
+
 /** The seed of a proof: `option`, then `CLAIMS_SEED`, then `defaultClaimsSeed`. */
 export function claimsSeed(option: number | undefined): number {
   const named = process.env.CLAIMS_SEED;
@@ -39,13 +42,20 @@ export function claimsRuns(option: number | undefined): number {
     return option ?? defaultRuns;
   }
   const runs = Number(named);
-  if (!Number.isSafeInteger(runs) || runs < 1) {
+  if (!Number.isSafeInteger(runs) || runs < 1 || runs > maxRuns) {
     throw new Error(
-      `CLAIMS_RUNS is ${JSON.stringify(named)}. Set it to a whole number above zero, such as CLAIMS_RUNS=400.`,
+      `CLAIMS_RUNS is ${JSON.stringify(named)}. Set it to a whole number from 1 to ${maxRuns}, such as CLAIMS_RUNS=400.`,
     );
   }
   return runs;
 }
+
+/**
+ * What a proof used. `proveClaims` prints it when `CLAIMS_RUNS` is set, so the
+ * nightly hunt can tell that its seed and its count reached the proof.
+ */
+export const usedLine = (contract: string, seed: number, runs: number) =>
+  `The contract ${contract} was proved with seed ${seed} and ${runs} runs of each command.`;
 
 /** The error of a kind that no value fits. The proof reports it as a command with no valid input. */
 export class NoValidInputError extends Error {

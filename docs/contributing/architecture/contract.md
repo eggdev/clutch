@@ -226,7 +226,9 @@ The inputs come from a seeded generator, `seeded` in
 `packages/sync/testing/seeded.ts`. The default seed is 532, with 40 runs of
 each command, so each run tries the same inputs. `CLAIMS_SEED` sets another
 seed, and `CLAIMS_RUNS` sets another run count. An option of the call wins
-over the variable. `CLAIMS_RUNS` must be a whole number above zero.
+over the variable. `CLAIMS_RUNS` must be a whole number from 1 to 1000000.
+While `CLAIMS_RUNS` is set, the proof prints the seed and the run count that
+it used.
 `CLAIMS_SEED=7 CLAIMS_RUNS=400 mise exec -- bun test packages/notes` tries
 400 other inputs for each command. A failure names the seed, the claim, the
 run and the input.
@@ -245,8 +247,14 @@ seconds.
 A claim that breaks on a new input is a defect, not a flaky test, so the job
 fails. The error annotation and the step summary name the package, the
 command, the claim and the line to run it again, such as
-`CLAIMS_SEED=<seed> CLAIMS_RUNS=20000 mise exec -- bun test <file>`. When it
-fails:
+`CLAIMS_SEED=<seed> CLAIMS_RUNS=20000 mise exec -- bun test --timeout 600000 <file>`.
+The line carries the time limit of the hunt. The default limit of `bun test`
+is 5 seconds, and it can end a long run before the failing input.
+
+The job also fails a proof that passed with another seed or run count. A
+`seed` or `runs` option in the proof file wins over the variables, and a
+skipped test proves nothing. Then the night tested no new input for that
+package. When the job fails:
 
 1. Run the printed line. It tries the same inputs again.
 2. Fix the defect in the command or in its contract.

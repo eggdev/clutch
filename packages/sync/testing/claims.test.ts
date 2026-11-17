@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 
 import { command, localChange } from '@repo/sync/contract/command';
 import type { Tool } from '@repo/sync/contract/command';
@@ -141,22 +141,35 @@ function withRuns(value: string, body: () => void) {
   }
 }
 
-test('the run count comes from CLAIMS_RUNS when the test names none', () => {
-  withRuns('7', () => {
-    expect(proveClaims(keeps, { seed: 532 }).checked).toContain(
-      'cards/rename: idempotent (7 runs)',
-    );
-    expect(proveClaims(keeps, { seed: 532, runs: 3 }).checked).toContain(
-      'cards/rename: idempotent (3 runs)',
-    );
-  });
+test('the run count comes from CLAIMS_RUNS when the test names none, and the proof says what it used', () => {
+  const said = spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    withRuns('7', () => {
+      expect(proveClaims(keeps, { seed: 532 }).checked).toContain(
+        'cards/rename: idempotent (7 runs)',
+      );
+      expect(proveClaims(keeps, { seed: 532, runs: 3 }).checked).toContain(
+        'cards/rename: idempotent (3 runs)',
+      );
+    });
+    // The option of the call wins, and the line shows it, so the nightly hunt sees that its count was not used.
+    expect(said.mock.calls.map(([line]) => line)).toEqual([
+      'The contract cards was proved with seed 532 and 7 runs of each command.',
+      'The contract cards was proved with seed 532 and 3 runs of each command.',
+    ]);
+    said.mockClear();
+    proveClaims(keeps, { seed: 532 });
+    expect(said).not.toHaveBeenCalled();
+  } finally {
+    said.mockRestore();
+  }
 });
 
-test('a CLAIMS_RUNS that is not a whole number above zero is refused', () => {
-  for (const value of ['0', '-4', '2.5', 'many']) {
+test('a CLAIMS_RUNS that is not a whole number from 1 to the limit is refused', () => {
+  for (const value of ['0', '-4', '2.5', 'many', '1000001', '9007199254740991']) {
     withRuns(value, () => {
       expect(() => proveClaims(keeps, { seed: 532 })).toThrow(
-        `CLAIMS_RUNS is "${value}". Set it to a whole number above zero`,
+        `CLAIMS_RUNS is "${value}". Set it to a whole number from 1 to 1000000`,
       );
     });
   }

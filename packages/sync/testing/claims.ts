@@ -11,6 +11,7 @@ import {
   claimsRuns,
   claimsSeed,
   defaultRuns,
+  usedLine,
   validInput,
   validRecord,
   words,
@@ -387,6 +388,9 @@ export function proveClaims(
         `Run the same inputs again with CLAIMS_SEED=${seed}${runCount === defaultRuns ? '' : ` CLAIMS_RUNS=${runCount}`}. See https://github.com/eggdev/clutch/blob/main/docs/contributing/architecture/contract.md#claims.`,
       ].join('\n'),
     );
+  }
+  if (process.env.CLAIMS_RUNS) {
+    console.log(usedLine(proven.contract.name, seed, runCount));
   }
   return { seed, checked: check.checked, unchecked: check.unchecked };
 }

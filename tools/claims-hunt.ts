@@ -72,9 +72,22 @@ const runProof: RunProof = (file, seed, runs) => {
   return { file, passed: result.status === 0, output: `${result.stdout}${result.stderr}` };
 };
 
-/** The line that runs one proof file again with the same inputs. */
+/**
+ * The line that runs one proof file again with the same inputs. It carries
+ * the time limit of the hunt, because the default limit of `bun test` ends a
+ * long run before it reaches the failing input.
+ */
 export const againLine = (file: string, seed: number, runs: number) =>
-  `CLAIMS_SEED=${seed} CLAIMS_RUNS=${runs} mise exec -- bun test ${file}`;
+  `CLAIMS_SEED=${seed} CLAIMS_RUNS=${runs} mise exec -- bun test --timeout ${testTimeout} ${file}`;
+
+/**
+ * Whether a proof in `output` ran with the seed and the count of the hunt.
+ * `proveClaims` prints one line for each contract that it proved while
+ * `CLAIMS_RUNS` was set. A `seed` or `runs` option of the call wins over the
+ * variables, and a skipped test prints no line, so each case reads as no.
+ */
+export const usedHunt = (output: string, seed: number, runs: number) =>
+  output.includes(`was proved with seed ${seed} and ${runs} runs of each command.`);
 
 /** Where the hunt writes: the console and the process environment, or a test's capture. */
 export type Sink = {
@@ -101,11 +114,18 @@ export function huntClaims(
     `Seed ${seed}, with ${runs} runs of each command. Each night has a new seed.`,
     '',
   ];
+  // The seed reaches the summary first, so a run that the job stops still names it.
+  const write = (lines: ReadonlyArray<string>) => {
+    if (sink.env.GITHUB_STEP_SUMMARY) {
+      appendFileSync(sink.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+    }
+  };
+  write(summary.splice(0));
   let failed = 0;
   for (const file of files) {
     const result = run(file, seed, runs);
     const again = againLine(file, seed, runs);
-    if (result.passed) {
+    if (result.passed && usedHunt(result.output, seed, runs)) {
       sink.log(`${file}: each claim holds.`);
       summary.push(`- \`${packageOf(file)}\`: each claim holds.`);
       continue;
@@ -113,13 +133,20 @@ export function huntClaims(
     failed += 1;
     sink.log(result.output);
     const broken = brokenClaims(result.output);
-    const named =
-      broken.length > 0
-        ? broken.map(({ command, claim }) => `${command} breaks "${claim}"`)
-        : ['the proof failed and named no broken claim. Read the log'];
+    let title = 'Contract claim broken with a new seed';
+    let named = broken.map(({ command, claim }) => `${command} breaks "${claim}"`);
+    if (result.passed) {
+      title = 'Contract proof did not use the new seed';
+      named = [
+        'the proof passed, but not with the seed and the run count of the hunt. A `seed` or `runs` option of the call wins over the variables, and a skipped test proves nothing',
+      ];
+    } else if (named.length === 0) {
+      title = 'Contract proof failed with a new seed';
+      named = ['the proof failed and named no broken claim. Read the log'];
+    }
     for (const what of named) {
       sink.log(
-        `::error file=${file},title=Contract claim broken with a new seed::Package ${packageOf(file)}: ${what}. Run it again: ${again}`,
+        `::error file=${file},title=${title}::Package ${packageOf(file)}: ${what}. Run it again: ${again}`,
       );
     }
     summary.push(`- \`${packageOf(file)}\`: ${named.join('; ')}. Run it again: \`${again}\``);
@@ -131,11 +158,9 @@ export function huntClaims(
     '',
     failed === 0
       ? 'Each claim holds.'
-      : `${failed} package(s) break a claim. Fix the defect, and add the failing input as a named test. See docs/contributing/architecture/contract.md#claims.`,
+      : `${failed} package(s) have a proof that failed. Fix the defect, and add the failing input as a named test. See docs/contributing/architecture/contract.md#claims.`,
   );
-  if (sink.env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(sink.env.GITHUB_STEP_SUMMARY, `${summary.join('\n')}\n`);
-  }
+  write(summary);
   return failed === 0 ? 0 : 1;
 }
 
