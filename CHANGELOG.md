@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.0 (2026-11-17)
+
+### Features
+
+- feat(sync): prove the contract claims nightly with a new seed (CL-555)
+
 ## 1.17.0 (2026-11-17)
 
 ### Features
