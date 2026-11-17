@@ -46,12 +46,15 @@ export type PrState = {
   approved: boolean;
   log: BabysitLog;
   logId: number | null;
+  /** The account that `gh` runs as. It is often the owner's own, so a person's comment needs no marker of the tool. */
+  viewer?: string;
 };
 
 // A cancelled run is not red: a newer run, or a newer push, took its place.
 const failing = new Set(['FAILURE', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'ERROR']);
 
 const query = `query($owner: String!, $name: String!, $number: Int!) {
+  viewer { login }
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {
     number url isDraft state isCrossRepository headRefOid headRefName baseRefName mergeable
     author { login __typename }
@@ -166,8 +169,10 @@ export async function readPr(
     '-f',
     `query=${query}`,
   ]);
-  const pr = (JSON.parse(out) as { data: { repository: { pullRequest: PrNode } } }).data.repository
-    .pullRequest;
+  const { data } = JSON.parse(out) as {
+    data: { viewer?: { login: string }; repository: { pullRequest: PrNode } };
+  };
+  const pr = data.repository.pullRequest;
   const contexts: Array<Context> =
     pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? [];
   const failed = contexts
@@ -235,5 +240,6 @@ export async function readPr(
     approved: ownerReview?.state === 'APPROVED' && ownerReview.commit?.oid === pr.headRefOid,
     log: logComment ? parseLog(logComment.body) : emptyLog(),
     logId: logComment?.id ?? null,
+    viewer: data.viewer?.login,
   };
 }

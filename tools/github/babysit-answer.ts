@@ -18,6 +18,8 @@ export type Answer = {
   decision: Decision;
   reason: string;
   reply: string;
+  /** For a check: the failing test, when the failure names one. The log keeps it. */
+  test?: string;
 };
 
 /** A fix answers a thread only when this round pushed it. */
@@ -39,7 +41,7 @@ export function actionOf(decision: Decision, pushed: string | null) {
   const actions: Record<string, string> = {
     'no-change': 'no change',
     owner: 'left for the owner',
-    flaky: 'reran the failed jobs',
+    flaky: 'reran as flaky',
     'after-approval': 'not fixed: after the owner approved this head',
   };
   return actions[decision] ?? decision;
@@ -230,6 +232,7 @@ export async function answerChecks({ run, repo, plan, answers, pushed }: Context
       reason: answer?.reason ?? unanswered,
       action: actionOf(decision, pushed),
       resolved: false,
+      ...(answer?.test ? { test: answer.test } : {}),
     });
   }
   return items;

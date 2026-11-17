@@ -78,8 +78,10 @@ craft reviews answer different questions; none substitutes for all the others.
 
 A UI review produces findings. The agent fixes confirmed defects inside the
 brief and rechecks their behavior. Unrelated improvements stay in the queue.
-After three unsuccessful attempts at the same blocker, record the experiments
-and the smallest prerequisite needed to continue.
+When three fix rounds do not clear the same check or the same blocker, the
+session stops and asks the owner. The ask gives what failed, the three
+fixes that the session tried with their evidence, and the smallest decision or
+action that unblocks the work. A rerun of a flaky check is not a fix.
 
 The handoff leads with the working result and evidence. Name missing checks
 and the exact owner decision separately. An authorized release includes checking
