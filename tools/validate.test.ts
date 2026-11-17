@@ -4,7 +4,9 @@ import {
   changedPlan,
   checkTargets,
   findingsDocument,
+  observedTargets,
   runManyArgs,
+  runObserved,
   validateTargets,
 } from '@tools/validate';
 
@@ -73,4 +75,52 @@ test('validate --json names a check that wrote no findings as missing', () => {
     missing: ['check-contract'],
     findings: [],
   });
+});
+
+function fakeRun(target: string) {
+  if (target === 'check-crash') {
+    throw new Error('no such target');
+  }
+  return target === 'check-fake' ? 1 : 0;
+}
+
+test('an observed check with a finding prints a warning, and validate still passes', () => {
+  const lines: Array<string> = [];
+  const code = runObserved(0, ['check-fake', 'check-clean', 'check-crash'], fakeRun, (line) =>
+    lines.push(line),
+  );
+  expect(code).toBe(0);
+  expect(lines).toEqual([
+    'Warning: check-fake would block: it exited with code 1. It is observed, so validate still passes.',
+    'Warning: check-crash would block: it crashed: no such target. It is observed, so validate still passes.',
+  ]);
+});
+
+test('in CI an observed warning is an annotation, and a blocking failure still fails', () => {
+  const lines: Array<string> = [];
+  expect(
+    runObserved(
+      1,
+      ['check-fake'],
+      () => 1,
+      (line) => lines.push(line),
+      true,
+    ),
+  ).toBe(1);
+  expect(lines[0]).toStartWith('::warning title=Observed check check-fake::check-fake would block');
+});
+
+test('with no observed targets, nothing runs and nothing prints', () => {
+  const lines: Array<string> = [];
+  const runs: Array<string> = [];
+  expect(
+    runObserved(
+      0,
+      [],
+      (target) => runs.push(target),
+      (line) => lines.push(line),
+    ),
+  ).toBe(0);
+  expect([...runs, ...lines]).toEqual([]);
+  expect(observedTargets.filter((target) => validateTargets.includes(target))).toEqual([]);
 });

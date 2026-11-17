@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { checkScope } from '@tools/check-scope';
+import { checkScope, sourceList } from '@tools/check-scope';
+import { observedTargets, validateTargets } from '@tools/validate';
 
 let root = '';
 
@@ -96,4 +98,50 @@ test('a hand_test line in the body of an issue does not count', async () => {
   const errors = checkScope(root, 'HEAD', { ...limits, max: 100 });
   expect(errors).toHaveLength(1);
   expect(errors[0]).toContain('hand_test');
+});
+
+const quote = (list: Array<string>) => list.map((target) => `'${target}'`).join(', ');
+
+async function lists(checks: Array<string>, observed: Array<string>) {
+  await write(
+    'package.json',
+    JSON.stringify({ nx: { targets: { checks: { dependsOn: checks } } } }),
+  );
+  await write(
+    'tools/validate.ts',
+    `export const validateTargets = ['checks'];\nexport const observedTargets: Array<string> = [${quote(observed)}];\n`,
+  );
+}
+
+const unobserved = (target: string) =>
+  `The PR adds ${target} to a blocking list, and the base does not observe it. A new check starts in observedTargets of tools/validate.ts. A rename or split passes when it removes the old target.`;
+
+test('a new blocking target fails unless the base observes it', async () => {
+  await lists(['check-old'], []);
+  git('add', '-A');
+  git('commit', '-qm', 'lists');
+  await lists(['check-old', 'check-new'], []);
+  expect(checkScope(root, 'HEAD', { max: 100, exclude: [] })).toEqual([unobserved('check-new')]);
+
+  await lists(['check-old'], ['check-new']);
+  git('add', '-A');
+  git('commit', '-qm', 'observe');
+  await lists(['check-old', 'check-new'], []);
+  expect(checkScope(root, 'HEAD', { max: 100, exclude: [] })).toEqual([]);
+});
+
+test('a rename passes one for one, and a split adds one target too many', async () => {
+  await lists(['check-old'], []);
+  git('add', '-A');
+  git('commit', '-qm', 'lists');
+  await lists(['check-renamed'], []);
+  expect(checkScope(root, 'HEAD', { max: 100, exclude: [] })).toEqual([]);
+  await lists(['check-a', 'check-b'], []);
+  expect(checkScope(root, 'HEAD', { max: 100, exclude: [] })).toEqual([unobserved('check-b')]);
+});
+
+test('the source reader finds the lists of tools/validate.ts', () => {
+  const source = readFileSync(path.join(import.meta.dir, 'validate.ts'), 'utf-8');
+  expect(sourceList(source, 'validateTargets')).toEqual(validateTargets);
+  expect(sourceList(source, 'observedTargets')).toEqual(observedTargets);
 });

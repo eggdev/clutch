@@ -26,6 +26,15 @@ export const validateTargets = [
 ];
 
 /**
+ * Each observed check target. `validate` runs each one after the blocking
+ * targets, and prints a finding as a warning. An observed check never changes
+ * the exit code. A new check starts here, and a later pull request moves it to
+ * a blocking list. check-scope holds that rule. See
+ * docs/contributing/setup/checks.md#observed-checks.
+ */
+export const observedTargets: Array<string> = [];
+
+/**
  * The time a `validate --changed` run should take, in seconds. Above it, the
  * run warns. Measured on the 4-core GitHub runner on 2026-10-31 (CL-303): the
  * validate step's p50 was 64 s for the full run over 5 PRs, and 50 s for
@@ -64,6 +73,45 @@ function runNx(
 export function runTargets(targets: Array<string>, env: Record<string, string | undefined>) {
   return runNx(runManyArgs(targets), env);
 }
+
+/** The warning for an observed check that would block. In CI it is a warning annotation. */
+export function observedWarning(target: string, why: string, ci: boolean) {
+  const text = `${target} would block: ${why}. It is observed, so validate still passes.`;
+  return ci ? `::warning title=Observed check ${target}::${text}` : `Warning: ${text}`;
+}
+
+/**
+ * Runs each observed target with `run`, and prints a warning for each that
+ * fails or crashes. Returns `blocking`, the exit code of the blocking
+ * targets, so an observed check never changes the result. With no observed
+ * targets, it runs nothing and prints nothing.
+ */
+export function runObserved(
+  blocking: number,
+  targets: ReadonlyArray<string>,
+  run: (target: string) => number,
+  print: (line: string) => void = console.log,
+  ci = Boolean(process.env.GITHUB_ACTIONS),
+) {
+  for (const target of targets) {
+    let why: string;
+    try {
+      const code = run(target);
+      if (code === 0) {
+        continue;
+      }
+      why = `it exited with code ${code}`;
+    } catch (error) {
+      why = `it crashed: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    print(observedWarning(target, why, ci));
+  }
+  return blocking;
+}
+
+/** Runs one observed target with Nx, for `runObserved`. */
+const runObservedTarget = (env: Record<string, string | undefined>) => (target: string) =>
+  runTargets([target], env);
 
 /**
  * The document that `validate --json` prints. `checks` names each check that
@@ -156,7 +204,11 @@ async function validateChanged(root: string, explicitBase: string | undefined) {
       exits.push(await start(step).exited);
     }
   }
-  const code = exits.find((exit) => exit !== 0) ?? 0;
+  const code = runObserved(
+    exits.find((exit) => exit !== 0) ?? 0,
+    plan.kind === 'none' ? [] : observedTargets,
+    runObservedTarget(env),
+  );
   const seconds = Math.round((performance.now() - started) / 1000);
   console.log(`validate --changed took ${seconds} s (budget ${changedBudgetSeconds} s).`);
   if (seconds > changedBudgetSeconds) {
@@ -183,5 +235,10 @@ if (import.meta.main) {
   const quick = args.includes('--quick');
   // CI=1 for validate, so its Nx cache keys match CI's. See docs/contributing/setup/nx.md#cache-keys.
   const env = quick ? process.env : { ...process.env, CI: '1' };
-  process.exit(runTargets(quick ? checkTargets : validateTargets, env));
+  if (quick) {
+    process.exit(runTargets(checkTargets, env));
+  }
+  process.exit(
+    runObserved(runTargets(validateTargets, env), observedTargets, runObservedTarget(env)),
+  );
 }

@@ -21,6 +21,12 @@ style when an AI agent runs it. That style prints only the path of each failing
 task's log under `~/.nx`. Clutch syncs `tools/`, so a project gets a change to
 the list or the flags without a decision on its `package.json` scripts.
 
+| List              | In                  | A failure                                                                    |
+| ----------------- | ------------------- | ---------------------------------------------------------------------------- |
+| `validateTargets` | `tools/validate.ts` | Blocks. `checks` is one of these targets                                     |
+| `dependsOn`       | `checks` target     | Blocks                                                                       |
+| `observedTargets` | `tools/validate.ts` | Prints a warning and blocks nothing. See [observed checks](#observed-checks) |
+
 ### Only what changed
 
 ```sh
@@ -80,6 +86,7 @@ A check stays only when it stops a mistake that an agent makes for real. The
 pull request of a new check target names the check that it replaces, or it
 says why none can go. No check covers these two rules, so review keeps them.
 See [decision record 0006](../decisions/0006-no-cap-on-the-blocking-checks.md).
+A new check also starts as an [observed check](#observed-checks).
 
 | Target                       | Rejects                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -109,7 +116,7 @@ See [decision record 0006](../decisions/0006-no-cap-on-the-blocking-checks.md).
 | `check-workflow-lint`        | actionlint errors, shellcheck findings in `run:` scripts, and zizmor findings of medium severity or higher                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `check-flaky-tests`          | A quarantined test that is expired, more than 30 days out, missing from its file, or tied to a done issue                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `check-user-docs`            | A user page whose frontmatter breaks the table in [user docs](../../users/README.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `check-scope`                | A PR over `pr_size.max` lines, a new screen with no stated `hand_test`, or a new feature after kickoff with no `goal:` from project intent.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `check-scope`                | A PR over `pr_size.max` lines, a new screen with no stated `hand_test`, or a new feature after kickoff with no `goal:` from project intent. A new target in a blocking list that the base did not observe. See [observed checks](#observed-checks)                                                                                                                                                                                                                                                                                                                                                                     |
 | `check-migrations`           | A change, rename or deletion of a migration that reached `main`. See [migrations](./migrations.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `check-guardrail-coverage`   | A file that a check, a lint plugin or a hook reads, with no pattern in `tools/guardrail-files.json`. See [guardrail files](../harness-engineering.md#guardrail-files)                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `check-transaction-safe`     | A service that marks itself transaction-safe when `primitives.yaml` does not list it. See [server](../architecture/server.md#services-in-a-server-change)                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -127,9 +134,9 @@ See [decision record 0006](../decisions/0006-no-cap-on-the-blocking-checks.md).
 Add a check as `tools/check-<name>.ts`. Export a `check<Name>(root)` function
 that returns its findings, so a test can call it on a temporary repository. A
 new check starts on the finding type. See [findings](#findings). Add
-a test, a root target in `package.json`, the target in the `dependsOn` list of
-the root `checks` target, and a row here. `validate` and the pre-push hook both
-run `checks`, so the new check runs in both.
+a test, a root target in `package.json`, the target in `observedTargets`, and a
+row here. A later pull request moves the target to the `dependsOn` list of the
+root `checks` target. See [observed checks](#observed-checks).
 
 A failure message names the file, the problem and the fix. Print the fix hint
 and a link to the page that owns the rule above the list of problems. See
@@ -141,6 +148,28 @@ string, and the run continues. See [CI](#ci) for the other three rules.
 
 [Dependencies](./dependencies.md) explains `check-dependency-overrides` and
 `audit-prod`. `audit-prod` needs network access.
+
+### Observed checks
+
+A new check starts in `observedTargets` in
+[`tools/validate.ts`](../../../tools/validate.ts). `validate` and
+`validate --changed` run each observed check after the blocking targets. The
+pre-push hook, `check` and `validate --json` do not run them.
+
+When an observed check exits with an error, `validate` prints one warning with
+its target name and the reason. In CI, the warning is an annotation on the run.
+A crash prints a warning too. An observed check never changes the exit code of
+`validate`.
+Read each warning. It is a real problem, or a false positive of the check.
+
+A later pull request moves the check to the `dependsOn` list of `checks`. That
+pull request says what the check reported while it was observed. It says that
+each report was a real problem, or what changed in the check.
+
+`check-scope` holds this rule on a pull request. It fails when the pull request
+adds a target to a blocking list, and the base has that target in no list. A
+rename or a split passes when the pull request removes as many targets from the
+blocking lists. With no base, it skips this rule.
 
 ### Findings
 

@@ -15,6 +15,10 @@ import { parse } from 'yaml';
  * - After kickoff, a PR that adds a feature changes an issue whose `goal:` names
  *   a user goal from docs/contributing/project-intent.md, so the product cannot
  *   drift from who it is for.
+ * - A PR adds a target to a blocking list only when the base has that target
+ *   in the observed list, or in a blocking list already. A PR that removes as
+ *   many targets from the blocking lists may add as many, for a rename or a
+ *   split. See docs/contributing/setup/checks.md#observed-checks.
  */
 const screen = /^features\/[^/]+\/screens\/(?!\.gitkeep$).+$/u;
 const issue = /^\.clutch\/issues\/[^/]+\.md$/u;
@@ -103,6 +107,61 @@ function namesGoal(root: string, files: ReadonlyArray<string>) {
     });
 }
 
+/** The text of `file` at `rev`. Empty when the file is not there. */
+const textAt = (root: string, rev: string, file: string) =>
+  Bun.spawnSync(['git', '-C', root, 'show', `${rev}:${file}`]).stdout.toString();
+
+/** The string items of the array `name` in the source of tools/validate.ts, or null. */
+export function sourceList(source: string, name: string) {
+  const body = new RegExp(`export const ${name}[^=]*=\\s*\\[([^\\]]*)\\]`, 'u').exec(source)?.[1];
+  return body === undefined ? null : [...body.matchAll(/'([^']+)'/gu)].map((match) => match[1]);
+}
+
+/** The `dependsOn` list of the root `checks` target in package.json, or null. */
+function checksList(json: string) {
+  try {
+    const list = JSON.parse(json)?.nx?.targets?.checks?.dependsOn;
+    return Array.isArray(list) ? list.filter((item) => typeof item === 'string') : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The blocking lists and the observed list of a revision. A list it lacks is null. */
+function targetLists(read: (file: string) => string) {
+  const validate = read('tools/validate.ts');
+  return {
+    blocking: [checksList(read('package.json')), sourceList(validate, 'validateTargets')],
+    observed: new Set(sourceList(validate, 'observedTargets')),
+  };
+}
+
+/**
+ * The targets that the PR adds to a blocking list, while the base has them in
+ * no list. As many as the PR removes from the blocking lists pass. A list that
+ * one side lacks, such as a project without tools/validate.ts, is skipped.
+ */
+export function unobservedTargets(root: string, base: string, head: string | null) {
+  const before = targetLists((file) => textAt(root, base, file));
+  const after = targetLists((file) => contentOf(root, head, file));
+  const was = new Set<string>();
+  const now = new Set<string>();
+  for (const [at, list] of before.blocking.entries()) {
+    const next = after.blocking[at];
+    if (list !== null && next !== null) {
+      for (const target of list) {
+        was.add(target);
+      }
+      for (const target of next) {
+        now.add(target);
+      }
+    }
+  }
+  const added = [...now].filter((target) => !was.has(target) && !before.observed.has(target));
+  const removed = [...was].filter((target) => !now.has(target)).length;
+  return added.slice(removed);
+}
+
 export function checkScope(
   root: string,
   base: string,
@@ -139,6 +198,11 @@ export function checkScope(
   ) {
     errors.push(
       `The PR adds features/${features.join(', features/')}, and no changed issue has a \`goal:\` from ${intentFile}.`,
+    );
+  }
+  for (const target of unobservedTargets(root, base, head)) {
+    errors.push(
+      `The PR adds ${target} to a blocking list, and the base does not observe it. A new check starts in observedTargets of tools/validate.ts. A rename or split passes when it removes the old target.`,
     );
   }
   return errors;
