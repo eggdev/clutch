@@ -98,7 +98,8 @@ const passed = 'The blocking checks passed, so validate exits with code 0.';
 test('an observed check with a finding prints a warning, and validate still passes', () => {
   const lines: Array<string> = [];
   const targets = ['check-fake', 'check-clean', 'check-crash', 'check-killed'];
-  expect(runObserved(0, targets, fakeRun, (line) => lines.push(line))).toBe(0);
+  // Outside CI. The test names it, so the form does not follow the machine that runs the test.
+  expect(runObserved(0, targets, fakeRun, (line) => lines.push(line), false)).toBe(0);
   expect(lines).toEqual([
     heading,
     'Warning: check-fake would block: it exited with code 1. It is observed, so validate still passes.',
