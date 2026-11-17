@@ -102,10 +102,15 @@ test('a hand_test line in the body of an issue does not count', async () => {
 
 const quote = (list: Array<string>) => list.map((target) => `'${target}'`).join(', ');
 
-async function lists(checks: Array<string>, observed: Array<string>) {
+/** Writes the lists. Each target runs `bun tools/<script>.ts`, by default its own name. */
+async function lists(checks: Array<string>, observed: Array<string>, scripts = {}) {
+  const command = (target: string) => ({
+    options: { command: `bun tools/${(scripts as Record<string, string>)[target] ?? target}.ts` },
+  });
+  const targets = Object.fromEntries([...checks, ...observed].map((t) => [t, command(t)]));
   await write(
     'package.json',
-    JSON.stringify({ nx: { targets: { checks: { dependsOn: checks } } } }),
+    JSON.stringify({ nx: { targets: { ...targets, checks: { dependsOn: checks } } } }),
   );
   await write(
     'tools/validate.ts',
@@ -113,31 +118,61 @@ async function lists(checks: Array<string>, observed: Array<string>) {
   );
 }
 
+function commit(message: string) {
+  git('add', '-A');
+  git('commit', '-qm', message);
+}
+
+const scope = () => checkScope(root, 'HEAD', { max: 100, exclude: [] });
+
 const unobserved = (target: string) =>
-  `The PR adds ${target} to a blocking list, and the base does not observe it. A new check starts in observedTargets of tools/validate.ts. A rename or split passes when it removes the old target.`;
+  `The PR adds ${target} to a blocking list, and the base does not observe it. Add it to observedTargets in tools/validate.ts first. Only a rename that keeps the command of the old target skips that step. A split or a replacement does not.`;
 
 test('a new blocking target fails unless the base observes it', async () => {
   await lists(['check-old'], []);
-  git('add', '-A');
-  git('commit', '-qm', 'lists');
+  commit('lists');
   await lists(['check-old', 'check-new'], []);
-  expect(checkScope(root, 'HEAD', { max: 100, exclude: [] })).toEqual([unobserved('check-new')]);
+  expect(scope()).toEqual([unobserved('check-new')]);
 
   await lists(['check-old'], ['check-new']);
-  git('add', '-A');
-  git('commit', '-qm', 'observe');
+  commit('observe');
   await lists(['check-old', 'check-new'], []);
-  expect(checkScope(root, 'HEAD', { max: 100, exclude: [] })).toEqual([]);
+  expect(scope()).toEqual([]);
 });
 
-test('a rename passes one for one, and a split adds one target too many', async () => {
+test('only a rename that keeps the command skips observe mode', async () => {
   await lists(['check-old'], []);
-  git('add', '-A');
-  git('commit', '-qm', 'lists');
-  await lists(['check-renamed'], []);
-  expect(checkScope(root, 'HEAD', { max: 100, exclude: [] })).toEqual([]);
-  await lists(['check-a', 'check-b'], []);
-  expect(checkScope(root, 'HEAD', { max: 100, exclude: [] })).toEqual([unobserved('check-b')]);
+  commit('lists');
+  await lists(['check-renamed'], [], { 'check-renamed': 'check-old' });
+  expect(scope()).toEqual([]);
+  await lists(['check-new'], []);
+  expect(scope()).toEqual([unobserved('check-new')]);
+  await lists(['check-a', 'check-b'], [], { 'check-a': 'check-old' });
+  expect(scope()).toEqual([unobserved('check-b')]);
+  await lists(['check-new'], ['check-old']);
+  expect(scope()).toEqual([unobserved('check-new')]);
+});
+
+test('a blocking list that the head cannot read is a problem', async () => {
+  await lists(['check-old'], []);
+  commit('lists');
+  await write('tools/validate.ts', 'const list = [];\nexport const validateTargets = list;\n');
+  expect(scope()).toEqual([
+    'check-scope cannot read validateTargets in tools/validate.ts at the head, so it cannot check new blocking targets. Write it as an array of strings.',
+  ]);
+});
+
+test('the source reader skips comments and matches the exact name', () => {
+  const source = [
+    "export const validateTargetsOld = ['wrong'];",
+    "/* export const validateTargets = ['commented']; */",
+    'export const validateTargets: Array<string> = [ // a list ] with a bracket',
+    "  'typecheck', /* ] */",
+    "  'https://example.com', // keep",
+    '];',
+  ].join('\n');
+  expect(sourceList(source, 'validateTargets')).toEqual(['typecheck', 'https://example.com']);
+  expect(sourceList('export const validateTargets = list;', 'validateTargets')).toBeNull();
 });
 
 test('the source reader finds the lists of tools/validate.ts', () => {

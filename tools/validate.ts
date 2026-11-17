@@ -74,44 +74,111 @@ export function runTargets(targets: Array<string>, env: Record<string, string | 
   return runNx(runManyArgs(targets), env);
 }
 
+/**
+ * The time limit of one observed check, in seconds. A check runs in seconds,
+ * and the whole blocking run takes about 64 s (CL-303). A check that runs for
+ * 5 minutes hangs, so the limit stops it and validate goes on.
+ */
+export const observedLimitSeconds = 300;
+
+/** How one observed check ended: an exit code, or the signal that stopped it. */
+export type ObservedEnd = number | { signal: string; timedOut?: boolean };
+
+/** Text for a GitHub workflow command. A title also encodes `:` and `,`. */
+export function escapeAnnotation(text: string, title = false) {
+  const escaped = text.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+  return title ? escaped.replaceAll(':', '%3A').replaceAll(',', '%2C') : escaped;
+}
+
 /** The warning for an observed check that would block. In CI it is a warning annotation. */
 export function observedWarning(target: string, why: string, ci: boolean) {
   const text = `${target} would block: ${why}. It is observed, so validate still passes.`;
-  return ci ? `::warning title=Observed check ${target}::${text}` : `Warning: ${text}`;
+  return ci
+    ? `::warning title=${escapeAnnotation(`Observed check ${target}`, true)}::${escapeAnnotation(text)}`
+    : `Warning: ${text}`;
+}
+
+/** Why an observed check that ended with `end` would block, or null when it passed. */
+function failure(end: ObservedEnd) {
+  if (typeof end === 'number') {
+    return end === 0 ? null : `it exited with code ${end}`;
+  }
+  return end.timedOut
+    ? `it ran past the limit of ${observedLimitSeconds} s, so validate stopped it`
+    : `the signal ${end.signal} ended it`;
 }
 
 /**
  * Runs each observed target with `run`, and prints a warning for each that
- * fails or crashes. Returns `blocking`, the exit code of the blocking
- * targets, so an observed check never changes the result. With no observed
- * targets, it runs nothing and prints nothing.
+ * fails, crashes or runs past its limit. A heading comes first, and the result
+ * of the blocking targets comes last. Returns `blocking`, their exit code, so
+ * an observed check never changes the result. With no observed targets, it
+ * runs nothing and prints nothing.
  */
 export function runObserved(
   blocking: number,
   targets: ReadonlyArray<string>,
-  run: (target: string) => number,
+  run: (target: string) => ObservedEnd,
   print: (line: string) => void = console.log,
   ci = Boolean(process.env.GITHUB_ACTIONS),
 ) {
+  if (targets.length === 0) {
+    return blocking;
+  }
+  print('Observed checks (they never block):');
   for (const target of targets) {
-    let why: string;
+    let why: string | null;
     try {
-      const code = run(target);
-      if (code === 0) {
-        continue;
-      }
-      why = `it exited with code ${code}`;
+      why = failure(run(target));
     } catch (error) {
       why = `it crashed: ${error instanceof Error ? error.message : String(error)}`;
     }
-    print(observedWarning(target, why, ci));
+    if (why !== null) {
+      print(observedWarning(target, why, ci));
+    }
   }
+  print(
+    `The blocking checks ${blocking === 0 ? 'passed' : 'failed'}, so validate exits with code ${blocking}.`,
+  );
   return blocking;
 }
 
-/** Runs one observed target with Nx, for `runObserved`. */
-const runObservedTarget = (env: Record<string, string | undefined>) => (target: string) =>
-  runTargets([target], env);
+/** Runs one observed target with Nx, inside its time limit. */
+export const runObservedTarget =
+  (env: Record<string, string | undefined>, cwd?: string, limitSeconds = observedLimitSeconds) =>
+  (target: string): ObservedEnd => {
+    const run = Bun.spawnSync([process.execPath, 'x', 'nx', ...runManyArgs([target])], {
+      env,
+      cwd,
+      stdout: 'inherit',
+      stderr: 'inherit',
+      timeout: limitSeconds * 1000,
+    });
+    // Nx can catch the signal of the limit and exit with a code, so check the limit first.
+    if (run.exitedDueToTimeout) {
+      return { signal: String(run.signalCode ?? 'SIGTERM'), timedOut: true };
+    }
+    // Bun types exitCode as a number, but a signal leaves it null.
+    return run.signalCode ? { signal: String(run.signalCode) } : run.exitCode;
+  };
+
+/**
+ * The step that `validate` and `validate --changed` both run after the
+ * blocking targets: each observed target with Nx. Returns `blocking`.
+ */
+export function observe(
+  blocking: number,
+  env: Record<string, string | undefined>,
+  options: { targets?: ReadonlyArray<string>; cwd?: string; limitSeconds?: number } = {},
+  print: (line: string) => void = console.log,
+) {
+  return runObserved(
+    blocking,
+    options.targets ?? observedTargets,
+    runObservedTarget(env, options.cwd, options.limitSeconds),
+    print,
+  );
+}
 
 /**
  * The document that `validate --json` prints. `checks` names each check that
@@ -204,11 +271,9 @@ async function validateChanged(root: string, explicitBase: string | undefined) {
       exits.push(await start(step).exited);
     }
   }
-  const code = runObserved(
-    exits.find((exit) => exit !== 0) ?? 0,
-    plan.kind === 'none' ? [] : observedTargets,
-    runObservedTarget(env),
-  );
+  const code = observe(exits.find((exit) => exit !== 0) ?? 0, env, {
+    targets: plan.kind === 'none' ? [] : observedTargets,
+  });
   const seconds = Math.round((performance.now() - started) / 1000);
   console.log(`validate --changed took ${seconds} s (budget ${changedBudgetSeconds} s).`);
   if (seconds > changedBudgetSeconds) {
@@ -238,7 +303,5 @@ if (import.meta.main) {
   if (quick) {
     process.exit(runTargets(checkTargets, env));
   }
-  process.exit(
-    runObserved(runTargets(validateTargets, env), observedTargets, runObservedTarget(env)),
-  );
+  process.exit(observe(runTargets(validateTargets, env), env));
 }

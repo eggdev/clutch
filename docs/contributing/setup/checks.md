@@ -156,20 +156,37 @@ A new check starts in `observedTargets` in
 `validate --changed` run each observed check after the blocking targets. The
 pre-push hook, `check` and `validate --json` do not run them.
 
-When an observed check exits with an error, `validate` prints one warning with
-its target name and the reason. In CI, the warning is an annotation on the run.
-A crash prints a warning too. An observed check never changes the exit code of
-`validate`.
-Read each warning. It is a real problem, or a false positive of the check.
+`validate` prints the line `Observed checks (they never block):` before the
+observed checks. After them, it prints the result of the blocking checks and
+the exit code. When an observed check exits with an error, `validate` prints
+one warning with its target name and the reason. A crash, a signal and the time
+limit print a warning too. The time limit is 5 minutes for each check. In CI,
+the warning is an annotation on the run. An observed check never changes the
+exit code of `validate`.
 
 A later pull request moves the check to the `dependsOn` list of `checks`. That
 pull request says what the check reported while it was observed. It says that
-each report was a real problem, or what changed in the check.
+each report was a real problem, or what changed in the check. To get the
+reports, run the check on `main`:
+
+```sh
+mise exec -- bun tools/<name>.ts
+```
+
+Then read the warning annotations of the CI runs on `main`. These commands list
+the runs and show the annotations of one run:
+
+```sh
+gh run list --workflow CI --branch main --limit 20
+gh run view <run-id>
+```
 
 `check-scope` holds this rule on a pull request. It fails when the pull request
-adds a target to a blocking list, and the base has that target in no list. A
-rename or a split passes when the pull request removes as many targets from the
-blocking lists. With no base, it skips this rule.
+adds a target to a blocking list, and the base has that target in no list. Only
+a true rename passes: the pull request removes a blocking target, and the new
+target runs the same command. A split, a replacement and a new check all start
+in `observedTargets`. When `check-scope` cannot read a blocking list at the
+head, it fails. With no base, it skips this rule.
 
 ### Findings
 

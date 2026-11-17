@@ -16,9 +16,9 @@ import { parse } from 'yaml';
  *   a user goal from docs/contributing/project-intent.md, so the product cannot
  *   drift from who it is for.
  * - A PR adds a target to a blocking list only when the base has that target
- *   in the observed list, or in a blocking list already. A PR that removes as
- *   many targets from the blocking lists may add as many, for a rename or a
- *   split. See docs/contributing/setup/checks.md#observed-checks.
+ *   in the observed list, or in a blocking list already. A true rename passes:
+ *   the new target runs the command of a removed one. See
+ *   docs/contributing/setup/checks.md#observed-checks.
  */
 const screen = /^features\/[^/]+\/screens\/(?!\.gitkeep$).+$/u;
 const issue = /^\.clutch\/issues\/[^/]+\.md$/u;
@@ -111,55 +111,116 @@ function namesGoal(root: string, files: ReadonlyArray<string>) {
 const textAt = (root: string, rev: string, file: string) =>
   Bun.spawnSync(['git', '-C', root, 'show', `${rev}:${file}`]).stdout.toString();
 
-/** The string items of the array `name` in the source of tools/validate.ts, or null. */
+/** `source` without its comments. A string keeps its text, so `//` in a URL stays. */
+const withoutComments = (source: string) =>
+  source.replaceAll(
+    /('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//gu,
+    (match, text: string | undefined) => text ?? '',
+  );
+
+/**
+ * The string items of the array `name` in the source of tools/validate.ts, or
+ * null. It matches the exact name, then `:` or `=`, then an array literal.
+ */
 export function sourceList(source: string, name: string) {
-  const body = new RegExp(`export const ${name}[^=]*=\\s*\\[([^\\]]*)\\]`, 'u').exec(source)?.[1];
+  const body = new RegExp(`export const ${name}\\s*(?::[^=]*)?=\\s*\\[([^\\]]*)\\]`, 'u').exec(
+    withoutComments(source),
+  )?.[1];
   return body === undefined ? null : [...body.matchAll(/'([^']+)'/gu)].map((match) => match[1]);
 }
 
-/** The `dependsOn` list of the root `checks` target in package.json, or null. */
-function checksList(json: string) {
+/** The root Nx targets of package.json, or null. */
+function rootTargets(json: string): Record<string, unknown> | null {
   try {
-    const list = JSON.parse(json)?.nx?.targets?.checks?.dependsOn;
-    return Array.isArray(list) ? list.filter((item) => typeof item === 'string') : null;
+    const targets = JSON.parse(json)?.nx?.targets;
+    return typeof targets === 'object' && targets !== null ? targets : null;
   } catch {
     return null;
   }
 }
 
+/** The `dependsOn` list of the root `checks` target, or null. */
+function checksList(targets: Record<string, unknown> | null) {
+  const list = (targets?.checks as { dependsOn?: unknown } | undefined)?.dependsOn;
+  return Array.isArray(list) ? list.filter((item) => typeof item === 'string') : null;
+}
+
+/** The command of a root target, as text, or null when it has none. */
+function commandOf(targets: Record<string, unknown> | null, target: string) {
+  const options = (targets?.[target] as { options?: { command?: unknown; commands?: unknown } })
+    ?.options;
+  const command = options?.command ?? options?.commands;
+  return command === undefined ? null : JSON.stringify(command);
+}
+
 /** The blocking lists and the observed list of a revision. A list it lacks is null. */
 function targetLists(read: (file: string) => string) {
   const validate = read('tools/validate.ts');
+  const targets = rootTargets(read('package.json'));
   return {
-    blocking: [checksList(read('package.json')), sourceList(validate, 'validateTargets')],
+    targets,
+    blocking: [
+      { name: 'the dependsOn list of checks in package.json', list: checksList(targets) },
+      {
+        name: 'validateTargets in tools/validate.ts',
+        list: sourceList(validate, 'validateTargets'),
+      },
+    ],
     observed: new Set(sourceList(validate, 'observedTargets')),
   };
 }
 
 /**
- * The targets that the PR adds to a blocking list, while the base has them in
- * no list. As many as the PR removes from the blocking lists pass. A list that
- * one side lacks, such as a project without tools/validate.ts, is skipped.
+ * The problems with the blocking lists of the PR. A target that the PR adds to
+ * a blocking list, while the base has it in no list, is one. A true rename
+ * passes: the PR removes a blocking target, and the new target at the head
+ * runs the same command as the old one at the base. A list that the base
+ * lacks, such as in a project without tools/validate.ts, is skipped. A list
+ * that the base has and the head cannot be read is a problem.
  */
-export function unobservedTargets(root: string, base: string, head: string | null) {
+export function blockingProblems(root: string, base: string, head: string | null) {
   const before = targetLists((file) => textAt(root, base, file));
   const after = targetLists((file) => contentOf(root, head, file));
+  const problems: Array<string> = [];
   const was = new Set<string>();
   const now = new Set<string>();
-  for (const [at, list] of before.blocking.entries()) {
-    const next = after.blocking[at];
-    if (list !== null && next !== null) {
-      for (const target of list) {
-        was.add(target);
-      }
-      for (const target of next) {
-        now.add(target);
-      }
+  for (const [at, { name, list }] of before.blocking.entries()) {
+    const next = after.blocking[at]?.list ?? null;
+    if (list === null) {
+      continue;
+    }
+    if (next === null) {
+      problems.push(
+        `check-scope cannot read ${name} at the head, so it cannot check new blocking targets. Write it as an array of strings.`,
+      );
+      continue;
+    }
+    for (const target of list) {
+      was.add(target);
+    }
+    for (const target of next) {
+      now.add(target);
     }
   }
-  const added = [...now].filter((target) => !was.has(target) && !before.observed.has(target));
-  const removed = [...was].filter((target) => !now.has(target)).length;
-  return added.slice(removed);
+  const removed = new Set(
+    [...was]
+      .filter((target) => !now.has(target))
+      .map((target) => commandOf(before.targets, target))
+      .filter((command) => command !== null),
+  );
+  for (const target of now) {
+    if (was.has(target) || before.observed.has(target)) {
+      continue;
+    }
+    const command = commandOf(after.targets, target);
+    if (command !== null && removed.delete(command)) {
+      continue;
+    }
+    problems.push(
+      `The PR adds ${target} to a blocking list, and the base does not observe it. Add it to observedTargets in tools/validate.ts first. Only a rename that keeps the command of the old target skips that step. A split or a replacement does not.`,
+    );
+  }
+  return problems;
 }
 
 export function checkScope(
@@ -200,11 +261,7 @@ export function checkScope(
       `The PR adds features/${features.join(', features/')}, and no changed issue has a \`goal:\` from ${intentFile}.`,
     );
   }
-  for (const target of unobservedTargets(root, base, head)) {
-    errors.push(
-      `The PR adds ${target} to a blocking list, and the base does not observe it. A new check starts in observedTargets of tools/validate.ts. A rename or split passes when it removes the old target.`,
-    );
-  }
+  errors.push(...blockingProblems(root, base, head));
   return errors;
 }
 

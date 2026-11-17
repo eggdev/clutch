@@ -1,9 +1,14 @@
 import { expect, test } from 'bun:test';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import {
   changedPlan,
   checkTargets,
+  escapeAnnotation,
   findingsDocument,
+  observe,
   observedTargets,
   runManyArgs,
   runObserved,
@@ -81,46 +86,81 @@ function fakeRun(target: string) {
   if (target === 'check-crash') {
     throw new Error('no such target');
   }
+  if (target === 'check-killed') {
+    return { signal: 'SIGKILL' };
+  }
   return target === 'check-fake' ? 1 : 0;
 }
 
+const heading = 'Observed checks (they never block):';
+const passed = 'The blocking checks passed, so validate exits with code 0.';
+
 test('an observed check with a finding prints a warning, and validate still passes', () => {
   const lines: Array<string> = [];
-  const code = runObserved(0, ['check-fake', 'check-clean', 'check-crash'], fakeRun, (line) =>
-    lines.push(line),
-  );
-  expect(code).toBe(0);
+  const targets = ['check-fake', 'check-clean', 'check-crash', 'check-killed'];
+  expect(runObserved(0, targets, fakeRun, (line) => lines.push(line))).toBe(0);
   expect(lines).toEqual([
+    heading,
     'Warning: check-fake would block: it exited with code 1. It is observed, so validate still passes.',
     'Warning: check-crash would block: it crashed: no such target. It is observed, so validate still passes.',
+    'Warning: check-killed would block: the signal SIGKILL ended it. It is observed, so validate still passes.',
+    passed,
   ]);
 });
 
-test('in CI an observed warning is an annotation, and a blocking failure still fails', () => {
+test('in CI an observed warning is an escaped annotation, and a blocking failure still fails', () => {
   const lines: Array<string> = [];
   expect(
     runObserved(
       1,
-      ['check-fake'],
+      ['check-a:b,c'],
       () => 1,
       (line) => lines.push(line),
       true,
     ),
   ).toBe(1);
-  expect(lines[0]).toStartWith('::warning title=Observed check check-fake::check-fake would block');
+  expect(lines[1]).toStartWith('::warning title=Observed check check-a%3Ab%2Cc::check-a:b,c would');
+  expect(lines[2]).toBe('The blocking checks failed, so validate exits with code 1.');
+  expect(escapeAnnotation('100% done\r\nnext')).toBe('100%25 done%0D%0Anext');
+  expect(escapeAnnotation('a: b, c', true)).toBe('a%3A b%2C c');
 });
 
 test('with no observed targets, nothing runs and nothing prints', () => {
   const lines: Array<string> = [];
   const runs: Array<string> = [];
-  expect(
-    runObserved(
-      0,
-      [],
-      (target) => runs.push(target),
-      (line) => lines.push(line),
-    ),
-  ).toBe(0);
+  const run = (target: string) => runs.push(target);
+  expect(runObserved(0, [], run, (line) => lines.push(line))).toBe(0);
   expect([...runs, ...lines]).toEqual([]);
   expect(observedTargets.filter((target) => validateTargets.includes(target))).toEqual([]);
 });
+
+const nxTarget = (command: string) => ({
+  executor: 'nx:run-commands',
+  options: { command },
+  cache: false,
+});
+
+test('validate runs a real observed target with Nx, and stops one at its limit', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'observe-'));
+  try {
+    await symlink(
+      path.join(import.meta.dir, '..', 'node_modules'),
+      path.join(root, 'node_modules'),
+    );
+    await writeFile(path.join(root, 'nx.json'), '{"neverConnectToCloud":true}');
+    const targets = { 'check-fails': nxTarget('exit 3'), 'check-hangs': nxTarget('sleep 30') };
+    await writeFile(
+      path.join(root, 'package.json'),
+      JSON.stringify({ name: 'fake', nx: { targets } }),
+    );
+    const env = { ...process.env, NX_DAEMON: 'false', GITHUB_ACTIONS: '' };
+    const lines: Array<string> = [];
+    const options = { targets: ['check-fails', 'check-hangs'], cwd: root, limitSeconds: 3 };
+    expect(observe(0, env, options, (line) => lines.push(line))).toBe(0);
+    expect(lines[1]).toContain('check-fails would block: it exited with code 1.');
+    expect(lines[2]).toContain('check-hangs would block: it ran past the limit');
+    expect(lines).toHaveLength(4);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}, 30_000);
