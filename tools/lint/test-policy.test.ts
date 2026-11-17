@@ -71,3 +71,23 @@ test('a test that asserts a value, through expect or a named helper, passes', as
     ),
   ).toEqual([]);
 });
+
+test('a fixed Bun sleep or a retry option in a test fails, and a wait for an event passes', async () => {
+  expect(
+    await lint(
+      {
+        'packages/notes/ui/notes.test.ts': `${header}${[
+          "test('a', async () => { await Bun.sleep(100); expect(read()).toBe(1); });",
+          "test('b', () => { Bun.sleepSync(5); expect(read()).toBe(1); });",
+          "test('c', () => { expect(read()).toBe(1); }, { retry: 3 });",
+          "describe('d', () => { test('e', () => { expect(1).toBe(1); }); }, { retries: 2 });",
+          "test('f', async () => { await saved(); expect(read()).toBe(1); }, { timeout: 500 });",
+        ].join('\n')}\n`,
+        'packages/notes/ui/notes.ts': 'export const wait = () => Bun.sleep(1);\n',
+      },
+      ['repo-tests'],
+    ),
+  ).toEqual(
+    Array.from({ length: 4 }, () => 'packages/notes/ui/notes.test.ts repo-tests/no-sleep-or-retry'),
+  );
+});

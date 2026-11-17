@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.22.0 (2026-11-17)
+
+### Features
+
+- feat(tools): start a new check in observe mode (CL-559)
+
+### Fixes and maintenance
+
+- fix(ci): push the gardening branch with the Git hooks off (CL-562)
+
+## 1.21.0 (2026-11-17)
+
+### Features
+
+- feat(babysit): ask the owner after three failed fixes (CL-557)
+
+## 1.20.0 (2026-11-17)
+
+### Features
+
+- feat(tools): fix or delete a flaky test, with no renewal (CL-556)
+
+## 1.19.0 (2026-11-17)
+
+### Features
+
+- feat(review): apply the review rules that the diff triggers (CL-553)
+
+## 1.18.1 (2026-11-17)
+
+### Fixes and maintenance
+
+- fix(merge): count each added line of a gardening rule patch (CL-561)
+
+## 1.18.0 (2026-11-17)
+
+### Features
+
+- feat(sync): prove the contract claims nightly with a new seed (CL-555)
+
+## 1.17.0 (2026-11-17)
+
+### Features
+
+- feat(merge): the owner approves a rule that gardening proposes (CL-554)
+
+## 1.16.3 (2026-11-17)
+
+### Fixes and maintenance
+
+- fix(release): write a changeset that passes the format check (CL-560)
+
+## 1.16.2 (2026-11-17)
+
+### Fixes and maintenance
+
+- test(merge): guard the revert of the guardrail hold (#282)
+
 ## 1.16.1 (2026-11-16)
 
 ### Fixes and maintenance

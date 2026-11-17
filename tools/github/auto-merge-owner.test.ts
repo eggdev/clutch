@@ -120,3 +120,52 @@ test('on holds a low-risk PR whose diff makes a contract break, until the owner 
     'Would auto-merge at the step medium.\nQueued the merge.',
   ]);
 });
+
+test('on holds a gardening PR that adds a review rule, until the owner approves its head', async () => {
+  const config = { mode: 'on', step: 'bots', owner: 'eggdev' } as const;
+  const gardening = {
+    headRefName: 'gardening/2026-11-16',
+    author: { login: 'app/x', is_bot: true },
+  };
+  const rule: [string, Partial<Result>] = [
+    'gh api --paginate repos/eggdev/clutch/pulls/7/files',
+    { out: JSON.stringify({ filename: 'docs/contributing/review.md', patch: '+- Trigger: x' }) },
+  ];
+  const waiting = fake([rule], gardening);
+  expect(await decide(waiting, config)).toEqual([
+    'Would not auto-merge at the step bots:\n- The gardening pass proposes a rule. The owner approves a new rule. It changes docs/contributing/review.md.',
+  ]);
+  expect(merges(waiting.calls)).toEqual([]);
+  const approvedHead = fake([rule, [reviews, { out: `APPROVED\t${head}` }]], gardening);
+  expect(await decide(approvedHead, config)).toEqual([
+    'Would auto-merge at the step bots. The owner approved this head.\nQueued the merge.',
+  ]);
+  // GitHub leaves out the patch of a large file, and the listing then says `null`.
+  const noPatch = fake(
+    [
+      [
+        'gh api --paginate repos/eggdev/clutch/pulls/7/files',
+        { out: '{"filename":"docs/contributing/review.md","patch":null,"previous_filename":null}' },
+      ],
+    ],
+    gardening,
+  );
+  const [held] = await decide(noPatch, config);
+  expect(held).toContain('The gardening pass proposes a rule.');
+  expect(merges(noPatch.calls)).toEqual([]);
+  // A rename of a check script away from its guardrail path is a changed rule too.
+  const renamed = fake(
+    [
+      [
+        'gh api --paginate repos/eggdev/clutch/pulls/7/files',
+        {
+          out: '{"filename":"tools/old/scope.ts","patch":null,"previous_filename":"tools/check-scope.ts"}',
+        },
+      ],
+    ],
+    gardening,
+  );
+  const [moved] = await decide(renamed, config);
+  expect(moved).toContain('It changes tools/old/scope.ts.');
+  expect(merges(renamed.calls)).toEqual([]);
+});

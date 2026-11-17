@@ -6,6 +6,8 @@
 # The journeys job runs each web journey 20 times on each device with no retry,
 # and counts the first runs that failed. It only measures.
 # See docs/contributing/end-to-end-testing.md#flake-hunt.
+# The claims job proves the contract claims with a new seed each night. A
+# broken claim fails it. See docs/contributing/architecture/contract.md#claims.
 name: Flake hunt
 
 on:
@@ -156,3 +158,23 @@ jobs:
           path: test-results/journeys
           if-no-files-found: ignore
           retention-days: 14
+
+  # The contract claims of each package with a new seed and 20000 runs of each
+  # command. The blocking runs keep seed 532 and 40 runs, so a pull request
+  # fails only for its own change. A broken claim is a defect, not a flaky
+  # test, so this job fails. It pushes nothing, so it needs no bot token. See
+  # docs/contributing/architecture/contract.md#claims.
+  claims:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: bun install --frozen-lockfile --ignore-scripts
+      # It prints the seed first, and writes it to the step summary.
+      - name: Prove the contract claims with a new seed
+        run: bun tools/claims-hunt.ts

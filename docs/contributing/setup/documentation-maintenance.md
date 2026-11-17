@@ -11,8 +11,9 @@ How contributor docs and user copy stay current. See the
   an architecture rule or a check changes. Update a package `README.md` when its
   API or limits change.
 - Keep `AGENTS.md` a short map. Put detail in focused pages.
-- Bugbot reviews each PR against `.cursor/BUGBOT.md`. When a check covers one of
-  its rules, delete the rule there.
+- Agent review checks each PR against the rules of
+  [review](../review.md) that its diff triggers. When a check covers one of
+  those rules, delete the rule there.
 - When a mistake repeats, turn the lesson into a test, a lint rule or a check.
   See [harness engineering](../harness-engineering.md).
 - When a user guide describes a flow that code defines, such as onboarding

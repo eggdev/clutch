@@ -128,8 +128,10 @@ the record from those receipts. See
 
 Classify failures as product defect, harness gap or prerequisite. Correct
 in-scope defects and rerun the affected path. Stop repeating an unchanged
-experiment. After three unsuccessful experiments on the same blocker, retain
-the evidence and the smallest unblock action rather than hiding the failure.
+experiment. After three failed fix rounds on the same check or blocker,
+[ask the owner](#ask-the-owner), as the
+[three-round rule](../../../docs/contributing/delivery.md#evidence-before-handoff)
+says. Never hide the failure.
 
 Finalize every review session on success, failure, cancellation or blockage.
 Verify owned resources were released; quarantine uncertain cleanup before reuse.

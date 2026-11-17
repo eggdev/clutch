@@ -199,6 +199,7 @@ test('a comment with no answer gets no reply, and does not go to the owner', asy
       threads: [],
       comments: [{ id: 3, author: 'bot', body: 'A thought.', at: '', url: '' }],
       approvedThreads: [],
+      ownerNow: [],
       skip: null,
       stuck: false,
     },

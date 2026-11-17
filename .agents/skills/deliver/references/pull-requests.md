@@ -379,7 +379,12 @@ The bot rule:
   and its own changeset. Each package the lockfile adds must come from the npm
   registry, or from a workspace folder of this repository. Renovate already
   waits out the 3-day release age.
-- A gardening PR's `clutch risk` tier must be `low` or `medium`.
+- A gardening PR's `clutch risk` tier must be `low` or `medium`. A gardening
+  PR that adds a line to `docs/contributing/review.md`, or changes a file that
+  `tools/guardrail-files.json` lists, proposes a rule. It waits for the owner:
+  the gardening pass proposes a rule, and the owner approves a new rule. The
+  owner's approval of the head lifts this hold, and no other part of the bot
+  rule. A PR that only deletes a rule needs no approval (`tools/github/bot-rule.ts`).
 - A Clutch sync PR, which `clutch-sync.yml` opens, may change only what
   `clutch sync` writes: the managed files that its `.clutch/lineage.json`
   lists, the lineage, its changeset, `clutch.yaml`, the merged files such as

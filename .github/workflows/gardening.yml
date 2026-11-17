@@ -44,7 +44,7 @@ jobs:
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
-      # One gardening PR at a time. A person reviews the open one first.
+      # One gardening PR at a time. The open one merges or closes first.
       - name: Find an open gardening pull request
         id: open
         if: steps.credential.outputs.run == 'true'
@@ -84,39 +84,93 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
 
-            Do the weekly gardening pass. Follow the steps in
+            Do the weekly gardening pass. The steps below are the steps of
             docs/contributing/harness-engineering.md, section "Weekly
-            gardening". The default branch is checked out.
+            gardening", with the same numbers. Read that section first. The
+            default branch is checked out.
 
-            - Read the pull requests merged in the last 7 days with
+            Read the week first:
+            - The pull requests merged in the last 7 days, with
               `gh pr list --state merged` and `gh pr view --comments`.
-            - Read the reverts of the last 7 days: the merged pull requests
-              whose head branch starts with `revert/`. The `gh pr list`
-              output has `headRefName` and `mergedAt` for each one.
-            - Read open cleanup issues with `gh issue list` and
-              `gh issue view`. Read the open `risk-tighten` issues with
-              `gh issue list --label risk-tighten` and `gh issue view`.
-            - For each revert, read the pull request that it reverts, the one
-              its body names as "Reverts #N". Read its changed files with
-              `gh pr view N --json files,body`, and the code in them with
-              Read. Read the failing CI that its comments link with
-              `gh pr view N --comments`. Then add the smallest regression test
-              or check that fails on the reverted change and passes on `main`.
-              Name the reverted pull request in a comment above the test.
-            - Read the friction of the last 7 days with
+            - The comment `## Babysit log` of each of those pull requests. A
+              line with `reran as flaky` names a check that failed and then
+              passed on the same commit, and the test when the session knew it.
+              That test is flaky.
+            - The reverts of the last 7 days: the merged pull requests whose
+              head branch starts with `revert/`. The `gh pr list` output has
+              `headRefName` and `mergedAt` for each one.
+            - Open cleanup issues, with `gh issue list` and `gh issue view`,
+              and the open `risk-tighten` issues, with
+              `gh issue list --label risk-tighten`.
+            - The friction of the last 7 days, with
               `mise exec -- bun run clutch friction list --since 7d --json`.
               Each entry has an `at` time, which names it.
-            - Read `tools/flaky-tests.json`. When the file is missing, the
-              list is empty. A test whose `until` date is within 7 days is
-              about to expire.
-            - Pick at most 3 items from the reverts, the friction and the
-              expiring flaky tests. Take the reverts first, then the ones that
-              cost the most or repeat. Fix each one with a doc, a check, a tool
-              fix or a test fix. A flaky test that you fix leaves
-              `tools/flaky-tests.json` in the same edit.
-            - A friction entry is handled when your edit fixes it. Delete its
-              line from `.clutch/friction.jsonl`, and list its `at` value
-              under "Handled friction" in the body. Leave every other line.
+            - `tools/flaky-tests.json`. When the file is missing, the list is
+              empty. A test whose `until` date is within 7 days is about to
+              expire.
+
+            1. Find a mistake that repeats in the review comments and the
+               reverts.
+            2. A repeated mistake becomes a candidate rule only when it occurs
+               in at least 2 pull requests, as review comments or reverts, and
+               has a trigger that you can read from a diff. Name both pull
+               requests and the trigger.
+            3. Make 3 independent attempts to disprove each candidate. Start
+               one subagent with the Agent tool for each attempt, and give it
+               the candidate, its trigger and its 2 pull requests. Each attempt
+               takes one angle:
+               a. Find merged pull requests of the last 30 days that the rule
+                  flags, though they were right. Use
+                  `gh pr list --state merged --search "merged:>=<date>"`.
+               b. Find a check, a lint rule or a review rule that already
+                  covers the mistake. Read `tools/`, `docs/contributing/review.md`
+                  and the lint config.
+               c. Argue that the pattern is not a mistake, or that a cheaper
+                  fix removes its cause.
+               Drop the candidate when one attempt succeeds.
+            4. Add each candidate that survives to
+               `docs/contributing/review.md`, in the form that its section
+               "Add or remove a rule" asks for. Add it only when no check,
+               lint rule or type can hold the rule. When one can, propose that
+               guardrail in the body and leave the page as it is. The body has a section
+               "Candidate rules". For each candidate, also a dropped one, give
+               the rule text, the trigger, the 2 pull requests and the result
+               of each attempt.
+            5. Delete stale guidance from `docs/contributing/`, and tighten
+               unclear steps.
+            6. Delete each rule from `docs/contributing/review.md` that a check
+               covers.
+            7. Each cleanup issue that your edits close gets a "Closes #N" line
+               in the body.
+            8. For each revert, read the pull request that it reverts, the one
+               its body names as "Reverts #N". Read its changed files with
+               `gh pr view N --json files,body`, and the code in them with
+               Read. Read the failing CI that its comments link with
+               `gh pr view N --comments`. Then add the smallest regression test
+               or check that fails on the reverted change and passes on `main`.
+               Name the reverted pull request in a comment above the test. The
+               body has a "Reverts" section. For each revert, list the reverted
+               pull request, the test that now guards it, and a re-land plan in
+               2 or 3 lines: what to change so it can merge again.
+            9. Pick at most 3 items from the reverts, the friction, the
+               expiring flaky tests and the flaky reruns of the babysit logs.
+               Take the reverts first, then the ones that
+               cost the most or repeat. Fix each one with a doc, a check, a
+               tool fix or a test fix. Fix an expiring flaky test, or delete
+               it, as docs/contributing/testing.md, section "Flaky tests",
+               says. Either way, it leaves `tools/flaky-tests.json` in the same
+               edit. A friction entry is handled when your edit fixes it.
+               Delete its line from `.clutch/friction.jsonl`, and list its `at`
+               value under "Handled friction" in the body. Leave every other
+               line.
+            10. List the stale design proposals that
+                `bun tools/check-proposals.ts --stale` names, as the docs
+                section says.
+            11. Run `mise exec -- bun run validate`. Fix each problem that it
+                reports, and run it again until it passes. A later step runs it
+                too, and opens no pull request when it fails.
+
+            Rules for each step:
             - Make small edits to files only. Do not run git, and do not
               push. A later step commits your edits and opens one pull request.
             - Tightening `.clutch/risk.yaml` stays a proposal, never an edit.
@@ -124,12 +178,6 @@ jobs:
               tighter tier, or why a check would catch the break instead.
             - A guardrail that needs a person's decision goes in the pull
               request body as a proposal, not as an edit.
-            - Each cleanup issue that your edits close gets a "Closes #N" line
-              in the body.
-            - When the week has a revert, the body has a "Reverts" section. For
-              each revert, list the reverted pull request, the test that now
-              guards it, and a re-land plan in 2 or 3 lines: what to change so
-              it can merge again.
 
             Return a pull request title and a body in Markdown. The title is a
             Conventional Commit of 72 characters or fewer, such as
@@ -139,7 +187,7 @@ jobs:
           # The cheapest model unless the CLUTCH_AGENT_MODEL repository variable names another one.
           claude_args: |
             --model ${{ vars.CLUTCH_AGENT_MODEL || 'claude-haiku-5-5' }}
-            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(mise exec -- bun run clutch friction:*)"
+            --allowedTools "Read,Glob,Grep,Edit,Write,Agent,Bash(mise exec -- bun run validate),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(mise exec -- bun run clutch friction:*),Bash(bun tools/check-proposals.ts:*)"
             --json-schema '{"type":"object","properties":{"title":{"type":"string"},"body":{"type":"string"}},"required":["title","body"]}'
       # A PR that the default token opens starts no workflows, so CI and agent
       # review would not run on it. The release bot's token does start them.
@@ -153,10 +201,47 @@ jobs:
           # Only the branch push and the pull request. The app has more permissions.
           permission-contents: write
           permission-pull-requests: write
-      - name: Open the gardening pull request
+      # Writes the body and the changeset. The steps after it need both.
+      - name: Prepare the gardening pull request
+        id: prepare
         if: steps.open.outputs.run == 'true'
         env:
           RESULT: ${{ steps.garden.outputs.structured_output }}
+        run: |
+          if [ -z "$RESULT" ]; then
+            echo "::error title=Gardening gave no result::The gardening step returned no structured output. Read its log."
+            exit 1
+          fi
+          # A result with no title gives an empty text here, not the word "null".
+          title="$(printf '%s' "$RESULT" | jq -r '.title // empty')"
+          if [ -z "$title" ] || [ -z "$(git status --porcelain)" ]; then
+            echo "::notice title=Gardening found nothing::The pass made no edits this week."
+            exit 0
+          fi
+          printf '%s' "$title" > "$RUNNER_TEMP/gardening-title.txt"
+          printf '%s' "$RESULT" | jq -r '.body // empty' > "$RUNNER_TEMP/gardening-body.md"
+          # Each PR carries a changeset, as tools/github/pr.ts writes it: feat is
+          # a minor bump, "!" is a major one, and the rest are a patch.
+          bump='patch'
+          case "$title" in
+            *'!:'*) bump=major ;;
+            feat*) bump=minor ;;
+          esac
+          # Single quotes around the name, as the formatter keeps them.
+          printf -- "---\n'%s': %s\n---\n\n%s\n" "$(jq -r .name package.json)" "$bump" "$title" \
+            > ".changeset/gardening-$(date -u +%Y-%m-%d).md"
+          echo "edits=true" >> "$GITHUB_OUTPUT"
+      # The agent may skip or miss a check. A red pass fails here with the
+      # output and opens no pull request, since no session would fix one. The
+      # agent has no format command, so the formatter runs first.
+      - name: Format the edits and run the checks
+        if: steps.prepare.outputs.edits == 'true'
+        run: |
+          mise exec -- bun run format
+          mise exec -- bun run validate
+      - name: Open the gardening pull request
+        if: steps.prepare.outputs.edits == 'true'
+        env:
           # The action's token comes from the Claude GitHub App when it is
           # installed. A PR that the default token opens starts no workflows,
           # so CI and agent review would not run on it.
@@ -165,29 +250,16 @@ jobs:
           REVIEWER: ${{ vars.GARDENING_REVIEWER }}
           BASE: ${{ github.event.repository.default_branch }}
         run: |
-          if [ -z "$RESULT" ]; then
-            echo "::error title=Gardening gave no result::The gardening step returned no structured output. Read its log."
-            exit 1
-          fi
-          title="$(printf '%s' "$RESULT" | jq -r '.title')"
-          if [ -z "$title" ] || [ -z "$(git status --porcelain)" ]; then
-            echo "::notice title=Gardening found nothing::The pass made no edits this week."
-            exit 0
-          fi
-          printf '%s' "$RESULT" | jq -r '.body' > "$RUNNER_TEMP/gardening-body.md"
+          title="$(cat "$RUNNER_TEMP/gardening-title.txt")"
           branch="gardening/$(date -u +%Y-%m-%d)"
+          # validate runs `bun install` in its lockfile check, and that install
+          # turns the repository's Git hooks on again. The pre-push hook would
+          # run the journeys, and this job has no browser. validate passed
+          # above, and CI runs the journeys on the pull request.
+          git config core.hooksPath /dev/null
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch --create "$branch"
-          # Each PR carries a changeset, as tools/github/pr.ts writes it: feat is
-          # a minor bump, "!" is a major one, and the rest are a patch.
-          bump='patch'
-          case "$title" in
-            *'!:'*) bump=major ;;
-            feat*) bump=minor ;;
-          esac
-          printf -- '---\n"%s": %s\n---\n\n%s\n' "$(jq -r .name package.json)" "$bump" "$title" \
-            > ".changeset/gardening-$(date -u +%Y-%m-%d).md"
           git add --all
           git commit --message "$title"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"

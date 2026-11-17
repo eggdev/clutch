@@ -6,6 +6,7 @@ const flaky = {
   file: 'tools/a.test.ts',
   name: 'slow one',
   issue: 'CL-128',
+  since: '2026-11-01',
   until: '2026-11-20',
   reason: 'x',
 };

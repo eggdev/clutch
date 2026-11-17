@@ -1,6 +1,13 @@
 import { expect, test } from 'bun:test';
 
-import { botKind, renovateProblems, revertedPr, syncProblems } from '@tools/github/bot-rule';
+import {
+  botKind,
+  gardeningProblems,
+  renovateProblems,
+  revertedPr,
+  ruleHold,
+  syncProblems,
+} from '@tools/github/bot-rule';
 
 test('the bot comes from the head branch', () => {
   expect(botKind('renovate/all-minor')).toBe('renovate');
@@ -130,5 +137,51 @@ test('a Clutch sync PR fails on a file that sync does not write, or a lockfile s
   ).toEqual([
     'apps/web/src/main.ts is not a file that clutch sync writes.',
     'bun.lock takes x@github:o/r from outside the npm registry.',
+  ]);
+});
+
+const review = 'docs/contributing/review.md';
+const guardrails = ['tools/check-*.ts', '.github/workflows/**'];
+
+test('a gardening PR that adds a review rule or changes a guardrail file waits for the owner', () => {
+  const added = [{ filename: review, patch: '@@ -1,2 +1,3 @@\n line\n+- Trigger: a new rule.' }];
+  expect(gardeningProblems(added, 'low', guardrails, false)).toEqual([
+    `${ruleHold} It changes ${review}.`,
+  ]);
+  expect(gardeningProblems(added, 'low', guardrails, true)).toEqual([]);
+  expect(
+    gardeningProblems([{ filename: 'tools/check-docs.ts', patch: '' }], 'low', guardrails, false),
+  ).toEqual([`${ruleHold} It changes tools/check-docs.ts.`]);
+  expect(gardeningProblems([{ filename: review }], 'low', guardrails, false)).toHaveLength(1);
+  // The patch has no `+++` file line, so an added line that starts with `++ ` is a rule too.
+  const plus = [
+    { filename: review, patch: '@@ -1,1 +1,2 @@\n line\n+++ a rule with two plus signs' },
+  ];
+  expect(gardeningProblems(plus, 'low', guardrails, false)).toHaveLength(1);
+});
+
+test('a gardening PR that renames a rule file away waits for the owner', () => {
+  const moved = [{ filename: 'tools/old/docs.ts', previous: 'tools/check-docs.ts' }];
+  expect(gardeningProblems(moved, 'low', guardrails, false)).toEqual([
+    `${ruleHold} It changes tools/old/docs.ts.`,
+  ]);
+  const page = [{ filename: 'docs/old-review.md', previous: review }];
+  expect(gardeningProblems(page, 'low', guardrails, false)).toHaveLength(1);
+  expect(gardeningProblems(moved, 'low', guardrails, true)).toEqual([]);
+});
+
+test('a gardening PR that only deletes a review rule, or changes other files, merges as before', () => {
+  const deleted = [
+    { filename: review, patch: '@@ -1,3 +1,2 @@\n line\n-- Trigger: an old rule.\n+' },
+  ];
+  expect(gardeningProblems(deleted, 'low', guardrails, false)).toEqual([]);
+  // A blank added line with a kept line after it adds no rule.
+  const blank = [{ filename: review, patch: '@@ -1,3 +1,3 @@\n-- Trigger: old.\n+\n kept line' }];
+  expect(gardeningProblems(blank, 'low', guardrails, false)).toEqual([]);
+  expect(
+    gardeningProblems([{ filename: 'docs/x.md', patch: '+text' }], 'medium', guardrails, false),
+  ).toEqual([]);
+  expect(gardeningProblems(deleted, 'high', guardrails, true)).toEqual([
+    "The gardening PR's risk tier is high, not low or medium.",
   ]);
 });

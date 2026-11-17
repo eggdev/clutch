@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { checkScope } from '@tools/check-scope';
+import { checkScope, sourceList } from '@tools/check-scope';
+import { observedTargets, validateTargets } from '@tools/validate';
 
 let root = '';
 
@@ -96,4 +98,85 @@ test('a hand_test line in the body of an issue does not count', async () => {
   const errors = checkScope(root, 'HEAD', { ...limits, max: 100 });
   expect(errors).toHaveLength(1);
   expect(errors[0]).toContain('hand_test');
+});
+
+const quote = (list: Array<string>) => list.map((target) => `'${target}'`).join(', ');
+
+/** Writes the lists. Each target runs `bun tools/<script>.ts`, by default its own name. */
+async function lists(checks: Array<string>, observed: Array<string>, scripts = {}) {
+  const command = (target: string) => ({
+    options: { command: `bun tools/${(scripts as Record<string, string>)[target] ?? target}.ts` },
+  });
+  const targets = Object.fromEntries([...checks, ...observed].map((t) => [t, command(t)]));
+  await write(
+    'package.json',
+    JSON.stringify({ nx: { targets: { ...targets, checks: { dependsOn: checks } } } }),
+  );
+  await write(
+    'tools/validate.ts',
+    `export const validateTargets = ['checks'];\nexport const observedTargets: Array<string> = [${quote(observed)}];\n`,
+  );
+}
+
+function commit(message: string) {
+  git('add', '-A');
+  git('commit', '-qm', message);
+}
+
+const scope = () => checkScope(root, 'HEAD', { max: 100, exclude: [] });
+
+const unobserved = (target: string) =>
+  `The PR adds ${target} to a blocking list, and the base does not observe it. Add it to observedTargets in tools/validate.ts first. Only a rename that keeps the command of the old target skips that step. A split or a replacement does not.`;
+
+test('a new blocking target fails unless the base observes it', async () => {
+  await lists(['check-old'], []);
+  commit('lists');
+  await lists(['check-old', 'check-new'], []);
+  expect(scope()).toEqual([unobserved('check-new')]);
+
+  await lists(['check-old'], ['check-new']);
+  commit('observe');
+  await lists(['check-old', 'check-new'], []);
+  expect(scope()).toEqual([]);
+});
+
+test('only a rename that keeps the command skips observe mode', async () => {
+  await lists(['check-old'], []);
+  commit('lists');
+  await lists(['check-renamed'], [], { 'check-renamed': 'check-old' });
+  expect(scope()).toEqual([]);
+  await lists(['check-new'], []);
+  expect(scope()).toEqual([unobserved('check-new')]);
+  await lists(['check-a', 'check-b'], [], { 'check-a': 'check-old' });
+  expect(scope()).toEqual([unobserved('check-b')]);
+  await lists(['check-new'], ['check-old']);
+  expect(scope()).toEqual([unobserved('check-new')]);
+});
+
+test('a blocking list that the head cannot read is a problem', async () => {
+  await lists(['check-old'], []);
+  commit('lists');
+  await write('tools/validate.ts', 'const list = [];\nexport const validateTargets = list;\n');
+  expect(scope()).toEqual([
+    'check-scope cannot read validateTargets in tools/validate.ts at the head, so it cannot check new blocking targets. Write it as an array of strings.',
+  ]);
+});
+
+test('the source reader skips comments and matches the exact name', () => {
+  const source = [
+    "export const validateTargetsOld = ['wrong'];",
+    "/* export const validateTargets = ['commented']; */",
+    'export const validateTargets: Array<string> = [ // a list ] with a bracket',
+    "  'typecheck', /* ] */",
+    "  'https://example.com', // keep",
+    '];',
+  ].join('\n');
+  expect(sourceList(source, 'validateTargets')).toEqual(['typecheck', 'https://example.com']);
+  expect(sourceList('export const validateTargets = list;', 'validateTargets')).toBeNull();
+});
+
+test('the source reader finds the lists of tools/validate.ts', () => {
+  const source = readFileSync(path.join(import.meta.dir, 'validate.ts'), 'utf-8');
+  expect(sourceList(source, 'validateTargets')).toEqual(validateTargets);
+  expect(sourceList(source, 'observedTargets')).toEqual(observedTargets);
 });

@@ -1,4 +1,5 @@
 {
-  "description": "Quarantined flaky tests. Each one has an open issue that owns its fix, a reason, and an expiry at most 30 days ahead. The blocking test runs leave these tests out, and a non-blocking CI step runs each one 3 times and reports. An entry whose file is a web journey (features/<name>/journeys/<id>.pw.ts) names a snap: the journey still compares that screenshot, but a change warns instead of failing. check-flaky-tests fails on an expired entry, on a missing or done issue, and on a name that is not in the file. See docs/contributing/testing.md#flaky-tests.",
-  "tests": []
+  "description": "Flaky tests. A flaky test is fixed. Until the fix, it may be quarantined in tests, for at most 30 days from its first day (since). The quarantine cannot be renewed. When it ends and the cause is not found, the test is deleted, and its entry moves to removed with the reason: what was tried and why the cause was not found. The blocking test runs leave quarantined tests out, and a non-blocking CI step runs each one 3 times and reports. An entry whose file is a web journey (features/<name>/journeys/<id>.pw.ts) names a snap: the journey still compares that screenshot, but a change warns instead of failing. check-flaky-tests fails on an expired entry, on a missing or done issue, on a name that is not in the file, on a moved since, and on a removed test that is still in its file or has no reason. See docs/contributing/testing.md#flaky-tests.",
+  "tests": [],
+  "removed": []
 }
