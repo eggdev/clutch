@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.0 (2026-11-17)
+
+### Features
+
+- feat(review): apply the review rules that the diff triggers (CL-553)
+
 ## 1.18.1 (2026-11-17)
 
 ### Fixes and maintenance
