@@ -250,7 +250,10 @@ The pass:
    re-land plan.
 9. Read the week's friction with `clutch friction list --since 7d --json`,
    and [`tools/flaky-tests.json`](../../tools/flaky-tests.json) for tests that
-   expire within 7 days. Fix at most 3 items in all, the reverts from step 8
+   expire within 7 days. Read the `## Babysit log` comment of each merged PR
+   of the week. A line with `reran as flaky` names a flaky test, as the
+   [babysit skill](../../.agents/skills/babysit-pr/SKILL.md) says. Fix at most
+   3 items in all, the reverts from step 8
    included, and the ones that cost the most or repeat. A fixed friction entry
    leaves `.clutch/friction.jsonl` in the same PR, and the body names it by its
    `at` time. An expiring flaky test is fixed or deleted, as

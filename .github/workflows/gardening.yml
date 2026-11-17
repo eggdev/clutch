@@ -92,6 +92,10 @@ jobs:
             Read the week first:
             - The pull requests merged in the last 7 days, with
               `gh pr list --state merged` and `gh pr view --comments`.
+            - The comment `## Babysit log` of each of those pull requests. A
+              line with `reran as flaky` names a check that failed and then
+              passed on the same commit, and the test when the session knew it.
+              That test is flaky.
             - The reverts of the last 7 days: the merged pull requests whose
               head branch starts with `revert/`. The `gh pr list` output has
               `headRefName` and `mergedAt` for each one.
@@ -148,8 +152,9 @@ jobs:
                body has a "Reverts" section. For each revert, list the reverted
                pull request, the test that now guards it, and a re-land plan in
                2 or 3 lines: what to change so it can merge again.
-            9. Pick at most 3 items from the reverts, the friction and the
-               expiring flaky tests. Take the reverts first, then the ones that
+            9. Pick at most 3 items from the reverts, the friction, the
+               expiring flaky tests and the flaky reruns of the babysit logs.
+               Take the reverts first, then the ones that
                cost the most or repeat. Fix each one with a doc, a check, a
                tool fix or a test fix. Fix an expiring flaky test, or delete
                it, as docs/contributing/testing.md, section "Flaky tests",
