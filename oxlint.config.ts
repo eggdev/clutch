@@ -269,11 +269,12 @@ export default defineConfig({
     },
     {
       // A test proves behavior that a user or a caller sees: it runs every
-      // time, asserts a value, and does not only snapshot an output or check
+      // time with no sleep or retry, asserts a value, and does not only snapshot an output or check
       // that something exists. See docs/contributing/testing.md#test-rules.
       files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/*.pw.ts', '**/*.journey.ts'],
       rules: {
         'repo-tests/no-hidden-tests': 'error',
+        'repo-tests/no-sleep-or-retry': 'error',
         'repo-tests/no-snapshots': 'error',
         'repo-tests/assert-behavior': 'error',
       },

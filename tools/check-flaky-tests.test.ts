@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import path from 'node:path';
 
-import { checkFlakyTests } from '@tools/check-flaky-tests';
+import { baseTests, checkFlakyTests, declares } from '@tools/check-flaky-tests';
 import { bunTests, excludePattern, onlyPattern } from '@tools/flaky';
-import type { FlakyTest } from '@tools/flaky';
+import type { FlakyTest, RemovedTest } from '@tools/flaky';
 import { inRepo } from '@tools/testing/in-repo';
 
 const today = '2026-11-01';
@@ -13,6 +13,7 @@ const entry = (more: Partial<FlakyTest> = {}): FlakyTest => ({
   file: 'tools/thing.test.ts',
   name,
   issue: 'CL-128',
+  since: '2026-10-25',
   until: '2026-11-20',
   reason: 'Timed out once on CI.',
   ...more,
@@ -22,11 +23,11 @@ const issue = (status: string) =>
   `---\nid: CL-128\ntitle: 'Fix the thing'\nphase: P4\nstatus: ${status}\ndepends_on: []\npr: ''\nowner: agent\n---\n\n# CL-128\n`;
 
 /** A repository with one test file, one issue and a registry of `entries`. */
-function repo(entries: Array<FlakyTest>, status = 'todo') {
+function repo(entries: Array<FlakyTest>, status = 'todo', removed: Array<RemovedTest> = []) {
   return {
     'tools/thing.test.ts': `test('${name}', () => {});\ntest('another thing', () => {});\n`,
     '.clutch/issues/CL-128.md': issue(status),
-    'tools/flaky-tests.json': JSON.stringify({ tests: entries }),
+    'tools/flaky-tests.json': JSON.stringify({ tests: entries, removed }),
   };
 }
 
@@ -35,16 +36,79 @@ test('an entry with an open issue, a reason and a near expiry passes', async () 
   expect(await inRepo({}, (root) => checkFlakyTests(root, today))).toEqual([]);
 });
 
-test('an expired entry fails with the fix, and so does an expiry more than 30 days ahead', async () => {
+test('an expired entry fails and names both ways out', async () => {
   const [expired] = await inRepo(repo([entry({ until: '2026-10-31' })]), (root) =>
     checkFlakyTests(root, today),
   );
-  expect(expired).toContain('the quarantine ended on 2026-10-31');
+  expect(expired).toContain('the quarantine ended on 2026-10-31, and it cannot be renewed');
   expect(expired).toContain('Fix the test under CL-128 and remove the entry');
-  const [far] = await inRepo(repo([entry({ until: '2026-12-15' })]), (root) =>
+  expect(expired).toContain('Or delete the test, and move the entry to "removed"');
+});
+
+test('an expiry 31 days after since, or a since in the future, fails', async () => {
+  const [far] = await inRepo(repo([entry({ since: '2026-10-25', until: '2026-11-25' })]), (root) =>
     checkFlakyTests(root, today),
   );
-  expect(far).toContain('more than 30 days ahead. Pick a date no later than 2026-12-01');
+  expect(far).toContain(
+    'until 2026-11-25 is more than 30 days after since 2026-10-25. Pick a date no later than 2026-11-24',
+  );
+  expect(
+    await inRepo(repo([entry({ since: '2026-10-25', until: '2026-11-24' })]), (root) =>
+      checkFlakyTests(root, today),
+    ),
+  ).toEqual([]);
+  const [future] = await inRepo(repo([entry({ since: '2026-11-02' })]), (root) =>
+    checkFlakyTests(root, today),
+  );
+  expect(future).toContain('since 2026-11-02 is in the future');
+});
+
+test('a PR that moves the since of an entry on the base branch fails, so a quarantine is not renewed', async () => {
+  const renewed = entry({ since: '2026-10-30', until: '2026-11-28' });
+  const [moved] = await inRepo(repo([renewed]), (root) =>
+    checkFlakyTests(root, today, [entry({ since: '2026-10-01', until: '2026-10-31' })]),
+  );
+  expect(moved).toContain(
+    'since moved from 2026-10-01 to 2026-10-30. A quarantine cannot be renewed',
+  );
+  expect(await inRepo(repo([entry()]), (root) => checkFlakyTests(root, today, [entry()]))).toEqual(
+    [],
+  );
+});
+
+test('the base entries come from the registry at the base commit, and there are none without a base', async () => {
+  const tests = await inRepo(repo([entry()]), (root) => {
+    const git = (...args: Array<string>) =>
+      Bun.spawnSync(['git', '-C', root, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args]);
+    git('init', '-q');
+    git('add', '.');
+    git('commit', '-qm', 'base');
+    return [baseTests(root, 'HEAD'), baseTests(root, null)];
+  });
+  expect(tests).toEqual([[entry()], []]);
+});
+
+const removed = (more: Partial<RemovedTest> = {}): RemovedTest => ({
+  file: 'tools/thing.test.ts',
+  name: 'a deleted flake',
+  removed: '2026-10-31',
+  reason: 'It timed out 1 run in 20. A fake clock and a fresh port did not help.',
+  issue: 'CL-128',
+  ...more,
+});
+
+test('a removed test needs a reason, and must be gone from its file', async () => {
+  expect(
+    await inRepo(repo([], 'done', [removed()]), (root) => checkFlakyTests(root, today)),
+  ).toEqual([]);
+  const problems = await inRepo(
+    repo([], 'done', [removed({ reason: '' }), removed({ name: 'another thing' })]),
+    (root) => checkFlakyTests(root, today),
+  );
+  expect(problems).toEqual([
+    expect.stringContaining('"a deleted flake": add reason. Each removed test needs'),
+    expect.stringContaining('"another thing": the test is still in the file'),
+  ]);
 });
 
 test('an entry whose issue is missing or done fails', async () => {
@@ -77,7 +141,9 @@ test('a wrong name, a missing file, a non-bun file, a duplicate or a missing fie
       'tools/gone.test.ts "a sometimes slow thing finishes": the file does not exist',
     ),
     expect.stringContaining('only bun test files and journey screenshots can be quarantined'),
-    expect.stringContaining('add reason. Each entry needs file, name, issue, until and reason.'),
+    expect.stringContaining(
+      'add reason. Each entry needs file, name, issue, since, until and reason.',
+    ),
     expect.stringContaining('is listed twice. Keep one.'),
     expect.stringContaining('is listed twice. Keep one.'),
   ]);
@@ -130,4 +196,74 @@ test('the patterns leave a quarantined test out of a run, and run it alone, also
     passCount(root, onlyPattern(flaky[1])),
   ]);
   expect(counts).toEqual(['1', '1', '1']);
+});
+
+test('a renamed entry with the same issue keeps the base since, and a base entry with no since is not compared', async () => {
+  const base = [entry({ name: 'an old name', since: '2026-10-01', until: '2026-10-31' })];
+  const [moved] = await inRepo(repo([entry()]), (root) => checkFlakyTests(root, today, base));
+  expect(moved).toContain('since moved from 2026-10-01 to 2026-10-25');
+  const upgraded = [{ ...entry(), since: undefined }];
+  expect(await inRepo(repo([entry()]), (root) => checkFlakyTests(root, today, upgraded))).toEqual(
+    [],
+  );
+});
+
+test('a quarantined test whose issue, or whose file and name, is in removed fails', async () => {
+  const problems = await inRepo(
+    repo([entry(), entry({ name: 'another thing', issue: 'CL-130' })], 'todo', [
+      removed({ name: 'a gone test' }),
+      removed({ name: 'another thing', issue: 'CL-128' }),
+    ]),
+    (root) => checkFlakyTests(root, today),
+  );
+  expect(problems.filter((problem) => problem.includes('is in "removed"'))).toHaveLength(2);
+});
+
+test('a malformed date gives a clear problem and no crash', async () => {
+  const problems = await inRepo(
+    {
+      ...repo(
+        [entry({ since: '2026-13-40' }), entry({ name: 'another thing', until: '2026-02-30' })],
+        'todo',
+        [removed({ removed: '2026-02-30', issue: 'CL-130' })],
+      ),
+      '.clutch/issues/CL-130.md': issue('done'),
+    },
+    (root) => checkFlakyTests(root, today),
+  );
+  expect(problems).toEqual([
+    expect.stringContaining('since must be a real date'),
+    expect.stringContaining('until must be a real date'),
+    expect.stringContaining('removed must be a real date'),
+  ]);
+});
+
+test('a removed entry with a missing issue or a future date fails', async () => {
+  const problems = await inRepo(
+    repo([], 'done', [removed({ issue: 'CL-129' }), removed({ removed: '2026-11-02' })]),
+    (root) => checkFlakyTests(root, today),
+  );
+  expect(problems).toEqual([
+    expect.stringContaining('CL-129 does not exist'),
+    expect.stringContaining('removed 2026-11-02 is in the future'),
+  ]);
+});
+
+test('a test name counts only as the first argument of a test call', () => {
+  const file = 'tools/thing.test.ts';
+  expect(declares(`test("${name}", () => {});`, name, file)).toBe(true);
+  expect(declares(`  it.only(\`${name}\`, () => {});`, name, file)).toBe(true);
+  expect(declares(`test.each([[1], [2]])('${name}', () => {});`, name, file)).toBe(true);
+  expect(declares(`test('x', () => { expect(1, '${name}').toBe(1); });`, name, file)).toBe(false);
+  expect(declares(`const label = '${name}';`, name, file)).toBe(false);
+  expect(declares(`latest('${name}');`, name, file)).toBe(false);
+});
+
+test('a removed test whose name is only in a string, not a test call, passes', async () => {
+  const files = {
+    ...repo([], 'done', [removed()]),
+    'tools/thing.test.ts':
+      "test('a kept test', () => { expect(1, 'a deleted flake').toBe(1); });\n",
+  };
+  expect(await inRepo(files, (root) => checkFlakyTests(root, today))).toEqual([]);
 });

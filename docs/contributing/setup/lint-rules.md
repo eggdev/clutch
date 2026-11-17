@@ -202,6 +202,13 @@ file. It rejects skipped and focused tests, snapshots, tests with no
 assertion, and tests that only check that a value exists. See
 [test rules](../testing.md#test-rules).
 
+| Rule                | Rejects                                                                                        |
+| ------------------- | ---------------------------------------------------------------------------------------------- |
+| `no-hidden-tests`   | `test.skip`, `test.only`, `test.todo`, `xit` and the other ways to leave a test out of the run |
+| `no-sleep-or-retry` | `Bun.sleep`, `Bun.sleepSync`, and a `retry` or `retries` option on `test` or `describe`        |
+| `no-snapshots`      | `toMatchSnapshot` and the other snapshot matchers                                              |
+| `assert-behavior`   | A test with no assertion, or with assertions that only check that a value exists               |
+
 ## Effect code
 
 The `repo-effect` plugin,

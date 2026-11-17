@@ -46,18 +46,26 @@ test('a seeded flaky test is found in a real bun --rerun-each report, and a stab
 test('a flake that the quarantine already holds is not added again', () => {
   const tallies = [{ file: 'a.test.ts', name: 'slow', passed: 18, failed: 2 }];
   const known = [
-    { file: 'a.test.ts', name: 'slow', issue: 'CL-128', until: '2026-11-20', reason: 'x' },
+    {
+      file: 'a.test.ts',
+      name: 'slow',
+      issue: 'CL-128',
+      since: '2026-11-01',
+      until: '2026-11-20',
+      reason: 'x',
+    },
   ];
   expect(newFlakes(tallies, known)).toEqual([]);
   expect(newFlakes(tallies, [])).toHaveLength(1);
 });
 
-test('a new flake gets a 14-day quarantine entry and an issue that names the run', () => {
+test('a new flake gets a 14-day quarantine entry from today and an issue that names the run', () => {
   const flake = { file: 'a.test.ts', name: 'slow', passed: 18, failed: 2 };
   expect(entryFor(flake, 'CL-140', '2026-11-02', 'https://ci/run/1')).toEqual({
     file: 'a.test.ts',
     name: 'slow',
     issue: 'CL-140',
+    since: '2026-11-02',
     until: '2026-11-16',
     reason:
       'The flake hunt on 2026-11-02 saw it fail 2 of 20 runs on the same code (https://ci/run/1).',

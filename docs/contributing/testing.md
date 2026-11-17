@@ -56,20 +56,29 @@ owner. See [review](./review.md).
 
 ## Flaky tests
 
-A flaky test passes and fails on the same code. Fix it. When the fix takes
-longer than the PR at hand, quarantine the test: never delete it, and never
-skip it in the file. The lint rule `repo-tests/no-hidden-tests` refuses
-`test.skip` and `test.skipIf`.
+A flaky test passes and fails on the same code. Fix it. Never skip it in the
+file, never add a sleep, and never retry it until it passes. The lint rule
+`repo-tests/no-hidden-tests` refuses `test.skip` and `test.skipIf`. The lint
+rule `repo-tests/no-sleep-or-retry` refuses `Bun.sleep`, `Bun.sleepSync`, and a
+`retry` or `retries` option. Review catches other waits, such as a `setTimeout`
+promise or `page.waitForTimeout`.
 
-The quarantine is [`tools/flaky-tests.json`](../../tools/flaky-tests.json).
-Each entry names one `bun test` test, or one screenshot of a web journey:
+When the fix takes longer than the PR at hand, quarantine the test. A
+quarantine lasts at most 30 days from its first day, and it cannot be made
+longer. When it ends and the cause is not found, delete the test. Write down
+the reason in the `removed` list.
+
+The registry is [`tools/flaky-tests.json`](../../tools/flaky-tests.json). Each
+entry of its `tests` list names one `bun test` test, or one screenshot of a web
+journey:
 
 | Field    | What it holds                                                                                                              |
 | -------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `file`   | The `bun test` file, such as `tools/check-db.test.ts`, or a web journey.                                                   |
 | `name`   | The exact name in the test call, also inside a `describe` block. For a journey, the name in a `snap(page, '<name>')` call. |
 | `issue`  | The open issue that owns the fix. Its `owner` owns the test.                                                               |
-| `until`  | The last day of the quarantine, at most 30 days ahead.                                                                     |
+| `since`  | The first day of the quarantine. It never moves.                                                                           |
+| `until`  | The last day of the quarantine, at most 30 days after `since`.                                                             |
 | `reason` | What failed and where, such as the CI run.                                                                                 |
 
 - `tools/test-budget.ts` runs each `bun test` target. It leaves the
@@ -78,20 +87,31 @@ Each entry names one `bun test` test, or one screenshot of a web journey:
   writes a table to the job summary: passed, flaky, or failed every attempt.
   It never fails the job.
 - `check-flaky-tests` fails on an expired entry, or an entry whose issue is
-  missing or `done`. It also fails on a name that is not in the file, and on an
-  expiry more than 30 days ahead. A new date needs a new reason in review.
+  missing or `done`. It also fails on a name that is not in the file. And it
+  fails on a `since` in the future, or an `until` more than 30 days after it.
+- `check-flaky-tests` also fails when a PR moves the `since` of an entry that
+  the base branch has. It finds that entry by its issue, or by its file and
+  name. So a quarantine cannot be renewed.
+- A test or an issue in `removed` cannot come back as a quarantine.
+- The check cannot see a renamed test under a new issue. Review catches it.
 - A journey entry quarantines one screenshot of a web journey. `snap` still
   compares and uploads that shot, but a change writes a warning on the test
   instead of failing the `journeys` check. A missing baseline still fails.
   The `bun test` runs ignore the entry. See
   [screenshots](./setup/verification.md#screenshots).
 - Remove the entry in the PR that fixes the test.
+- When the quarantine ends and the cause is not found, delete the test. In the
+  same PR, move its entry to the `removed` list. A removed entry has `file`,
+  `name`, `removed` (the day), `issue` and `reason`. The reason says what you
+  tried, and why the cause was not found. `check-flaky-tests` fails on a removed
+  entry with no reason, a missing issue or a future date. It also fails when a
+  test call in the file still has the name.
 - The nightly [flake hunt](../../.github/workflows/flake-hunt.yml) runs the
   tools tests 20 times on the same code. Each test that passes on some runs and
   fails on others gets a 14-day entry and a new issue, in one PR. The hunt files
   each issue with `clutch issues new`, titled `Fix the flaky test <file>: <name>`,
   and writes its id to the entry's `issue` field. The issue file is part of the
-  same PR. Its phase is the `FLAKE_ISSUE_PHASE` repository variable, `later` when
+  same PR. The entry's `since` is the day of the hunt. Its phase is the `FLAKE_ISSUE_PHASE` repository variable, `later` when
   unset. The release bot opens the PR, so CI runs on it. The hunt uses no agent.
   While its PR is open, the next hunt skips.
 - The same flake hunt runs each web journey 20 times on each device, with no

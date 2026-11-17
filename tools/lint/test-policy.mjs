@@ -11,6 +11,11 @@ const declarers = new Set(['test', 'it', 'describe']);
 const hidden = new Set(['skip', 'only', 'todo', 'skipIf', 'todoIf', 'failing', 'if']);
 /** The global spellings of a skipped or focused test. */
 const hiddenGlobals = new Set(['xtest', 'xit', 'xdescribe', 'fit', 'fdescribe', 'ftest']);
+/** The fixed sleeps of Bun. A test waits for the event it needs, not for a time. */
+const sleeps = new Set(['sleep', 'sleepSync']);
+/** The options that run a failed test again, so a flaky test passes. */
+const retryOptions = new Set(['retry', 'retries']);
+
 /** Snapshot matchers. A snapshot records an output; it does not say which behavior is right. */
 const snapshots = new Set([
   'toMatchSnapshot',
@@ -112,6 +117,54 @@ export default {
                 messageId: 'hidden',
                 data: { name: `${declarerOf(callee)}.${modifier}` },
               });
+            }
+          },
+        };
+      },
+    },
+    'no-sleep-or-retry': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          sleep: message(
+            '`Bun.{{name}}` waits for a fixed time, so the test is slow or flaky. Wait for the event that the test needs.',
+          ),
+          retry: message(
+            'A `{{name}}` option runs a failed test again, so a flaky test passes. Fix the test. See docs/contributing/testing.md#flaky-tests.',
+          ),
+        },
+      },
+      create(context) {
+        return {
+          CallExpression(node) {
+            const { callee } = node;
+            if (
+              callee.type === 'MemberExpression' &&
+              !callee.computed &&
+              callee.object.type === 'Identifier' &&
+              callee.object.name === 'Bun' &&
+              sleeps.has(callee.property.name)
+            ) {
+              context.report({ node, messageId: 'sleep', data: { name: callee.property.name } });
+              return;
+            }
+            if (!declarers.has(declarerOf(callee))) {
+              return;
+            }
+            for (const argument of node.arguments) {
+              const option =
+                argument.type === 'ObjectExpression' &&
+                argument.properties.find(
+                  (property) =>
+                    property.type === 'Property' &&
+                    !property.computed &&
+                    retryOptions.has(property.key.name ?? property.key.value),
+                );
+              if (option) {
+                const name = option.key.name ?? option.key.value;
+                context.report({ node: option, messageId: 'retry', data: { name } });
+              }
             }
           },
         };
