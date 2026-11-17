@@ -21,6 +21,8 @@ const offLabel = 'babysit:off';
 export const roundsPerTrigger = 2;
 /** At most this many rounds for one PR in a UTC day. */
 export const roundsPerDay = 8;
+/** A check that still fails after this many pushed fixes needs the owner. See docs/contributing/delivery.md. */
+export const fixesPerCheck = 3;
 /** A branch this many commits behind its base gets a merge sync, even with no conflict. */
 export const behindLimit = 20;
 
@@ -41,6 +43,9 @@ type Trigger =
   | 'new-comment'
   | 'owner-approved';
 
+/** A failed check that the session could not fix, with the pushed fixes the log holds. */
+type OwnerCheck = { name: string; fixes: Array<{ pushed: string; reason: string }> };
+
 /** Why a plan has no round when the PR needs no work. */
 export const nothingToDo = 'nothing to do';
 
@@ -55,6 +60,8 @@ export type Plan = {
   comments: Array<Comment>;
   /** Threads left for the owner that the owner's approval of this head now answers. They need no model. */
   approvedThreads: Array<Thread>;
+  /** Failed checks that still fail after their third pushed fix. Only the owner clears them. */
+  ownerNow: Array<OwnerCheck>;
   /** Why no round runs, when none does. */
   skip: string | null;
   /** True when the caps stop a round that has work. The workflow marks the PR stuck. */
@@ -73,6 +80,31 @@ export function isAgentPr(state: Pick<PrState, 'author' | 'authorIsBot' | 'headR
 }
 
 const answeredByBabysitter = (body: string) => body.includes(replyMarker);
+
+/**
+ * Each failed check with at least `fixesPerCheck` pushed fixes in the log. A
+ * person's comment after a fix starts the count again, since the person has
+ * spoken.
+ */
+function checksForOwner(state: PrState): Array<OwnerCheck> {
+  const person = state.comments
+    .filter((c) => !c.author.endsWith('[bot]') && !answeredByBabysitter(c.body))
+    .filter((c) => !machine.some((m) => m.test(c.body)))
+    .map((c) => c.at)
+    .toSorted()
+    .at(-1);
+  return state.failed.flatMap((check) => {
+    const fixes = state.log.rounds
+      .filter((r) => r.pushed && (!person || r.at > person))
+      .flatMap((r) =>
+        r.items
+          .filter((i) => i.kind === 'check' && i.ref === check.name)
+          .filter((i) => i.action.startsWith('fixed in'))
+          .map((i) => ({ pushed: r.pushed ?? '', reason: i.reason })),
+      );
+    return fixes.length >= fixesPerCheck ? [{ name: check.name, fixes }] : [];
+  });
+}
 
 /** The work on a PR now, and whether the caps let a round run. `now` is an ISO time. */
 export function plan(state: PrState, now: string): Plan {
@@ -114,6 +146,7 @@ export function plan(state: PrState, now: string): Plan {
     threads,
     comments,
     approvedThreads,
+    ownerNow: state.pending === 0 ? checksForOwner(state) : [],
   } as const;
   const skip = (reason: string, stuck = false): Plan => ({ ...base, skip: reason, stuck });
   if (!state.open || state.draft) {
@@ -138,6 +171,11 @@ export function plan(state: PrState, now: string): Plan {
     !comments.some((c) => c.at > stuckAt.at && !c.author.endsWith('[bot]'))
   ) {
     return skip(`labelled ${stuckLabel}`);
+  }
+  // A check that three fixes did not clear stops the round: the owner decides the next step.
+  if (base.ownerNow.length > 0) {
+    const names = base.ownerNow.map((c) => c.name).join(', ');
+    return skip(`${names} still failed after ${fixesPerCheck} fixes and needs the owner now`, true);
   }
   const key = triggers.join(',');
   const same = state.log.rounds.filter(

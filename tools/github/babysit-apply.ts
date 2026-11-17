@@ -135,6 +135,8 @@ export async function apply(
     event: string;
     runUrl: string;
     now: string;
+    /** The checkout's friction log and branch, where a flaky rerun is recorded. */
+    friction?: { file: string; branch: string | null };
   },
 ) {
   const context: Context = {
@@ -143,6 +145,7 @@ export async function apply(
     plan: input.plan,
     answers: afterApproval(input.answers, input.plan.approved),
     pushed: input.pushed,
+    friction: input.friction && { ...input.friction, at: input.now },
   };
   const items = [
     ...(await answerThreads(context)),

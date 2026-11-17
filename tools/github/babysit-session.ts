@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { nothingToDo, plan } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
+import { frictionFile } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, writeLog } from '@tools/github/babysit-apply';
 import type { Round } from '@tools/github/babysit-log';
@@ -45,7 +46,12 @@ async function babysitPlan(run: Run, number: string, now: string) {
   await writeFile(file, JSON.stringify(next, null, 1));
   console.log(JSON.stringify(next, null, 1));
   const left = next.skip === nothingToDo && (await ownerLeft(run, repo, owner, Number(number)));
-  const ask = ownerAsk({ repo, number, stuck: false, left, now: [] }) ?? '';
+  const checks = next.ownerNow.map((check) => ({ ref: check.name }));
+  for (const check of next.ownerNow) {
+    const fixes = check.fixes.map((f) => `\`${f.pushed.slice(0, 7)}\`: ${f.reason}`);
+    console.log(`${check.name} needs the owner now. Fixes tried: ${fixes.join('; ')}.`);
+  }
+  const ask = ownerAsk({ repo, number, stuck: false, left, now: checks }) ?? '';
   console.log(
     next.skip
       ? `No round: ${next.skip}.${next.stuck ? ` Run \`bun run pr babysit ${number} --stuck "<why>"\` to log it.` : ''}${ask && ` ${ask}`}`
@@ -91,6 +97,10 @@ async function babysitApply(
       `No round for #${number}: ${kept.skip}. Log it with \`bun run pr babysit ${number} --stuck "<why>"\`.`,
     );
   }
+  const [top, branch] = await Promise.all([
+    must(run, ['git', 'rev-parse', '--show-toplevel']),
+    run(['git', 'branch', '--show-current']),
+  ]);
   const answers = input.answers
     ? ((JSON.parse(await readFile(input.answers, 'utf-8')) as { items?: Array<Answer> }).items ??
       [])
@@ -106,6 +116,9 @@ async function babysitApply(
     event: common.event,
     runUrl: '',
     now: input.now,
+    friction: top
+      ? { file: path.join(top, frictionFile), branch: branch.out.trim() || null }
+      : undefined,
   });
   const stuck = round.outcome === 'stuck';
   const next =
