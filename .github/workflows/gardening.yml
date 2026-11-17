@@ -164,11 +164,14 @@ jobs:
                value under "Handled friction" in the body. Leave every other
                line.
             10. List the stale design proposals that
-                `bun tools/check-proposals.ts --stale` names, as the docs
-                section says.
+                `mise exec -- bun tools/check-proposals.ts --stale` names, as
+                the docs section says.
             11. Run `mise exec -- bun run validate`. Fix each problem that it
                 reports, and run it again until it passes. A later step runs it
-                too, and opens no pull request when it fails.
+                too, and opens no pull request when it fails. One failure is
+                not yours to fix: `check-changeset` fails in your run, because
+                a later step writes the changeset from your title. Write no
+                file in `.changeset/`.
 
             Rules for each step:
             - Make small edits to files only. Do not run git, and do not
@@ -187,7 +190,7 @@ jobs:
           # The cheapest model unless the CLUTCH_AGENT_MODEL repository variable names another one.
           claude_args: |
             --model ${{ vars.CLUTCH_AGENT_MODEL || 'claude-haiku-5-5' }}
-            --allowedTools "Read,Glob,Grep,Edit,Write,Agent,Bash(mise exec -- bun run validate),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(mise exec -- bun run clutch friction:*),Bash(bun tools/check-proposals.ts:*)"
+            --allowedTools "Read,Glob,Grep,Edit,Write,Agent,Bash(mise exec -- bun run validate),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(mise exec -- bun run clutch friction:*),Bash(bun tools/check-proposals.ts:*),Bash(mise exec -- bun tools/check-proposals.ts:*)"
             --json-schema '{"type":"object","properties":{"title":{"type":"string"},"body":{"type":"string"}},"required":["title","body"]}'
       # A PR that the default token opens starts no workflows, so CI and agent
       # review would not run on it. The release bot's token does start them.
