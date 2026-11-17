@@ -155,7 +155,7 @@ test('a medium PR that changes a check script merges with no guardrail hold', as
         { out: JSON.stringify({ filename: 'tools/check-scope.ts', patch: '-a\n+b' }) },
       ],
     ],
-    { headRefName: 'clutch/cl-123-check-scope', author: agent },
+    { headRefName: 'clutch/cl-123-check-scope', author: app },
   );
   expect(await decide(gh, { mode: 'on', step: 'medium' })).toEqual([
     'Would auto-merge at the step medium.\nQueued the merge.',
