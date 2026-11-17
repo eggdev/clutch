@@ -15,7 +15,10 @@ Rank 18 of the researched practices. About three in five of the leading reposito
 1. Write the review rules in one page. This repository uses [review](../review.md).
 2. Add a workflow that runs the review on each pull request. See [`.github/workflows/agent-review.yml`](../../../.github/workflows/agent-review.yml).
 3. Add the `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` secret on GitHub. Without a secret, the review job passes with a notice.
-4. For Cursor Bugbot, add `.cursor/BUGBOT.md` and point it at the same rules.
+4. Run one reviewer, and tune it through the rules page. This repository runs
+   agent review only. A project can use Cursor Bugbot or CodeRabbit in place
+   of the workflow. It then adds the config of that tool, such as
+   `.cursor/BUGBOT.md`, and points it at the same rules.
 5. Set `ai_review_bot` to `adopted` in `clutch.yaml`.
 
 ## Waive
