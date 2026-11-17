@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.2 (2026-11-17)
+
+### Fixes and maintenance
+
+- test(merge): guard the revert of the guardrail hold (#282)
+
 ## 1.16.1 (2026-11-16)
 
 ### Fixes and maintenance
