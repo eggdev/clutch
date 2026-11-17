@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.0 (2026-11-17)
+
+### Features
+
+- feat(tools): fix or delete a flaky test, with no renewal (CL-556)
+
 ## 1.19.0 (2026-11-17)
 
 ### Features
