@@ -3,11 +3,10 @@ import path from 'node:path';
 
 import { nothingToDo, plan } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
-import { frictionFile } from '@tools/github/babysit-answer';
 import type { Answer } from '@tools/github/babysit-answer';
 import { apply, writeLog } from '@tools/github/babysit-apply';
 import type { Round } from '@tools/github/babysit-log';
-import { decisionsNow, ownerAsk, ownerLeft } from '@tools/github/babysit-owner';
+import { decisionsNow, ownerAsk, ownerEvidence, ownerLeft } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
 import { must } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
@@ -47,9 +46,8 @@ async function babysitPlan(run: Run, number: string, now: string) {
   console.log(JSON.stringify(next, null, 1));
   const left = next.skip === nothingToDo && (await ownerLeft(run, repo, owner, Number(number)));
   const checks = next.ownerNow.map((check) => ({ ref: check.name }));
-  for (const check of next.ownerNow) {
-    const fixes = check.fixes.map((f) => `\`${f.pushed.slice(0, 7)}\`: ${f.reason}`);
-    console.log(`${check.name} needs the owner now. Fixes tried: ${fixes.join('; ')}.`);
+  for (const line of ownerEvidence(next.ownerNow)) {
+    console.log(line);
   }
   const ask = ownerAsk({ repo, number, stuck: false, left, now: checks }) ?? '';
   console.log(
@@ -88,7 +86,11 @@ async function babysitApply(
     const round: Round = { ...common, sync, items: [], outcome: 'stuck', note: input.stuck };
     await writeLog(run, repo, owner, kept.number, round, []);
     const ask = ownerAsk({ repo, number, stuck: true, left: false, now: [] }) ?? '';
-    console.log(`#${number}: stuck. ${input.stuck}${ask && ` ${ask}`}`);
+    // The ask carries the evidence, so the owner decides from one message.
+    const evidence = ownerEvidence(kept.ownerNow).join(' ');
+    console.log(
+      `#${number}: stuck. ${input.stuck}${evidence && ` ${evidence}`}${ask && ` ${ask}`}`,
+    );
     return 1;
   }
   // The plan's caps hold the apply step too: a skipped round only logs as stuck.
@@ -97,10 +99,6 @@ async function babysitApply(
       `No round for #${number}: ${kept.skip}. Log it with \`bun run pr babysit ${number} --stuck "<why>"\`.`,
     );
   }
-  const [top, branch] = await Promise.all([
-    must(run, ['git', 'rev-parse', '--show-toplevel']),
-    run(['git', 'branch', '--show-current']),
-  ]);
   const answers = input.answers
     ? ((JSON.parse(await readFile(input.answers, 'utf-8')) as { items?: Array<Answer> }).items ??
       [])
@@ -116,9 +114,6 @@ async function babysitApply(
     event: common.event,
     runUrl: '',
     now: input.now,
-    friction: top
-      ? { file: path.join(top, frictionFile), branch: branch.out.trim() || null }
-      : undefined,
   });
   const stuck = round.outcome === 'stuck';
   const next =

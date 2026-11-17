@@ -43,8 +43,13 @@ type Trigger =
   | 'new-comment'
   | 'owner-approved';
 
-/** A failed check that the session could not fix, with the pushed fixes the log holds. */
-type OwnerCheck = { name: string; fixes: Array<{ pushed: string; reason: string }> };
+/** A failed check that the session could not fix: its failed run, its failing test when known, and its pushed fixes. */
+export type OwnerCheck = {
+  name: string;
+  url: string;
+  test?: string;
+  fixes: Array<{ pushed: string; reason: string }>;
+};
 
 /** Why a plan has no round when the PR needs no work. */
 export const nothingToDo = 'nothing to do';
@@ -60,7 +65,7 @@ export type Plan = {
   comments: Array<Comment>;
   /** Threads left for the owner that the owner's approval of this head now answers. They need no model. */
   approvedThreads: Array<Thread>;
-  /** Failed checks that still fail after their third pushed fix. Only the owner clears them. */
+  /** Failed checks that still fail after their third pushed fix in a row. Only the owner clears them. */
   ownerNow: Array<OwnerCheck>;
   /** Why no round runs, when none does. */
   skip: string | null;
@@ -82,27 +87,54 @@ export function isAgentPr(state: Pick<PrState, 'author' | 'authorIsBot' | 'headR
 const answeredByBabysitter = (body: string) => body.includes(replyMarker);
 
 /**
- * Each failed check with at least `fixesPerCheck` pushed fixes in the log. A
- * person's comment after a fix starts the count again, since the person has
- * spoken.
+ * Whether a person wrote this comment. `gh` often runs as the owner's own
+ * account, so a comment from that account is the tool's own only when it
+ * carries the tool's marker.
+ */
+function byPerson(comment: Comment, viewer?: string) {
+  if (comment.author.endsWith('[bot]') || machine.some((m) => m.test(comment.body))) {
+    return false;
+  }
+  return (Boolean(viewer) && comment.author !== viewer) || !answeredByBabysitter(comment.body);
+}
+
+/**
+ * Each failed check with at least `fixesPerCheck` pushed fixes since its count
+ * started. The count starts again after the latest round logged as stuck,
+ * since the owner answered that ask, and after a person's comment. It also
+ * starts again at a push where the check was green.
  */
 function checksForOwner(state: PrState): Array<OwnerCheck> {
-  const person = state.comments
-    .filter((c) => !c.author.endsWith('[bot]') && !answeredByBabysitter(c.body))
-    .filter((c) => !machine.some((m) => m.test(c.body)))
-    .map((c) => c.at)
-    .toSorted()
-    .at(-1);
+  const since =
+    [
+      state.log.rounds.findLast((r) => r.outcome === 'stuck')?.at ?? '',
+      ...state.comments.filter((c) => byPerson(c, state.viewer)).map((c) => c.at),
+    ]
+      .toSorted()
+      .at(-1) ?? '';
   return state.failed.flatMap((check) => {
-    const fixes = state.log.rounds
-      .filter((r) => r.pushed && (!person || r.at > person))
-      .flatMap((r) =>
-        r.items
-          .filter((i) => i.kind === 'check' && i.ref === check.name)
-          .filter((i) => i.action.startsWith('fixed in'))
-          .map((i) => ({ pushed: r.pushed ?? '', reason: i.reason })),
-      );
-    return fixes.length >= fixesPerCheck ? [{ name: check.name, fixes }] : [];
+    const fixes: OwnerCheck['fixes'] = [];
+    let test: string | undefined;
+    for (const round of state.log.rounds.toReversed()) {
+      if (round.at <= since) {
+        break;
+      }
+      const items = round.items.filter((i) => i.kind === 'check' && i.ref === check.name);
+      test ??= items.find((i) => i.test)?.test;
+      if (!round.pushed) {
+        continue;
+      }
+      // The round does not list the check, so it was green at that head.
+      if (items.length === 0) {
+        break;
+      }
+      for (const item of items.filter((i) => i.action.startsWith('fixed in'))) {
+        fixes.unshift({ pushed: round.pushed, reason: item.reason });
+      }
+    }
+    return fixes.length >= fixesPerCheck
+      ? [{ name: check.name, url: check.url, ...(test ? { test } : {}), fixes }]
+      : [];
   });
 }
 
@@ -168,7 +200,7 @@ export function plan(state: PrState, now: string): Plan {
   if (
     stuckAt &&
     stuckAt.head === state.head &&
-    !comments.some((c) => c.at > stuckAt.at && !c.author.endsWith('[bot]'))
+    !state.comments.some((c) => c.at > stuckAt.at && byPerson(c, state.viewer))
   ) {
     return skip(`labelled ${stuckLabel}`);
   }

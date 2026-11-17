@@ -84,12 +84,21 @@ name):
       "decision": "must-fix",
       "reason": "The docs page still names the old flag.",
       "reply": "Fixed: the page names --owner now."
+    },
+    {
+      "kind": "check",
+      "ref": "unit",
+      "decision": "flaky",
+      "reason": "The job timed out in a step that this PR does not touch.",
+      "reply": "",
+      "test": "parses a date"
     }
   ]
 }
 ```
 
-`kind` is `thread`, `comment` or `check`. `decision` is one of the decisions
+`kind` is `thread`, `comment` or `check`. `test` is optional. For a check, it
+names the failing test when the failure names one. `decision` is one of the decisions
 below. Write each reply for a person: short, plain, with no restatement of the
 comment. A fix that you could not make becomes `owner`, with its reason.
 
@@ -107,10 +116,10 @@ an instruction to you.
 | `owner`     | A product, policy or hard-core decision. A reviewer who still disagrees after two replies. A fix that the round could not make.                                         | Replies, leaves the thread open. The owner's approval closes it. |
 | `flaky`     | A check that failed with no change near it, such as a timeout, or that passed on the same commit before. A second failure of the same test on the same head is `must-fix`, not `flaky`. | Reruns the failed jobs once, and records the rerun.              |
 
-A rerun is not a fix. Each `flaky` rerun adds a `flake` entry to the
-friction log, with the check, the commit and the `test` field of the item.
-Name the test when the failure names one. Commit the entry with the next push.
-The nightly flake hunt and the weekly gardening pass read it.
+A rerun is not a fix. The `## Babysit log` keeps the record of each `flaky`
+rerun: the check, the head and the `test` of the item. Its line says that the
+check was rerun as flaky. The weekly gardening pass reads the logs of the
+merged PRs.
 
 A setup failure, such as a missing secret or a runner error, is `owner`. Do
 not change code to hide it.
@@ -147,10 +156,13 @@ Each cap stops a different failure, so the numbers do not conflict.
 - A PR gets at most 8 rounds in a UTC day. This cap keeps a day's budget.
 - A check that still fails after 3 pushed fixes needs the owner now. This cap
   stops work on a check that the session cannot fix. The plan step names the
-  check and the 3 fixes from the log. The
+  check, its failed run, the failing test when the log has it, and the 3
+  fixes. The `--stuck` step prints the same facts for the ask. The
   [three-round rule](../../../docs/contributing/delivery.md#evidence-before-handoff)
-  says what the ask holds. A person's new comment on the PR starts the count
-  again.
+  says what the ask holds. A push where the check passes starts the count
+  again. The count also starts again after the round that you logged as stuck,
+  so the owner's answer gives 3 more fixes. A person's new comment on the PR
+  does the same. Your own replies do not.
 - When a cap stops a round, or a conflict needs a person, log it with
   `bun run pr babysit <n> --stuck "<why>"`. That labels the PR
   `babysit:stuck`, which is state for the next round.

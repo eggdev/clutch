@@ -1,6 +1,3 @@
-import { appendFile, mkdir, readFile } from 'node:fs/promises';
-import path from 'node:path';
-
 import { replyMarker } from '@tools/github/babysit';
 import type { Plan } from '@tools/github/babysit';
 import type { Decision, Item } from '@tools/github/babysit-log';
@@ -21,7 +18,7 @@ export type Answer = {
   decision: Decision;
   reason: string;
   reply: string;
-  /** For a flaky check: the test that the failure names, when it names one. */
+  /** For a check: the failing test, when the failure names one. The log keeps it. */
   test?: string;
 };
 
@@ -44,7 +41,7 @@ export function actionOf(decision: Decision, pushed: string | null) {
   const actions: Record<string, string> = {
     'no-change': 'no change',
     owner: 'left for the owner',
-    flaky: 'reran the failed jobs',
+    flaky: 'reran as flaky',
     'after-approval': 'not fixed: after the owner approved this head',
   };
   return actions[decision] ?? decision;
@@ -66,35 +63,7 @@ export type Context = {
   plan: Plan;
   answers: Array<Answer>;
   pushed: string | null;
-  /** Where a flaky rerun is recorded: the checkout's friction log, its branch and the time. */
-  friction?: { file: string; branch: string | null; at: string };
 };
-
-/** The friction log of a checkout. `clutch friction add` writes the same form. */
-export const frictionFile = '.clutch/friction.jsonl';
-
-/**
- * Adds one `flake` entry for a rerun check, in the form of `clutch friction
- * add`. A rerun is not a fix: the flake hunt and the gardening pass read it.
- */
-async function recordFlake(
-  friction: NonNullable<Context['friction']>,
-  input: { check: string; test?: string; head: string; number: number },
-) {
-  const test = input.test ? `, test ${input.test}` : '';
-  const text = `PR #${input.number} reran check ${input.check}${test} as flaky at ${input.head.slice(0, 7)}`;
-  const entry = {
-    at: friction.at,
-    issue: null,
-    kind: 'flake',
-    text: text.replaceAll(/\s+/gu, ' '),
-    branch: friction.branch,
-  };
-  await mkdir(path.dirname(friction.file), { recursive: true });
-  const before = await readFile(friction.file, 'utf-8').catch(() => '');
-  const separator = before && !before.endsWith('\n') ? '\n' : '';
-  await appendFile(friction.file, `${separator}${JSON.stringify(entry)}\n`);
-}
 
 export const unanswered = 'the agent gave no decision';
 
@@ -245,7 +214,7 @@ export async function answerComments({ run, repo, plan, answers, pushed }: Conte
 }
 
 /** Reruns the failed jobs of each check that the agent calls flaky. */
-export async function answerChecks({ run, repo, plan, answers, pushed, friction }: Context) {
+export async function answerChecks({ run, repo, plan, answers, pushed }: Context) {
   const items: Array<Item> = [];
   for (const check of plan.failed) {
     const answer = answers.find((a) => a.kind === 'check' && a.ref === check.name);
@@ -253,14 +222,6 @@ export async function answerChecks({ run, repo, plan, answers, pushed, friction 
     const runId = /\/runs\/(\d+)/u.exec(check.url)?.[1];
     if (decision === 'flaky' && runId) {
       await must(run, ['gh', 'run', 'rerun', runId, '--failed', '--repo', repo]);
-      if (friction) {
-        await recordFlake(friction, {
-          check: check.name,
-          test: answer?.test,
-          head: plan.head,
-          number: plan.number,
-        });
-      }
     }
     items.push({
       kind: 'check',
@@ -271,6 +232,7 @@ export async function answerChecks({ run, repo, plan, answers, pushed, friction 
       reason: answer?.reason ?? unanswered,
       action: actionOf(decision, pushed),
       resolved: false,
+      ...(answer?.test ? { test: answer.test } : {}),
     });
   }
   return items;

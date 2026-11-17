@@ -26,7 +26,7 @@ export type Item = {
   author: string;
   decision: Decision;
   reason: string;
-  /** What it did: `fixed in <sha>`, `replied`, `reran`, or `left for the owner`. */
+  /** What it did: `fixed in <sha>`, `replied`, `reran as flaky`, or `left for the owner`. */
   action: string;
   resolved: boolean;
   /** For a thread: its first comment's id, which `pr findings` matches. */
@@ -35,6 +35,8 @@ export type Item = {
   path?: string;
   /** For a thread: the first line of its first comment, which names an agent review finding's level. */
   finding?: string;
+  /** For a check: the failing test, when the answer names one. A `flaky` item with it records the rerun. */
+  test?: string;
 };
 
 export type Round = {
@@ -117,9 +119,12 @@ function renderRound(round: Round, index: number) {
       '| --- | --- | --- | --- | --- | --- |',
     );
     for (const item of round.items) {
-      const ref = item.url ? `[${item.kind}](${item.url})` : `${item.kind} ${cell(item.ref)}`;
+      // A check's name is the item, so it shows also beside a link.
+      const name = item.kind === 'check' ? `check ${cell(item.ref)}` : item.kind;
+      const ref = item.url ? `[${name}](${item.url})` : `${item.kind} ${cell(item.ref)}`;
+      const done = item.test ? `${item.action}, test ${item.test}` : item.action;
       lines.push(
-        `| ${ref} | ${cell(item.author)} | ${item.decision} | ${cell(item.reason)} | ${cell(item.action)} | ${item.resolved ? 'yes' : 'no'} |`,
+        `| ${ref} | ${cell(item.author)} | ${item.decision} | ${cell(item.reason)} | ${cell(done)} | ${item.resolved ? 'yes' : 'no'} |`,
       );
     }
   }

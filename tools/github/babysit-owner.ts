@@ -1,4 +1,5 @@
 import { plan } from '@tools/github/babysit';
+import type { OwnerCheck } from '@tools/github/babysit';
 import { blockingOnlyFix, unanswered } from '@tools/github/babysit-answer';
 import type { Item } from '@tools/github/babysit-log';
 import { readPr } from '@tools/github/babysit-read';
@@ -62,6 +63,19 @@ export async function ownerLeft(run: Run, repo: string, owner: string, number: n
     state.log.rounds.at(-1)?.outcome === 'stuck';
   const waitingOwner = state.log.rounds.at(-1)?.outcome === 'waiting-owner';
   return onlyOwnerLeft(status, state.approved, workLeft, waitingOwner);
+}
+
+/**
+ * What the owner needs to decide on each check that needs the owner now: the
+ * failed run, the failing test when the log has it, and each fix with its
+ * reason. The plan step and the `--stuck` ask print the same text.
+ */
+export function ownerEvidence(checks: ReadonlyArray<OwnerCheck>) {
+  return checks.map((check) => {
+    const test = check.test ? `, failing test ${check.test}` : '';
+    const fixes = check.fixes.map((f) => `\`${f.pushed.slice(0, 7)}\`: ${f.reason}`);
+    return `${check.name} needs the owner now. Failed run: ${check.url || 'no link'}${test}. Fixes tried: ${fixes.join('; ')}.`;
+  });
 }
 
 /** How a round tells the session to reach the owner. */
