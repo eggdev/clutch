@@ -11,15 +11,18 @@ runs updates this page and needs no approval for it.
 
 `.github/workflows/agent-review.yml` runs on each pull request that is not a
 draft. It runs the Claude Code GitHub Action with [review](./review.md) as its rules, under the base branch's `CLAUDE.md`, `AGENTS.md` and `.claude/`.
+Agent review is the one reviewer of this template. A person tunes it by changing the review page.
 
-1. The agent reads the diff and the pages that the diff touches.
-2. It reads the threads that the babysitter already answered and resolved. It
+1. `tools/github/review-rules.ts` reads the review page and the full diff. It
+   writes the finding levels and each rule whose `Trigger:` line matches the diff.
+2. The agent applies only those rules. It reads the diff and the pages that the diff touches.
+3. It reads the threads that the babysitter already answered and resolved. It
    does not raise a `note` finding again on the same path for the same rule,
    unless the diff changed its cause. It raises a `blocking` finding whenever
    its cause is in the diff.
-3. It posts an inline comment for each finding.
-4. It posts one summary comment that lists each finding and its level.
-5. It returns the number of blocking findings and each `owner` finding to the
+4. It posts an inline comment for each finding.
+5. It posts one summary comment that lists each finding and its level.
+6. It returns the number of blocking findings and each `owner` finding to the
    workflow.
 
 Each inline comment opens a review thread. An open thread does not hold a merge. The
@@ -29,7 +32,10 @@ the owner. The owner's approval of the head resolves the owner's threads.
 The [weekly digest](./capabilities/factory-observability.md#weekly-digest) lists each `owner` finding of a merged pull request.
 
 The agent reads the full diff from the checkout, not from the API, so a large
-PR is reviewed whole. The job also counts every inline `owner` comment, so a
+PR is reviewed whole. The rule tool and the Bun version come from the base commit.
+Bun runs outside the checkout, so no PR code runs in this step.
+The rules page still comes from the PR, so a PR can change its own rules.
+The tool applies a trigger that it cannot read to each PR. When the tool cannot run, the agent applies every rule. The job also counts every inline `owner` comment, so a
 short structured answer alone cannot let a PR through. A failed listing of
 this head's comments is reported as a warning. A failed listing of the earlier
 heads' comments fails the job, so a re-run lists them again.

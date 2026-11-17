@@ -33,4 +33,4 @@ script that reads the wrong variable from deleting production.
 - A cleanup run reports one failure for all resources that it could not delete.
   It never stops at the first one.
 
-<!-- kickoff: The name guard function and the check that rejects a delete call without it. Until the check exists, Bugbot flags an unguarded delete. -->
+<!-- kickoff: The name guard function and the check that rejects a delete call without it. Until the check exists, agent review flags an unguarded delete. -->
