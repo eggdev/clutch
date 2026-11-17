@@ -33,8 +33,13 @@ export async function packageName(root: string): Promise<string> {
 
 const quote = (name: string) => name.replaceAll(/[.*+?^${}()|[\]\\/]/gu, String.raw`\$&`);
 
+/**
+ * The text of one changeset file, in the form that the formatter keeps: the
+ * package name in single quotes. A bot writes this file with no Git hook to
+ * format it, so any other form fails `format-check` on the bot's pull request.
+ */
 export function changesetText(name: string, bump: Bump, summary: string) {
-  return `---\n"${name}": ${bump}\n---\n\n${summary}\n`;
+  return `---\n'${name}': ${bump}\n---\n\n${summary}\n`;
 }
 
 /** Reads one changeset file. Returns nothing when it holds no bump for the package `name`. */

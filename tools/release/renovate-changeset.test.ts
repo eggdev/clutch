@@ -23,7 +23,7 @@ test('a Renovate branch gets a patch changeset named after it, with the PR title
     'renovate/all-minor-patch\nchore(deps): update all non-major dependencies\n',
   );
   expect(await read('.changeset/renovate-all-minor-patch.md')).toBe(
-    '---\n"shop": patch\n---\n\nchore(deps): update all non-major dependencies\n',
+    "---\n'shop': patch\n---\n\nchore(deps): update all non-major dependencies\n",
   );
 });
 

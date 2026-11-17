@@ -202,7 +202,9 @@ jobs:
             *'!:'*) bump=major ;;
             feat*) bump=minor ;;
           esac
-          printf -- '---\n"%s": %s\n---\n\n%s\n' "$(jq -r .name package.json)" "$bump" "$title" \
+          # Single quotes around the name, as the formatter keeps them. No Git
+          # hook formats the file here, so another form fails format-check.
+          printf -- "---\n'%s': %s\n---\n\n%s\n" "$(jq -r .name package.json)" "$bump" "$title" \
             > ".changeset/security-$(date -u +%Y-%m-%d).md"
           git add --all
           git commit --message "$title"
