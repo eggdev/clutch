@@ -32,9 +32,10 @@ the owner. The owner's approval of the head resolves the owner's threads.
 The [weekly digest](./capabilities/factory-observability.md#weekly-digest) lists each `owner` finding of a merged pull request.
 
 The agent reads the full diff from the checkout, not from the API, so a large
-PR is reviewed whole. The job runs the default branch's copy of the rule tool, so a PR cannot change
-which rules review it. The tool applies a trigger that it cannot read to each
-PR. When the tool cannot run, the agent applies every rule. The job also counts every inline `owner` comment, so a
+PR is reviewed whole. The rule tool and the Bun version come from the base commit.
+Bun runs outside the checkout, so no PR code runs in this step.
+The rules page still comes from the PR, so a PR can change its own rules.
+The tool applies a trigger that it cannot read to each PR. When the tool cannot run, the agent applies every rule. The job also counts every inline `owner` comment, so a
 short structured answer alone cannot let a PR through. A failed listing of
 this head's comments is reported as a warning. A failed listing of the earlier
 heads' comments fails the job, so a re-run lists them again.

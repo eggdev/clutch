@@ -1,14 +1,15 @@
 /**
  * Selects the rules of docs/contributing/review.md that a diff triggers:
  *
- *   bun tools/github/review-rules.ts <diff file> [review page]
+ *   bun tools/github/review-rules.ts <diff file> [review page] [repository root]
  *
  * It prints the parts of the page that define the finding levels, then each
  * rule whose `Trigger:` line matches the diff. A trigger that it cannot read
  * applies always, so a parse problem never hides a rule. The grammar is in the
  * "Add or remove a rule" section of the page. The agent-review job runs the
- * default branch's copy of this file, so a PR cannot change which rules review
- * it. So the file imports nothing from the repository and runs with no install.
+ * base branch's copy of this file outside the checkout, so a PR cannot change
+ * the code that selects its rules. So the file imports nothing from the
+ * repository and runs with no install. The root resolves `files listed in`.
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -40,6 +41,10 @@ export type Page = {
   /** The prose of each rule section before its first rule. */
   intros: Map<string, string>;
   rules: Array<Rule>;
+  /** Each `## ` heading, in page order. */
+  sections: Array<string>;
+  /** Prose after the rules of a section. It reaches no reviewer, so the form fails it. */
+  dropped: Array<string>;
 };
 
 export type Diff = { files: Array<string>; lines: Array<{ file: string; text: string }> };
@@ -110,6 +115,8 @@ function paragraph(body: Array<string>, label: string): string | undefined {
 export function parsePage(content: string): Page {
   const rules: Array<Rule> = [];
   const intros = new Map<string, string>();
+  const sections: Array<string> = [];
+  const dropped: Array<string> = [];
   const lines = content.split('\n');
   let section = '';
   let preambleEnd = -1;
@@ -139,6 +146,7 @@ export function parsePage(content: string): Page {
     if (heading) {
       close();
       section = heading[1] ?? '';
+      sections.push(section);
     } else if (start) {
       close();
       if (preambleEnd === -1) {
@@ -150,7 +158,12 @@ export function parsePage(content: string): Page {
     } else {
       close();
       const open = section;
-      if (open && !rules.some((rule) => rule.section === open) && line.trim()) {
+      if (!open || !line.trim()) {
+        continue;
+      }
+      if (rules.some((rule) => rule.section === open)) {
+        dropped.push(`${open}: ${line.trim()}`);
+      } else {
         intros.set(open, [intros.get(open), line].filter(Boolean).join('\n'));
       }
     }
@@ -159,7 +172,30 @@ export function parsePage(content: string): Page {
   const first = lines.findIndex((line) => line.startsWith('## '));
   const preamble =
     first === -1 ? '' : lines.slice(first, Math.max(first, preambleEnd)).join('\n').trim();
-  return { preamble, intros, rules };
+  return { preamble, intros, rules, sections, dropped };
+}
+
+const lastSection = 'Add or remove a rule';
+
+/** Rules with no readable `Trigger:` or no `Because:`, rule sections with no rule, and dropped prose. */
+export function formProblems(content: string): Array<string> {
+  const page = parsePage(content);
+  const first = page.sections.indexOf(page.rules[0]?.section ?? '');
+  const end = page.sections.indexOf(lastSection);
+  const ruleSections = first === -1 ? [] : page.sections.slice(first, end === -1 ? undefined : end);
+  return [
+    ...page.rules.flatMap((rule) => [
+      ...(rule.hasTrigger ? [] : [`${rule.name} has no Trigger: line`]),
+      ...(rule.hasBecause ? [] : [`${rule.name} has no Because: line`]),
+      ...(rule.hasTrigger && rule.trigger.kind === 'unreadable'
+        ? [`${rule.name} has an unreadable trigger`]
+        : []),
+    ]),
+    ...ruleSections
+      .filter((section) => !page.rules.some((rule) => rule.section === section))
+      .map((section) => `${section} has no rule item`),
+    ...page.dropped.map((line) => `prose after the rules is dropped: ${line}`),
+  ];
 }
 
 /** The changed paths, old and new, and the added and removed lines of a unified diff. */
@@ -276,12 +312,11 @@ export function selectRules(content: string, diff: Diff, read: ReadFile): string
 }
 
 if (import.meta.main) {
-  const [diffFile, pageFile = reviewPage] = process.argv.slice(2);
+  const [diffFile, pageFile = reviewPage, root = process.cwd()] = process.argv.slice(2);
   if (!diffFile) {
-    console.error('Usage: bun tools/github/review-rules.ts <diff file> [review page]');
+    console.error('Usage: bun tools/github/review-rules.ts <diff file> [review page] [root]');
     process.exit(2);
   }
-  const root = process.cwd();
   const read: ReadFile = (file) => readFileSync(path.resolve(root, file), 'utf-8');
   process.stdout.write(
     selectRules(read(pageFile), parseDiff(readFileSync(diffFile, 'utf-8')), read),

@@ -90,7 +90,7 @@ findings are how a weaker check reaches the owner.
   `owner`. A hatch with no reason is `blocking`. A new option of a new feature
   is not a hatch.
 
-  Trigger: files listed in `tools/guardrail-files.json`; files `**/__screenshots__/**`; files except `**/*.md` with lines `-disable`, `@ts-`, `ignore`, `allow`, `exempt`, `skip`.
+  Trigger: files listed in `tools/guardrail-files.json`; files `**/__screenshots__/**`, `**/__snapshots__/**`; files except `**/*.md` with lines `-disable`, `@ts-`, `ignore`, `allow`, `exempt`, `skip`, `as any`, `as unknown`, `noqa`, `nolint`, `suppress`.
 
   Because: commit `0ff8362f`, which locked the type escape hatches, and commit `80e1a00a`, which added the rule.
 
@@ -98,7 +98,7 @@ findings are how a weaker check reaches the owner.
   a deleted test whose module still exists. Each one is `owner`. A deleted test
   with no reason is `blocking`.
 
-  Trigger: files `**/*.test.*`, `**/*.spec.*`, `**/testing/**`, `**/__screenshots__/**`.
+  Trigger: files `**/*.test.*`, `**/*.spec.*`, `**/testing/**`, `**/test/**`, `**/tests/**`, `**/__tests__/**`, `**/e2e/**`, `**/*.journey.*`, `**/journeys/**`, `**/__snapshots__/**`, `**/__screenshots__/**`.
 
   Because: commit `fda4e632`, which made test removals visible, and commit `80e1a00a`, which added the rule.
 
@@ -118,9 +118,9 @@ findings are how a weaker check reaches the owner.
   A fingerprint change with no change to native code, native config or a
   native dependency is `blocking`.
 
-  Trigger: files `**/native-fingerprint.json`.
+  Trigger: files `**/*fingerprint*`.
 
-  Because: commit `f5ae673e`, which builds native apps only on a fingerprint change.
+  Because: commit `80e1a00a`, which added the rule. Related: commit `f5ae673e`, which builds native apps only on a fingerprint change.
 
 ## Hard invariants
 
@@ -143,7 +143,7 @@ findings are how a weaker check reaches the owner.
   route. Each finding is `blocking`. See
   [single-page app](../principles/single-page-app.md).
 
-  Trigger: files `apps/**`, `features/**`, `tools/server-rendered-routes.yaml`.
+  Trigger: files `apps/**`, `features/**`, `packages/**`, `**/vite.config.*`, `tools/server-rendered-routes.yaml`.
 
   Because: [CL-542](../../.clutch/issues/CL-542.md) in #271, and [single-page app](../principles/single-page-app.md).
 
@@ -154,7 +154,7 @@ findings are how a weaker check reaches the owner.
   or tool with no declaration. See
   [one door for each decision](../principles/one-door-for-each-decision.md).
 
-  Trigger: files `apps/**`, `features/**`, `packages/**`, `tools/**`.
+  Trigger: files `apps/**`, `features/**`, `packages/**`, `tools/**`, `factory/**`, `.github/workflows/**`, `.agents/**`, `.claude/**`.
 
   Because: [one door for each decision](../principles/one-door-for-each-decision.md).
 
@@ -170,7 +170,7 @@ findings are how a weaker check reaches the owner.
   Also flag a touch target smaller than 44 by 44 px. Each finding is `blocking`.
   See [mobile first](../principles/mobile-first.md).
 
-  Trigger: files `**/*.tsx`, `**/*.jsx`, `**/*.css`; files `**/*.ts` with lines `clientWidth`, `innerWidth`, `visualViewport`, `resize`, `matchMedia`.
+  Trigger: files `**/*.tsx`, `**/*.jsx`, `**/*.css`, `**/*.scss`, `**/*.sass`, `**/*.less`, `**/*.html`; files `**/*.ts`, `**/*.js`, `**/*.mjs` with lines `clientWidth`, `innerWidth`, `visualViewport`, `resize`, `matchMedia`, `@media`, `\b(sm|md|lg|xl|2xl):`, `WindowDimensions`, `Dimensions\.get`.
 
   Because: [CL-541](../../.clutch/issues/CL-541.md) in #269, and [mobile first](../principles/mobile-first.md).
 
@@ -180,9 +180,9 @@ findings are how a weaker check reaches the owner.
   the same function. That finding is `blocking`. See
   [previews](./setup/previews.md#destructive-automation-checks-the-name-first).
 
-  Trigger: files `.github/workflows/**`, `tools/**`, `**/*.sh`; files except `**/*.md` with lines `delete`, `destroy`.
+  Trigger: files `.github/workflows/**`, `tools/**`, `factory/**`, `**/scripts/**`, `**/*.sh`; files except `**/*.md` with lines `delete`, `destroy`, `remove`, `purge`, `drop`, `teardown`, `prune`, `wipe`, `\brm\s+-`.
 
-  Because: commit `9ff0e61f`, which added the preview rules, and [previews](./setup/previews.md#destructive-automation-checks-the-name-first).
+  Because: commit `80e1a00a`, which added the rule. Related: commit `9ff0e61f`, which added the preview rules, and [previews](./setup/previews.md#destructive-automation-checks-the-name-first).
 
 ## Principles that no check holds
 
@@ -195,7 +195,7 @@ Each finding below is `blocking`.
   that does not show its shortcut. Also flag a single-key shortcut that fires
   in a text field. Each finding is `blocking`. See [keyboard first](../principles/keyboard-first.md).
 
-  Trigger: files `**/*.tsx`, `**/*.jsx`; files `**/*.ts` with lines `keydown`, `keyup`, `keypress`, `hotkey`, `shortcut`.
+  Trigger: files `**/*.tsx`, `**/*.jsx`, `**/*.html`; files `**/*.ts`, `**/*.js`, `**/*.mjs` with lines `keydown`, `keyup`, `keypress`, `hotkey`, `shortcut`, `\.key\b`, `(meta|ctrl|alt|shift)Key`, `accesskey`.
 
   Because: [CL-531](../../.clutch/issues/CL-531.md) in #261, and [keyboard first](../principles/keyboard-first.md).
 
@@ -203,7 +203,7 @@ Each finding below is `blocking`.
   a cache that hides slowness, unless the same change links an issue for the
   root fix. Each finding is `blocking`. See [fix the root bottleneck](../principles/fix-the-root-bottleneck.md).
 
-  Trigger: files except `**/*.md` with lines `timeout`, `fallback`, `degrad`, `cache`, `retry`, `stale`.
+  Trigger: files except `**/*.md` with lines `timeout`, `fallback`, `degrad`, `cache`, `retry`, `stale`, `ttl`, `max-?age`, `backoff`, `deadline`, `debounce`, `throttle`, `memoi`.
 
   Because: [CL-531](../../.clutch/issues/CL-531.md) in #261, and [fix the root bottleneck](../principles/fix-the-root-bottleneck.md).
 
@@ -212,7 +212,7 @@ Each finding below is `blocking`.
 - **An untyped fake.** Flag a fake that is not typed against the vendor SDK. See
   [test the workflow](../principles/test-the-workflow.md).
 
-  Trigger: files `**/testing/**`, `**/*fake*`, `**/*.test.*`.
+  Trigger: files `**/testing/**`, `**/*fake*`, `**/*Fake*`, `**/*stub*`, `**/*Stub*`, `**/*mock*`, `**/*Mock*`, `**/__mocks__/**`, `**/*.test.*`, `**/*.spec.*`; files except `**/*.md` with lines `fake`, `stub`, `mock`.
 
   Because: [test the workflow](../principles/test-the-workflow.md).
 

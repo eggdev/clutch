@@ -95,19 +95,43 @@ jobs:
         run: |
           git diff --no-color "$BASE_SHA"...HEAD > "$RUNNER_TEMP/pr.diff"
           echo "Full diff: $(grep -c '^diff --git ' "$RUNNER_TEMP/pr.diff") files, $(wc -l < "$RUNNER_TEMP/pr.diff") lines."
-      - if: steps.credential.outputs.present == 'true'
-        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-        with:
-          install_args: bun
-      # The reviewer applies only the rules of review.md whose triggers the diff matches. The default branch's copy of the tool selects them, so a PR cannot change which rules review it. Any failure falls back to every rule.
-      - name: Select the review rules
+      # The reviewer applies only the rules of review.md whose triggers the diff matches. The base commit gives the tool, its mise.toml and so the Bun version. Bun runs in a folder outside the checkout, so the PR's bunfig.toml, .env and mise.toml do not apply. The rules page still comes from the PR. Any failure falls back to every rule.
+      - name: Prepare the base branch's review tools
+        id: rule-tools
         if: steps.credential.outputs.present == 'true'
+        continue-on-error: true
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
+          tools="$RUNNER_TEMP/review-tools"
+          mkdir -p "$tools"
+          git show "$BASE_SHA:mise.toml" > "$tools/mise.toml"
+          if git cat-file -e "$BASE_SHA:mise.lock" 2>/dev/null; then
+            git show "$BASE_SHA:mise.lock" > "$tools/mise.lock"
+          fi
+          git show "$BASE_SHA:tools/github/review-rules.ts" > "$tools/review-rules.ts"
+          : > "$tools/bunfig.toml"
+          echo "dir=$tools" >> "$GITHUB_OUTPUT"
+      - if: steps.credential.outputs.present == 'true' && steps.rule-tools.outcome == 'success'
+        continue-on-error: true
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        env:
+          MISE_TRUSTED_CONFIG_PATHS: ${{ steps.rule-tools.outputs.dir }}
+        with:
+          working_directory: ${{ steps.rule-tools.outputs.dir }}
+          install_args: bun
+          env: false
+          export_path: false
+      - name: Select the review rules
+        if: steps.credential.outputs.present == 'true'
+        env:
+          TOOLS: ${{ steps.rule-tools.outputs.dir }}
+          MISE_TRUSTED_CONFIG_PATHS: ${{ steps.rule-tools.outputs.dir }}
+        run: |
           out="$RUNNER_TEMP/review-rules.md"
-          if git show "$BASE_SHA:tools/github/review-rules.ts" > "$RUNNER_TEMP/review-rules.ts" 2>/dev/null \
-            && bun "$RUNNER_TEMP/review-rules.ts" "$RUNNER_TEMP/pr.diff" docs/contributing/review.md > "$out"; then
+          checkout="$PWD"
+          if [ -n "$TOOLS" ] && (cd "$TOOLS" && mise exec -- bun --config="$TOOLS/bunfig.toml" "$TOOLS/review-rules.ts" \
+            "$RUNNER_TEMP/pr.diff" "$checkout/docs/contributing/review.md" "$checkout") > "$out"; then
             head -n 3 "$out"
           else
             echo "::notice title=Every review rule applies::The rules could not be selected for this diff, so the review applies every rule of docs/contributing/review.md."
