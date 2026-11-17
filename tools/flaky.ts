@@ -65,7 +65,8 @@ const isSnap = (test: FlakyTest) => journeyFile.test(test.file);
 /** The quarantined `bun test` tests, which the test runs leave out. */
 export const bunTests = (tests: ReadonlyArray<FlakyTest>) => tests.filter((test) => !isSnap(test));
 
-const escape = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+/** `text` with each regular expression character escaped. */
+export const escape = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 
 /**
  * A `bun test -t` pattern that matches every test except the quarantined ones.
