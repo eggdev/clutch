@@ -12,6 +12,9 @@
   that one device adds, renames, and renames offline reaches a second device
   with no reload. Run notes-sync once.
 
+`paths` in `verification.json` holds the same map in a form that tools read.
+`bun run pr open` reads it for the verification record.
+
 The features deliberately share suites instead of repeating the same expensive
 setup for each assertion. Each web journey is a flow; its header is its feature
 page. No native journey is runnable here; native flows need the device host.

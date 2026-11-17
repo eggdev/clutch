@@ -37,6 +37,8 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - After you rebase your own branch, run `open` again with `--force`. It pushes
   with `--force-with-lease`, which refuses when someone else pushed to the branch.
 - To change only the body, run `bun run pr body <number> <file>`.
+- `open` writes the verification record as the first line of the
+  "Verification" section. See [verification record](#verification-record).
 - `open` asks the release bot to open a new PR. See
   [who opens the pull request](#who-opens-the-pull-request).
 - `open` marks the branch's issue `done` in the PR head, before it pushes. A
@@ -47,6 +49,58 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - `bun run pr ready <id> <number>` is optional. It adds the PR link to the
   issue, once the PR exists. It makes no commit when the issue already says
   `done` with that link.
+
+### Verification record
+
+`open` builds the record from the receipts of the verify runner, never from
+text that the agent writes. It does these steps:
+
+1. It finds the flows that are due. A flow is due when its `paths` in
+   `.agents/skills/verify/verification.json` match a changed file. Both the
+   map at the base and the map at the head count, so a PR cannot remove a flow
+   for itself. A Markdown file needs no flow. A journey flow with no `paths`
+   covers its feature folder.
+2. It reads each passing receipt under `$DELIVERY_EVIDENCE_ROOT`. Each receipt
+   holds the Git tree id of the files that the flow ran on. A receipt counts
+   when no file that differs between that tree and the head is in the
+   `paths` of its flow. A receipt of a stale run does not count.
+3. It writes one line, and removes each other body line that starts with
+   `Verified: `. `bun run pr body` writes the line too, with no gate.
+
+`open` stops when it cannot find `origin/<base>` or the diff fails. Run
+`git fetch`, or pass the right `--base`.
+
+Run a flow again after a change to a file that it covers. This includes a
+change that a merge with the base brings in.
+
+The line is one of these forms:
+
+- `Verified: notes-sync, installer`: each flow that is due passed.
+- `Verified: docs-only`: the change is Markdown only.
+- `Verified: incomplete (passed: notes-sync; missing: installer)`: some due
+  flows have no receipt.
+- `Verified: incomplete (missing: installer)`: no due flow has a receipt.
+- `Verified: incomplete (no flow covers these files)`: no flow maps the change.
+
+`verification.gate` in `clutch.yaml` sets what a missing flow does. The
+stricter value of the base and the head applies. A value that is not one of
+these three stops `open`.
+
+- `observe`, the default: `open` prints that the gate would block the PR, and
+  goes on. The records are the log.
+- `enforce`: `open` refuses the PR before it commits or pushes, and names the
+  flows to run. `--unverified "<reason>"` lets it through, and adds
+  `; unverified because: <reason>` inside the brackets of the record.
+- `off`: `open` writes the record and does nothing else.
+
+Move the gate from `observe` to `enforce` when the owner has read some weeks of
+records and found no wrong block. To list the merged PRs that are not fully
+verified, run this query. Set the date to the day of the first record. A PR
+from before that day has no record, so the query cannot find it.
+
+```sh
+gh pr list --state merged --limit 200 --search 'merged:>=2026-11-17 in:body "Verified: incomplete"'
+```
 
 ### Who opens the pull request
 

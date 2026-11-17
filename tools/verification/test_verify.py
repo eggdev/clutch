@@ -264,7 +264,17 @@ class VerificationTests(unittest.TestCase):
         self.assertNotEqual(receipt['revision'], receipt['revisionAfter'])
         self.value['flows']['flow']['commands'] = [[sys.executable, '-c',
             'from pathlib import Path; Path("visual").mkdir(); Path("visual/frame.png").write_bytes(b"new")']]
-        self.assertEqual(self.run_tool('run', 'flow')[0], 0)
+        code, result = self.run_tool('run', 'flow')
+        self.assertEqual(code, 0)
+        # The receipt names the tree that a commit of the verified work tree gets.
+        receipt = json.loads((Path(result['evidence']) / 'receipt.json').read_text())
+        old = subprocess.run(['git', 'rev-parse', 'HEAD^{tree}'], cwd=self.repo, check=True, capture_output=True)
+        # The run was on uncommitted work, so its tree is that work, not the tree of HEAD.
+        self.assertNotEqual(receipt['revision']['tree'], old.stdout.decode().strip())
+        git = ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'core.hooksPath=/dev/null']
+        subprocess.run([*git, 'commit', '-qam', 'verified'], cwd=self.repo, check=True, capture_output=True)
+        head = subprocess.run(['git', 'rev-parse', 'HEAD^{tree}'], cwd=self.repo, check=True, capture_output=True)
+        self.assertEqual(receipt['revision']['tree'], head.stdout.decode().strip())
 
     def test_log_budget_fails_without_retaining_unbounded_output(self):
         self.value['limits'] = {'logBytes': 64}

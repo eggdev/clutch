@@ -148,6 +148,14 @@ test('each worktree problem names its YAML path', () => {
   ]);
 });
 
+test('verification is optional and takes off, observe or enforce', () => {
+  expect(validateClutchConfig(valid).config?.verification).toBeUndefined();
+  expect(
+    validateClutchConfig({ ...valid, verification: { gate: 'enforce' } }).config?.verification,
+  ).toEqual({ gate: 'enforce' });
+  expect(paths({ ...valid, verification: { gate: 'on' } })).toEqual(['verification.gate']);
+});
+
 test('automerge is optional and takes off, dry-run or on', () => {
   expect(validateClutchConfig(valid).config?.automerge).toBeUndefined();
   expect(

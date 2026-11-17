@@ -121,7 +121,10 @@ user goal of [project intent](../../../docs/contributing/project-intent.md). Use
 Run verify's mapped proof and the required repository gate. Record criterion,
 revision, environment, expected/observed result and evidence. Changed relevant
 source, app build or backend invalidates previous proof. A test selection that
-runs nothing is not success.
+runs nothing is not success. Run each flow that the change maps to before the
+commit, so its receipt matches the tree that `pr open` pushes. `pr open` writes
+the record from those receipts. See
+[verification record](./references/pull-requests.md#verification-record).
 
 Classify failures as product defect, harness gap or prerequisite. Correct
 in-scope defects and rerun the affected path. Stop repeating an unchanged

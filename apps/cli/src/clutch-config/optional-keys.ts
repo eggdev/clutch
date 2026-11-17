@@ -110,3 +110,23 @@ export function readFactory(value: unknown, errors: Errors) {
     ...(intake === undefined ? {} : { intake }),
   };
 }
+
+/** What `bun run pr open` does with a change that has a missing verify flow. */
+export const verificationGates = ['off', 'observe', 'enforce'] as const;
+
+export function readVerification(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'verification', message: 'Expected a map with gate.' });
+    return;
+  }
+  unknownKeys(value, ['gate'], 'verification', errors);
+  const { gate } = value;
+  if (!verificationGates.some((mode) => mode === gate)) {
+    errors.push({
+      path: 'verification.gate',
+      message: `Expected ${verificationGates.join(', ')}.`,
+    });
+    return;
+  }
+  return { gate: gate as (typeof verificationGates)[number] };
+}

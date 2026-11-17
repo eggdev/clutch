@@ -71,6 +71,11 @@ automerge:
 # code scanning takes results and Semgrep elsewhere. This repository is public, so auto runs
 # CodeQL. Kickoff asks each project. See docs/contributing/capabilities/codeql-sast.md.
 sast: auto
+# What bun run pr open does with a change that has no passing verify receipt for a flow
+# that the feature map asks for: off, observe or enforce. observe prints that the gate
+# would block it, and the record on the PR is the log. See docs/contributing/delivery.md.
+verification:
+  gate: observe
 # When clutch labels warns about a large PR, and when a PR must split (tools/check-scope.ts).
 pr_size:
   warn: 300

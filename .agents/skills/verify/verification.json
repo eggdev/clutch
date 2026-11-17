@@ -30,6 +30,9 @@
     "session-queue": {
       "platform": "library",
       "role": "trusted runtime controller with disposable SQLite",
+      "paths": [
+        "packages/runtime/**"
+      ],
       "ownsStack": true,
       "commands": [
         [
@@ -45,6 +48,10 @@
     "review-tools": {
       "platform": "cli",
       "role": "agent using disposable verification and issue fixtures",
+      "paths": [
+        "tools/verification/**",
+        ".agents/skills/deliver-linear/scripts/**"
+      ],
       "ownsStack": true,
       "commands": [
         [
@@ -74,6 +81,10 @@
     "installer": {
       "platform": "cli",
       "role": "agent installing tooling into disposable repositories",
+      "paths": [
+        "apps/cli/**",
+        "clutch.files.yaml"
+      ],
       "ownsStack": true,
       "commands": [
         [
@@ -89,6 +100,20 @@
     "notes-sync": {
       "platform": "web",
       "role": "the dev actor on two browser contexts, against dev servers that the runner reuses or starts and stops",
+      "paths": [
+        "features/notes/**",
+        "packages/notes/**",
+        "packages/sync/**",
+        "apps/app/**",
+        "apps/api/**",
+        "packages/access/**",
+        "packages/identity/**",
+        "packages/design-system/**",
+        "packages/app-build/**",
+        "packages/journeys/**",
+        "tools/journeys/**",
+        "tools/dev.ts"
+      ],
       "ownsStack": true,
       "timeoutSeconds": 300,
       "artifactPaths": [

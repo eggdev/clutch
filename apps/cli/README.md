@@ -530,6 +530,8 @@ autoRevert: # optional
 pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
 sast: auto # optional: auto (the default), codeql or semgrep
+verification: # optional
+  gate: observe # off, observe (the default) or enforce: what bun run pr open does with a missing flow
 pr_size: # optional
   warn: 300 # the default: clutch labels warns above it
   max: 1000 # a PR above it fails check-scope and splits
@@ -561,6 +563,12 @@ fleet: # optional: the repositories the weekly digest reads
 `automerge.mode` tells the Auto-merge workflow what to do, and `automerge.step`
 how far it reaches: bot PRs, then low-risk agent PRs, then medium-risk ones. See
 [auto-merge](../../.agents/skills/deliver/references/pull-requests.md#auto-merge).
+
+`verification.gate` tells `bun run pr open` what to do with a change that has
+no passing verify receipt for a flow that the feature map asks for. `observe`
+prints that the gate would block it, `enforce` refuses it, and `off` only writes
+the record. `clutch doctor` prints the gate. See
+[verification record](../../.agents/skills/deliver/references/pull-requests.md#verification-record).
 
 `autoRevert.watch` lists checks or job names that count as required for the
 Auto-revert workflow only. A project with a live deploy lists its deploy job, so

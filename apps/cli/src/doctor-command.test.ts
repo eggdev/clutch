@@ -95,8 +95,9 @@ test('a repository without Clutch files reports every capability as undeclared',
   const all = await capabilities();
   const count = all.length;
   expect(lines.filter((line) => line.startsWith('  '))).toHaveLength(count);
-  expect(lines.at(-2)).toContain(`Declared: 0 adopted, 0 waived, 0 n/a, ${count} undeclared.`);
-  expect(lines.at(-1)).toBe('SAST: auto -> ? (code scanning not checked without --remote)');
+  expect(lines.at(-3)).toContain(`Declared: 0 adopted, 0 waived, 0 n/a, ${count} undeclared.`);
+  expect(lines.at(-2)).toBe('SAST: auto -> ? (code scanning not checked without --remote)');
+  expect(lines.at(-1)).toBe('Verification gate: observe');
 });
 
 test('--phase narrows the report, and a bad clutch.yaml exits 1 with its path', async () => {
