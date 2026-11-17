@@ -60,6 +60,34 @@ test('a section groups the summaries by bump, and the newest section comes first
   );
 });
 
+test('the changeset that a tool writes passes the formatter with no Git hook', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'changeset-format-'));
+  try {
+    const repo = path.resolve(import.meta.dir, '../..');
+    const { renovateChangeset } = await import('@tools/release/renovate-changeset.mjs');
+    await writeFile(path.join(root, 'tool.md'), changesetText('clutch', 'patch', 'fix: a thing'));
+    await writeFile(
+      path.join(root, 'renovate.md'),
+      renovateChangeset('renovate/all\nchore(deps): update all', 'clutch').text,
+    );
+    const check = Bun.spawnSync(
+      [
+        path.join(repo, 'node_modules/.bin/oxfmt'),
+        '--check',
+        '--config',
+        path.join(repo, '.oxfmtrc.json'),
+        path.join(root, 'tool.md'),
+        path.join(root, 'renovate.md'),
+      ],
+      { stdout: 'pipe', stderr: 'pipe' },
+    );
+    expect(check.stdout.toString() + check.stderr.toString()).toContain('correct format');
+    expect(check.exitCode).toBe(0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('a release bumps package.json, writes the changelog and removes the changesets', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'release-'));
   try {
