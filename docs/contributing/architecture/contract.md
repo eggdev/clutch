@@ -223,9 +223,43 @@ test('each command of the notes contract keeps the claims that the contract make
 ```
 
 The inputs come from a seeded generator, `seeded` in
-`packages/sync/testing/seeded.ts`. The default seed is 532, so each run tries
-the same inputs. `CLAIMS_SEED=7 mise exec -- bun test packages/notes` tries
-other inputs. A failure names the seed, the claim, the run and the input.
+`packages/sync/testing/seeded.ts`. The default seed is 532, with 40 runs of
+each command, so each run tries the same inputs. `CLAIMS_SEED` sets another
+seed, and `CLAIMS_RUNS` sets another run count. An option of the call wins
+over the variable. `CLAIMS_RUNS` must be a whole number from 1 to 1000000.
+While `CLAIMS_RUNS` is set, the proof prints the seed and the run count that
+it used.
+`CLAIMS_SEED=7 CLAIMS_RUNS=400 mise exec -- bun test packages/notes` tries
+400 other inputs for each command. A failure names the seed, the claim, the
+run and the input.
+
+`validate` and CI on a PR keep seed 532 and 40 runs. A PR must fail only for
+its own change. A new seed there could fail a PR for an old defect.
+
+The `claims` job of the nightly [flake hunt](../../../.github/workflows/flake-hunt.yml)
+picks a new seed each night. It runs `bun tools/claims-hunt.ts`, which runs
+each package's proof file with that seed and 20000 runs of each command.
+`proofFiles` in `tools/contract-claims.ts` finds the files, so a new package
+with a contract joins with no workflow edit. The job prints the seed first,
+and writes it to the step summary, also when it passes. It takes a few
+seconds.
+
+A claim that breaks on a new input is a defect, not a flaky test, so the job
+fails. The error annotation and the step summary name the package, the
+command, the claim and the line to run it again, such as
+`CLAIMS_SEED=<seed> CLAIMS_RUNS=20000 mise exec -- bun test --timeout 600000 <file>`.
+The line carries the time limit of the hunt. The default limit of `bun test`
+is 5 seconds, and it can end a long run before the failing input.
+
+The job also fails a proof that passed with another seed or run count. A
+`seed` or `runs` option in the proof file wins over the variables, and a
+skipped test proves nothing. Then the night tested no new input for that
+package. When the job fails:
+
+1. Run the printed line. It tries the same inputs again.
+2. Fix the defect in the command or in its contract.
+3. Add the failing input as a named test of the command, so each blocking
+   run tries it.
 
 Before each run, the pool holds records of the contract with the IDs `k1`,
 `k2` and `k3`. A plain `string` field takes one of those values, so a command
