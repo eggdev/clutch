@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.17.0 (2026-11-17)
+
+### Features
+
+- feat(merge): the owner approves a rule that gardening proposes (CL-554)
+
 ## 1.16.3 (2026-11-17)
 
 ### Fixes and maintenance
