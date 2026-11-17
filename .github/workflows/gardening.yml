@@ -252,6 +252,11 @@ jobs:
         run: |
           title="$(cat "$RUNNER_TEMP/gardening-title.txt")"
           branch="gardening/$(date -u +%Y-%m-%d)"
+          # validate runs `bun install` in its lockfile check, and that install
+          # turns the repository's Git hooks on again. The pre-push hook would
+          # run the journeys, and this job has no browser. validate passed
+          # above, and CI runs the journeys on the pull request.
+          git config core.hooksPath /dev/null
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch --create "$branch"
