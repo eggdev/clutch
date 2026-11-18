@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.2 (2026-11-18)
+
+### Fixes and maintenance
+
+- chore(clutch): file the project differences of a sync
+
 ## 1.23.1 (2026-11-17)
 
 ### Fixes and maintenance
