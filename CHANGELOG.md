@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.10 (2026-11-20)
+
+### Fixes and maintenance
+
+- refactor(sync): split the confirmed records out of the pool (CL-579)
+
 ## 1.23.9 (2026-11-20)
 
 ### Fixes and maintenance
