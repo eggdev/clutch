@@ -94,6 +94,16 @@ the same, so loading the local database needs no decode.
   the client sends it again.
 - The queue survives a reload. A transaction made offline goes to the server
   when the socket opens again.
+- After a socket drops, it opens again, and the engine pulls again. The new
+  `Pull` names the last sync ID and the loaded groups of the pool, so the
+  client gets each change that it missed. A group that a gate asked for and
+  that is not loaded yet is asked for again.
+  `packages/sync/runtime/transport.test.ts` holds this.
+- An ended session stops the engine: the 4401 close, or a `Pull` that fails
+  with `SessionEnded`. The engine tells the app once. It then pulls and pushes
+  no more, also when its socket could open again.
+- When a save to the local database fails, such as on a full device, the pool
+  reports one sentence, and the next change saves again.
 - Only the sync package uses the network or device storage on the client. The
   [client lint rules](../setup/lint-rules.md#client-code) reject the others.
 - The transport and its Effect code load after the first paint. The first

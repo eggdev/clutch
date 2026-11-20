@@ -77,3 +77,46 @@ test('the pool takes its IDs and its time from the stamps of the platform', asyn
   const pool = await loadPool(memoryLocalDatabase(), [renameLocal], [], testStamps());
   expect(pool.run(rename, { id: 'a', title: 'New' })).toBe('id-1');
 });
+
+test('a save that fails is reported once, and the next change saves the newest state', async () => {
+  const database = memoryLocalDatabase(
+    poolState({ lastSyncId: 2, tables: { Card: [{ id: 'a', title: 'Saved' }] } }),
+  );
+  const lines: Array<string> = [];
+  // The device refuses the first two writes, as a full device does.
+  let refusals = 2;
+  let settled = Promise.withResolvers<null>();
+  const pool = await loadPool(
+    {
+      ...database,
+      write: async (state) => {
+        try {
+          if (refusals > 0) {
+            refusals -= 1;
+            throw new Error('The device is full.');
+          }
+          await database.write(state);
+        } finally {
+          settled.resolve(null);
+        }
+      },
+    },
+    [renameLocal],
+    [defineContract('cards', { records: [card], commands: [rename], loads: [] })],
+    testStamps(),
+    (line) => lines.push(line),
+  );
+  for (const title of ['First', 'Second', 'Third']) {
+    settled = Promise.withResolvers<null>();
+    pool.run(rename, { id: 'a', title });
+    await settled.promise;
+    // The save reads the outcome of its write in the task after it.
+    await Promise.resolve();
+  }
+  expect(lines).toEqual([
+    'This device could not save the last change. The change stays on this screen, and the next change saves again.',
+  ]);
+  expect(database.writes()).toBe(1);
+  const saved = await database.read();
+  expect(saved?.pending).toHaveLength(3);
+});
