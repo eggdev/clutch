@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.0 (2026-11-20)
+
+### Features
+
+- feat(sync): deliver live deltas across server processes (CL-918)
+
 ## 1.25.1 (2026-11-20)
 
 ### Fixes and maintenance
