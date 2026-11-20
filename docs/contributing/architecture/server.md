@@ -31,7 +31,9 @@ export class Actors extends Context.Service<
 `packages/identity` shows the pattern. `service/actors.ts` declares the
 service. `runtime/dev.server.ts` builds it from `config/dev.ts`, and
 `testing/actor.ts` builds it for tests. The sync server asks it for the actor
-of each socket and each call.
+of each socket and each call. A Layer that finds no session dies with
+`SessionEnded`, from `packages/sync/types/session-ended.ts`. The sync server
+then closes the socket with code 4401. Each other failure is a server fault.
 
 ## Services in a server change
 

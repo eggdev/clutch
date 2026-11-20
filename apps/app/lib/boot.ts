@@ -1,5 +1,5 @@
 import { clientOf } from '@repo/sync/contract/define';
-import { connectAfterPaint, loadPool } from '@repo/sync/runtime/boot';
+import { connectAfterPaint, endSession, loadPool } from '@repo/sync/runtime/boot';
 import { openLocalDatabase } from '@repo/sync/runtime/local-database';
 import type { Pool } from '@repo/sync/runtime/pool';
 import { useSyncExternalStore } from 'react';
@@ -18,6 +18,13 @@ import { registerServiceWorker } from '@/lib/service-worker';
  */
 const { contracts, commands } = clientOf(packages);
 
+/** The end of the session of the current start, once it has loaded. */
+let endCurrent: (() => Promise<void>) | undefined;
+
+function engineNotStarted() {
+  // The start below connects the engine before anything can end it.
+}
+
 /**
  * One start of the app. The pool reports a saved copy, a record from the
  * server or a command that does not fit this build. Each report goes to the
@@ -32,18 +39,40 @@ const store = bootStore<Pool>(async (report) => {
     report(line);
   });
   registerServiceWorker();
-  connectAfterPaint(pool, {
+  let ended = false;
+  let disconnect = engineNotStarted;
+  const end = async () => {
+    // A second end of the same start, such as a sign-out and a 4401 close, does nothing.
+    if (ended) {
+      return;
+    }
+    ended = true;
+    await endSession(database, pool, disconnect);
+    store.restart();
+    afterSessionEnded();
+  };
+  disconnect = connectAfterPaint(pool, {
     url: syncUrl(),
     contracts,
     headers: socketHeaders(),
-    onSessionEnded: async () => {
-      await database.clear();
-      store.restart();
-      afterSessionEnded();
+    onSessionEnded: () => {
+      void end();
     },
   });
+  endCurrent = end;
   return pool;
 });
+
+/**
+ * Ends the session on this device: it stops the sync engine and the saves
+ * of the pool, clears the local database, and starts the app again with an
+ * empty pool. It needs no server, so a sign-out that happens offline still
+ * clears the device. The app calls it when the server ends the session. A
+ * project's sign-out screen calls it after its identity vendor signs out.
+ */
+export async function endSessionOnDevice(): Promise<void> {
+  await endCurrent?.();
+}
 
 /**
  * The start of the app: the object pool once the app has read the local

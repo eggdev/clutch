@@ -10,7 +10,7 @@ import type {
   SavedRecord,
   SyncPosition,
 } from '@repo/sync/types/local-database';
-import type { Transaction } from '@repo/sync/types/protocol';
+import type { SyncActor, Transaction } from '@repo/sync/types/protocol';
 
 /**
  * The doors of the object pool. A copy is checked where it comes in and
@@ -177,12 +177,21 @@ function isSavedRecord(value: unknown): value is SavedRecord {
   );
 }
 
+function isActor(value: unknown): value is SyncActor {
+  return (
+    isObject(value) &&
+    typeof value['userId'] === 'string' &&
+    typeof value['organizationId'] === 'string'
+  );
+}
+
 function isPosition(value: unknown): value is SyncPosition {
   return (
     isObject(value) &&
     typeof value['lastSyncId'] === 'number' &&
     isStrings(value['groups']) &&
-    (value['leftOutBy'] === undefined || typeof value['leftOutBy'] === 'string')
+    (value['leftOutBy'] === undefined || typeof value['leftOutBy'] === 'string') &&
+    (value['actor'] === undefined || isActor(value['actor']))
   );
 }
 
@@ -227,6 +236,7 @@ export function stateOf(
     meta,
     pending,
     ...(saved.leftOutBy === undefined ? {} : { leftOutBy: saved.leftOutBy }),
+    ...(saved.actor === undefined ? {} : { actor: saved.actor }),
   };
 }
 
@@ -254,6 +264,7 @@ export function fullSave(state: PoolState): LocalSave {
         lastSyncId: state.lastSyncId,
         groups: state.groups,
         ...(state.leftOutBy === undefined ? {} : { leftOutBy: state.leftOutBy }),
+        ...(state.actor === undefined ? {} : { actor: state.actor }),
       },
     },
     add: state.pending,
