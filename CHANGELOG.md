@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.9 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(checks): count the size label as check-scope does (CL-582)
+
 ## 1.23.8 (2026-11-20)
 
 ### Fixes and maintenance
