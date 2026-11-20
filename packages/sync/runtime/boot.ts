@@ -219,15 +219,16 @@ export async function endSession(
 }
 
 /**
- * Follows a session end in another tab of this device. When another tab
- * clears the local database, this tab stops its engine with `disconnect` and
- * the saves of its pool at once, before it can write anything back. Then it
- * calls `restart`, so the app starts again with an empty pool. The tab hears
- * the clear as a message, or as a save that found the database cleared,
- * whichever comes first. The tab that clears never hears its own clear. It
- * follows one end, and returns the stop of the follow.
+ * Follows the loss of the local database in this tab. Another tab ended the
+ * session and cleared the database: the tab hears it as a message, or as a
+ * save that found the database cleared, whichever comes first. Or a tab of a
+ * newer build took the database for its new layout. This tab then stops its
+ * engine with `disconnect` and the saves of its pool at once, before it can
+ * write anything back. Then it calls `restart`, so the app starts again on
+ * what the database holds now. The tab that clears never hears its own
+ * clear. It follows one loss, and returns the stop of the follow.
  */
-export function followSessionEnd(
+export function followLostDatabase(
   database: LocalDatabase,
   pool: SavedPool,
   disconnect: () => void,

@@ -213,7 +213,7 @@ holds the rule for each adapter.
 
 `clear` tells each other tab of the database on the device first. On the
 web, it posts a message on a `BroadcastChannel` with the name of the
-database. `onLost` wakes in each other tab, and `followSessionEnd` then
+database. `onLost` wakes in each other tab, and `followLostDatabase` then
 stops that tab's engine and saves and starts the app again.
 
 The message can come late. A socket message of the other tab can start a
@@ -242,7 +242,12 @@ again from the server.
 A tab of an older build that holds the IndexedDB database open blocks this
 move. The open then fails with a sentence that says to close that tab. A tab
 closes its own handle when a newer build asks for a new version, so it never
-blocks that build.
+blocks that build. Then the tab can no longer save, so `onLost` wakes, and
+`followLostDatabase` stops its engine and its saves and starts the app
+again, with no clear. On the web the page loads again, with the newer build,
+and opens the new layout. Each waiting transaction was saved when the person
+made it, so the new layout has it, and the start sends it.
+`packages/sync/runtime/indexed-db.browser.test.ts` holds this.
 
 `openLocalDatabase` in `packages/sync/runtime/local-database.ts` opens IndexedDB
 on the web. `packages/sync/runtime/local-database.native.ts` replaces it on a

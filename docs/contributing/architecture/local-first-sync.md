@@ -284,7 +284,7 @@ device. Eight rules hold this.
   starts, the web adapter posts a message on a `BroadcastChannel` with the
   name of the database. A tab that hears it stops its engine and the saves of
   its pool at once, so it writes nothing back. Then it starts again with an
-  empty pool. `followSessionEnd` in `packages/sync/runtime/boot.ts` does
+  empty pool. `followLostDatabase` in `packages/sync/runtime/boot.ts` does
   this. The message can reach the tab after a save of that tab started. The
   generation of the local database stops that save: each clear writes a new
   one, and a save of a handle that read an older one writes nothing. Then

@@ -133,12 +133,23 @@ function writerOf(name: string): Promise<Writer> {
  * each other tab of the same name through a `BroadcastChannel`.
  *
  * Version 1 kept the whole state under one key. The upgrade moves its rows
- * into the new stores and deletes the old store. See
+ * into the new stores and deletes the old store. `version` is the version of
+ * the layout. A test passes a later one, as a tab of a newer build does. See
  * docs/contributing/architecture/client.md#older-layouts.
  */
-export async function openIndexedDb(name: string): Promise<LocalDatabase> {
+export async function openIndexedDb(name: string, version = 2): Promise<LocalDatabase> {
+  let lost = false;
+  const heard = new Set<() => void>();
+  function wake() {
+    if (!lost) {
+      lost = true;
+      for (const listener of heard) {
+        listener();
+      }
+    }
+  }
   const blocked = Promise.withResolvers<never>();
-  const opening = openDB(name, 2, {
+  const opening = openDB(name, version, {
     async upgrade(upgrade, oldVersion, _newVersion, tx) {
       if (oldVersion >= 2) {
         return;
@@ -161,10 +172,15 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
         ),
       );
     },
+    // A tab of a newer build asks for a new version. This handle lets the
+    // database go, so it never blocks that build, and it can no longer save.
+    // `onLost` wakes, so the app starts again on the new layout. Each waiting
+    // transaction was saved when it was made, so the new layout has it.
     blocking(_current, _next, event) {
       if (event.target instanceof IDBDatabase) {
         event.target.close();
       }
+      wake();
     },
   });
   const database = await Promise.race([opening, blocked.promise]);
@@ -178,16 +194,6 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
     await first.store.put(generation, 'generation');
   }
   await first.done;
-  let lost = false;
-  const heard = new Set<() => void>();
-  function wake() {
-    if (!lost) {
-      lost = true;
-      for (const listener of heard) {
-        listener();
-      }
-    }
-  }
   const writer = await writerOf(name);
   // Each other tab of this database hears a clear on this channel. A channel
   // never hears its own message.

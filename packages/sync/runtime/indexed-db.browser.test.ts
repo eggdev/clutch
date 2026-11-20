@@ -15,7 +15,12 @@ import type { Browser } from '@playwright/test';
 const root = path.join(import.meta.dir, '..', '..', '..');
 const entrySource = `
 import { openDB } from 'idb';
+import { localChange } from '@repo/sync/contract/command';
+import { defineContract } from '@repo/sync/contract/define';
+import { followLostDatabase, loadPool } from '@repo/sync/runtime/boot';
+import type { SavedPool } from '@repo/sync/runtime/boot';
 import { openIndexedDb } from '@repo/sync/runtime/indexed-db';
+import { testCommand, testModel } from '@repo/sync/testing/pool-state';
 import {
   expectOldLayoutMoved,
   localDatabaseCases,
@@ -105,9 +110,58 @@ async function runNoGeneration(): Promise<Array<string>> {
   return [await first.save({ add: [], done: [] }), await second.save({ add: [], done: [] })];
 }
 
+const card = testModel('Card', { id: 'string', title: 'string' });
+const rename = testCommand('cards/rename', { id: 'string', title: 'string' }, 'local');
+const renameLocal = localChange(rename, (draft, input) => {
+  draft.put(card, input);
+});
+const cards = defineContract('cards', { records: [card], commands: [rename], loads: [] });
+
+let restarted: SavedPool | undefined;
+let disconnects = 0;
+
+/**
+ * Starts the app on the database of the upgrade test, as the composition root
+ * does, and runs one command. A start again opens the database at version 3,
+ * as the page of the newer build does. It resolves when the command is saved.
+ */
+async function startBeforeUpgrade(): Promise<void> {
+  const database = await openIndexedDb('upgrade');
+  const pool = await loadPool(database, [renameLocal], [cards]);
+  followLostDatabase(
+    database,
+    pool,
+    () => {
+      disconnects += 1;
+    },
+    async () => {
+      restarted = await loadPool(await openIndexedDb('upgrade', 3), [renameLocal], [cards]);
+    },
+  );
+  pool.run(rename, { id: 'a', title: 'Before the upgrade' });
+  for (let saved = await database.read(); !saved?.pending.length; saved = await database.read()) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+/** Opens the database of the upgrade test at version 3, as a tab of a newer build does. */
+async function upgrade(): Promise<void> {
+  await openIndexedDb('upgrade', 3);
+}
+
+/** What the start after the upgrade sends, once it has started, and how often the engine stopped. */
+function afterUpgrade() {
+  return restarted
+    ? { unsent: restarted.unsent().map(({ input }) => input), disconnects }
+    : undefined;
+}
+
 Object.assign(globalThis, {
   runLocalDatabaseCases: runCases,
   runNoGeneration,
+  startBeforeUpgrade,
+  upgrade,
+  afterUpgrade,
   runOldLayout,
   openForLock,
   waitForWriter,
@@ -210,5 +264,29 @@ test('a clear in one tab wakes each other tab of the database, and not its own',
   await clearing.evaluate('globalThis.clearTabs()');
   await other.waitForFunction('globalThis.clearsHeard() === 1');
   expect(await clearing.evaluate<number>('globalThis.clearsHeard()')).toBe(0);
+  await context.close();
+}, 60_000);
+
+test('a tab whose database a newer build upgrades starts again, and still sends its waiting command', async () => {
+  const context = await browser.newContext();
+  await context.route('https://app.test/', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }),
+  );
+  const open = async () => {
+    const page = await context.newPage();
+    await page.goto('https://app.test/');
+    await page.addScriptTag({ content: bundle });
+    return page;
+  };
+  const older = await open();
+  await older.evaluate('globalThis.startBeforeUpgrade()');
+  const newer = await open();
+  // The open waits until the older tab lets the database go.
+  await newer.evaluate('globalThis.upgrade()');
+  await older.waitForFunction('globalThis.afterUpgrade() !== undefined');
+  expect(await older.evaluate('globalThis.afterUpgrade()')).toEqual({
+    unsent: [{ id: 'a', title: 'Before the upgrade' }],
+    disconnects: 1,
+  });
   await context.close();
 }, 60_000);

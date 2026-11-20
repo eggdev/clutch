@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 
 import { localChange } from '@repo/sync/contract/command';
 import { defineContract } from '@repo/sync/contract/define';
-import { endSession, followSessionEnd, loadPool } from '@repo/sync/runtime/boot';
+import { endSession, followLostDatabase, loadPool } from '@repo/sync/runtime/boot';
 import type { SavedPool } from '@repo/sync/runtime/boot';
 import { memoryLocalDatabase } from '@repo/sync/testing/local-database';
 import { poolState, testCommand, testGroup, testModel } from '@repo/sync/testing/pool-state';
@@ -101,13 +101,13 @@ test('a session end in one tab stops the engine and the saves of each other tab,
   const there = await loadPool(other, [renameLocal], [cards]);
   await settle();
   const heard: Array<string> = [];
-  followSessionEnd(
+  followLostDatabase(
     memory,
     here,
     () => heard.push('own disconnect'),
     () => heard.push('own start'),
   );
-  followSessionEnd(
+  followLostDatabase(
     other,
     there,
     () => heard.push('disconnect'),
@@ -271,7 +271,7 @@ async function lateSaveOfOtherTab(
   const tabA = await loadPool(handleA, [renameLocal], [cards]);
   const tabB = await loadPool(handleB, [renameLocal], [cards]);
   let restarts = 0;
-  followSessionEnd(handleB, tabB, noEngine, () => {
+  followLostDatabase(handleB, tabB, noEngine, () => {
     restarts += 1;
   });
   await settle();

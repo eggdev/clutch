@@ -159,10 +159,12 @@ export type LocalDatabase = {
    */
   readonly clear: () => Promise<void>;
   /**
-   * Wakes once when this handle can no longer save: another tab cleared the
+   * Wakes once when this handle can no longer save. Another tab cleared the
    * database, which the tab hears as a message or as a save that gives
-   * `cleared`. It returns the stop of the listener. A platform with one
-   * process has no other tab, so only a second handle of a test clears it.
+   * `cleared`. Or a tab of a newer build asked for a new version of the
+   * database, and this handle let it go. It returns the stop of the
+   * listener. A platform with one process has no other tab, so only a second
+   * handle of a test clears it.
    */
   readonly onLost: (listener: () => void) => () => void;
   /**
