@@ -13,12 +13,35 @@ import { GroupNotAllowed } from '@repo/sync/types/group-not-allowed';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import type { Outcome, Transaction } from '@repo/sync/types/protocol';
 import { ServerBehind } from '@repo/sync/types/server-behind';
+import { SessionEnded, sessionEndedCode } from '@repo/sync/types/session-ended';
 import { Deferred, Effect, Layer, Queue, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { RpcServer } from 'effect/rpc';
+import { Socket } from 'effect/socket';
 
 /** The path of the sync socket on the server app. */
 const syncPath = '/sync';
+
+/**
+ * An `Actors` layer that finds no session dies with `SessionEnded`. Each
+ * other failure stays a server fault, so a client keeps its local database.
+ */
+const noSession = (defect: unknown) =>
+  defect instanceof SessionEnded ? Effect.succeed(null) : Effect.die(defect);
+
+/**
+ * Accepts the upgrade of a socket with no session, and closes it at once
+ * with code 4401. A browser cannot read the status of a refused upgrade, but
+ * it reads the close code, so a client that was offline when its session
+ * ended learns it when it connects.
+ */
+const endedSocket = (request: HttpServerRequest.HttpServerRequest) =>
+  Effect.gen(function* () {
+    const socket = yield* Effect.orDie(request.upgrade);
+    const writer = yield* socket.writer;
+    yield* writer.write(new Socket.CloseEvent(sessionEndedCode, 'The session ended.'));
+    return HttpServerResponse.empty();
+  });
 
 /**
  * The WebSocket protocol of the RPC server, with each socket kept in
@@ -41,7 +64,12 @@ const trackedWebsocket = Layer.effect(RpcServer.Protocol)(
         );
       }
       return Effect.gen(function* () {
-        const actor = yield* actors.fromHeaders(request.headers);
+        const actor = yield* actors
+          .fromHeaders(request.headers)
+          .pipe(Effect.catchDefect(noSession));
+        if (!actor) {
+          return yield* endedSocket(request);
+        }
         const tracked: HttpServerRequest.HttpServerRequest = Object.create(request, {
           upgrade: {
             value: request.upgrade.pipe(

@@ -20,7 +20,10 @@ type PullCall = { readonly lastSyncId: number; readonly groups: ReadonlyArray<st
 type Server = {
   readonly push: (transactions: ReadonlyArray<Transaction>) => ReadonlyArray<Outcome>;
   readonly allows: (group: string) => boolean;
-  /** The messages of one pull. Without it, a pull stays open and sends nothing. */
+  /**
+   * The messages of one pull. Without it, a pull sends the loaded groups,
+   * which open the pushes, then stays open.
+   */
   readonly pull?: (call: PullCall) => Stream.Stream<SyncMessage, SessionEnded>;
 };
 
@@ -32,7 +35,12 @@ function sessionStays() {
 function connected(pool: Pool, server: Server, done: () => boolean) {
   const handlers = SyncRpcs.toLayer({
     Push: ({ transactions }) => Effect.sync(() => server.push(transactions)),
-    Pull: (call) => server.pull?.(call) ?? Stream.never,
+    Pull: (call) =>
+      server.pull?.(call) ??
+      Stream.concat(
+        Stream.make<Array<SyncMessage>>({ _tag: 'Groups', loaded: [], backfill: [] }),
+        Stream.never,
+      ),
     Load: ({ group }) => (server.allows(group) ? Effect.void : new GroupNotAllowed({ group })),
   });
   const waitUntilDone = Effect.suspend(() => (done() ? Effect.void : Effect.fail('not yet'))).pipe(

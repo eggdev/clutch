@@ -10,13 +10,13 @@ whole engine.
 | Where does a screen read?             | The object pool, through `useRecordIds` and `useRecord`                                                   |
 | How does a screen write?              | It calls a command through `useCommand`. It never starts a request.                                       |
 | What does a write change first?       | The object pool, in the same frame. The transaction goes to the queue.                                    |
-| What does the local database hold?    | The confirmed records with their groups, the last sync ID, the loaded groups and the waiting transactions |
+| What does the local database hold?    | The confirmed records with their groups, the sync position, the waiting transactions and their actor      |
 | Who decides if a write stands?        | The server change of the command                                                                          |
 | Which clients get a change?           | Each client that loaded one of the change's sync groups                                                   |
 | How does the client learn the answer? | The delta for its transaction arrives on the socket                                                       |
 | What happens when the server says no? | The object pool drops the local change, and the screen says why                                           |
 | How do conflicts resolve?             | Last writer wins, in server order                                                                         |
-| What ends a session?                  | The server closes the user's sockets with code 4401                                                       |
+| What ends a session?                  | The server closes the user's sockets with code 4401, or the person signs out on the device, even offline. |
 
 ## Sync engine
 
@@ -47,8 +47,9 @@ The protocol has three calls over one WebSocket for each organization, through
   it again. `packages/sync/runtime/transport.test.ts` holds this.
 - `Pull` names the groups that the client loaded before. It streams a `Groups`
   message first, then the deltas after the client's last sync ID, then each
-  live delta. Each delta holds only the changes of the loaded groups, and a
-  delete of each record that left them.
+  live delta. The first `Groups` message names the actor of the connection:
+  its user and its organization. Each delta holds only the changes of the
+  loaded groups, and a delete of each record that left them.
   A client past sync ID 0 that does not name an eager group lacks its
   records. The first `Groups` message then holds the snapshot of that group.
   With `pages`, `Page` messages come before it.
@@ -74,7 +75,8 @@ ends right: the pool keeps the change with the higher sync ID.
 
 `Pull` fails with `SessionEnded` when the session ends. It fails with
 `ServerBehind` when the client's last sync ID is above the server's newest
-event.
+event. A socket with no session opens and closes at once with code 4401. See
+[the end of a session](#the-end-of-a-session).
 
 `Pull` also sends the digest of the app's contracts. See
 [the manifest and the digest](./contract.md#manifest-and-digest).
@@ -138,11 +140,50 @@ the same, so loading the local database needs no decode.
 - One `Pull` element holds at most 1,000 deltas, so one decode stays short.
   A page of a snapshot holds at most 1,000 records.
 - A sign-out calls `Sessions.end` with the user. Each of the user's sockets
-  closes with code 4401, and the client clears its local database.
+  closes with code 4401, and the client clears its local database. See
+  [the end of a session](#the-end-of-a-session).
 - After a database restore, the server's log can end before a client's last
   sync ID. `Pull` then fails with `ServerBehind`. The client drops its
   confirmed records and sets its last sync ID to 0. It keeps its pending
   transactions, sends them again, and pulls again from 0.
+
+## The end of a session
+
+One person never sees or sends the saved work of another person on the same
+device. Four rules hold this.
+
+- The saved copy holds its actor. The position row of the local database
+  holds the user and the organization that the copy belongs to. A copy from
+  before this rule has none, and takes the actor of the first `Groups`
+  message that names one. The local database keeps the name `app`: a browser
+  cannot know its user before the server answers.
+- The engine sends no `Push` on a connection before the first `Groups`
+  message of its pull confirmed the actor. When that message names another
+  actor, the pool drops the confirmed records, the loaded groups, the
+  position and each waiting transaction. It reports one sentence, and the
+  engine pulls again from 0 as the new actor. The same user in another
+  organization is another actor, because sync IDs belong to one
+  organization. A server that names no actor opens the gate too, and the
+  copy stays. `packages/sync/runtime/transport-actor.test.ts` and
+  `pool-actor.test.ts` hold this.
+- A client that was offline when its session ended learns it when it
+  connects. An `Actors` layer that finds no session dies with `SessionEnded`.
+  The sync server then accepts the upgrade of the socket and closes it at
+  once with code 4401, because a browser cannot read the status of a refused
+  upgrade. Each other failure of `Actors` stays a server fault, and the
+  client keeps its local database. `apps/api/src/sessions.test.ts` holds
+  this.
+- An ended session stops the saves before the local database clears.
+  `endSession` in `packages/sync/runtime/boot.ts` stops the engine, stops the
+  saves of the pool and lets a save that runs finish, then clears the
+  database. It needs no server. After it, no change of the old pool reaches
+  the database, also on native, where no page loads again.
+  `packages/sync/runtime/boot-session.test.ts` holds this.
+
+`endSessionOnDevice` in `apps/app/lib/boot.ts` calls `endSession`, then starts
+the app again with an empty pool. The app calls it on a 4401 close and on a
+`Pull` that fails with `SessionEnded`. A project's sign-out screen calls it
+after its identity vendor signs out, also offline.
 
 ## Sync groups
 

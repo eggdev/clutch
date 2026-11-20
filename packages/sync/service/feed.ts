@@ -29,11 +29,6 @@ export type Connection = {
 /** One `Load`: the group, and whether the client reads its snapshot in pages. */
 export type LoadRequest = { readonly group: string; readonly pages: boolean };
 
-const groupsMessage = (
-  loaded: ReadonlySet<string>,
-  backfill: ReadonlyArray<Delta>,
-): SyncMessage => ({ _tag: 'Groups', loaded: [...loaded], backfill });
-
 type Input =
   | { readonly kind: 'delta'; readonly delta: Delta }
   | { readonly kind: 'load'; readonly request: LoadRequest };
@@ -55,7 +50,18 @@ type Input =
 export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Connection) {
   return Stream.unwrap(
     Effect.gen(function* () {
-      const { organizationId } = connection;
+      const { organizationId, userId } = connection;
+      // The first `Groups` message names the actor, so the client drops a
+      // saved copy of another actor before it sends anything.
+      let named = false;
+      const groupsMessage = (
+        loaded: ReadonlySet<string>,
+        backfill: ReadonlyArray<Delta>,
+      ): SyncMessage => {
+        const actor = named ? {} : { actor: { userId, organizationId } };
+        named = true;
+        return { _tag: 'Groups', loaded: [...loaded], backfill, ...actor };
+      };
       // Subscribe before the backlog, so no event falls between the two.
       const subscription = yield* log.subscribe(organizationId);
       const loaded = new Set(connection.loaded);

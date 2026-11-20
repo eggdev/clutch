@@ -28,7 +28,9 @@ Device caches can be stale while offline.
 
 - The local database records the last sync ID that it applied.
 - When online, the sync engine asks for each event after that sync ID.
-- A copy is deleted when the session ends: the socket closes with code 4401.
+- A copy is deleted when the session ends: the socket closes with code 4401,
+  or the person signs out on the device. A copy of another actor is dropped
+  before the client sends anything.
 - A copy never decides a command, a permission or a business transition. The
   server decides.
 - The interface reads and writes the device copy first, and the server confirms

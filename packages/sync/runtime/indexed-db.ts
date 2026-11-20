@@ -7,7 +7,7 @@ import type { IDBPTransaction } from 'idb';
 const records = 'records';
 /** One row for each waiting transaction, in the order the tabs added them. */
 const transactions = 'transactions';
-/** One row, under the key `position`: the last sync ID, the loaded groups and `leftOutBy`. */
+/** One row, under the key `position`: the last sync ID, the loaded groups, `leftOutBy` and the actor. */
 const position = 'position';
 /** The store of the old layout, which held the whole state under the key `state`. */
 const oldStore = 'pool';

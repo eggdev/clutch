@@ -133,8 +133,8 @@ The sync engine keeps its state on the device through one seam,
 kinds of rows: one for each confirmed record, one for each waiting
 transaction, and one for the sync position. A deleted record keeps a row
 with no record, so the pool remembers the sync ID of the delete. The sync position is the last
-sync ID, the loaded groups and `leftOutBy`. `read` joins the rows into one
-state. `save` writes one change in one database transaction. `clear` removes
+sync ID, the loaded groups, `leftOutBy` and the actor that the copy belongs
+to. `read` joins the rows into one state. `save` writes one change in one database transaction. `clear` removes
 every row.
 
 A save holds the records that changed since the last save, the records that
@@ -164,6 +164,21 @@ Each tab writes its own waiting transactions:
   change from the server.
 
 `packages/sync/runtime/boot.test.ts` holds these rules.
+
+### The end of a session
+
+`loadPool` gives the pool a `stop`. It detaches the save listener and waits
+for a save that runs, so no later change of the pool reaches the database.
+`connectAfterPaint` returns the stop of the engine. `endSession` calls both,
+then clears the database. `endSessionOnDevice` in `apps/app/lib/boot.ts`
+calls it, then starts the app again. A project's sign-out calls
+`endSessionOnDevice`. The Web Lock stays with the page, so the next start in
+the same page stays the writer. See
+[the end of a session](./local-first-sync.md#the-end-of-a-session).
+
+A saved copy of another actor is dropped when the server names the actor of
+the connection. A position with an actor of another shape makes the read
+unreadable, like any other position of another shape.
 
 ### Older layouts
 

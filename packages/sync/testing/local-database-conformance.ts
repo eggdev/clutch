@@ -18,7 +18,7 @@ function rename(id: string, title = 'New'): Transaction {
   return { id, command: 'cards/rename', input: { id: 'a', title } };
 }
 
-/** A state with two confirmed records, a loaded group and one pending transaction. */
+/** A state of one actor, with two confirmed records, a loaded group and one pending transaction. */
 function sampleState(title = 'Old'): PoolState {
   return {
     lastSyncId: 7,
@@ -35,6 +35,7 @@ function sampleState(title = 'Old'): PoolState {
     },
     pending: [rename('t1')],
     leftOutBy: 'old-build',
+    actor: { userId: 'ana', organizationId: 'acme' },
   };
 }
 
@@ -74,12 +75,14 @@ async function readState(db: LocalDatabase, what: string): Promise<PoolState> {
   return state;
 }
 
+const { actor: _noActor, ...oldLayout } = sampleState('Old layout');
+
 /**
- * A copy in the old layout: one value that held the whole state. An adapter
- * test stores it where the old adapter kept it, opens the adapter, and passes
- * the handle to `expectOldLayoutMoved`.
+ * A copy in the old layout: one value that held the whole state. The old
+ * layout named no actor. An adapter test stores it where the old adapter
+ * kept it, opens the adapter, and passes the handle to `expectOldLayoutMoved`.
  */
-export const oldLayoutCopy: PoolState = sampleState('Old layout');
+export const oldLayoutCopy: PoolState = oldLayout;
 
 /** Throws unless the handle reads the old copy whole, its waiting transaction included. */
 export async function expectOldLayoutMoved(db: LocalDatabase): Promise<void> {

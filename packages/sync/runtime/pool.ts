@@ -25,7 +25,7 @@ import {
 } from '@repo/sync/runtime/tables';
 import type { Tables } from '@repo/sync/runtime/tables';
 import type { ConfirmedSave, PoolState } from '@repo/sync/types/local-database';
-import type { Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
+import type { Delta, Outcome, SyncActor, Transaction } from '@repo/sync/types/protocol';
 import type { ReadablePool, Rejection } from '@repo/sync/types/records';
 
 type Pending = { readonly transaction: Transaction; sent: boolean; acceptedAt: number | null };
@@ -90,6 +90,14 @@ export type Pool = ReadablePool & {
    * that another build left a record out of is then loaded again from 0.
    */
   readonly nameBuild: (digest: string) => void;
+  /**
+   * The engine passes the actor that the first `Groups` message of a pull
+   * names. A copy of another actor is dropped whole: the confirmed records,
+   * the loaded groups, the position and each waiting transaction. It returns
+   * `false` then, and the engine pulls again from 0. A copy that names no
+   * actor takes this one. With no actor, from an older server, the copy stays.
+   */
+  readonly confirmActor: (actor?: SyncActor) => boolean;
   readonly settle: (outcomes: ReadonlyArray<Outcome>) => void;
   readonly onPending: (listener: () => void) => () => void;
   /** Wakes after every change to the pool, so the engine can save it. Screens never use it. */
@@ -315,6 +323,32 @@ export function createPool(
         );
         resetConfirmed();
       }
+    },
+    confirmActor(actor) {
+      const saved = confirmed.actor();
+      if (!actor) {
+        return true;
+      }
+      if (saved?.userId === actor.userId && saved.organizationId === actor.organizationId) {
+        return true;
+      }
+      confirmed.setActor(actor);
+      if (!saved) {
+        // The next save writes the actor of the copy.
+        wake(changeListeners);
+        return true;
+      }
+      report(
+        'This device held the data of another account, so the app removed it, with its unsent changes, and loads this account from the server.',
+      );
+      confirmed.reset();
+      confirmed.setLoaded([]);
+      pending = [];
+      rejection = undefined;
+      recompute();
+      wake(rejectionWatchers);
+      wake(pendingListeners);
+      return false;
     },
     settle(outcomes) {
       const before = rejection;
