@@ -7,10 +7,12 @@ import type { RecordCursor } from '@repo/sync/repo/records';
 import { oldestOf } from '@repo/sync/repo/trim';
 import { Database } from '@repo/sync/service/database';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
+import { liveDeltas } from '@repo/sync/service/live';
 import { seenDelta } from '@repo/sync/service/visible';
+import { Wake } from '@repo/sync/service/wake';
 import type { Change, Delta } from '@repo/sync/types/protocol';
-import { Context, Effect, Layer, Option, PubSub, Stream } from 'effect';
-import type { Scope } from 'effect';
+import { Context, Effect, Layer, Option, Stream } from 'effect';
+import type { PubSub, Scope } from 'effect';
 
 /**
  * At most this many events go in one page of the backlog, and this many
@@ -33,8 +35,10 @@ export type SnapshotPage = { readonly deltas: ReadonlyArray<Delta>; readonly mor
 
 /**
  * The append-only log of one server. `commit` writes the owner records and
- * the event in one database transaction, then publishes the delta after the
- * commit. Each change must name its sync groups and a model that a contract
+ * the event in one database transaction. After the commit, it wakes the live
+ * reader of the organization in this process, and each other process through
+ * `Wake`. Each reader then reads the new events from the log, in sync ID
+ * order. Each change must name its sync groups and a model that a contract
  * declares. `snapshot`, `backlog` and
  * `subscribe` give a connection its records and events; see `service/feed.ts`.
  */
@@ -66,10 +70,10 @@ export class EventLog extends Context.Service<
       group: string,
       skip?: ReadonlySet<string>,
     ) => Stream.Stream<SnapshotPage, unknown>;
-    /** Every new event of the organization, from now on. */
+    /** Every new event of the organization, from now on, in sync ID order, whichever process wrote it. */
     readonly subscribe: (
       organizationId: string,
-    ) => Effect.Effect<PubSub.Subscription<Delta>, never, Scope.Scope>;
+    ) => Effect.Effect<PubSub.Subscription<Delta>, unknown, Scope.Scope>;
   }
 >()('sync/EventLog') {}
 
@@ -145,17 +149,15 @@ export function eventLog(
   return Layer.effect(EventLog)(
     Effect.gen(function* () {
       const db = yield* Database;
-      const hubs = new Map<string, PubSub.PubSub<Delta>>();
-      const hubOf = (organizationId: string) =>
-        Effect.gen(function* () {
-          const existing = hubs.get(organizationId);
-          if (existing) {
-            return existing;
-          }
-          const hub = yield* PubSub.unbounded<Delta>();
-          hubs.set(organizationId, hub);
-          return hub;
-        });
+      const wake = yield* Wake;
+      const live = yield* liveDeltas(db, pageSize);
+      // A commit in another process wakes the reader of its organization here.
+      yield* Stream.runForEach(wake.signals, (signal) => {
+        if (signal.kind === 'commit') {
+          return live.wake(signal.organizationId);
+        }
+        return signal.kind === 'listening' ? live.wakeAll : Effect.void;
+      }).pipe(Effect.forkScoped);
 
       const commit: Commit = (organizationId, transactionId, write) =>
         Effect.gen(function* () {
@@ -163,22 +165,18 @@ export function eventLog(
             Effect.gen(function* () {
               const known = yield* findTransaction(tx, organizationId, transactionId);
               if (known !== undefined) {
-                return { syncId: known, delta: null };
+                return { syncId: known, appended: false };
               }
               const changes = yield* write(tx);
               yield* checkGroups(changes);
               yield* checkRecords(declared, changes);
               const stored = yield* appendEvent(tx, organizationId, transactionId, changes);
-              const delta: Delta = {
-                syncId: stored.syncId,
-                transactionId,
-                changes: stored.changes,
-              };
-              return { syncId: stored.syncId, delta };
+              return { syncId: stored.syncId, appended: true };
             }),
           );
-          if (result.delta) {
-            yield* PubSub.publish(yield* hubOf(organizationId), result.delta);
+          if (result.appended) {
+            yield* live.wake(organizationId);
+            yield* wake.send({ kind: 'commit', organizationId });
           }
           return result.syncId;
         });
@@ -211,8 +209,7 @@ export function eventLog(
                 }),
               ),
           ),
-        subscribe: (organizationId) =>
-          Effect.flatMap(hubOf(organizationId), (hub) => PubSub.subscribe(hub)),
+        subscribe: live.subscribe,
       };
     }),
   );

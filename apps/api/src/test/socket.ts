@@ -2,6 +2,8 @@ import { BunHttpServer } from '@effect/platform-bun';
 import { ActorsTest } from '@repo/identity/testing/actor';
 import { WebhookSignatureTest } from '@repo/notes/testing/webhook';
 import { DatabasePglite } from '@repo/sync/runtime/database.server';
+import { WakePglite } from '@repo/sync/runtime/wake.server';
+import { Database } from '@repo/sync/service/database';
 import type { SyncMessage } from '@repo/sync/types/protocol';
 import { Effect, Layer } from 'effect';
 import { HttpServer } from 'effect/http';
@@ -16,6 +18,27 @@ export const testServer = api(DatabasePglite()).pipe(
   Layer.provide(WebhookSignatureTest),
   Layer.provideMerge(BunHttpServer.layerTest),
 );
+
+/**
+ * One process of the API over a database that the test provides, such as
+ * `DatabaseTest()`. Each process gets its own wake over that database, so a
+ * test can run two processes over one database, and reach the database too.
+ */
+export const apiProcess = () =>
+  api(
+    Layer.merge(
+      Layer.effect(Database)(
+        Effect.gen(function* () {
+          return yield* Database;
+        }),
+      ),
+      Layer.fresh(WakePglite),
+    ),
+  ).pipe(
+    Layer.provide(ActorsTest()),
+    Layer.provide(WebhookSignatureTest),
+    Layer.provideMerge(BunHttpServer.layerTest),
+  );
 
 /** The sync socket URL of the test server. */
 export const syncUrl = HttpServer.addressFormattedWith((address) =>

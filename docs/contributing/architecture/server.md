@@ -126,6 +126,21 @@ listed contract has no server change. `serverOf(packages)` gives both lists from
 
 A load reads the snapshot of a group from `sync_records`, not the history of the log. The snapshot holds the last change of each live record, in pages by the record key. See [the protocol](./local-first-sync.md).
 
+## More than one process
+
+A server can run as more than one process over one Postgres database, such as two API processes and a job runner. `Wake` in `packages/sync/service/wake.ts` connects them, and the database driver gives it.
+
+- After a commit, the event log wakes the reader of the organization in its own process at once. Then it sends `commit` with the organization ID to the other processes.
+- `DatabasePostgres` sends each signal with `NOTIFY` on the channel `sync_wake`, and each process hears the others with `LISTEN`. A process drops its own signals.
+- Each process keeps one reader for each organization that a connection follows. A wake makes the reader read the events after its mark from the log, in sync ID order. So a client gets each delta in order, whichever process wrote it, and none is dropped.
+- `Sessions.end` closes the user's sockets in its own process, then sends `end` with the user ID. Each other process closes that user's sockets too.
+- When the listener loses its connection, it listens again after a second. Then each reader reads its log again, because a signal sent in between is lost.
+- `DatabasePglite` runs in one process, so its wake reaches only that process. A server on PGlite runs as one process.
+
+`packages/sync/service/live.test.ts` runs two event logs over one database. `apps/api/src/processes.test.ts` runs two API processes over one database, for the live delta and for a sign-out. Both use PGlite, whose `LISTEN` reaches each listener of the same database. No test runs a real Postgres server, so the `NOTIFY` path of `WakePostgres` is not tested.
+
+One limit stays. `fillRecords` in `packages/sync/repo/events.ts` fills `sync_records` from the log only while the table is empty. During a rolling deploy from a build before that table, an older process can still write events without their record state. The fill then never sees those events. Deploy that change with every process stopped, or run the fill again by hand.
+
 ## Jobs and the outbox
 
 A job does slow or outside work after a commit, such as a vendor call or a

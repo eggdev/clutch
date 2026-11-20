@@ -1,37 +1,21 @@
 import { expect, test } from 'bun:test';
 
-import { BunHttpServer } from '@effect/platform-bun';
-import { ActorsTest } from '@repo/identity/testing/actor';
 import { createNote } from '@repo/notes/contract/notes';
 import { notesClient } from '@repo/notes/runtime/client';
-import { WebhookSignatureTest } from '@repo/notes/testing/webhook';
 import { trimLogJob } from '@repo/sync/jobs/trim-log';
-import { DatabasePglite } from '@repo/sync/runtime/database.server';
 import { createPool } from '@repo/sync/runtime/pool';
 import { engine } from '@repo/sync/runtime/transport';
-import { Database } from '@repo/sync/service/database';
+import { DatabaseTest } from '@repo/sync/testing/database';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import { ConfigProvider, Effect, Layer, Schedule, Stream } from 'effect';
 import { RpcClient } from 'effect/rpc';
 
-import { api } from '@/server';
-import { socketClient, syncUrl } from '@/test/socket';
+import { apiProcess, socketClient, syncUrl } from '@/test/socket';
 
 const at = '2026-10-28T12:00:00.000Z';
 
 /** The whole API over a real socket, with its database open to the test too, so the test can run the trim. */
-const server = api(
-  Layer.effect(Database)(
-    Effect.gen(function* () {
-      return yield* Database;
-    }),
-  ),
-).pipe(
-  Layer.provide(ActorsTest()),
-  Layer.provide(WebhookSignatureTest),
-  Layer.provideMerge(DatabasePglite()),
-  Layer.provideMerge(BunHttpServer.layerTest),
-);
+const server = apiProcess().pipe(Layer.provideMerge(DatabaseTest()));
 
 const note = (id: string) => ({
   id: `t-${id}`,

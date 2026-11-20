@@ -235,3 +235,29 @@ export function eventsAfter(
       })),
     );
 }
+
+/**
+ * Up to `limit` events of an organization after `lastSyncId`, oldest first,
+ * whatever their groups. The live reader of each process reads the new events
+ * with it. `last` is the sync ID of the last event read.
+ */
+export function eventsSince(
+  db: DrizzleDatabase,
+  organizationId: string,
+  lastSyncId: number,
+  limit: number,
+) {
+  return db
+    .select()
+    .from(syncEvents)
+    .where(and(eq(syncEvents.organizationId, organizationId), gt(syncEvents.syncId, lastSyncId)))
+    .orderBy(asc(syncEvents.syncId))
+    .limit(limit)
+    .pipe(
+      Effect.map((rows) => ({
+        deltas: deltasOf(rows),
+        last: rows.at(-1)?.syncId,
+        full: rows.length === limit,
+      })),
+    );
+}
