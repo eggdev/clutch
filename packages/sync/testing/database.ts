@@ -1,5 +1,6 @@
 import { PgliteClient } from '@effect/sql-pglite';
 import { migrateSync } from '@repo/sync/runtime/migrate.server';
+import { WakePglite } from '@repo/sync/runtime/wake.server';
 import { Database } from '@repo/sync/service/database';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import * as PgliteDrizzle from 'drizzle-orm/effect-pglite';
@@ -51,8 +52,13 @@ const template = (migrations: ReadonlyArray<Migration>) =>
  * A fresh in-memory Postgres for one test, with the event log and each
  * package migration from `migrations` applied. It is the real database
  * engine, not a fake. Each test gets its own instance, loaded from a dump that
- * the process migrated once.
+ * the process migrated once. It gives the PGlite client and a `Wake` over it
+ * too, so a test can build a second wake over the same database.
  */
 export function DatabaseTest(...migrations: ReadonlyArray<Migration>) {
-  return Layer.unwrap(Effect.map(template(migrations), (loadDataDir) => pglite({ loadDataDir })));
+  return Layer.unwrap(
+    Effect.map(template(migrations), (loadDataDir) =>
+      Layer.provideMerge(WakePglite, pglite({ loadDataDir })),
+    ),
+  );
 }

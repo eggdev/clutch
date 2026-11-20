@@ -7,10 +7,12 @@ import type { RecordCursor } from '@repo/sync/repo/records';
 import { oldestOf } from '@repo/sync/repo/trim';
 import { Database } from '@repo/sync/service/database';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
+import { liveDeltas } from '@repo/sync/service/live';
 import { seenDelta } from '@repo/sync/service/visible';
+import { Wake } from '@repo/sync/service/wake';
 import type { Change, Delta } from '@repo/sync/types/protocol';
-import { Context, Effect, Layer, Option, PubSub, Stream } from 'effect';
-import type { Scope } from 'effect';
+import { Context, Effect, Layer, Option, Schedule, Stream } from 'effect';
+import type { Duration, PubSub, Scope } from 'effect';
 
 /**
  * At most this many events go in one page of the backlog, and this many
@@ -18,6 +20,12 @@ import type { Scope } from 'effect';
  * server reads one page at a time.
  */
 const rowsPerPage = 1000;
+
+/**
+ * Each live reader with a connection reads the log again this often, so a
+ * lost wake leaves a connection behind for at most this long.
+ */
+const rereadInterval = '30 seconds';
 
 type Commit = <E, R>(
   organizationId: string,
@@ -32,10 +40,12 @@ export type BacklogPage = { readonly deltas: ReadonlyArray<Delta>; readonly last
 export type SnapshotPage = { readonly deltas: ReadonlyArray<Delta>; readonly more: boolean };
 
 /**
- * The append-only log of one server. `commit` writes the owner records and
- * the event in one database transaction, then publishes the delta after the
- * commit. Each change must name its sync groups and a model that a contract
- * declares. `snapshot`, `backlog` and
+ * The append-only log of one server. `commit` writes the owner records, the
+ * event and the wake of each other process in one database transaction, so
+ * the wake goes out exactly when the commit holds. After the commit, it wakes
+ * the live reader of the organization in this process. Each reader then reads
+ * the new events from the log, in sync ID order. Each change must name its
+ * sync groups and a model that a contract declares. `snapshot`, `backlog` and
  * `subscribe` give a connection its records and events; see `service/feed.ts`.
  */
 export class EventLog extends Context.Service<
@@ -66,10 +76,10 @@ export class EventLog extends Context.Service<
       group: string,
       skip?: ReadonlySet<string>,
     ) => Stream.Stream<SnapshotPage, unknown>;
-    /** Every new event of the organization, from now on. */
+    /** Every new event of the organization, from now on, in sync ID order, whichever process wrote it. */
     readonly subscribe: (
       organizationId: string,
-    ) => Effect.Effect<PubSub.Subscription<Delta>, never, Scope.Scope>;
+    ) => Effect.Effect<PubSub.Subscription<Delta>, unknown, Scope.Scope>;
   }
 >()('sync/EventLog') {}
 
@@ -134,7 +144,10 @@ function checkRecords(
  */
 export function eventLog(
   contracts: ReadonlyArray<Contract>,
-  options: { readonly pageSize?: number | undefined } = {},
+  options: {
+    readonly pageSize?: number | undefined;
+    readonly rereadEvery?: Duration.Input | undefined;
+  } = {},
 ) {
   const pageSize = options.pageSize ?? rowsPerPage;
   const declared = new Map(
@@ -145,17 +158,20 @@ export function eventLog(
   return Layer.effect(EventLog)(
     Effect.gen(function* () {
       const db = yield* Database;
-      const hubs = new Map<string, PubSub.PubSub<Delta>>();
-      const hubOf = (organizationId: string) =>
-        Effect.gen(function* () {
-          const existing = hubs.get(organizationId);
-          if (existing) {
-            return existing;
-          }
-          const hub = yield* PubSub.unbounded<Delta>();
-          hubs.set(organizationId, hub);
-          return hub;
-        });
+      const wake = yield* Wake;
+      const live = yield* liveDeltas(db, pageSize);
+      // A commit in another process wakes the reader of its organization here.
+      yield* Stream.runForEach(wake.signals, (signal) => {
+        if (signal.kind === 'commit') {
+          return live.wake(signal.organizationId);
+        }
+        return signal.kind === 'listening' ? live.wakeAll : Effect.void;
+      }).pipe(Effect.forkScoped);
+      // No lost signal leaves a connection behind for longer than this.
+      yield* live.wakeAll.pipe(
+        Effect.repeat(Schedule.spaced(options.rereadEvery ?? rereadInterval)),
+        Effect.forkScoped,
+      );
 
       const commit: Commit = (organizationId, transactionId, write) =>
         Effect.gen(function* () {
@@ -163,22 +179,18 @@ export function eventLog(
             Effect.gen(function* () {
               const known = yield* findTransaction(tx, organizationId, transactionId);
               if (known !== undefined) {
-                return { syncId: known, delta: null };
+                return { syncId: known, appended: false };
               }
               const changes = yield* write(tx);
               yield* checkGroups(changes);
               yield* checkRecords(declared, changes);
               const stored = yield* appendEvent(tx, organizationId, transactionId, changes);
-              const delta: Delta = {
-                syncId: stored.syncId,
-                transactionId,
-                changes: stored.changes,
-              };
-              return { syncId: stored.syncId, delta };
+              yield* wake.sendOnCommit(tx, { kind: 'commit', organizationId });
+              return { syncId: stored.syncId, appended: true };
             }),
           );
-          if (result.delta) {
-            yield* PubSub.publish(yield* hubOf(organizationId), result.delta);
+          if (result.appended) {
+            yield* live.wake(organizationId);
           }
           return result.syncId;
         });
@@ -211,8 +223,7 @@ export function eventLog(
                 }),
               ),
           ),
-        subscribe: (organizationId) =>
-          Effect.flatMap(hubOf(organizationId), (hub) => PubSub.subscribe(hub)),
+        subscribe: live.subscribe,
       };
     }),
   );

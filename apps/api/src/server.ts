@@ -12,6 +12,7 @@ import { OutboxLive } from '@repo/sync/service/jobs';
 import type { RouteServicesOf } from '@repo/sync/service/routes';
 import { serverOf } from '@repo/sync/service/server-package.server';
 import { SessionsLive } from '@repo/sync/service/sessions';
+import type { Wake } from '@repo/sync/service/wake';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerResponse } from 'effect/http';
 import { RpcSerialization } from 'effect/rpc';
@@ -48,9 +49,11 @@ const health = Layer.effectDiscard(
  * The API without its HTTP server, database driver, actors or the services of
  * its routes. The composition root in `main.ts` provides them; a test
  * provides test versions. Access names the sync groups that each actor may
- * load. The job runner runs the jobs that the outbox holds.
+ * load. The job runner runs the jobs that the outbox holds. The driver also
+ * gives the wake, which tells the other processes of the server about each
+ * commit and each sign-out.
  */
-export function api<E, R>(database: Layer.Layer<Database, E, R>) {
+export function api<E, R>(database: Layer.Layer<Database | Wake, E, R>) {
   return HttpRouter.serve(
     Layer.mergeAll(
       // The services of every server change, so a change of any package fits
@@ -65,8 +68,9 @@ export function api<E, R>(database: Layer.Layer<Database, E, R>) {
     Layer.provide(eventLog(contracts)),
     Layer.provide(OutboxLive),
     Layer.provide(SyncGroupsFromAccess),
-    Layer.provide(Layer.provideMerge(migrated, database)),
     // The app keeps `Sessions`, so a sign-out can end a user's sockets.
     Layer.provideMerge(SessionsLive),
+    // One wake for the event log and the sessions.
+    Layer.provide(Layer.provideMerge(migrated, database)),
   );
 }

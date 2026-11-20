@@ -36,6 +36,7 @@ The engine is our own code, not a vendor.
 | Group seam     | `packages/sync/service/sync-groups.ts`, filled by `packages/access`               | Server                        |
 | RPC server     | `packages/sync/runtime/server.server.ts`                                          | Server                        |
 | Sessions       | `packages/sync/service/sessions.ts`                                               | Server                        |
+| Wake           | `packages/sync/service/wake.ts`, `packages/sync/runtime/wake.server.ts`           | Server                        |
 
 The protocol has three calls over one WebSocket for each organization, through
 `effect/rpc`:
@@ -101,10 +102,12 @@ the same, so loading the local database needs no decode.
    records and appends one event to the log.
 5. Appending an event locks the organization's row in `sync_counters`, so sync
    IDs only increase and have no gaps.
-6. After the commit, the server publishes the delta to every open `Pull` of the
-   organization. Each `Pull` sends only the changes of its loaded groups, and a
-   delete of each record that left them. The
-   sender gets its delta too.
+6. The same transaction wakes each other process of the server, so the wake
+   goes out only when the commit holds. After the commit, the server wakes its
+   own process too. In each process, one reader for each organization reads the
+   new events from the log, in sync ID order. It hands them to every open `Pull`
+   of the organization in that process. Each `Pull` sends only the changes of its loaded groups, and a
+   delete of each record that left them. The sender gets its delta too.
 7. The client applies the delta to its confirmed records, then applies each
    pending local change again on top. This is the rebase.
 8. A rejected transaction leaves the queue, and the object pool drops its
@@ -143,8 +146,8 @@ the same, so loading the local database needs no decode.
 - One `Pull` element holds at most 1,000 deltas, so one decode stays short.
   A page of a snapshot holds at most 1,000 records.
 - A sign-out calls `Sessions.end` with the user. Each of the user's sockets
-  closes with code 4401, and the client clears its local database. See
-  [the end of a session](#the-end-of-a-session).
+  closes with code 4401, in each process of the server, and the client clears
+  its local database. See [the end of a session](#the-end-of-a-session).
 - After a database restore, the server's log can end before a client's last
   sync ID. After a trim, the log can start after it. `Pull` then fails with
   `ServerBehind`. The client drops its confirmed records and sets its last
