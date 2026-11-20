@@ -112,6 +112,9 @@ export class SyncRpcs extends RpcGroup.make(
       // The digest of the client's contracts. An optional key, so the server
       // still reads the call of a build that does not send it.
       contract: Schema.optionalKey(Schema.String),
+      // The client reads a backfill at the start of the stream in `Page`
+      // messages. An optional key, as in `Load`.
+      pages: Schema.optionalKey(Schema.Boolean),
     },
     success: SyncMessage,
     error: Schema.Union([SessionEnded, ServerBehind]),

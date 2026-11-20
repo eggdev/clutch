@@ -136,7 +136,7 @@ export function SyncServer<R>(
           }),
         // After a database restore, the log can end before the client's last
         // sync ID. The client then loads again from 0.
-        Pull: ({ lastSyncId, groups, contract }, { client, headers }) =>
+        Pull: ({ lastSyncId, groups, contract, pages }, { client, headers }) =>
           Stream.unwrap(
             Effect.gen(function* () {
               const actor = yield* actors.fromHeaders(headers);
@@ -163,6 +163,11 @@ export function SyncServer<R>(
                   ...allowed.eager,
                   ...groups.filter((group) => allowed.lazy.includes(group)),
                 ],
+                // A client that holds data and did not name an eager group,
+                // such as a new one, lacks its history before its last sync ID.
+                fill:
+                  lastSyncId > 0 ? allowed.eager.filter((group) => !groups.includes(group)) : [],
+                pages: pages ?? false,
                 granted,
                 requests: queue,
               }).pipe(Stream.orDie, Stream.ensuring(Effect.sync(() => requests.delete(client.id))));
