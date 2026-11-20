@@ -47,6 +47,16 @@ The pool keeps each record that did not change as the same object. It wakes
 only the watchers of the models and records that changed. A test that counts
 renders is in `packages/sync/ui/sync-provider.test.tsx`.
 
+A change costs what it changed, not what the pool holds. The confirmed
+records name the records that a delta or a purge changed. The waiting
+changes write over the confirmed records, into a small set of writes. The
+pool then compares only those records and the ones that the waiting changes
+wrote the time before. A load or a reset of the confirmed records compares
+every record once. With 100,000 records, one local edit or a delta of 3
+records takes well under a millisecond. An ID list of a changed model is
+still sorted again when a screen reads it.
+`packages/sync/runtime/pool-change-cost.test.ts` holds this.
+
 ## Pending writes
 
 A command with `waits: 'server'` shows a pending state on the control that

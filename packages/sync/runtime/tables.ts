@@ -11,17 +11,19 @@ import type { ReadablePool, Rejection } from '@repo/sync/types/records';
  * transactions with the outcomes of a push. They share one module, because
  * each module of the pool loads before the first paint.
  */
-export type Table = Map<string, RecordRow>;
+type Table = Map<string, RecordRow>;
 export type Tables = Map<string, Table>;
 
-export function copy(tables: Tables): Tables {
-  return new Map([...tables].map(([name, table]) => [name, new Map(table)]));
-}
+/**
+ * What the waiting changes wrote over the confirmed records, by model and ID.
+ * `null` is a record that a waiting change removed.
+ */
+export type Writes = Map<string, Map<string, RecordRow | null>>;
 
-export function tableOf(tables: Tables, name: string): Table {
+export function tableOf<Row>(tables: Map<string, Map<string, Row>>, name: string) {
   let table = tables.get(name);
   if (!table) {
-    table = new Map();
+    table = new Map<string, Row>();
     tables.set(name, table);
   }
   return table;
@@ -46,14 +48,24 @@ function readAs<Row extends RecordRow>(
   return model.is(record) ? record : undefined;
 }
 
-export function draftOver(tables: Tables): Draft {
+/** The record that screens see: the write of a waiting change, or else the confirmed record. */
+function seen(base: Tables, writes: Writes, model: string, id: string): RecordRow | undefined {
+  const written = writes.get(model);
+  return written?.has(id) ? (written.get(id) ?? undefined) : base.get(model)?.get(id);
+}
+
+/** The draft that a waiting change writes to: it reads `base` under `writes`, and writes only `writes`. */
+export function draftOver(base: Tables, writes: Writes): Draft {
   return {
-    get: <Row extends RecordRow>(model: Model<Row>, id: string) => readAs(model, tables, id),
+    get<Row extends RecordRow>(model: Model<Row>, id: string) {
+      const record: unknown = seen(base, writes, model.name, id);
+      return model.is(record) ? record : undefined;
+    },
     put: (model, row) => {
-      tableOf(tables, model.name).set(row.id, row);
+      tableOf(writes, model.name).set(row.id, row);
     },
     remove: (model, id) => {
-      tables.get(model.name)?.delete(id);
+      tableOf(writes, model.name).set(id, null);
     },
   };
 }
@@ -74,32 +86,6 @@ export function sameJson(a: unknown, b: unknown): boolean {
     );
   }
   return false;
-}
-
-/**
- * Puts each record of `before` that did not change back into `after`, so it
- * stays the same object. Returns each model and record ID that did change.
- */
-function keepUnchanged(before: Tables, after: Tables): Array<[model: string, id: string]> {
-  const changed: Array<[model: string, id: string]> = [];
-  for (const name of new Set([...before.keys(), ...after.keys()])) {
-    const old = before.get(name) ?? new Map<string, RecordRow>();
-    const next = after.get(name) ?? new Map<string, RecordRow>();
-    for (const [id, row] of next) {
-      const previous = old.get(id);
-      if (previous && sameJson(previous, row)) {
-        next.set(id, previous);
-      } else {
-        changed.push([name, id]);
-      }
-    }
-    for (const id of old.keys()) {
-      if (!next.has(id)) {
-        changed.push([name, id]);
-      }
-    }
-  }
-  return changed;
 }
 
 /** Sorts IDs by one field of their records, then by ID. `where` keeps only matching records. */
@@ -155,34 +141,65 @@ export const recordKey = (model: string, id: string) => `${model}\u0000${id}`;
 /** What a screen reads from the pool, and how it watches it. */
 type Reads = Pick<ReadablePool, 'get' | 'ids' | 'watchModel' | 'watchRecord'>;
 
+/** The key of each record of `tables`. */
+function keysOf(tables: Map<string, Map<string, unknown>>): Array<string> {
+  return [...tables].flatMap(([model, table]) =>
+    [...table.keys()].map((id) => recordKey(model, id)),
+  );
+}
+
 /**
  * The tables that screens see, with their ID lists and watchers. `show` puts
- * in the next tables. Each record that did not change stays the same object,
- * and only the watchers of the records and models that changed wake. An ID
- * list is built again only after its model changed, and the old array is
- * kept when the IDs match, so a screen that reads it does not render again.
+ * them in step with the confirmed records and the writes of the waiting
+ * changes. It visits only the records that `touched` names and the records
+ * that the waiting changes wrote, now or the time before, and returns how
+ * many it visited. Each record that did not change stays the same object, and
+ * only the watchers of the records and models that changed wake. An ID list
+ * is built again only after its model changed, and the old array is kept
+ * when the IDs match, so a screen that reads it does not render again.
  */
 export function visibleTables(): Reads & {
-  readonly show: (next: Tables) => void;
+  readonly show: (base: Tables, writes: Writes, touched: ReadonlySet<string> | 'all') => number;
 } {
-  let visible: Tables = new Map();
+  const visible: Tables = new Map();
+  let lastWrites: Writes = new Map();
   const lists = new Map<string, { ids: ReadonlyArray<string>; changed: boolean }>();
   const modelWatchers = listenerMap();
   const recordWatchers = listenerMap();
   return {
-    show(next) {
-      const changed = keepUnchanged(visible, next);
-      visible = next;
-      const models = new Set(changed.map(([name]) => name));
+    show(base, writes, touched) {
+      const keys = new Set(touched === 'all' ? [...keysOf(visible), ...keysOf(base)] : touched);
+      for (const key of [...keysOf(lastWrites), ...keysOf(writes)]) {
+        keys.add(key);
+      }
+      lastWrites = writes;
+      const changed: Array<string> = [];
+      const models = new Set<string>();
+      for (const key of keys) {
+        const [model = '', id = ''] = key.split('\u0000');
+        const before = visible.get(model)?.get(id);
+        const next = seen(base, writes, model, id);
+        if (before === next || (before && next && sameJson(before, next))) {
+          continue;
+        }
+        if (next) {
+          tableOf(visible, model).set(id, next);
+        } else {
+          visible.get(model)?.delete(id);
+        }
+        models.add(model);
+        changed.push(key);
+      }
       for (const [key, list] of lists) {
         list.changed ||= models.has(key.slice(0, key.indexOf('\u0000')));
       }
-      for (const [name, id] of changed) {
-        recordWatchers.wake(recordKey(name, id));
+      for (const key of changed) {
+        recordWatchers.wake(key);
       }
       for (const name of models) {
         modelWatchers.wake(name);
       }
+      return keys.size;
     },
     get: (model, id) => readAs(model, visible, id),
     ids(model, order, where) {

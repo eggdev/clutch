@@ -32,11 +32,21 @@ export type PoolDeclarations = {
   readonly commands: ReadonlyArray<CommandDeclaration>;
 };
 
-/** What the pool takes with a default: the stamps of the platform, and the report. */
+/** What the pool takes with a default: the stamps of the platform, the report, and the count of each change. */
 export type PoolOptions = {
   readonly stamps?: Stamps;
   readonly report?: Report;
+  /**
+   * Hears how many records each change put in step with the screens. A test
+   * of the cost of a change reads it. The app leaves it out.
+   */
+  readonly compared?: (records: number) => void;
 };
+
+/** The default count of a change: nobody reads it. */
+export function countNothing(): void {
+  // The app does not count the records of a change.
+}
 
 /** The stamps of a real device: a random ID, and the clock of the device. */
 export const deviceStamps: Stamps = {

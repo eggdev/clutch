@@ -4,6 +4,7 @@ import type { CallOf, Fields } from '@repo/sync/contract/fields';
 import { createConfirmed } from '@repo/sync/runtime/confirmed';
 import {
   consoleReport,
+  countNothing,
   deviceStamps,
   otherActorRows,
   runMisfit,
@@ -12,7 +13,6 @@ import {
 import type { PoolDeclarations, PoolOptions } from '@repo/sync/runtime/pool-doors';
 import {
   applyOutcomes,
-  copy,
   draftOver,
   groupWaits,
   keepActor,
@@ -21,7 +21,7 @@ import {
   visibleTables,
   wake,
 } from '@repo/sync/runtime/tables';
-import type { Pending } from '@repo/sync/runtime/tables';
+import type { Pending, Writes } from '@repo/sync/runtime/tables';
 import type { ConfirmedSave, PoolState, WaitingRow } from '@repo/sync/types/local-database';
 import type { Delta, Outcome, SyncActor, Transaction } from '@repo/sync/types/protocol';
 import type { ReadablePool, Rejection } from '@repo/sync/types/records';
@@ -144,6 +144,7 @@ export function createPool(
 ): Pool {
   const stamps = options.stamps ?? deviceStamps;
   const report = options.report ?? consoleReport;
+  const compared = options.compared ?? countNothing;
   const byName = new Map(changes.map((change) => [change.name, change]));
   const waits = groupWaits();
   const confirmed = createConfirmed(declarations.records, report, waits.loading);
@@ -155,12 +156,13 @@ export function createPool(
   const pendingListeners = new Set<() => void>();
 
   function recompute() {
-    const next = copy(confirmed.tables());
-    const draft = draftOver(next);
+    // The waiting changes write over the confirmed records, and never into them.
+    const writes: Writes = new Map();
+    const draft = draftOver(confirmed.tables(), writes);
     for (const { transaction } of pending) {
       byName.get(transaction.command)?.replay(draft, transaction.input);
     }
-    screen.show(next);
+    compared(screen.show(confirmed.tables(), writes, confirmed.takeTouched()));
     wake(changeListeners);
   }
 

@@ -24,8 +24,13 @@ type ConfirmedState = Omit<PoolState, 'pending'>;
  * nothing that waits. The pool puts each waiting change on top of them.
  */
 export type Confirmed = {
-  /** The confirmed tables. The pool copies them before it applies a waiting change. */
+  /** The confirmed tables. The pool reads them under each waiting change, and never writes them. */
   readonly tables: () => Tables;
+  /**
+   * The keys of the records that changed since the last call, or `all` after
+   * a load or a reset. The pool puts only these records in step.
+   */
+  readonly takeTouched: () => ReadonlySet<string> | 'all';
   readonly lastSyncId: () => number;
   readonly loaded: () => ReadonlySet<string>;
   /**
@@ -127,6 +132,9 @@ export function createConfirmed(
   // record after the confirmed records were dropped.
   let unsaved = new Set<string>();
   let unsavedAll = false;
+  // The same for the visible tables of the pool, since its last change.
+  let touched = new Set<string>();
+  let touchedAll = true;
   // The build that left a record of a delta out of the confirmed records, if one did.
   let leftOutBy: string | undefined;
   let build = 'unnamed';
@@ -158,6 +166,7 @@ export function createConfirmed(
       meta.set(key, { groups: change.groups, syncId, deleted: true });
     }
     unsaved.add(key);
+    touched.add(key);
   }
 
   function drop(key: string) {
@@ -165,6 +174,7 @@ export function createConfirmed(
     tables.get(model)?.delete(id);
     meta.delete(key);
     unsaved.add(key);
+    touched.add(key);
   }
 
   function purge() {
@@ -182,12 +192,19 @@ export function createConfirmed(
     meta = new Map();
     unsaved = new Set();
     unsavedAll = true;
+    touchedAll = true;
     lastSyncId = 0;
     leftOutBy = undefined;
   }
 
   return {
     tables: () => tables,
+    takeTouched() {
+      const taken = touchedAll ? 'all' : touched;
+      touched = new Set();
+      touchedAll = false;
+      return taken;
+    },
     lastSyncId: () => lastSyncId,
     loaded: () => loaded,
     load(state) {
@@ -212,6 +229,7 @@ export function createConfirmed(
       ({ lastSyncId, leftOutBy } = state);
       unsaved = new Set();
       unsavedAll = false;
+      touchedAll = true;
       return true;
     },
     snapshot: () => ({

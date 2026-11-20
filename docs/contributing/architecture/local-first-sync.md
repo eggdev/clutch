@@ -113,7 +113,10 @@ the same, so loading the local database needs no decode.
    events leave no event out. Each `Pull` sends only the changes of its loaded groups, and a
    delete of each record that left them. The sender gets its delta too.
 7. The client applies the delta to its confirmed records, then applies each
-   pending local change again on top. This is the rebase.
+   pending local change again on top. This is the rebase. The pending changes
+   write over the confirmed records and never into them. Then the pool
+   compares only the records of the delta and the records that the pending
+   changes wrote. So the cost follows what changed, not what the pool holds.
 8. A rejected transaction leaves the queue, and the object pool drops its
    local change. `usePendingCommand` gives the refused code and the reason of
    a run. `useLastRejection` gives the last rejection of the pool.
