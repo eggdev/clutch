@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.8 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(checks): leave migration snapshots out of the PR size count (CL-582)
+
 ## 1.23.7 (2026-11-20)
 
 ### Fixes and maintenance
