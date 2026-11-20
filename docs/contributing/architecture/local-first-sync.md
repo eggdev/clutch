@@ -24,7 +24,7 @@ The engine is our own code, not a vendor.
 
 | Part           | File                                                                              | Runs on                       |
 | -------------- | --------------------------------------------------------------------------------- | ----------------------------- |
-| Object pool    | `packages/sync/runtime/pool.ts`                                                   | Client                        |
+| Object pool    | `packages/sync/runtime/pool.ts`, `runtime/confirmed.ts` (the confirmed records)   | Client                        |
 | Local database | `packages/sync/types/local-database.ts` (the seam), `runtime/indexed-db.ts` (web) | Client                        |
 | Boot           | `packages/sync/runtime/boot.ts`                                                   | Client                        |
 | Transport      | `packages/sync/runtime/transport.ts`                                              | Client, after the first paint |
@@ -263,7 +263,8 @@ screen shows nothing in its place.
 
 ## What to read when changing it
 
-- `packages/sync/runtime/pool.ts`, `packages/sync/service/event-log.ts` and
+- `packages/sync/runtime/pool.ts`, `packages/sync/runtime/confirmed.ts`,
+  `packages/sync/service/event-log.ts` and
   `packages/sync/service/feed.ts`
 - [Server](./server.md) and [client](./client.md)
 - [Normalized source of truth](../../principles/normalized-source-of-truth.md#client-copies)
