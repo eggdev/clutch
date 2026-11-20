@@ -5,7 +5,7 @@ import path from 'node:path';
 import type { Limits } from '@/config';
 import { paths, readPrivate } from '@/config';
 import type { Action, Outcome, Plan, Pull } from '@/plan';
-import { dotenv, outcomeOf, planJob, redact } from '@/plan';
+import { dotenv, outcomeOf, parseEnv, planJob, redact } from '@/plan';
 
 export type JobRequest = {
   repo: string;
@@ -18,6 +18,7 @@ export type JobRequest = {
   /** The value of `github.token` inside the job. */
   token: string;
   secrets: Record<string, string>;
+  environment?: string;
   vars: Record<string, string>;
   logFile: string;
   signal: AbortSignal;
@@ -134,19 +135,16 @@ function workflowsOf(source: string) {
   return files;
 }
 
-/** A value of the secrets file: the secret itself, or a 1Password reference to it. */
-async function reveal(repo: string, value = '') {
-  if (!value.startsWith('op://')) {
-    return value;
-  }
+/** A repository's 1Password Environment, read with its own token. The token reaches no job. */
+async function environment(repo: string, name?: string) {
   try {
-    // Each repository has its own service account, so no token reads another's vault.
     const file = path.join(paths.config, 'secrets', `${repo.replace('/', '__')}.op-token`);
-    const env = { OP_SERVICE_ACCOUNT_TOKEN: readPrivate(file).trim() };
-    return await sh(['op', 'read', '--no-newline', value], undefined, env);
+    const list = ['environment', 'secret', 'list', name ?? '', '--reveal', '--format=dotenv'];
+    const token = { OP_SERVICE_ACCOUNT_TOKEN: name ? readPrivate(file).trim() : '' };
+    return name ? parseEnv(await sh(['op', ...list], undefined, token)) : {};
   } catch (error) {
-    console.log(`1Password gave no value for ${value}: ${String(error).slice(0, 300)}`);
-    return null;
+    console.log(`1Password gave no Environment ${name}: ${String(error).slice(0, 300)}`);
+    return {};
   }
 }
 
@@ -164,9 +162,9 @@ async function prepare(request: JobRequest, run: string, source: string) {
   if (!plan) {
     return `No pull request job named ${job} at this commit`;
   }
-  const named = plan.secrets.filter((name) => request.secrets[name] !== undefined);
-  const values = await Promise.all(named.map((name) => reveal(repo, request.secrets[name])));
-  const missing = plan.secrets.filter((name) => (values[named.indexOf(name)] ?? null) === null);
+  // The Environment comes first. The secrets file gives what the Environment lacks.
+  const have = { ...request.secrets, ...(await environment(repo, request.environment)) };
+  const missing = plan.secrets.filter((name) => have[name] === undefined);
   if (missing.length > 0) {
     return `Missing secret: ${missing.join(', ')}`.slice(0, 140);
   }
@@ -174,7 +172,10 @@ async function prepare(request: JobRequest, run: string, source: string) {
   const full = { ...event, repository: pull.base.repo, sender: pull.user };
   await writeFile(path.join(run, 'lci/event.json'), JSON.stringify(full));
   await writeFile(path.join(run, 'lci/vars'), dotenv(request.vars));
-  return { plan, secrets: Object.fromEntries(named.map((name, at) => [name, values[at] ?? ''])) };
+  return {
+    plan,
+    secrets: Object.fromEntries(plan.secrets.map((name) => [name, have[name] ?? ''])),
+  };
 }
 
 /** Starts the container, runs `act` in it and writes the output to the log, with no secret value. */

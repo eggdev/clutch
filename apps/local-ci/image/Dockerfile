@@ -5,7 +5,7 @@ ARG NODE_VERSION=24.15.0
 ARG YQ_VERSION=4.47.2
 ARG GH_VERSION=2.103.3
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      build-essential bzip2 ca-certificates curl docker.io file git git-lfs gnupg iproute2 jq \
+      build-essential bzip2 ca-certificates curl docker.io file fonts-dejavu-core git git-lfs gnupg iproute2 jq \
       libnss-myhostname locales openssh-client pkg-config procps python3 python3-pip python3-venv rsync sudo tini \
       tzdata unzip wget xz-utils zip zstd \
     && rm -rf /var/lib/apt/lists/*
@@ -20,7 +20,7 @@ RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-l
     && tar -xzf /tmp/act.tgz -C /usr/local/bin act && rm /tmp/act.tgz
 RUN (userdel -r ubuntu 2>/dev/null || true) \
     && useradd --create-home --uid 1001 --shell /bin/bash --groups docker runner \
-    && echo 'runner ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/runner && install -d -o runner /opt/hostedtoolcache
+    && echo 'runner ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/runner && install -d -o runner /opt/hostedtoolcache /home/runner/work
 USER runner
 WORKDIR /home/runner
 ENTRYPOINT ["/usr/bin/tini", "--"]

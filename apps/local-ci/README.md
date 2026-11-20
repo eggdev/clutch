@@ -44,6 +44,7 @@ repos:
     checks: [validate, journeys, secrets, commits, sast]
     authors: [eggdev, 'eggdev-clutch-bot[bot]']
     limits: { journeys: { cpus: 6 } }
+    op_environment: clutch-ci
     vars: { NEON_PROJECT_ID: example }
 ```
 
@@ -51,11 +52,10 @@ Each of the `max_jobs` slots owns an equal share of the machine's cores, and a j
 `timeout_minutes` is the most that a job can ask for. `action_overrides` names the commit to
 run for an action that act cannot run as pinned.
 
-The secrets of a repository are `NAME=value` lines in
-`~/.config/local-ci/secrets/<owner>__<repo>.env`, with mode 600. A value is a
-1Password reference, such as `op://clutch/neon/api-key`, or the secret itself.
-`NAME=` means that the secret is empty on purpose. The `op` CLI reads a
-reference with the repository's service account token, in the `.op-token` file next to it.
+`op_environment` names the 1Password Environment that holds the secrets of a repository. The `op`
+CLI reads it with the repository's service account token, in
+`~/.config/local-ci/secrets/<owner>__<repo>.op-token`, with mode 600. The `.env` file next to it
+holds `NAME=value` lines for what the Environment lacks. `NAME=` means that the secret is empty on purpose.
 
 ## Operate
 

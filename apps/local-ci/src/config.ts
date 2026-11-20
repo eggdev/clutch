@@ -14,6 +14,7 @@ export type RepoConfig = {
   checks: Array<string>;
   authors: Array<string>;
   limits?: Record<string, Partial<Limits>>;
+  op_environment?: string;
   vars?: Record<string, string>;
 };
 
@@ -24,7 +25,6 @@ export type Config = {
   image: string;
   /** An action that `act` cannot run as pinned: its repository, and the commit to run in its place. */
   action_overrides?: Record<string, string>;
-  /** A narrower token for `github.token` in jobs. Without it, a job gets the service's token. */
   job_token_file?: string;
   defaults: Limits;
   repos: Record<string, RepoConfig>;

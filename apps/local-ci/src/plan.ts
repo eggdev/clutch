@@ -11,7 +11,6 @@ export type Pull = {
 
 export type Action = { name: string; repo: string; ref: string };
 
-/** What the service needs to know about one job before it runs. */
 export type Plan = {
   file: string;
   secrets: Array<string>;
