@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.5 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): apply a trimmed transaction once, and cap a push (CL-591)
+
 ## 1.26.4 (2026-11-20)
 
 ### Fixes and maintenance
