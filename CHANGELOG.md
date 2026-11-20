@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.23.10 (2026-11-20)
+
+### Fixes and maintenance
+
+- refactor(sync): split the confirmed records out of the pool (CL-579)
+
+## 1.23.9 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(checks): count the size label as check-scope does (CL-582)
+
+## 1.23.8 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(checks): leave migration snapshots out of the PR size count (CL-582)
+
+## 1.23.7 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): send the history of a new eager group (CL-581)
+
 ## 1.23.6 (2026-11-20)
 
 ### Fixes and maintenance

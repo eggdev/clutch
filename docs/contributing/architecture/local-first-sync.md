@@ -47,7 +47,11 @@ The protocol has three calls over one WebSocket for each organization, through
   it again. `packages/sync/runtime/transport.test.ts` holds this.
 - `Pull` names the groups that the client loaded before. It streams a `Groups`
   message first, then the deltas after the client's last sync ID, then each
-  live delta. Each delta holds only the changes of the loaded groups.
+  live delta. Each delta holds only the changes of the loaded groups, and a
+  delete of each record that left them.
+  A client past sync ID 0 that does not name an eager group lacks its
+  history. The first `Groups` message then holds the backfill of that group
+  up to the last sync ID. With `pages`, `Page` messages come before it.
 - `Load` asks the open `Pull` to load one more group. It fails with
   `GroupNotAllowed` when the actor may not load the group. With `pages`, the
   client reads the backfill in `Page` messages of at most 1,000 events. A
@@ -79,7 +83,8 @@ the same, so loading the local database needs no decode.
 5. Appending an event locks the organization's row in `sync_counters`, so sync
    IDs only increase and have no gaps.
 6. After the commit, the server publishes the delta to every open `Pull` of the
-   organization. Each `Pull` sends only the changes of its loaded groups. The
+   organization. Each `Pull` sends only the changes of its loaded groups, and a
+   delete of each record that left them. The
    sender gets its delta too.
 7. The client applies the delta to its confirmed records, then applies each
    pending local change again on top. This is the rebase.

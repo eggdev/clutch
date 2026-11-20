@@ -13,6 +13,13 @@ export type Connection = {
   readonly lastSyncId: number;
   /** The groups to load first: each eager group, and each lazy one the client had before. */
   readonly loaded: ReadonlyArray<string>;
+  /**
+   * Loaded groups whose history up to `lastSyncId` the client lacks, such as
+   * an eager group that it did not name. The first messages hold it.
+   */
+  readonly fill?: ReadonlyArray<string>;
+  /** The client reads a backfill in `Page` messages. */
+  readonly pages?: boolean;
   /** The groups the actor may load now. It runs again after a change to the user's group. */
   readonly granted: Effect.Effect<Granted, unknown>;
   /** Groups that `Load` asked for. */
@@ -32,8 +39,8 @@ type Input =
   | { readonly kind: 'load'; readonly request: LoadRequest };
 
 /**
- * The messages of one connection. It sends the loaded groups first, then the
- * backlog of those groups, then each live event in sync ID order. A `Load`
+ * The messages of one connection. It sends the loaded groups first, with the
+ * history of each group in `fill`, then the backlog of those groups, then each live event in sync ID order. A `Load`
  * request adds a group and sends its backfill: in `Page` messages and a last
  * `Groups` message when the client reads pages, else in one `Groups` message.
  * The messages of one input go out before the next input runs, so no other
@@ -88,6 +95,50 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
           return out;
         });
 
+      // The backfill of `groups` up to `upTo`, as the client of `loaded` sees
+      // it. A client that reads pages gets `Page` messages, and the last page
+      // in the `Groups` message. Another client gets one `Groups` message.
+      const backfillMessages = (
+        groups: ReadonlyArray<string>,
+        upTo: number,
+        pages: boolean,
+      ): Stream.Stream<SyncMessage, unknown> =>
+        Stream.unwrap(
+          Effect.gen(function* () {
+            const now = new Set(loaded);
+            const read = (group: string) =>
+              log.backfill(organizationId, upTo, new Set([group]), now);
+            if (!pages) {
+              const all = yield* Stream.runCollect(
+                Stream.flatMap(Stream.fromIterable(groups), read),
+              );
+              return Stream.make(
+                groupsMessage(
+                  now,
+                  all.flatMap((page) => page.deltas),
+                ),
+              );
+            }
+            const lastGroup = groups.at(-1);
+            if (lastGroup === undefined) {
+              return Stream.make(groupsMessage(now, []));
+            }
+            return Stream.fromIterable(groups).pipe(
+              Stream.flatMap((group) =>
+                read(group).pipe(
+                  Stream.flatMap(({ deltas, more }) => {
+                    if (!more && group === lastGroup) {
+                      return Stream.make(groupsMessage(now, deltas));
+                    }
+                    const page: SyncMessage = { _tag: 'Page', group, backfill: deltas };
+                    return deltas.length ? Stream.make(page) : Stream.empty;
+                  }),
+                ),
+              ),
+            );
+          }),
+        );
+
       const onLoad = ({
         group,
         pages,
@@ -101,27 +152,7 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
             return Stream.empty;
           }
           loaded.add(group);
-          const now = new Set(loaded);
-          const backfill = log.backfill(organizationId, watermark, new Set([group]), now);
-          if (!pages) {
-            // A build that does not read pages gets the whole backfill at once.
-            const all = yield* Stream.runCollect(backfill);
-            return Stream.make(
-              groupsMessage(
-                now,
-                all.flatMap((page) => page.deltas),
-              ),
-            );
-          }
-          return backfill.pipe(
-            Stream.flatMap(({ deltas, more }) => {
-              if (!more) {
-                return Stream.make(groupsMessage(now, deltas));
-              }
-              const page: SyncMessage = { _tag: 'Page', group, backfill: deltas };
-              return deltas.length ? Stream.make(page) : Stream.empty;
-            }),
-          );
+          return backfillMessages([group], watermark, pages);
         });
 
       const live = Stream.merge(
@@ -139,7 +170,14 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
         ),
       );
 
-      return Stream.concat(Stream.concat(Stream.make(groupsMessage(loaded, [])), backlog), live);
+      // The first `Groups` message holds the history of each group to fill,
+      // up to the last sync ID. The backlog sends the events after it.
+      const opening = backfillMessages(
+        (connection.fill ?? []).filter((group) => loaded.has(group)),
+        connection.lastSyncId,
+        connection.pages ?? false,
+      );
+      return Stream.concat(Stream.concat(opening, backlog), live);
     }),
   );
 }
