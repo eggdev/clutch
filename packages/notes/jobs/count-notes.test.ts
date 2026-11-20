@@ -7,7 +7,7 @@ import { countNotes } from '@repo/notes/jobs/count-notes';
 import { NotesTest } from '@repo/notes/testing/notes';
 import { runDueJobs } from '@repo/sync/runtime/job-runner.server';
 import { EventLog, eventLog } from '@repo/sync/service/event-log';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Stream } from 'effect';
 
 const at = '2026-10-28T12:00:00.000Z';
 
@@ -25,12 +25,11 @@ test('a new note asks for a count, and the job commits the count of its space', 
       }
       const ran = yield* runDueJobs([countNotes]);
       const head = yield* log.head(testActor.organizationId);
-      const deltas = yield* log.backfill(
-        testActor.organizationId,
-        head,
-        new Set(['space:general']),
+      const pages = yield* Stream.runCollect(
+        log.backfill(testActor.organizationId, head, new Set(['space:general'])),
       );
-      const counts = deltas
+      const counts = pages
+        .flatMap((page) => page.deltas)
         .flatMap((delta) => delta.changes)
         .filter((change) => change.model === 'SpaceNoteCount')
         .map((change) => change.data);

@@ -253,6 +253,7 @@ test('a save that fails is reported once, and the next change saves every record
     (line) => lines.push(line),
   );
   await settled.promise;
+  const startWrites = memory.writes();
   refusals = 2;
   for (const title of ['First', 'Second', 'Third']) {
     settled = Promise.withResolvers<null>();
@@ -264,6 +265,7 @@ test('a save that fails is reported once, and the next change saves every record
   expect(lines).toEqual([
     'This device could not save the last change. The change stays on this screen, and the next change saves again.',
   ]);
+  expect(memory.writes()).toBe(startWrites + 1);
   const last = memory.saves().at(-1);
   expect(last?.confirmed?.replace).toBe(true);
   expect(last?.add).toHaveLength(3);

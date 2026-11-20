@@ -189,3 +189,45 @@ test('a reset of the confirmed records forgets each deleted record', () => {
   pool.applyGroups(['org:a', 'space:x', 'space:y'], oldBackfill);
   expect(pool.get(card, 'r')?.title).toBe('r');
 });
+
+/** Lets each pending promise callback run, so a gate that resolved has set its flag. */
+const settled = () =>
+  new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+
+test('a page of a backfill adds its records, and the group loads only with the last message', async () => {
+  const pool = createPool([], declared);
+  pool.applyGroups(['org:a'], []);
+  let done = false;
+  const waiting = pool.loadGroup('space:x').then(() => {
+    done = true;
+  });
+  pool.applyPage('space:x', [{ syncId: 1, transactionId: null, changes: [put('a', ['space:x'])] }]);
+  await settled();
+  expect(pool.get(card, 'a')).toBeDefined();
+  expect(pool.loadedGroups()).toEqual(['org:a']);
+  expect(done).toBe(false);
+  // A Groups message between two pages keeps the records of the group that loads.
+  pool.applyGroups(['org:a'], []);
+  expect(pool.get(card, 'a')).toBeDefined();
+  pool.applyPage('space:x', [{ syncId: 2, transactionId: null, changes: [put('b', ['space:x'])] }]);
+  pool.applyGroups(
+    ['org:a', 'space:x'],
+    [{ syncId: 3, transactionId: null, changes: [put('c', ['space:x'])] }],
+  );
+  await waiting;
+  expect(pool.ids(card).toSorted()).toEqual(['a', 'b', 'c']);
+  expect(pool.requestedGroups()).toEqual([]);
+});
+
+test('a refused group drops the records of its pages', async () => {
+  const lines: Array<string> = [];
+  const pool = createPool([], declared, { report: (line) => lines.push(line) });
+  pool.applyGroups(['org:a'], []);
+  const gate = pool.loadGroup('space:x');
+  pool.applyPage('space:x', [{ syncId: 1, transactionId: null, changes: [put('a', ['space:x'])] }]);
+  pool.refuseGroup('space:x');
+  expect(await gate).toBe(false);
+  expect(pool.get(card, 'a')).toBeUndefined();
+});

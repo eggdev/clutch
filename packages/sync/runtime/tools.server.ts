@@ -10,7 +10,7 @@ import { EventLog } from '@repo/sync/service/event-log';
 import { settle } from '@repo/sync/service/settle';
 import { SyncGroups } from '@repo/sync/service/sync-groups';
 import type { Delta } from '@repo/sync/types/protocol';
-import { Clock, Effect } from 'effect';
+import { Clock, Effect, Stream } from 'effect';
 
 type Json = Readonly<Record<string, unknown>>;
 
@@ -47,11 +47,10 @@ const isObject = (value: unknown): value is Json =>
 const refused = (code: string, reason: string): ToolResult => ({ ok: false, code, reason });
 
 /**
- * The records of one model that a client holds after it loads one group:
- * each change of the group, in sync order, applied in turn.
+ * Applies the changes of one model to the records that a client holds after
+ * it loads one group. Each page of the group's changes comes in sync order.
  */
-function recordsOf(deltas: ReadonlyArray<Delta>, model: string): Map<string, Json> {
-  const records = new Map<string, Json>();
+function applyTo(records: Map<string, Json>, deltas: ReadonlyArray<Delta>, model: string) {
   for (const delta of deltas) {
     for (const change of delta.changes) {
       if (change.model === model && (change.action === 'delete' || change.data === null)) {
@@ -79,8 +78,13 @@ function loadFor(declared: Load, groupId: string, actor: Actor) {
     }
     const log = yield* EventLog;
     const head = yield* log.head(actor.organizationId);
-    const deltas = yield* log.backfill(actor.organizationId, head, new Set([group]));
-    return recordsOf(deltas, declared.record);
+    // One page at a time, so the read holds the records and not their history.
+    return yield* log.backfill(actor.organizationId, head, new Set([group])).pipe(
+      Stream.runFold(
+        () => new Map<string, Json>(),
+        (records, { deltas }) => applyTo(records, deltas, declared.record),
+      ),
+    );
   });
 }
 
