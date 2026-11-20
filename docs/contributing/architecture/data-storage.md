@@ -54,7 +54,7 @@ The template's sync engine holds these frozen contracts:
 | ---------------------------------------------------------- | --------------------------------------- |
 | The `sync_counters` and `sync_events` tables               | `packages/sync/repo/schema.ts`          |
 | The change shape in each event, with its `groups`          | `packages/sync/types/protocol.ts`       |
-| The `pool` store and its `state` key in the local database | `packages/sync/runtime/indexed-db.ts`   |
+| The `records`, `transactions` and `position` client stores | `packages/sync/runtime/indexed-db.ts`   |
 | The saved pool state, with `groups` and `meta`             | `packages/sync/types/local-database.ts` |
 
 An event keeps its organization ID, so the log is scoped by tenant too. Its

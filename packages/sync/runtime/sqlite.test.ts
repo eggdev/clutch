@@ -96,8 +96,10 @@ test('a row that is no JSON reads as a copy that the pool drops and reports, not
   if (saved) {
     pool.load(saved);
   }
-  expect(lines[0]).toBe(
+  // The pool declares no command, so it refuses the waiting transaction that the read kept.
+  expect(lines).toEqual([
     'The saved copy has another shape than this build reads, so it was dropped, and the pool loads again from the server.',
-  );
+    'The saved command cards/rename is not declared by this build, so it was not sent.',
+  ]);
   database.close();
 });

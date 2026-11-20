@@ -184,6 +184,7 @@ test('a save that fails is reported once, and the next change saves the newest s
   expect(lines).toEqual([
     'This device could not save the last change. The change stays on this screen, and the next change saves again.',
   ]);
+  expect(memory.writes()).toBe(1);
   const saved = await memory.read();
   expect(saved?.pending).toHaveLength(3);
 });
