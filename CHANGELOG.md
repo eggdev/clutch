@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.7 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): send the history of a new eager group (CL-581)
+
 ## 1.23.6 (2026-11-20)
 
 ### Fixes and maintenance
