@@ -73,10 +73,7 @@ each row without `actor`. The first save after a `Groups` message removes the
 mark. The generation of a local database is a random string. It is the key `generation` of the IndexedDB store `position`, or the column `value` of the SQLite table `pool_generation`. Each clear writes a new one. A database
 without it gets one at its first open. The count of the room made is the key
 `room` of the IndexedDB store `position`, or the column `value` of the SQLite
-table `pool_room`. Each `makeRoom` raises it, and each clear removes it. A
-recreate of the IndexedDB database, and a tab that loses its database, leave
-a copy in `localStorage` under a key that starts with
-`local-database:<name>:rescue:` and ends with the ID of the copy. It is JSON
+table `pool_room`. Each `makeRoom` raises it, and each clear removes it. A recreate of the IndexedDB database leaves a copy in `localStorage`, and so does a tab that loses its database. Its key starts with `local-database:<name>:rescue:` and ends with the ID of the copy. It is JSON
 with `generation` and `waiting`, the waiting rows in order. The copy of a
 recreate also has `room`, `position` and `ended`. The next open writes back
 each waiting row that the database does not hold, from each copy of its

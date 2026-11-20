@@ -186,9 +186,7 @@ records are a cache of the server. `loadPool` in
   The next open writes the copy back when the write did not happen. Each
   other tab lets the old database go before the delete, and keeps its own
   queue in a copy too, as [a lost database](#older-layouts) does. The SQLite file holds other names too,
-  so the SQLite adapter deletes the records in small steps instead. It first
-  commits the emptied position and the count of the room made, so a delete
-  that stops part way leaves sync ID 0 with some records. The next start
+  so the SQLite adapter deletes the records in small steps instead. It first commits the emptied position and the count of the room made. So a delete that stops part way leaves sync ID 0 with some records. The next start
   loads again from 0, and the first `Groups` message of that pull drops each
   record that the pull did not send. It never touches the waiting rows.
 - After it makes room, the pool saves only its waiting transactions for the
@@ -299,9 +297,7 @@ since the old build cannot open the newer layout.
 A waiting transaction whose save had not started, or that waits after a
 failed save, is only in the memory of the tab. So before the tab lets the
 database go, and again before it starts again, `followLostDatabase` calls
-`keep` with the whole queue of the tab. The IndexedDB adapter writes it to
-`localStorage`, under a key of its own handle that starts with
-`local-database:<name>:rescue:`, so two tabs never write over each other.
+`keep` with the whole queue of the tab. The IndexedDB adapter writes it to `localStorage`, under a key that starts with `local-database:<name>:rescue:`. Each handle has its own key, so two tabs never write over each other.
 Each open writes back every copy, then removes each copy that no tab wrote
 again. A row that the database holds already is not added again, so a crash
 between the two adds no row twice. A copy of another generation is the work

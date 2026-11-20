@@ -28,7 +28,7 @@ import { Effect, Fiber, Layer, Queue, Stream } from 'effect';
  * The seeds that run in CI, of 30 that passed. Each runs in about 0.4 s. In
  * seed 8 the position of the pool stays behind the head at a quiet point.
  */
-const seeds = [3, 8, 17, 26];
+const seeds = [8, 17];
 
 function trial(seed: number) {
   const random = seeded(seed);

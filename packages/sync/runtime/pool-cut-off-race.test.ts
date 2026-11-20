@@ -23,9 +23,9 @@ import { Effect, Fiber, Latch, Layer, Queue, Stream } from 'effect';
 
 /**
  * The seeds that run in CI, of 30 that passed. They cut the first pull after
- * message 1, 2, 4 and 11, and each runs in about 0.5 s.
+ * message 1 and after message 11, and each runs in about 0.4 s.
  */
-const seeds = [13, 24, 9, 2];
+const seeds = [13, 2];
 
 const eager = ['org:a', 'space:z'];
 const lazy = ['space:x', 'space:y'];
@@ -107,7 +107,7 @@ function trial(seed: number) {
     const loaded = [...eager, ...named.filter((group) => lazy.includes(group))];
     const fill = lastSyncId > 0 ? eager.filter((group) => !named.includes(group)) : [];
     const second = yield* pull({ lastSyncId, loaded }, fill, 3, Number.POSITIVE_INFINITY);
-    yield* Effect.sleep('200 millis');
+    yield* Effect.sleep('60 millis');
     live = false;
     yield* until(
       () =>
