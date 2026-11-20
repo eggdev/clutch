@@ -21,6 +21,7 @@ import {
   localDatabaseCases,
   oldLayoutCopy,
 } from '@repo/sync/testing/local-database-conformance';
+import type { LocalDatabase } from '@repo/sync/types/local-database';
 
 type Result = { readonly name: string; readonly error: string | null };
 
@@ -59,7 +60,26 @@ async function runOldLayout(): Promise<string | null> {
   }
 }
 
-Object.assign(globalThis, { runLocalDatabaseCases: runCases, runOldLayout });
+let held: LocalDatabase | undefined;
+
+/** Opens the database of the lock test, and says whether this page writes the confirmed records. */
+async function openForLock(): Promise<boolean> {
+  held = await openIndexedDb('lock');
+  return held.isWriter();
+}
+
+/** Waits until this page becomes the writer. */
+async function waitForWriter(): Promise<boolean> {
+  await held?.writer;
+  return held?.isWriter() ?? false;
+}
+
+Object.assign(globalThis, {
+  runLocalDatabaseCases: runCases,
+  runOldLayout,
+  openForLock,
+  waitForWriter,
+});
 `;
 
 /** One case of the bundle, with the message of its error or null. */
@@ -112,4 +132,25 @@ test('the IndexedDB adapter passes every local database case in Chromium, and mo
   await context.close();
   expect(results.filter((result) => result.error !== null)).toEqual([]);
   expect(oldLayout).toBeNull();
+}, 60_000);
+
+test('one tab writes the confirmed records, and the next tab takes over when it closes', async () => {
+  const context = await browser.newContext();
+  await context.route('https://app.test/', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }),
+  );
+  const open = async () => {
+    const page = await context.newPage();
+    await page.goto('https://app.test/');
+    await page.addScriptTag({ content: bundle });
+    return page;
+  };
+  const first = await open();
+  expect(await first.evaluate<boolean>('globalThis.openForLock()')).toBe(true);
+  const second = await open();
+  expect(await second.evaluate<boolean>('globalThis.openForLock()')).toBe(false);
+  const takeover = second.evaluate<boolean>('globalThis.waitForWriter()');
+  await first.close();
+  expect(await takeover).toBe(true);
+  await context.close();
 }, 60_000);

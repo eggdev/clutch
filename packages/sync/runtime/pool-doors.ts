@@ -237,7 +237,9 @@ export function fullSave(state: PoolState): LocalSave {
   }
   return {
     confirmed: {
+      replace: true,
       put,
+      remove: [],
       position: {
         lastSyncId: state.lastSyncId,
         groups: state.groups,
@@ -284,5 +286,5 @@ export function oldLayoutSave(value: unknown): LocalSave {
       put.push({ model, id: row.id, row, groups: known['groups'], syncId });
     }
   }
-  return { confirmed: { put, position }, add, done: [] };
+  return { confirmed: { replace: true, put, remove: [], position }, add, done: [] };
 }

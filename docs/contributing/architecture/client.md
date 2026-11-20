@@ -136,9 +136,21 @@ sync ID, the loaded groups and `leftOutBy`. `read` joins the rows into one
 state. `save` writes one change in one database transaction. `clear` removes
 every row.
 
+A save holds the records that changed since the last save, the records that
+were deleted, and the sync position. So one delta writes only the records
+that it changed. After the pool drops its confirmed records, or after a save
+fails, the next save replaces every record.
+
 ### Two tabs
 
-Each tab has its own pool, and each tab writes its own waiting transactions:
+Each tab has its own pool. Two tabs can hold different groups and positions,
+so only one tab writes the confirmed records and the sync position. On the
+web, it is the tab that holds the Web Lock of the database name. When that
+tab closes, the next tab gets the lock and writes its whole confirmed state
+once. A browser with no Web Locks lets each tab write. A native app has one
+process, so its pool always writes.
+
+Each tab writes its own waiting transactions:
 
 - A tab adds the row of a transaction when the person runs the command.
 - A tab deletes the row when the transaction leaves its queue: its delta

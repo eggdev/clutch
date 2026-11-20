@@ -21,12 +21,13 @@ import {
   readAs,
   recordKey,
   sameJson,
+  savedRows,
   sortedIds,
   tableOf,
   wake,
 } from '@repo/sync/runtime/tables';
 import type { Tables } from '@repo/sync/runtime/tables';
-import type { PoolState, RecordMeta } from '@repo/sync/types/local-database';
+import type { ConfirmedSave, PoolState, RecordMeta } from '@repo/sync/types/local-database';
 import type { Change, Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
 import type { ReadablePool, Rejection } from '@repo/sync/types/records';
 
@@ -44,8 +45,20 @@ export type Pool = ReadablePool & {
   ) => string;
   readonly isPending: (transactionId: string) => boolean;
   readonly lastSyncId: () => number;
+  /**
+   * Loads a saved state. The pool then counts the state as saved, so the
+   * next save writes only what changes after it. A copy that the pool drops
+   * makes the next save replace every saved record.
+   */
   readonly load: (state: PoolState) => void;
   readonly snapshot: () => PoolState;
+  /**
+   * The confirmed records that changed since the last call, the records that
+   * were deleted, and the sync position, for the next save. `everything`
+   * asks for every record, such as after a save that failed. The pool asks
+   * for every record itself after it drops its confirmed records.
+   */
+  readonly confirmedChanges: (everything: boolean) => ConfirmedSave;
   /** Every transaction in the queue, sent or not, in the order the person ran them. */
   readonly queue: () => ReadonlyArray<Transaction>;
   readonly unsent: () => ReadonlyArray<Transaction>;
@@ -115,6 +128,10 @@ export function createPool(
   // The groups and last sync ID of each confirmed record, by `recordKey`.
   let meta = new Map<string, RecordMeta>();
   let loaded = new Set<string>();
+  // The keys of the confirmed records that changed since the last save, or
+  // every record when the pool dropped its confirmed records.
+  let unsaved = new Set<string>();
+  let unsavedAll = false;
   // The build that left a record of a delta out of the confirmed records, if one did.
   let leftOutBy: string | undefined;
   let build = 'unnamed';
@@ -172,6 +189,7 @@ export function createPool(
       tableOf(confirmed, change.model).delete(change.id);
       meta.delete(key);
     }
+    unsaved.add(key);
   }
 
   /** Records a refusal the way the server's refusal is recorded, and wakes the rejection watchers. */
@@ -188,6 +206,7 @@ export function createPool(
         const [model = '', id = ''] = key.split('\u0000');
         confirmed.get(model)?.delete(id);
         meta.delete(key);
+        unsaved.add(key);
       }
     }
   }
@@ -203,6 +222,8 @@ export function createPool(
   function resetConfirmed() {
     confirmed = new Map();
     meta = new Map();
+    unsavedAll = true;
+    unsaved = new Set();
     lastSyncId = 0;
     leftOutBy = undefined;
     for (const entry of pending) {
@@ -268,6 +289,7 @@ export function createPool(
         confirmed = new Map();
         lastSyncId = 0;
         leftOutBy = undefined;
+        unsavedAll = true;
         // The pool asks the server again for each group of the dropped copy.
         for (const group of Array.isArray(state.groups) ? state.groups : []) {
           waits.keep(group);
@@ -282,8 +304,10 @@ export function createPool(
           ]),
         );
         ({ lastSyncId, leftOutBy } = state);
+        unsavedAll = false;
         wakeLoaded();
       }
+      unsaved = new Set();
       pending = [];
       // A copy with another shape may hold no list of saved commands.
       for (const transaction of Array.isArray(state.pending) ? state.pending : []) {
@@ -307,6 +331,22 @@ export function createPool(
       pending: pending.map(({ transaction }) => transaction),
       ...(leftOutBy === undefined ? {} : { leftOutBy }),
     }),
+    confirmedChanges(everything) {
+      const replace = everything || unsavedAll;
+      const { put, remove } = savedRows(replace ? meta.keys() : unsaved, meta, confirmed);
+      unsaved = new Set();
+      unsavedAll = false;
+      return {
+        replace,
+        put,
+        remove: replace ? [] : remove,
+        position: {
+          lastSyncId,
+          groups: [...loaded],
+          ...(leftOutBy === undefined ? {} : { leftOutBy }),
+        },
+      };
+    },
     queue: () => pending.map(({ transaction }) => transaction),
     unsent: () => pending.filter(({ sent }) => !sent).map(({ transaction }) => transaction),
     markSent(ids, sent) {

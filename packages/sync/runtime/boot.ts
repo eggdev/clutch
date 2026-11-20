@@ -3,7 +3,7 @@ import type { Contract } from '@repo/sync/contract/define';
 import type { Stamps } from '@repo/sync/contract/fields';
 import { createPool } from '@repo/sync/runtime/pool';
 import type { Pool } from '@repo/sync/runtime/pool';
-import { consoleReport, fullSave } from '@repo/sync/runtime/pool-doors';
+import { consoleReport } from '@repo/sync/runtime/pool-doors';
 import type { Report } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase } from '@repo/sync/types/local-database';
 import type { Transaction } from '@repo/sync/types/protocol';
@@ -38,9 +38,10 @@ function queueChanges(
 
 /**
  * Loads the object pool from the local database before the first paint. Each
- * change to the pool is written back: the confirmed records and the sync
+ * change to the pool is written back: the records that changed and the sync
  * position, and the waiting transactions that this tab added or finished.
- * This file imports no Effect code, so the first screen stays small.
+ * Only the tab that the database names as the writer writes the confirmed
+ * records. This file imports no Effect code, so the first screen stays small.
  *
  * `contracts` lists each contract of the app. A command of one of them that
  * shows at once and has no local change in `changes` stops the app here, at
@@ -76,6 +77,10 @@ export async function loadPool(
     },
     { stamps, report },
   );
+  // A tab that writes before its read reads the newest saved state, so it
+  // writes only what changes after it. A tab that becomes the writer later
+  // writes its whole confirmed state once.
+  let writer = database.isWriter();
   const state = await database.read();
   if (state) {
     pool.load(state);
@@ -85,11 +90,12 @@ export async function loadPool(
   let held = new Set(state?.pending.map(({ id }) => id));
   // One save at a time, and always the newest state. A save that fails, such
   // as on a full device, is reported once, and the next change to the pool
-  // saves again.
+  // saves again, with every record.
   const tell = report ?? consoleReport;
   let writing = false;
   let again = false;
   let failing = false;
+  let everything = false;
   async function save() {
     if (writing) {
       again = true;
@@ -99,13 +105,19 @@ export async function loadPool(
     try {
       do {
         again = false;
+        const full = everything;
+        everything = false;
+        const confirmed = pool.confirmedChanges(full);
         const { add, done } = queueChanges(pool.queue(), held);
-        const { confirmed } = fullSave(pool.snapshot());
+        if (!writer && add.length === 0 && done.length === 0) {
+          continue;
+        }
         try {
-          await database.save({ confirmed, add, done });
+          await database.save(writer ? { confirmed, add, done } : { add, done });
           held = new Set([...held, ...add.map(({ id }) => id)].filter((id) => !done.includes(id)));
           failing = false;
         } catch {
+          everything = true;
           const first = !failing;
           failing = true;
           if (first) {
@@ -120,9 +132,19 @@ export async function loadPool(
       writing = false;
     }
   }
+  void (async () => {
+    await database.writer;
+    if (!writer) {
+      writer = true;
+      everything = true;
+      await save();
+    }
+  })();
   pool.onChange(() => {
     void save();
   });
+  // The first save removes what the load dropped, such as a saved command that this build refused.
+  void save();
   return pool;
 }
 

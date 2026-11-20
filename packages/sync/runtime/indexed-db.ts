@@ -25,7 +25,12 @@ async function write(tx: Writable, save: LocalSave): Promise<void> {
   const requests: Array<Promise<unknown>> = [];
   const { confirmed } = save;
   if (confirmed) {
-    requests.push(recordStore.clear());
+    if (confirmed.replace) {
+      requests.push(recordStore.clear());
+    }
+    for (const { model, id } of confirmed.remove) {
+      requests.push(recordStore.delete([model, id]));
+    }
     for (const record of confirmed.put) {
       requests.push(recordStore.put(record));
     }
@@ -44,6 +49,48 @@ async function write(tx: Writable, save: LocalSave): Promise<void> {
     }
   }
   await Promise.all(requests);
+}
+
+type Writer = { held: boolean; readonly taken: Promise<null> };
+
+/**
+ * Whether this page writes the confirmed records of a database name. The
+ * page that holds the Web Lock of the name is the writer until it closes.
+ * Then the next page gets the lock. The open asks for a free lock first, so
+ * the first page knows that it writes before it reads. Each handle of one
+ * page shares the answer, so a start again after a sign-out stays the
+ * writer. A browser with no Web Locks lets each page write.
+ */
+const writers = new Map<string, Promise<Writer>>();
+
+async function takeWriter(name: string): Promise<Writer> {
+  if (typeof navigator === 'undefined' || !('locks' in navigator)) {
+    return { held: true, taken: Promise.resolve(null) };
+  }
+  const lock = `local-database:${name}`;
+  const taken = Promise.withResolvers<null>();
+  const writer: Writer = { held: false, taken: taken.promise };
+  function hold() {
+    writer.held = true;
+    taken.resolve(null);
+    // The lock is held until the page closes.
+    return Promise.withResolvers<never>().promise;
+  }
+  const free = Promise.withResolvers<boolean>();
+  void navigator.locks.request(lock, { ifAvailable: true }, (granted) => {
+    free.resolve(granted !== null);
+    return granted === null ? null : hold();
+  });
+  if (!(await free.promise)) {
+    void navigator.locks.request(lock, hold);
+  }
+  return writer;
+}
+
+function writerOf(name: string): Promise<Writer> {
+  const known = writers.get(name) ?? takeWriter(name);
+  writers.set(name, known);
+  return known;
 }
 
 /**
@@ -87,6 +134,7 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
     },
   });
   const database = await Promise.race([opening, blocked.promise]);
+  const writer = await writerOf(name);
   return {
     read: async () => {
       const tx = database.transaction(stores, 'readonly');
@@ -106,5 +154,7 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
       const tx = database.transaction(stores, 'readwrite');
       await Promise.all([...stores.map((store) => tx.objectStore(store).clear()), tx.done]);
     },
+    isWriter: () => writer.held,
+    writer: writer.taken,
   };
 }
