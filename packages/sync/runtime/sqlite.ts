@@ -1,4 +1,5 @@
-import { leftBehind, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import { leftBehind, markAfter, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import type { MarkState } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase, LocalSave } from '@repo/sync/types/local-database';
 import type { SqliteDriver } from '@repo/sync/types/sqlite-driver';
 
@@ -34,7 +35,7 @@ const schema = [
   'create table if not exists pool_records (name text not null, model text not null, id text not null, value text not null, primary key (name, model, id))',
   'create table if not exists pool_transactions (seq integer primary key autoincrement, name text not null, id text not null, value text not null, unique (name, id))',
   'create table if not exists pool_position (name text primary key, value text not null)',
-  'create table if not exists pool_ended (name text primary key)',
+  'create table if not exists pool_ended (name text primary key, spent integer not null default 0)',
 ];
 
 export async function openSqlite(driver: SqliteDriver, name: string): Promise<LocalDatabase> {
@@ -64,6 +65,15 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
       await driver.run('rollback');
       throw error;
     }
+  }
+
+  /** The state of the mark of a session end, if there is one. */
+  async function markOf(): Promise<MarkState | undefined> {
+    const [mark] = await driver.all('select spent from pool_ended where name = ?', [name]);
+    if (!mark) {
+      return undefined;
+    }
+    return mark['spent'] === 1 ? 'spent' : 'fresh';
   }
 
   async function write(save: LocalSave): Promise<void> {
@@ -100,9 +110,13 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
         [name, transaction.id, JSON.stringify(transaction)],
       );
     }
-    const [mark] = await driver.all('select name from pool_ended where name = ?', [name]);
-    if (mark && confirmed?.position.actor) {
+    const { mark, sweep } = markAfter(await markOf(), save);
+    if (mark === undefined) {
       await driver.run('delete from pool_ended where name = ?', [name]);
+    } else if (mark === 'spent') {
+      await driver.run('update pool_ended set spent = 1 where name = ?', [name]);
+    }
+    if (sweep) {
       const rows = await driver.all('select seq, value from pool_transactions where name = ?', [
         name,
       ]);
@@ -145,12 +159,11 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
           'select value from pool_transactions where name = ? order by seq',
           [name],
         );
-        const [mark] = await driver.all('select name from pool_ended where name = ?', [name]);
         return stateOf(
           records.map((row) => parsed(row['value'])),
           position ? parsed(position['value']) : undefined,
           waiting.map((row) => parsed(row['value'])),
-          mark !== undefined,
+          (await markOf()) === 'fresh',
         );
       }),
     save: (save) => serial(() => atomically(() => write(save))),
@@ -161,7 +174,7 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
             await driver.run(`delete from ${table} where name = ?`, [name]);
           }
           await driver.run(
-            'insert into pool_ended (name) values (?) on conflict (name) do nothing',
+            'insert into pool_ended (name, spent) values (?, 0) on conflict (name) do update set spent = 0',
             [name],
           );
         }),

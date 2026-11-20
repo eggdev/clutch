@@ -107,7 +107,8 @@ export type Pool = ReadablePool & {
    * `false` then, and the engine pulls again from 0. A copy that names no
    * actor takes this one. In a copy that stays, each waiting transaction of
    * another actor is dropped, never sent, and reported once, and each one with
-   * no actor takes this one. With no actor, from an older server, the copy stays.
+   * no actor takes this one. With no actor, from an older server, the copy
+   * stays. The next save removes the mark of a session end, either way.
    */
   readonly confirmActor: (actor?: SyncActor) => boolean;
   readonly settle: (outcomes: ReadonlyArray<Outcome>) => void;
@@ -337,6 +338,7 @@ export function createPool(
       }
     },
     confirmActor(actor) {
+      confirmed.hearServer();
       const saved = confirmed.actor();
       if (!actor) {
         return true;

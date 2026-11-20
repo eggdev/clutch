@@ -2,6 +2,16 @@ import { fullSave } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase, PoolState } from '@repo/sync/types/local-database';
 import type { Transaction } from '@repo/sync/types/protocol';
 
+/** The confirmed part of a save with no record, and a position that names no actor. */
+function positionOnly() {
+  return {
+    replace: false,
+    put: [],
+    remove: [],
+    position: { lastSyncId: 7, groups: ['test'] },
+  };
+}
+
 /**
  * One case that every local database adapter must pass. `run` gets `open`,
  * which gives a handle to one database. A second call in the same case gives
@@ -275,6 +285,51 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
         ['t2', 't3'],
         'The waiting rows that stay',
       );
+    },
+  },
+  {
+    name: 'the first save after a start keeps the mark, and a read after it gives no mark',
+    async run(open) {
+      const db = await open();
+      const actor = { userId: 'ben', organizationId: 'acme' };
+      await db.clear();
+      await db.save({ add: [rename('t1')], done: [], afterLoad: true });
+      const read = await readState(db, 'The read after the first save of a start');
+      expectSame(read.ended, undefined, 'The mark after the first save of a start');
+      expectSame(read.pending, [rename('t1')], 'The waiting rows after the first save');
+      // The mark is still there: the save of an actor removes each row with no actor.
+      await db.save({
+        confirmed: { ...positionOnly(), position: { ...positionOnly().position, actor } },
+        add: [{ ...rename('t2'), actor }],
+        done: [],
+      });
+      const after = await readState(db, 'The read after the save of the actor');
+      expectSame(
+        after.pending.map(({ id }) => id),
+        ['t2'],
+        'The waiting rows after the save of the actor',
+      );
+    },
+  },
+  {
+    name: 'a save after a Groups message that names no actor removes the mark and keeps each waiting row',
+    async run(open) {
+      const db = await open();
+      const actor = { userId: 'ben', organizationId: 'acme' };
+      await db.clear();
+      await db.save({ add: [rename('t1')], done: [] });
+      await db.save({ confirmed: { ...positionOnly(), heardServer: true }, add: [], done: [] });
+      const read = await readState(db, 'The read after the Groups message');
+      expectSame(read.ended, undefined, 'The mark after the Groups message');
+      expectSame(read.pending, [rename('t1')], 'The waiting rows after the Groups message');
+      // The mark is gone: a later save of an actor removes no row.
+      await db.save({
+        confirmed: { ...positionOnly(), position: { ...positionOnly().position, actor } },
+        add: [],
+        done: [],
+      });
+      const after = await readState(db, 'The read after the save of the actor');
+      expectSame(after.pending, [rename('t1')], 'The waiting rows after the save of the actor');
     },
   },
   {

@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import { localChange } from '@repo/sync/contract/command';
 import { defineContract } from '@repo/sync/contract/define';
 import { endSession, followSessionEnd, loadPool } from '@repo/sync/runtime/boot';
+import type { SavedPool } from '@repo/sync/runtime/boot';
 import { memoryLocalDatabase } from '@repo/sync/testing/local-database';
 import { poolState, testCommand, testModel } from '@repo/sync/testing/pool-state';
 import type { LocalDatabase } from '@repo/sync/types/local-database';
@@ -187,3 +188,54 @@ for (const when of ['before the next start', 'after the next start'] as const) {
     expect(sent).toEqual([{ id: 'a', title: "Ben's" }]);
   });
 }
+
+function noEngine() {
+  // The engine of this test never started.
+}
+
+/**
+ * Ana's session ends on the device, and the next one starts. `before` runs
+ * on the pool of that start, then the app starts again. It returns what the
+ * start after that sends, the mark that the database reads then, and each
+ * sentence that the pools reported.
+ */
+async function startAgainAfterSessionEnd(before: (pool: SavedPool) => void) {
+  const lines: Array<string> = [];
+  const memory = memoryLocalDatabase({ ...saved(), actor: ana });
+  const start = () =>
+    loadPool(memory, [renameLocal], [cards], undefined, (line) => lines.push(line));
+  await endSession(memory, await start(), noEngine);
+  const next = await start();
+  before(next);
+  await settle();
+  await next.stop();
+  const restart = await start();
+  await settle();
+  return {
+    sent: restart.unsent().map(({ input }) => input),
+    read: await memory.read(),
+    lines,
+  };
+}
+
+test('with a server that names no actor, work done after the first Groups message survives a restart', async () => {
+  const { sent, read, lines } = await startAgainAfterSessionEnd((pool) => {
+    // A server of an older build: the first Groups message names no actor.
+    expect(pool.confirmActor()).toBe(true);
+    pool.applyGroups([], []);
+    pool.run(rename, { id: 'a', title: 'After the Groups message' });
+  });
+  expect(sent).toEqual([{ id: 'a', title: 'After the Groups message' }]);
+  expect(read?.ended).toBeUndefined();
+  expect(lines).toEqual([]);
+});
+
+test('after a session end, work done before the first Groups message survives a restart', async () => {
+  const { sent, read, lines } = await startAgainAfterSessionEnd((pool) => {
+    pool.run(rename, { id: 'a', title: 'Offline' });
+  });
+  expect(sent).toEqual([{ id: 'a', title: 'Offline' }]);
+  // The mark stays until the first Groups message, and no load drops a row again.
+  expect(read?.ended).toBeUndefined();
+  expect(lines).toEqual([]);
+});

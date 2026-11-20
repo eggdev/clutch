@@ -111,6 +111,9 @@ export async function loadPool(
   let failing = false;
   let everything = false;
   let stopped = false;
+  // The load dropped what a fresh mark of a session end asked for. The first
+  // save spends the mark, so no later start drops a row again.
+  let afterLoad = true;
   let running: Promise<void> = Promise.resolve();
   async function saveAll() {
     try {
@@ -124,11 +127,18 @@ export async function loadPool(
         everything = false;
         const confirmed = pool.confirmedChanges(full);
         const { add, done } = queueChanges(pool.queue(), held);
-        if (!writer && add.length === 0 && done.length === 0) {
+        const startSave = afterLoad;
+        if (!writer && !startSave && add.length === 0 && done.length === 0) {
           continue;
         }
         try {
-          await database.save(writer ? { confirmed, add, done } : { add, done });
+          await database.save({
+            ...(writer ? { confirmed } : {}),
+            add,
+            done,
+            ...(startSave ? { afterLoad: true } : {}),
+          });
+          afterLoad = false;
           held = new Map([...held, ...add.map((row): [string, string] => [row.id, actorOf(row)])]);
           for (const id of done) {
             held.delete(id);

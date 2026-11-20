@@ -1,4 +1,5 @@
-import { fullSave, leftBehind, stateOf } from '@repo/sync/runtime/pool-doors';
+import { fullSave, leftBehind, markAfter, stateOf } from '@repo/sync/runtime/pool-doors';
+import type { MarkState } from '@repo/sync/runtime/pool-doors';
 import { recordKey } from '@repo/sync/runtime/tables';
 import type {
   LocalDatabase,
@@ -34,7 +35,7 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
   let transactions: Array<WaitingRow> = [];
   let position: SyncPosition | undefined;
   // The mark of a session end, which a clear leaves.
-  let ended = false;
+  let ended: MarkState | undefined;
   const log: Array<LocalSave> = [];
   // The clear listeners of each handle, as a `BroadcastChannel` of each tab.
   const handles = new Set<Set<() => void>>();
@@ -62,8 +63,9 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
         structuredClone(transaction),
       );
     }
-    if (ended && confirmed?.position.actor) {
-      ended = false;
+    const { mark, sweep } = markAfter(ended, save);
+    ended = mark;
+    if (sweep) {
       transactions = transactions.filter((row) => !leftBehind(row, save));
     }
   }
@@ -75,7 +77,7 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
 
   if (initial) {
     apply(fullSave(initial));
-    ended = initial.ended === true;
+    ended = initial.ended ? 'fresh' : undefined;
   }
 
   function handle(writer: Promise<unknown>, held: boolean): MemoryLocalDatabase {
@@ -85,7 +87,9 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
     handles.add(heard);
     return {
       read: () =>
-        Promise.resolve(structuredClone(stateOf(inKeyOrder(), position, transactions, ended))),
+        Promise.resolve(
+          structuredClone(stateOf(inKeyOrder(), position, transactions, ended === 'fresh')),
+        ),
       save: (save) => {
         apply(save);
         log.push(structuredClone(save));
@@ -102,7 +106,7 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
         records.clear();
         transactions = [];
         position = undefined;
-        ended = true;
+        ended = 'fresh';
         return Promise.resolve();
       },
       onClearedElsewhere(listener) {

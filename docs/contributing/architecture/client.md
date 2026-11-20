@@ -202,9 +202,13 @@ the new value. So a row that took the confirmed actor is written again with it.
 
 `clear` leaves the mark of a session end, in the same database transaction.
 It is the key `ended` of the IndexedDB store `position`, or a row of the
-SQLite table `pool_ended`. A read gives it as `ended` while any other row is there.
-The first save whose position names an actor removes it, with each waiting
-row with no actor that the save does not write.
+SQLite table `pool_ended`. A read gives it as `ended` while any other row is
+there, until the first save of the next start spends it. So only the first
+start after a session end drops the waiting rows with no actor. The first save
+after a `Groups` message removes the mark, also when the server named no actor.
+When the save names an actor, it also removes each waiting row with no actor
+that it does not write. `markAfter` in `packages/sync/runtime/pool-doors.ts`
+holds the rule for each adapter.
 
 `clear` tells each other tab of the database on the device first. On the
 web, it posts a message on a `BroadcastChannel` with the name of the

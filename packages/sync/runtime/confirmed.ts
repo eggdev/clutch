@@ -51,6 +51,11 @@ export type Confirmed = {
   readonly actor: () => SyncActor | undefined;
   /** Names the actor of these records. The next save writes it with the position. */
   readonly setActor: (actor: SyncActor) => void;
+  /**
+   * A `Groups` message of this session came. Each save after it removes the
+   * mark of a session end, also when the server named no actor.
+   */
+  readonly hearServer: () => void;
   /** Applies a delta and returns `true`, or returns `false` when the pool already has it. */
   readonly applyDelta: (delta: Delta) => boolean;
   /** Applies each change of a backfill. A backfill does not move the sync position. */
@@ -139,6 +144,7 @@ export function createConfirmed(
   let leftOutBy: string | undefined;
   let build = 'unnamed';
   let actor: SyncActor | undefined;
+  let heard = false;
   // The keys of the records that a backfill of this pull sent since its last
   // `Groups` message, and whether a `Groups` message of this pull came.
   let sent = new Set<string>();
@@ -256,12 +262,16 @@ export function createConfirmed(
           ...(leftOutBy === undefined ? {} : { leftOutBy }),
           ...(actor === undefined ? {} : { actor }),
         },
+        ...(heard ? { heardServer: true } : {}),
       };
     },
     reset,
     actor: () => actor,
     setActor(next) {
       actor = next;
+    },
+    hearServer() {
+      heard = true;
     },
     applyDelta(delta) {
       if (delta.syncId <= lastSyncId) {

@@ -226,6 +226,31 @@ export function leftBehind(row: unknown, save: LocalSave): boolean {
   );
 }
 
+/**
+ * The state of the mark of a session end. A clear leaves it `fresh`, and a
+ * read gives it as `ended`. The first save of the next start leaves it
+ * `spent`: it stays, and a read no longer gives it.
+ */
+export type MarkState = 'fresh' | 'spent';
+
+/**
+ * What one save does to the mark of a session end: the state after the save,
+ * and whether the save removes each waiting row that `leftBehind` names. The
+ * first save whose position names an actor removes the mark and those rows. A
+ * save after a `Groups` message that named no actor removes only the mark,
+ * because the rows of the next session never get an actor from that server.
+ */
+export function markAfter(
+  mark: MarkState | undefined,
+  save: LocalSave,
+): { readonly mark: MarkState | undefined; readonly sweep: boolean } {
+  const named = save.confirmed?.position.actor !== undefined;
+  if (mark && (named || save.confirmed?.heardServer)) {
+    return { mark: undefined, sweep: named };
+  }
+  return { mark: mark && save.afterLoad ? 'spent' : mark, sweep: false };
+}
+
 /** The one sentence that the pool reports when it drops the waiting rows of another actor. */
 export const otherActorRows =
   'This device held unsent changes of another account, so the app removed them and did not send them.';

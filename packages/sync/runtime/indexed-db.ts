@@ -1,4 +1,5 @@
-import { leftBehind, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import { leftBehind, markAfter, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import type { MarkState } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase, LocalSave } from '@repo/sync/types/local-database';
 import { openDB } from 'idb';
 import type { IDBPTransaction } from 'idb';
@@ -10,7 +11,7 @@ const transactions = 'transactions';
 /**
  * One row, under the key `position`: the last sync ID, the loaded groups,
  * `leftOutBy` and the actor. A clear leaves the mark of a session end in
- * the same store, under the key `ended`.
+ * the same store, under the key `ended`, as its state.
  */
 const position = 'position';
 /** The store of the old layout, which held the whole state under the key `state`. */
@@ -18,6 +19,14 @@ const oldStore = 'pool';
 const stores = [records, transactions, position];
 
 type Writable = IDBPTransaction<unknown, ArrayLike<string>, 'readwrite' | 'versionchange'>;
+
+/** The state of the saved mark of a session end, if there is one. */
+function markState(saved: unknown): MarkState | undefined {
+  if (saved === undefined) {
+    return undefined;
+  }
+  return saved === 'spent' ? 'spent' : 'fresh';
+}
 
 /**
  * Writes one save in the database transaction `tx`. Each request joins the
@@ -51,10 +60,20 @@ async function write(tx: Writable, save: LocalSave): Promise<void> {
     const key = await waiting.index('id').getKey(transaction.id);
     requests.push(key === undefined ? waiting.add(transaction) : waiting.put(transaction, key));
   }
-  // The first save that names the actor of the next session removes the mark,
-  // and each other waiting row with no actor, which may be the work of the person who left.
-  if (confirmed?.position.actor && (await tx.objectStore(position).get('ended')) !== undefined) {
-    requests.push(tx.objectStore(position).delete('ended'));
+  // The first save of a start spends the mark. The first save after a
+  // `Groups` message removes it. When that save names the actor of the next
+  // session, it also removes each other waiting row with no actor, which may
+  // be the work of the person who left.
+  const before = markState(await tx.objectStore(position).get('ended'));
+  const { mark, sweep } = markAfter(before, save);
+  if (mark !== before) {
+    requests.push(
+      mark === undefined
+        ? tx.objectStore(position).delete('ended')
+        : tx.objectStore(position).put(mark, 'ended'),
+    );
+  }
+  if (sweep) {
     for (let cursor = await waiting.openCursor(); cursor; cursor = await cursor.continue()) {
       if (leftBehind(cursor.value, save)) {
         requests.push(cursor.delete());
@@ -162,7 +181,7 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
         tx.objectStore(position).get('ended'),
         tx.done,
       ]);
-      return stateOf(rows, saved, waiting, ended !== undefined);
+      return stateOf(rows, saved, waiting, markState(ended) === 'fresh');
     },
     save: async (save) => {
       const tx = database.transaction(stores, 'readwrite');
@@ -180,7 +199,7 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
       const tx = database.transaction(stores, 'readwrite');
       await Promise.all([
         ...stores.map((store) => tx.objectStore(store).clear()),
-        tx.objectStore(position).put(true, 'ended'),
+        tx.objectStore(position).put('fresh', 'ended'),
         tx.done,
       ]);
     },

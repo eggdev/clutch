@@ -43,9 +43,10 @@ export type PoolState = {
    */
   readonly actor?: SyncActor;
   /**
-   * A session ended on this device, and no save has named the actor of the
-   * next session yet. The pool drops each waiting row with no actor, because
-   * it may be the work of the person who left.
+   * A session ended on this device, and no start has loaded since. The pool
+   * drops each waiting row with no actor, because it may be the work of the
+   * person who left. The first save of the start spends the mark, so it does
+   * this once.
    */
   readonly ended?: true;
   /**
@@ -84,6 +85,12 @@ export type ConfirmedSave = {
   readonly put: ReadonlyArray<SavedRecord>;
   readonly remove: ReadonlyArray<RecordKey>;
   readonly position: SyncPosition;
+  /**
+   * A `Groups` message of this session came, also one that named no actor,
+   * as a server of an older build sends. The save removes the mark of a
+   * session end.
+   */
+  readonly heardServer?: true;
 };
 
 /**
@@ -97,6 +104,13 @@ export type LocalSave = {
   readonly confirmed?: ConfirmedSave;
   readonly add: ReadonlyArray<WaitingRow>;
   readonly done: ReadonlyArray<string>;
+  /**
+   * The first save of a start. The load before it dropped each waiting row
+   * with no actor that a fresh mark of a session end asked for, so the save
+   * spends the mark: a read gives no `ended` after it. A spent mark stays
+   * until the first `Groups` message.
+   */
+  readonly afterLoad?: true;
 };
 
 /**
@@ -120,10 +134,12 @@ export type LocalDatabase = {
   /**
    * Removes every row, and leaves the mark of a session end in the same
    * database transaction. A read reads the mark as `ended` while any other
-   * row is there. The first save whose position names an actor removes the
-   * mark and each waiting row with no actor. A session end calls it. It
-   * first tells each other tab of this database on the device, which then
-   * stops its engine and its saves.
+   * row is there, until a save with `afterLoad` spends it. The first save
+   * whose position names an actor removes the mark, fresh or spent, and each
+   * waiting row with no actor that it does not write. A save with
+   * `heardServer` removes the mark too. A session end calls it. It first
+   * tells each other tab of this database on the device, which then stops
+   * its engine and its saves.
    */
   readonly clear: () => Promise<void>;
   /**

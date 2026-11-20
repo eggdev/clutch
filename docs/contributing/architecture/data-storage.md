@@ -65,8 +65,11 @@ A saved position without `actor` keeps its copy, and takes the actor that the
 server names first. A waiting transaction row holds `actor` too, with the
 same shape. A row without it takes the actor that the server confirms next.
 A session end leaves a mark: the key `ended` of the IndexedDB store
-`position`, or a row of the SQLite table `pool_ended`. While it is there, a
-row without `actor` is dropped. The `records` store holds no record that is in no loaded
+`position`, or a row of the SQLite table `pool_ended`. Its value is its
+state: `fresh` after the clear, and `spent` after the first save of the next
+start (the column `spent` in SQLite). Only the load of a fresh mark drops
+each row without `actor`. The first save after a `Groups` message removes the
+mark. The `records` store holds no record that is in no loaded
 group of the position. A copy at sync ID 0 holds only part of a first load.
 The next pull from 0 drops each record that it does not send again.
 

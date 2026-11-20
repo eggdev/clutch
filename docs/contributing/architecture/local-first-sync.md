@@ -238,10 +238,14 @@ device. Eight rules hold this.
   and the next save writes the row again with that actor.
   `packages/sync/runtime/pool-waiting-actor.test.ts` holds this.
 - A session end leaves a mark in the local database. The clear writes it in
-  the same database transaction. While the mark is there, the pool drops
-  each waiting row with no actor when it loads, and never sends it. Such a
-  row may be the work of the person who left. The first save whose position
-  names an actor removes the mark. That save also deletes each waiting row
+  the same database transaction. The mark does its work once: at the first
+  start after the session end, the pool drops each waiting row with no actor
+  that it loads, and never sends it. Such a row may be the work of the
+  person who left. The first save of that start spends the mark, so a later
+  start keeps the rows with no actor, such as the work of the next person
+  while offline. The first `Groups` message of the next session removes the
+  mark, also from a server of an older build, which names no actor. When
+  the save of that message names an actor, it also deletes each waiting row
   with no actor that it does not write itself. A copy with no mark and no
   actor is an older copy, and its rows with no actor stay.
   `packages/sync/runtime/boot-session.test.ts` holds the order of the race.
