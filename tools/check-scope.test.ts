@@ -58,6 +58,18 @@ test('a change over the limit fails, and excluded files do not count', async () 
   expect(checkScope(root, 'HEAD', limits)).toEqual([]);
 });
 
+test('the generated snapshot of a migration does not count, and its SQL does', async () => {
+  await write('packages/x/repo/migrations/1_init/snapshot.json', '{}\n'.repeat(50));
+  await write('packages/x/repo/migrations/1_init/migration.sql', 'select 1;\n'.repeat(5));
+  git('add', '-A');
+  expect(checkScope(root, 'HEAD', limits)).toEqual([]);
+  await write('packages/x/repo/migrations/1_init/migration.sql', 'select 1;\n'.repeat(6));
+  git('add', '-A');
+  expect(checkScope(root, 'HEAD', limits)).toEqual([
+    'The PR changes 6 lines, over the limit of 5. Split it.',
+  ]);
+});
+
 test('a new screen needs an issue that states hand_test', async () => {
   await write('KICKOFF.md', '# Kickoff\n');
   git('add', '-A');

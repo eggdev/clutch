@@ -13,7 +13,7 @@ Rank 69 of the researched practices. About one in five of the leading repositori
 ## Adopt
 
 `clutch labels` counts the added and deleted lines against the merge base. It
-skips lockfiles, snapshots and `.clutch/`, plus the globs in `pr_size.exclude`.
+skips lockfiles, test snapshots, the generated snapshot of a migration and `.clutch/`, plus the globs in `pr_size.exclude`.
 It gives one label: `size/S` (up to 100 lines), `size/M` (300), `size/L` (800)
 or `size/XL`. The Labels workflow sets it on each pull request.
 

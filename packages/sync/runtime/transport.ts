@@ -116,7 +116,12 @@ export function engine(
     pool.nameBuild(contract);
     const pull = Effect.suspend(() =>
       client
-        .Pull({ lastSyncId: pool.lastSyncId(), groups: pool.loadedGroups(), contract })
+        .Pull({
+          lastSyncId: pool.lastSyncId(),
+          groups: pool.loadedGroups(),
+          contract,
+          pages: true,
+        })
         .pipe(Stream.runForEach((message) => Effect.sync(() => applyMessage(pool, message)))),
     );
     // A group that the actor may not load is refused: its gate stops waiting,
