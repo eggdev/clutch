@@ -74,8 +74,9 @@ head. So a record that changes, leaves or enters the group between two pages
 ends right: the pool keeps the change with the higher sync ID.
 `packages/sync/service/feed-snapshot.test.ts` holds this.
 
-`Pull` fails with `SessionEnded` when the session ends. It fails with
-`ServerBehind` when the server cannot send each event after the client's last
+`Pull` declares the error `SessionEnded`, and the client reads it as an ended
+session. The server of this repository ends a session with a 4401 close
+instead. `Pull` fails with `ServerBehind` when the server cannot send each event after the client's last
 sync ID. That happens when the last sync ID is above the server's newest
 event, or below the oldest event that the log still holds, minus 1. In the
 second case, the error names that oldest sync ID in `oldest`. A socket with
@@ -201,6 +202,13 @@ device. Four rules hold this.
   upgrade, but it reads the close code. Each other failure of `Actors` stays a server fault, and the
   client keeps its local database. `apps/api/src/sessions.test.ts` holds
   this.
+- A session that ends while its socket is open ends at the next call.
+  `Pull`, `Push` and `Load` each ask `Actors` for the actor again. When
+  `Actors` dies with `SessionEnded`, the server closes the socket of that
+  call with code 4401 and the call stops. `SocketEnds` in
+  `packages/sync/runtime/socket-ends.server.ts` ties each RPC client to its
+  socket. Each other defect stays a server fault, and the socket stays open.
+  `apps/api/src/sessions.test.ts` holds this for each call.
 - An ended session stops the saves before the local database clears.
   `endSession` in `packages/sync/runtime/boot.ts` stops the engine, stops the
   saves of the pool and lets a save that runs finish, then clears the

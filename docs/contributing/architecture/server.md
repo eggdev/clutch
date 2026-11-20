@@ -33,7 +33,8 @@ service. `runtime/dev.server.ts` builds it from `config/dev.ts`, and
 `testing/actor.ts` builds it for tests. The sync server asks it for the actor
 of each socket and each call. A Layer that finds no session dies with
 `SessionEnded`, from `packages/sync/types/session-ended.ts`. The sync server
-then closes the socket with code 4401. Each other failure is a server fault.
+then closes the socket with code 4401, at the upgrade and at each later call
+on the open socket. Each other failure is a server fault.
 
 ## Services in a server change
 
