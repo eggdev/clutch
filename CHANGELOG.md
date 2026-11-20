@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.4 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): drop the records of a load that was cut off (CL-586)
+
 ## 1.26.3 (2026-11-20)
 
 ### Fixes and maintenance
