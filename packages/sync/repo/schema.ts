@@ -48,7 +48,7 @@ export const syncEvents = pgTable(
  * The last state of each record that the log holds: its groups, the sync ID
  * of its last change, its last data, and whether that change deleted it. A
  * commit updates the row in the transaction of its event, so the next change
- * of the record knows the groups that it leaves. A group load can read the
+ * of the record knows the groups that it leaves. A group load reads the
  * records of a group from here, with a GIN index on the groups.
  */
 export const syncRecords = pgTable(

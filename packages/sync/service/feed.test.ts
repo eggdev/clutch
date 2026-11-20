@@ -93,11 +93,19 @@ test('a client gets only the changes of its loaded groups, from the backlog and 
   const messages = await run(
     Effect.gen(function* () {
       const log = yield* EventLog;
+      // The client holds data up to sync ID 1, so it reads the backlog after it.
+      yield* log.commit('org-a', 't0', () => Effect.succeed([change('o', ['space:y'])]));
       yield* log.commit('org-a', 't1', () => Effect.succeed([change('a', ['space:x'])]));
       yield* log.commit('org-a', 't2', () => Effect.succeed([change('b', ['space:y'])]));
       const requests = yield* Queue.unbounded<LoadRequest>();
       const seen = yield* Queue.unbounded<SyncMessage>();
-      const reading = yield* open(log, { loaded: ['org:a', 'space:x'] }, requests, seen, 3);
+      const reading = yield* open(
+        log,
+        { loaded: ['org:a', 'space:x'], lastSyncId: 1 },
+        requests,
+        seen,
+        3,
+      );
       yield* Queue.take(seen);
       yield* log.commit('org-a', 't3', () =>
         Effect.succeed([change('c', ['space:y']), change('d', ['space:x'])]),
@@ -116,7 +124,7 @@ test('loading a group sends its past changes once, then its live changes', async
       yield* log.commit('org-a', 't1', () => Effect.succeed([change('a', ['space:y'])]));
       const requests = yield* Queue.unbounded<LoadRequest>();
       const seen = yield* Queue.unbounded<SyncMessage>();
-      const reading = yield* open(log, { loaded: ['org:a'] }, requests, seen, 3);
+      const reading = yield* open(log, { loaded: ['org:a'], lastSyncId: 1 }, requests, seen, 3);
       yield* Queue.take(seen);
       yield* Queue.offer(requests, { group: 'space:y', pages: false });
       // The backfill message: the group is loaded before the live change.
@@ -198,12 +206,14 @@ test('the backlog shows a move as a delete to a client of the old group, and as 
   const [old, next, neither] = await run(
     Effect.gen(function* () {
       const log = yield* EventLog;
+      // The clients hold data up to sync ID 1, so they read the move in the backlog.
+      yield* log.commit('org-a', 't0', () => Effect.succeed([change('o', ['space:z'])]));
       yield* moveCard(log);
       const read = (loaded: ReadonlyArray<string>) =>
         Effect.gen(function* () {
           const requests = yield* Queue.unbounded<LoadRequest>();
           const seen = yield* Queue.unbounded<SyncMessage>();
-          const reading = yield* open(log, { loaded }, requests, seen, 2);
+          const reading = yield* open(log, { loaded, lastSyncId: 1 }, requests, seen, 2);
           return yield* Fiber.join(reading).pipe(Effect.timeout('2 seconds'));
         });
       const ofOld = yield* read(['org:a', 'space:x']);
@@ -253,7 +263,7 @@ test('a live move reaches each client as what it is for that client', async () =
   expect(actions(both)).toEqual(['Groups ', 'Deltas a upsert']);
 });
 
-test('a backfill shows a move by the groups that the client has loaded, not only the new one', async () => {
+test('a group load sends only the records that are in the group now, so a moved record is not sent', async () => {
   const [old, withNew] = await run(
     Effect.gen(function* () {
       const log = yield* EventLog;
@@ -270,9 +280,9 @@ test('a backfill shows a move by the groups that the client has loaded, not only
       return [yield* loadOld(['org:a']), yield* loadOld(['org:a', 'space:y'])];
     }),
   );
-  expect(actions(old)).toEqual(['Groups ', 'Groups a upsert,a delete']);
-  // The client holds the card through space y, so the move is an upsert for it.
-  expect(actions(withNew)).toEqual(['Groups ', 'Groups a upsert,a upsert']);
+  // The card is in space y now, so the snapshot of space x does not hold it.
+  expect(actions(old)).toEqual(['Groups ', 'Groups ']);
+  expect(actions(withNew)).toEqual(['Groups ', 'Groups ']);
 });
 
 /** Five cards of space y, one in each event. */
@@ -337,7 +347,7 @@ test('a backfill that fills its last page ends with a message that loads the gro
   expect(messages[2]?._tag === 'Groups' ? messages[2].backfill : undefined).toEqual([]);
 });
 
-/** Opens a feed whose client holds data up to sync ID 2 and lacks the history of space y. */
+/** Opens a feed whose client holds data up to sync ID 2 and lacks the records of space y. */
 const fillOpen = (pages: boolean, count: number) =>
   run(
     Effect.gen(function* () {
@@ -359,17 +369,20 @@ const fillOpen = (pages: boolean, count: number) =>
     1,
   );
 
-test('a group whose history the client lacks comes as the backfill of the first message', async () => {
+test('a group whose records the client lacks comes as the backfill of the first message', async () => {
+  // The snapshot holds each record as it is now. The backlog after sync ID 2
+  // sends c again, and the pool keeps one copy.
   expect(summary(await fillOpen(false, 2))).toEqual([
-    'groups org:a+space:y backfill a,b',
+    'groups org:a+space:y backfill a,b,c',
     'deltas c',
   ]);
 });
 
-test('a client that reads pages gets that history in pages before the first Groups message', async () => {
-  expect(summary(await fillOpen(true, 4))).toEqual([
+test('a client that reads pages gets those records in pages before the first Groups message', async () => {
+  expect(summary(await fillOpen(true, 5))).toEqual([
     'page space:y backfill a',
     'page space:y backfill b',
+    'page space:y backfill c',
     'groups org:a+space:y backfill ',
     'deltas c',
   ]);

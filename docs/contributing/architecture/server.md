@@ -124,6 +124,8 @@ listed contract has no server change. `serverOf(packages)` gives both lists from
 
 `eventLog(contracts)` in `packages/sync/service/event-log.ts` is the door that every change passes before a client gets it. Each commit checks its changes against the contracts that the server serves. A change of a model that no contract declares stops the commit. An upsert whose data does not fit its record also stops it, and the error names the fields that do not fit. A delete checks only its model. A failed check dies inside the transaction, so no event is appended. `packages/sync/service/event-log.test.ts` tests each rule.
 
+A load reads the snapshot of a group from `sync_records`, not the history of the log: the last change of each live record, in pages by the record key. See [the protocol](./local-first-sync.md).
+
 ## Jobs and the outbox
 
 A job does slow or outside work after a commit, such as a vendor call or a

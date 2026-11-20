@@ -77,9 +77,8 @@ function loadFor(declared: Load, groupId: string, actor: Actor) {
       return refused('forbidden', `You may not read the records of this ${declared.prefix}.`);
     }
     const log = yield* EventLog;
-    const head = yield* log.head(actor.organizationId);
-    // One page at a time, so the read holds the records and not their history.
-    return yield* log.backfill(actor.organizationId, head, new Set([group])).pipe(
+    // One page at a time, from the last change of each record of the group.
+    return yield* log.snapshot(actor.organizationId, group).pipe(
       Stream.runFold(
         () => new Map<string, Json>(),
         (records, { deltas }) => applyTo(records, deltas, declared.record),

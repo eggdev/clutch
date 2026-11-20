@@ -2,6 +2,8 @@ import type { Contract } from '@repo/sync/contract/define';
 import { unfitting } from '@repo/sync/contract/fields';
 import type { RecordDeclaration } from '@repo/sync/contract/record';
 import { appendEvent, eventsAfter, findTransaction, headOf } from '@repo/sync/repo/events';
+import { liveRecords } from '@repo/sync/repo/records';
+import type { RecordCursor } from '@repo/sync/repo/records';
 import { Database } from '@repo/sync/service/database';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { seenDelta } from '@repo/sync/service/visible';
@@ -10,10 +12,11 @@ import { Context, Effect, Layer, Option, PubSub, Stream } from 'effect';
 import type { Scope } from 'effect';
 
 /**
- * At most this many events go in one page of the backlog or of a backfill,
- * so one decode stays short, and the server reads one page at a time.
+ * At most this many events go in one page of the backlog, and this many
+ * records in one page of a snapshot, so one decode stays short, and the
+ * server reads one page at a time.
  */
-const eventsPerPage = 1000;
+const rowsPerPage = 1000;
 
 type Commit = <E, R>(
   organizationId: string,
@@ -24,15 +27,15 @@ type Commit = <E, R>(
 /** One page of the backlog: the visible deltas, and the sync ID of the last event read. */
 export type BacklogPage = { readonly deltas: ReadonlyArray<Delta>; readonly last: number };
 
-/** One page of a backfill: the visible deltas, and whether more pages follow. */
-export type BackfillPage = { readonly deltas: ReadonlyArray<Delta>; readonly more: boolean };
+/** One page of a snapshot: the last change of each record, and whether more pages follow. */
+export type SnapshotPage = { readonly deltas: ReadonlyArray<Delta>; readonly more: boolean };
 
 /**
  * The append-only log of one server. `commit` writes the owner records and
  * the event in one database transaction, then publishes the delta after the
  * commit. Each change must name its sync groups and a model that a contract
- * declares. `backlog`, `backfill` and
- * `subscribe` give a connection its events; see `service/feed.ts`.
+ * declares. `snapshot`, `backlog` and
+ * `subscribe` give a connection its records and events; see `service/feed.ts`.
  */
 export class EventLog extends Context.Service<
   EventLog,
@@ -46,18 +49,20 @@ export class EventLog extends Context.Service<
       groups: ReadonlySet<string>,
     ) => Stream.Stream<BacklogPage, unknown>;
     /**
-     * Every event up to a sync ID that touches the groups, as a client that
-     * loaded `loaded` sees it, in pages. Each page is its own query, so the
-     * server never holds the whole history of a group. `loaded` holds
-     * `groups` and every other group of the client, and is `groups` when
-     * left out. The last page has `more: false`, and it can be empty.
+     * Each live record of a group, once, as a delta of its last change, in
+     * pages. A deleted record is not sent, so the cost follows the records
+     * and not their history. A record that is also in a group of `skip` is
+     * left out. Each page is its own query, in the order of the record keys,
+     * so a record that changes between two pages is neither skipped nor sent
+     * twice. A change after the first page can be newer than the head that
+     * the caller read; the caller sends the events after that head as well.
+     * The last page has `more: false`, and it can be empty.
      */
-    readonly backfill: (
+    readonly snapshot: (
       organizationId: string,
-      upTo: number,
-      groups: ReadonlySet<string>,
-      loaded?: ReadonlySet<string>,
-    ) => Stream.Stream<BackfillPage, unknown>;
+      group: string,
+      skip?: ReadonlySet<string>,
+    ) => Stream.Stream<SnapshotPage, unknown>;
     /** Every new event of the organization, from now on. */
     readonly subscribe: (
       organizationId: string,
@@ -128,7 +133,7 @@ export function eventLog(
   contracts: ReadonlyArray<Contract>,
   options: { readonly pageSize?: number | undefined } = {},
 ) {
-  const pageSize = options.pageSize ?? eventsPerPage;
+  const pageSize = options.pageSize ?? rowsPerPage;
   const declared = new Map(
     contracts
       .flatMap((contract) => contract.records)
@@ -175,38 +180,32 @@ export function eventLog(
           return result.syncId;
         });
 
-      // The events after `after` that touch `groups`, a page at a time, as a
-      // client of `loaded` sees them. A page that is not full is the last.
-      const pages = (
-        organizationId: string,
-        after: number,
-        groups: ReadonlySet<string>,
-        loaded: ReadonlySet<string>,
-        upTo?: number,
-      ) =>
-        Stream.paginate(after, (cursor) =>
-          eventsAfter(db, organizationId, cursor, groups, pageSize, upTo).pipe(
-            Effect.map((page) => {
-              const last = page.last ?? cursor;
-              const deltas = page.deltas.flatMap((delta) => seenDelta(delta, loaded, groups) ?? []);
-              return [
-                [{ deltas, last, more: page.full }],
-                page.full ? Option.some(last) : Option.none(),
-              ] as const;
-            }),
-          ),
-        );
-
       return {
         commit,
         head: (organizationId: string) => headOf(db, organizationId),
+        // The events after `after` that touch `groups`, a page at a time. A
+        // page that is not full is the last.
         backlog: (organizationId, after, groups) =>
-          pages(organizationId, after, groups, groups).pipe(
-            Stream.map(({ deltas, last }): BacklogPage => ({ deltas, last })),
+          Stream.paginate(after, (cursor) =>
+            eventsAfter(db, organizationId, cursor, groups, pageSize).pipe(
+              Effect.map((page) => {
+                const last = page.last ?? cursor;
+                const deltas = page.deltas.flatMap((delta) => seenDelta(delta, groups) ?? []);
+                const next: BacklogPage = { deltas, last };
+                return [[next], page.full ? Option.some(last) : Option.none()] as const;
+              }),
+            ),
           ),
-        backfill: (organizationId, upTo, groups, loaded = groups) =>
-          pages(organizationId, 0, groups, loaded, upTo).pipe(
-            Stream.map(({ deltas, more }): BackfillPage => ({ deltas, more })),
+        snapshot: (organizationId, group, skip = new Set()) =>
+          Stream.paginate<RecordCursor | undefined, SnapshotPage, unknown, never>(
+            undefined,
+            (cursor) =>
+              liveRecords(db, organizationId, group, skip, cursor, pageSize).pipe(
+                Effect.map((page) => {
+                  const next: SnapshotPage = { deltas: page.deltas, more: page.full };
+                  return [[next], page.full ? Option.some(page.last) : Option.none()] as const;
+                }),
+              ),
           ),
         subscribe: (organizationId) =>
           Effect.flatMap(hubOf(organizationId), (hub) => PubSub.subscribe(hub)),

@@ -1,7 +1,7 @@
 import { syncCounters, syncEvents, syncRecords } from '@repo/sync/repo/schema';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import type { Change, Delta } from '@repo/sync/types/protocol';
-import { and, arrayOverlaps, asc, eq, gt, lte, max, or, sql } from 'drizzle-orm';
+import { and, arrayOverlaps, asc, eq, gt, max, or, sql } from 'drizzle-orm';
 import { Effect } from 'effect';
 
 /** The sync ID of a transaction that the log already holds, so a resent transaction applies once. */
@@ -204,8 +204,7 @@ function deltasOf(
 }
 
 /**
- * Up to `limit` events after `lastSyncId`, and up to `upTo` when it is given,
- * that touch `groups`, oldest first, with every change they store. `last` is
+ * Up to `limit` events after `lastSyncId` that touch `groups`, oldest first, with every change they store. `last` is
  * the sync ID of the last event read, so the next page starts after it. The
  * caller picks what a client sees.
  */
@@ -215,7 +214,6 @@ export function eventsAfter(
   lastSyncId: number,
   groups: ReadonlySet<string>,
   limit: number,
-  upTo?: number,
 ) {
   return db
     .select()
@@ -224,7 +222,6 @@ export function eventsAfter(
       and(
         eq(syncEvents.organizationId, organizationId),
         gt(syncEvents.syncId, lastSyncId),
-        upTo === undefined ? undefined : lte(syncEvents.syncId, upTo),
         arrayOverlaps(syncEvents.groups, [...groups]),
       ),
     )

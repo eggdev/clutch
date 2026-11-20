@@ -46,8 +46,9 @@ const DeltasMessage = Schema.TaggedStruct('Deltas', { deltas: Schema.Array(Delta
 
 /**
  * The groups that the client has loaded now. The client deletes each record
- * that is in none of them. `backfill` holds the past changes of each group
- * that the client loaded just now.
+ * that is in none of them. `backfill` holds the snapshot of each group that
+ * the client loaded just now: the last change of each live record of the
+ * group, with the sync ID of that change.
  */
 const GroupsMessage = Schema.TaggedStruct('Groups', {
   loaded: Schema.Array(Schema.String),
@@ -55,7 +56,7 @@ const GroupsMessage = Schema.TaggedStruct('Groups', {
 });
 
 /**
- * One page of the backfill of a group that loads. More pages can follow. The
+ * One page of the snapshot of a group that loads. More pages can follow. The
  * `Groups` message that names the group comes last, with the last page as
  * its backfill. Only a client that asked for pages in `Load` gets this
  * message, so an older build never reads it.
@@ -112,7 +113,7 @@ export class SyncRpcs extends RpcGroup.make(
       // The digest of the client's contracts. An optional key, so the server
       // still reads the call of a build that does not send it.
       contract: Schema.optionalKey(Schema.String),
-      // The client reads a backfill at the start of the stream in `Page`
+      // The client reads a snapshot at the start of the stream in `Page`
       // messages. An optional key, as in `Load`.
       pages: Schema.optionalKey(Schema.Boolean),
     },
@@ -123,8 +124,8 @@ export class SyncRpcs extends RpcGroup.make(
   Rpc.make('Load', {
     payload: {
       group: Schema.String,
-      // The client reads a backfill in `Page` messages. An optional key, so
-      // a build that does not send it gets the whole backfill in one message.
+      // The client reads a snapshot in `Page` messages. An optional key, so
+      // a build that does not send it gets the whole snapshot in one message.
       pages: Schema.optionalKey(Schema.Boolean),
     },
     error: GroupNotAllowed,

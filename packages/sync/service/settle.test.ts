@@ -22,7 +22,7 @@ function logThat(options: { readonly failures: number; readonly answers: boolean
       }),
     head: () => (options.answers ? Effect.succeed(6) : Effect.fail('connection lost')),
     backlog: () => Stream.empty,
-    backfill: () => Stream.empty,
+    snapshot: () => Stream.empty,
     subscribe: () => Effect.die('No test subscribes.'),
   });
   return { layer, commits: () => commits };

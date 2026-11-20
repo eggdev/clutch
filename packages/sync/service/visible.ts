@@ -23,19 +23,14 @@ function touches(change: Change, groups: ReadonlySet<string>) {
 }
 
 /**
- * The part of a delta that a connection sees, or nothing. The backlog, the
- * backfill and the live stream all use it, so a move looks the same on each.
- * `only` keeps the changes that touch those groups, as a backfill of one
- * group does. Each change is still judged by every loaded group: a client
- * that holds a record through another group gets the move as an upsert.
+ * The part of a delta that a connection sees, or nothing. The backlog and the
+ * live stream both use it, so a move looks the same on each. A snapshot sends
+ * each record as it is now, in the group that it is in, so it needs no rule
+ * for a move.
  */
-export function seenDelta(
-  delta: Delta,
-  loaded: ReadonlySet<string>,
-  only: ReadonlySet<string> = loaded,
-): Delta | undefined {
+export function seenDelta(delta: Delta, loaded: ReadonlySet<string>): Delta | undefined {
   const changes = delta.changes.flatMap((change) => {
-    const seen = touches(change, only) ? seenChange(change, loaded) : undefined;
+    const seen = touches(change, loaded) ? seenChange(change, loaded) : undefined;
     return seen ? [seen] : [];
   });
   return changes.length ? { ...delta, changes } : undefined;
