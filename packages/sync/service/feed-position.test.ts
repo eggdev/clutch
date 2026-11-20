@@ -169,3 +169,62 @@ test('a client past sync ID 0 that reads pages learns the actor before the first
     expect.objectContaining({ _tag: 'Page', group: 'space:y' }),
   ]);
 });
+
+/**
+ * The messages of a client of `org:a` at sync ID 1, after the events that
+ * `commits` writes, each one in the groups that it names. A `Load` of a group
+ * that the client holds already goes in at the start. The feed reads it only
+ * once it sent the backlog, and answers with a `Groups` message, so the
+ * messages up to that answer are each one of the catch-up.
+ */
+const catchUp = (commits: ReadonlyArray<ReadonlyArray<string>>) =>
+  run(
+    Effect.gen(function* () {
+      const log = yield* EventLog;
+      for (const [index, groups] of commits.entries()) {
+        yield* log.commit('org-a', `t-${index}`, () =>
+          Effect.succeed([change(`r${index}`, groups)]),
+        );
+      }
+      const requests = yield* Queue.unbounded<LoadRequest>();
+      yield* Queue.offer(requests, { group: 'org:a', pages: true });
+      const seen = yield* Queue.unbounded<SyncMessage>();
+      const reading = yield* Effect.forkChild(
+        Stream.runDrain(
+          yield* open(
+            log,
+            {
+              lastSyncId: 1,
+              requests,
+              granted: Effect.succeed({ eager: ['org:a'], lazy: [] }),
+            },
+            seen,
+          ),
+        ),
+      );
+      const first = yield* Queue.take(seen);
+      const rest = yield* until(seen, (message) => message._tag === 'Groups');
+      yield* Fiber.interrupt(reading);
+      return [first, ...rest].map((message) =>
+        message._tag === 'Deltas'
+          ? message.deltas.map((delta) => `${delta.syncId}:${delta.changes.length}`).join(',')
+          : message._tag,
+      );
+    }),
+  );
+
+test('a pull past sync ID 0 moves the client to the head once its backlog is sent', async () => {
+  // Events 2 and 3 are in a group that the client did not load.
+  const messages = await catchUp([['org:a'], ['space:y'], ['space:y']]);
+  expect(messages).toEqual(['Groups', '3:0', 'Groups']);
+});
+
+test('a pull whose backlog ends at the head sends no empty delta', async () => {
+  const messages = await catchUp([['org:a'], ['space:y'], ['org:a']]);
+  expect(messages).toEqual(['Groups', '3:1', 'Groups']);
+});
+
+test('a pull at the head sends nothing more', async () => {
+  const messages = await catchUp([['org:a']]);
+  expect(messages).toEqual(['Groups', 'Groups']);
+});

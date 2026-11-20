@@ -9,6 +9,7 @@ import type {
   RecordMeta,
   SavedRecord,
   SyncPosition,
+  WaitingRow,
 } from '@repo/sync/types/local-database';
 import type { SyncActor, Transaction } from '@repo/sync/types/protocol';
 
@@ -31,11 +32,21 @@ export type PoolDeclarations = {
   readonly commands: ReadonlyArray<CommandDeclaration>;
 };
 
-/** What the pool takes with a default: the stamps of the platform, and the report. */
+/** What the pool takes with a default: the stamps of the platform, the report, and the count of each change. */
 export type PoolOptions = {
   readonly stamps?: Stamps;
   readonly report?: Report;
+  /**
+   * Hears how many records each change put in step with the screens. A test
+   * of the cost of a change reads it. The app leaves it out.
+   */
+  readonly compared?: (records: number) => void;
 };
+
+/** The default count of a change: nobody reads it. */
+export function countNothing(): void {
+  // The app does not count the records of a change.
+}
 
 /** The stamps of a real device: a random ID, and the clock of the device. */
 export const deviceStamps: Stamps = {
@@ -195,13 +206,87 @@ function isPosition(value: unknown): value is SyncPosition {
   );
 }
 
-function isTransaction(value: unknown): value is Transaction {
-  return isObject(value) && typeof value['id'] === 'string' && typeof value['command'] === 'string';
+function isTransaction(value: unknown): value is WaitingRow {
+  return (
+    isObject(value) &&
+    typeof value['id'] === 'string' &&
+    typeof value['command'] === 'string' &&
+    (value['actor'] === undefined || isActor(value['actor']))
+  );
 }
 
 /**
+ * The position that `makeRoom` leaves: sync ID 0 and no `leftOutBy`, with
+ * the loaded groups and the actor of `saved`. No position, or one of
+ * another shape, leaves none.
+ */
+export function emptiedPosition(saved: unknown): SyncPosition | undefined {
+  if (!isPosition(saved)) {
+    return undefined;
+  }
+  const { groups, actor } = saved;
+  return { lastSyncId: 0, groups, ...(actor === undefined ? {} : { actor }) };
+}
+
+/** The saved count of the times that room was made on the device. A database from before it has 0. */
+export const roomCount = (saved: unknown): number => (typeof saved === 'number' ? saved : 0);
+
+/**
+ * What a handle writes of `save`: only its waiting rows once room was made
+ * after the handle opened, so the count `now` is not the count `opened`. A
+ * record or a position above 0 never lands over the emptied records.
+ */
+export function roomSave(save: LocalSave, opened: number, now: number): LocalSave {
+  if (opened === now || !save.confirmed) {
+    return save;
+  }
+  return { add: save.add, done: save.done, ...(save.afterLoad ? { afterLoad: true } : {}) };
+}
+
+/**
+ * Whether a saved waiting row is left behind by the save that removes the
+ * mark of a session end: it names no actor, and the save does not add it. A
+ * tab that saves the actor of the next session gave its own rows that actor.
+ */
+export function leftBehind(row: unknown, save: LocalSave): boolean {
+  return (
+    isObject(row) && row['actor'] === undefined && !save.add.some(({ id }) => id === row['id'])
+  );
+}
+
+/**
+ * The state of the mark of a session end. A clear leaves it `fresh`, and a
+ * read gives it as `ended`. The first save of the next start leaves it
+ * `spent`: it stays, and a read no longer gives it.
+ */
+export type MarkState = 'fresh' | 'spent';
+
+/**
+ * What one save does to the mark of a session end: the state after the save,
+ * and whether the save removes each waiting row that `leftBehind` names. The
+ * first save whose position names an actor removes the mark and those rows. A
+ * save after a `Groups` message that named no actor removes only the mark,
+ * because the rows of the next session never get an actor from that server.
+ */
+export function markAfter(
+  mark: MarkState | undefined,
+  save: LocalSave,
+): { readonly mark: MarkState | undefined; readonly sweep: boolean } {
+  const named = save.confirmed?.position.actor !== undefined;
+  if (mark && (named || save.confirmed?.heardServer)) {
+    return { mark: undefined, sweep: named };
+  }
+  return { mark: mark && save.afterLoad ? 'spent' : mark, sweep: false };
+}
+
+/** The one sentence that the pool reports when it drops the waiting rows of another actor. */
+export const otherActorRows =
+  'This device held unsent changes of another account, so the app removed them and did not send them.';
+
+/**
  * Joins the rows of one read into the state that the pool loads. A device
- * with no row reads as `undefined`. A record row or a position row with
+ * with no row, or with only the mark of a session end, reads as `undefined`.
+ * `ended` says that the mark is there. A record row or a position row with
  * another shape makes the confirmed part unreadable, so the read keeps no
  * record and no position, and the pool reports it and loads again from the
  * server. A waiting transaction with another shape is left out.
@@ -210,13 +295,15 @@ export function stateOf(
   records: ReadonlyArray<unknown>,
   position: unknown,
   transactions: ReadonlyArray<unknown>,
+  ended = false,
 ): PoolState | undefined {
   if (records.length === 0 && position === undefined && transactions.length === 0) {
     return undefined;
   }
   const pending = transactions.filter(isTransaction);
+  const mark: { readonly ended?: true } = ended ? { ended: true } : {};
   if (!records.every(isSavedRecord) || (position !== undefined && !isPosition(position))) {
-    return { lastSyncId: 0, tables: {}, groups: [], meta: {}, pending, unreadable: true };
+    return { lastSyncId: 0, tables: {}, groups: [], meta: {}, pending, unreadable: true, ...mark };
   }
   const tables: Record<string, Array<RecordRow>> = {};
   const meta: Record<string, RecordMeta> = {};
@@ -237,6 +324,7 @@ export function stateOf(
     pending,
     ...(saved.leftOutBy === undefined ? {} : { leftOutBy: saved.leftOutBy }),
     ...(saved.actor === undefined ? {} : { actor: saved.actor }),
+    ...mark,
   };
 }
 

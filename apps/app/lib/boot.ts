@@ -1,5 +1,10 @@
 import { clientOf } from '@repo/sync/contract/define';
-import { connectAfterPaint, endSession, loadPool } from '@repo/sync/runtime/boot';
+import {
+  connectAfterPaint,
+  endSession,
+  followLostDatabase,
+  loadPool,
+} from '@repo/sync/runtime/boot';
 import { openLocalDatabase } from '@repo/sync/runtime/local-database';
 import type { Pool } from '@repo/sync/runtime/pool';
 import { useSyncExternalStore } from 'react';
@@ -41,15 +46,29 @@ const store = bootStore<Pool>(async (report) => {
   registerServiceWorker();
   let ended = false;
   let disconnect = engineNotStarted;
+  // A session end in another tab stops this one too, and it starts again. So
+  // does a tab of a newer build that takes the local database for its new
+  // layout: the page loads again, with the newer build.
+  const unfollow = followLostDatabase(
+    database,
+    pool,
+    () => {
+      ended = true;
+      disconnect();
+    },
+    () => {
+      afterSessionEnded(store.restart);
+    },
+  );
   const end = async () => {
     // A second end of the same start, such as a sign-out and a 4401 close, does nothing.
     if (ended) {
       return;
     }
     ended = true;
+    unfollow();
     await endSession(database, pool, disconnect);
-    store.restart();
-    afterSessionEnded();
+    afterSessionEnded(store.restart);
   };
   disconnect = connectAfterPaint(pool, {
     url: syncUrl(),

@@ -58,6 +58,17 @@ The protocol has three calls over one WebSocket for each organization, through
   that have no page to come. The `Page` messages follow, and a last `Groups`
   message loads the group. So the client drops a copy of another actor
   before the first page.
+  After the backlog, the `Pull` sends one delta with no changes at the head
+  of the log. It skips it when the last delta of the backlog was there
+  already. Each event between is in no loaded group. The server may have
+  accepted a transaction while no `Pull` of the client was open, such as
+  when the socket dropped right after a `Push`. That transaction stops
+  waiting at the next `Pull`, also in a quiet organization. A `Pull` at the
+  head sends nothing more. The delta goes only after the server checked
+  that a trim did not drop an event of the backlog. So a client behind the
+  trimmed log still gets `ServerBehind`. `packages/sync/service/feed-position.test.ts`,
+  `packages/sync/service/feed-trim.test.ts` and
+  `apps/api/src/sender-position.test.ts` hold this.
 - A client at sync ID 0 holds at most part of a first load. Its `Pull` sends the snapshot of each
   loaded group in place of the deltas. With `pages`, a `Groups` message with
   the actor and no group comes before the first page. A group loads only with
@@ -101,7 +112,10 @@ the same, so loading the local database needs no decode.
    each stamp, then runs the local change at once.
 2. The transaction goes to the transaction queue. The pool saves the row of
    the transaction to the local database. See
-   [the local database](./client.md#local-database).
+   [the local database](./client.md#local-database). A device that cannot
+   save gives up its copy of the confirmed records first, and keeps the
+   waiting transactions. See
+   [a device that cannot save](./client.md#a-device-that-cannot-save).
 3. The transport sends the unsent transactions with `Push`. A failed push or
    pull tries again after 200 ms, then twice as long each time, up to 3
    seconds. Each wait moves by a random part of up to a fifth. So the clients
@@ -109,7 +123,9 @@ the same, so loading the local database needs no decode.
    its first `Groups` message, the wait starts again from 200 ms.
 4. The server checks the input against its fields, then the access rule. Then
    it runs the server change. In one database transaction, it writes the owner
-   records and appends one event to the log.
+   records and appends one event to the log. A deadlock or another failure of
+   the database that passes runs the change again, up to 5 times. See
+   [the event log](./server.md#the-event-log).
 5. Appending an event locks the organization's row in `sync_counters`, so sync
    IDs only increase and have no gaps.
 6. The same transaction wakes each other process of the server, so the wake
@@ -123,9 +139,14 @@ the same, so loading the local database needs no decode.
    the event holds nothing that the sender sees, the sender's `Pull` gets a
    delta with no changes at its sync ID. That delta goes out after each event
    before it. So the sender's last sync ID passes its transaction, and the
-   transaction stops waiting. `apps/api/src/sender-position.test.ts` holds this.
+   transaction stops waiting. The socket can drop before that delta. Then
+   the next `Pull` ends its backlog with a delta at the head of the log, and
+   that delta passes the transaction too. `apps/api/src/sender-position.test.ts` holds this.
 7. The client applies the delta to its confirmed records, then applies each
-   pending local change again on top. This is the rebase.
+   pending local change again on top. This is the rebase. The pending changes
+   write over the confirmed records and never into them. Then the pool
+   compares only the records of the delta and the records that the pending
+   changes wrote. So the cost follows what changed, not what the pool holds.
 8. A rejected transaction leaves the queue, and the object pool drops its
    local change. `usePendingCommand` gives the refused code and the reason of
    a run. `useLastRejection` gives the last rejection of the pool.
@@ -205,13 +226,36 @@ client did not get.
 ## The end of a session
 
 One person never sees or sends the saved work of another person on the same
-device. Four rules hold this.
+device. Eight rules hold this.
 
 - The saved copy holds its actor. The position row of the local database
   holds the user and the organization that the copy belongs to. A copy from
   before this rule has none, and takes the actor of the first `Groups`
   message that names one. The local database keeps the name `app`: a browser
   cannot know its user before the server answers.
+- Each saved waiting transaction holds the actor that ran it, once the pool
+  knows its actor. A row of another actor than the saved position, or than
+  the actor that the server confirms, is dropped and never sent. The pool
+  reports one sentence, and the next save deletes the row. A pool that loads
+  a saved actor gives it to each new row at once, also offline. A row with
+  no actor is from before this rule, or the pool made it before it knew its
+  actor. It takes the actor that the server confirms next, as the copy does,
+  and the next save writes the row again with that actor.
+  `packages/sync/runtime/pool-waiting-actor.test.ts` holds this.
+- A session end leaves a mark in the local database. The clear writes it in
+  the same database transaction. The mark does its work once. At the first
+  start after the session end, the pool drops each waiting row with no
+  actor that it loads, and never sends it. Such a row may be the work of
+  the person who left. The first save of that start spends the mark. So a
+  later start keeps the rows with no actor, such as the work of the next
+  person while offline. The first `Groups` message of the next session removes the
+  mark, also from a server of an older build, which names no actor. When
+  the save of that message names an actor, it also deletes each waiting row
+  with no actor that it does not write itself. A copy with no mark and no
+  actor is an older copy, and its rows with no actor stay.
+  `packages/sync/runtime/boot-session.test.ts` holds the order of the race.
+  One tab ends the session, another tab that heard nothing saves a row, and
+  the next person signs in.
 - The engine sends no `Push` on a connection before the first `Groups`
   message of its pull confirmed the actor. When that message names another
   actor, the pool drops the confirmed records, the loaded groups, the
@@ -241,6 +285,18 @@ device. Four rules hold this.
   database. It needs no server. After it, no change of the old pool reaches
   the database, also on native, where no page loads again.
   `packages/sync/runtime/boot-session.test.ts` holds this.
+- A session end reaches each other tab of the device. Before the clear
+  starts, the web adapter posts a message on a `BroadcastChannel` with the
+  name of the database. A tab that hears it stops its engine and the saves of
+  its pool at once, so it writes nothing back. Then it starts again with an
+  empty pool. `followLostDatabase` in `packages/sync/runtime/boot.ts` does
+  this. The message can reach the tab after a save of that tab started. The generation of the local database stops that save. Each clear writes a new one. A save of a handle that read an older one writes nothing. Then
+  the tab stops and starts again, as when it hears the message.
+  `packages/sync/runtime/boot-session.test.ts` holds both orders: the tab
+  that writes the confirmed records, and a tab that writes only its waiting
+  rows. Native has one process, so it has no other tab. A tab of an older
+  build does not hear the message. The actor of each waiting row then keeps
+  its work from going out as the next person.
 
 `endSessionOnDevice` in `apps/app/lib/boot.ts` calls `endSession`, then starts
 the app again with an empty pool. The app calls it on a 4401 close and on a
@@ -330,12 +386,16 @@ open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
   pages have come, until it loads, the server refuses it, or the pull ends.
 - A record of a group that did not finish loading does not outlive that
   load. When a pull ends, such as when the socket drops between two pages,
-  each group whose pages came stops loading. The pool drops each confirmed
-  record that is in no loaded group. The next `Pull` does not name the
-  group, and the gate asks for the whole group again. So a record that the
-  server deleted, or that moved to a group the person cannot see, between
-  the two loads does not stay. A record that is also in a loaded group stays,
-  and live deltas keep it right.
+  each group whose pages came stops loading. The engine calls `endPull` of
+  the pool at the end of each pull, however it ended. The socket dropped,
+  the server was behind, the actor changed, the session ended, or a defect
+  ended it.
+  `packages/sync/runtime/transport-pull-end.test.ts` holds that rule. The
+  pool drops each confirmed record that is in no loaded group. The next
+  `Pull` does not name the group, and the gate asks for the whole group
+  again. So a record that the server deleted, or that moved to a group the
+  person cannot see, between the two loads does not stay. A record that is
+  also in a loaded group stays, and live deltas keep it right.
 - A save never writes a confirmed record that is in no loaded group. It
   removes the row of such a record, and writes the record once its group
   loads. So a tab that closes in the middle of a load saves none of its records.

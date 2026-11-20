@@ -111,15 +111,12 @@ test('an older copy with a record of a group that never loaded loses it at the f
 
 test('at sync ID 0, the Groups message that ends the snapshot drops each record that it did not send', () => {
   const pool = createPool([], declared);
-  const leave = pool.onLoadRequest(() => {
-    // The engine listens for the length of one pull.
-  });
   pool.applyGroups(
     ['space:x'],
     [delta(1, put('r1', ['space:x'])), delta(2, put('r2', ['space:x']))],
   );
   // The pull ends before the delta at the head. The next pull from 0 sends the snapshot again.
-  leave();
+  pool.endPull();
   pool.applyPage('space:x', [delta(2, put('r2', ['space:x']))]);
   pool.applyGroups(['space:x'], []);
   expect(pool.ids(card)).toEqual(['r2']);

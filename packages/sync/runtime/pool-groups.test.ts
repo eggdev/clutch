@@ -45,7 +45,7 @@ test('the purge reaches the local database through the next save, which removes 
   const database = memoryLocalDatabase(pool.snapshot());
   // The database holds the state now, so the changes before this point are saved.
   pool.confirmedChanges(false);
-  const saves: Array<Promise<void>> = [];
+  const saves: Array<Promise<unknown>> = [];
   pool.onChange(() => {
     saves.push(database.save({ confirmed: pool.confirmedChanges(false), add: [], done: [] }));
   });
