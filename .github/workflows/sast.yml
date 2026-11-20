@@ -122,8 +122,49 @@ jobs:
         with:
           languages: javascript-typescript, actions, python
           build-mode: none
+      # Local CI runs this job with act, on the owner's machine. GitHub has no
+      # workflow run for it, so the upload has nothing to attach to and fails.
+      # There the scan keeps its results in the job, and the next step reads
+      # them. On GitHub the results go to the Security tab, as before.
       - if: steps.pick.outputs.engine == 'codeql' && steps.scope.outputs.scan == 'true'
+        id: analyze
         uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          upload: ${{ env.ACT && 'never' || 'always' }}
+      # Under local CI no code scanning judges the results, so this step does.
+      # A finding is known when GitHub lists an alert of the same rule in the
+      # same file that is not fixed: an open one, or one that a person
+      # dismissed. Any other finding is new: it prints, and it fails the job.
+      - name: Fail on a new CodeQL finding, under local CI
+        if: env.ACT && steps.pick.outputs.engine == 'codeql' && steps.scope.outputs.scan == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SARIF_DIR: ${{ steps.analyze.outputs.sarif-output }}
+        run: |
+          set -euo pipefail
+          ls "$SARIF_DIR"/*.sarif > /dev/null
+          gh api --paginate "repos/$GITHUB_REPOSITORY/code-scanning/alerts?per_page=100" \
+            --jq '.[] | select(.state != "fixed") | "\(.rule.id)\t\(.most_recent_instance.location.path)"' \
+            | sort -u > "$RUNNER_TEMP/known.tsv"
+          jq -r '.runs[].results[]
+            | select(((.suppressions // []) | length) == 0)
+            | [.ruleId, .locations[0].physicalLocation.artifactLocation.uri,
+               (.locations[0].physicalLocation.region.startLine | tostring),
+               (.message.text | split("\n")[0])]
+            | @tsv' "$SARIF_DIR"/*.sarif | sort -u > "$RUNNER_TEMP/found.tsv"
+          new=0
+          while IFS="$(printf '\t')" read -r rule file line message; do
+            [ -n "$rule" ] || continue
+            if grep -qxF "$(printf '%s\t%s' "$rule" "$file")" "$RUNNER_TEMP/known.tsv"; then
+              continue
+            fi
+            new=$((new + 1))
+            echo "::error file=$file,line=$line,title=$rule::$message"
+          done < "$RUNNER_TEMP/found.tsv"
+          echo "CodeQL found $(grep -c . "$RUNNER_TEMP/found.tsv" || true) result(s), and $new of them are new."
+          if [ "$new" -gt 0 ]; then
+            exit 1
+          fi
       # A finding fails the job and prints in the log. A false positive gets
       # `nosemgrep: rule-id -- reason` on its line or the line above, and
       # check-suppressions rejects one without a reason. Each rule turned off

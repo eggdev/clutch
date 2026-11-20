@@ -23,6 +23,10 @@ Under `auto`:
 
 The `sast` job asks GitHub for the code scanning alerts list. A 403 means the repository has no Code Security, so Semgrep runs. A notice on the run names the engine.
 
+### Under local CI
+
+[Local CI](https://github.com/eggdev/clutch/blob/main/apps/local-ci/README.md) runs the same `sast` job on the owner's machine, with act. GitHub has no workflow run for such a job, so CodeQL cannot upload its results. There the scan uploads nothing, and one more step of the job reads the results. It asks GitHub for the code scanning alerts that are not fixed. A finding of the same rule in the same file as one of those alerts is known. Any other finding is new: the step prints it, and the `sast` check fails. On GitHub that step does not run, and the results go to the Security tab.
+
 ### Private repositories
 
 Code scanning on a private repository needs GitHub Code Security, sold to organizations for each active committer. CodeQL's license allows free use only on open-source code, so a private repository without Code Security never runs CodeQL. It runs Semgrep instead.
