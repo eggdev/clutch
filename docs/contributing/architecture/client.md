@@ -184,8 +184,11 @@ records are a cache of the server. `loadPool` in
   Between the delete and the write, a copy of them waits in `localStorage`
   under the key `local-database:<name>:rescue`. The next open writes the copy
   back when the write did not happen. The SQLite file holds other names too,
-  so the SQLite adapter deletes the records in small steps instead. It never
-  touches the waiting rows.
+  so the SQLite adapter deletes the records in small steps instead. It first
+  commits the emptied position and the count of the room made, so a delete
+  that stops part way leaves sync ID 0 with some records. The next start
+  loads again from 0, and the first `Groups` message of that pull drops each
+  record that the pull did not send. It never touches the waiting rows.
 - After it makes room, the pool saves only its waiting transactions for the
   rest of the session, so it cannot fill the device again. The records in
   memory stay, and the screen keeps working. The pool reports one sentence

@@ -1,6 +1,9 @@
 import { Database } from 'bun:sqlite';
 import { expect, test } from 'bun:test';
 
+import { localChange } from '@repo/sync/contract/command';
+import { defineContract } from '@repo/sync/contract/define';
+import { loadPool } from '@repo/sync/runtime/boot';
 import { createPool } from '@repo/sync/runtime/pool';
 import { fullSave } from '@repo/sync/runtime/pool-doors';
 import { openSqlite } from '@repo/sync/runtime/sqlite';
@@ -9,7 +12,13 @@ import {
   localDatabaseCases,
   oldLayoutCopy,
 } from '@repo/sync/testing/local-database-conformance';
-import { poolState } from '@repo/sync/testing/pool-state';
+import {
+  poolState,
+  testCommand,
+  testGroup,
+  testModel,
+  testStamps,
+} from '@repo/sync/testing/pool-state';
 import type { SqlValue, SqliteDriver } from '@repo/sync/types/sqlite-driver';
 
 /** The SQLite of Bun as the driver, so the adapter runs on a real SQLite engine. */
@@ -153,5 +162,73 @@ test('making room deletes the records in small steps when one large delete fails
     pending: oldLayoutCopy.pending,
     actor: { userId: 'ana', organizationId: 'acme' },
   });
+  database.close();
+});
+
+test('a delete of the records that stops part way leaves sync ID 0, and the next start loads exactly the server records', async () => {
+  const database = new Database(':memory:');
+  const driver = bunDriver(database);
+  let full = false;
+  let batches = 0;
+  const failing: SqliteDriver = {
+    ...driver,
+    run: (sql, params) => {
+      // The large delete fails, and so does the second small one.
+      const batch = sql.startsWith('delete from pool_records where rowid in');
+      batches += full && batch ? 1 : 0;
+      if (full && (sql === 'delete from pool_records where name = ?' || batches === 2)) {
+        return Promise.reject(new Error('database or disk is full'));
+      }
+      return driver.run(sql, params);
+    },
+  };
+  const card = testModel('Card', { id: 'string', title: 'string' });
+  const rename = testCommand('cards/rename', { id: 'string', title: 'string' }, 'local');
+  const renameLocal = localChange(rename, (draft, input) => {
+    draft.put(card, input);
+  });
+  const cards = defineContract('cards', { records: [card], commands: [rename], loads: [] });
+  const ana = { userId: 'ana', organizationId: 'acme' };
+  const saved = Array.from({ length: 1200 }, (_, index) => ({ id: `c${index}`, title: 'Saved' }));
+  const local = await openSqlite(failing, 'app');
+  await local.save(
+    fullSave({ ...poolState({ lastSyncId: 77, tables: { Card: saved } }), actor: ana }),
+  );
+  full = true;
+  await expect(local.makeRoom()).rejects.toThrow('database or disk is full');
+  full = false;
+  const half = await local.read();
+  expect(half?.lastSyncId).toBe(0);
+  expect(half?.tables.Card).toHaveLength(700);
+
+  // The next start pulls from 0. The server holds 1000 of the cards now, with new titles.
+  const next = await loadPool(
+    await openSqlite(driver, 'app'),
+    [renameLocal],
+    [cards],
+    testStamps(),
+  );
+  expect(next.lastSyncId()).toBe(0);
+  expect(next.confirmActor(ana)).toBe(true);
+  const server = saved.slice(0, 1000).map(({ id }) => ({
+    model: 'Card',
+    id,
+    action: 'upsert' as const,
+    data: { title: `Server ${id}` },
+    groups: [testGroup],
+  }));
+  next.applyGroups([testGroup], [{ syncId: 90, transactionId: null, changes: server }]);
+  next.applyDeltas([{ syncId: 90, transactionId: null, changes: [] }]);
+  expect(next.ids(card).toSorted()).toEqual(server.map(({ id }) => id).toSorted());
+  expect(next.get(card, 'c999')?.title).toBe('Server c999');
+  await new Promise((resolve) => {
+    setTimeout(resolve, 10);
+  });
+  await next.stop();
+  const after = await local.read();
+  expect(after?.lastSyncId).toBe(90);
+  expect(after?.tables.Card?.map(({ id }) => id).toSorted()).toEqual(
+    server.map(({ id }) => id).toSorted(),
+  );
   database.close();
 });

@@ -247,11 +247,11 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
         if ((await generationOf()) !== generation) {
           return 'cleared';
         }
+        // The emptied position and the count commit first, so a delete that
+        // stops part way leaves sync ID 0, and the next start loads from 0.
+        await atomically(writeEmptiedPosition);
         try {
-          await atomically(async () => {
-            await driver.run('delete from pool_records where name = ?', [name]);
-            await writeEmptiedPosition();
-          });
+          await driver.run('delete from pool_records where name = ?', [name]);
         } catch {
           // A full device may not hold the journal of one large delete, and a
           // small delete needs less of it. The waiting rows are never touched.
@@ -267,7 +267,6 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
               break;
             }
           }
-          await atomically(writeEmptiedPosition);
         }
         return 'saved';
       });

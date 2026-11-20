@@ -166,9 +166,12 @@ export type LocalDatabase = {
    * end. Each handle reads the count when it opens, and a save after the
    * count changed writes only its waiting rows, so no record and no position
    * lands over the emptied records before the next start. A clear sets the
-   * count back. When that cannot be written
-   * either, the web adapter deletes the database, creates it again, and
-   * writes the waiting transactions into it. It keeps a copy of them in
+   * count back. When that cannot be written either, the SQLite adapter
+   * first commits the emptied position and the count, then deletes the
+   * records in small steps. A delete that stops part way then leaves sync ID
+   * 0 with some records, and the next start loads again from 0. When the
+   * drop cannot be written, the web adapter deletes the database, creates it
+   * again, and writes the waiting transactions into it. It keeps a copy of them in
    * `localStorage` for the time between, and writes that copy back at the
    * next open when the write did not happen. It gives `cleared` and writes
    * nothing when another handle cleared the database, as `save` does.
