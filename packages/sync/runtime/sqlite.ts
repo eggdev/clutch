@@ -1,4 +1,4 @@
-import { oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import { leftBehind, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase, LocalSave } from '@repo/sync/types/local-database';
 import type { SqliteDriver } from '@repo/sync/types/sqlite-driver';
 
@@ -34,6 +34,7 @@ const schema = [
   'create table if not exists pool_records (name text not null, model text not null, id text not null, value text not null, primary key (name, model, id))',
   'create table if not exists pool_transactions (seq integer primary key autoincrement, name text not null, id text not null, value text not null, unique (name, id))',
   'create table if not exists pool_position (name text primary key, value text not null)',
+  'create table if not exists pool_ended (name text primary key)',
 ];
 
 export async function openSqlite(driver: SqliteDriver, name: string): Promise<LocalDatabase> {
@@ -93,11 +94,24 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
       await driver.run('delete from pool_transactions where name = ? and id = ?', [name, id]);
     }
     for (const transaction of save.add) {
-      // A transaction that is saved already keeps its place in the order.
+      // A transaction that is saved already keeps its place in the order, and takes the new row.
       await driver.run(
-        'insert into pool_transactions (name, id, value) values (?, ?, ?) on conflict (name, id) do nothing',
+        'insert into pool_transactions (name, id, value) values (?, ?, ?) on conflict (name, id) do update set value = excluded.value',
         [name, transaction.id, JSON.stringify(transaction)],
       );
+    }
+    const [mark] = await driver.all('select name from pool_ended where name = ?', [name]);
+    if (mark && confirmed?.position.actor) {
+      await driver.run('delete from pool_ended where name = ?', [name]);
+      const rows = await driver.all('select seq, value from pool_transactions where name = ?', [
+        name,
+      ]);
+      for (const row of rows) {
+        const { seq } = row;
+        if (typeof seq === 'number' && leftBehind(parsed(row['value']), save)) {
+          await driver.run('delete from pool_transactions where seq = ?', [seq]);
+        }
+      }
     }
   }
 
@@ -131,10 +145,12 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
           'select value from pool_transactions where name = ? order by seq',
           [name],
         );
+        const [mark] = await driver.all('select name from pool_ended where name = ?', [name]);
         return stateOf(
           records.map((row) => parsed(row['value'])),
           position ? parsed(position['value']) : undefined,
           waiting.map((row) => parsed(row['value'])),
+          mark !== undefined,
         );
       }),
     save: (save) => serial(() => atomically(() => write(save))),
@@ -144,6 +160,10 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
           for (const table of ['pool_records', 'pool_transactions', 'pool_position']) {
             await driver.run(`delete from ${table} where name = ?`, [name]);
           }
+          await driver.run(
+            'insert into pool_ended (name) values (?) on conflict (name) do nothing',
+            [name],
+          );
         }),
       ),
     onClearedElsewhere: () => noOtherTab,

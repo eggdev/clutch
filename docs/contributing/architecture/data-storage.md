@@ -63,7 +63,10 @@ An event written before the column existed has no groups, so no client gets
 it. A saved pool state without `groups` and `meta` loads as an empty pool.
 A saved position without `actor` keeps its copy, and takes the actor that the
 server names first. A waiting transaction row holds `actor` too, with the
-same shape. A row without it takes the actor that the server confirms next. The `records` store holds no record that is in no loaded
+same shape. A row without it takes the actor that the server confirms next.
+A session end leaves a mark: the key `ended` of the IndexedDB store
+`position`, or a row of the SQLite table `pool_ended`. While it is there, a
+row without `actor` is dropped. The `records` store holds no record that is in no loaded
 group of the position. A copy at sync ID 0 holds only part of a first load.
 The next pull from 0 drops each record that it does not send again.
 

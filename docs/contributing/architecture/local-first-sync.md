@@ -196,7 +196,7 @@ client did not get.
 ## The end of a session
 
 One person never sees or sends the saved work of another person on the same
-device. Seven rules hold this.
+device. Eight rules hold this.
 
 - The saved copy holds its actor. The position row of the local database
   holds the user and the organization that the copy belongs to. A copy from
@@ -206,10 +206,22 @@ device. Seven rules hold this.
 - Each saved waiting transaction holds the actor that ran it, once the pool
   knows its actor. A row of another actor than the saved position, or than
   the actor that the server confirms, is dropped and never sent. The pool
-  reports one sentence, and the next save deletes the row. A row with no
-  actor is from before this rule, or the pool made it before it knew its
-  actor. It takes the actor that the server confirms next, as the copy does.
+  reports one sentence, and the next save deletes the row. A pool that loads
+  a saved actor gives it to each new row at once, also offline. A row with
+  no actor is from before this rule, or the pool made it before it knew its
+  actor. It takes the actor that the server confirms next, as the copy does,
+  and the next save writes the row again with that actor.
   `packages/sync/runtime/pool-waiting-actor.test.ts` holds this.
+- A session end leaves a mark in the local database. The clear writes it in
+  the same database transaction. While the mark is there, the pool drops
+  each waiting row with no actor when it loads, and never sends it. Such a
+  row may be the work of the person who left. The first save whose position
+  names an actor removes the mark. That save also deletes each waiting row
+  with no actor that it does not write itself. A copy with no mark and no
+  actor is an older copy, and its rows with no actor stay.
+  `packages/sync/runtime/boot-session.test.ts` holds the order of the race.
+  One tab ends the session, another tab that heard nothing saves a row, and
+  the next person signs in.
 - The engine sends no `Push` on a connection before the first `Groups`
   message of its pull confirmed the actor. When that message names another
   actor, the pool drops the confirmed records, the loaded groups, the

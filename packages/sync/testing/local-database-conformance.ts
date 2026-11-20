@@ -240,6 +240,55 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
     },
   },
   {
+    name: 'a clear leaves a mark, and a waiting row saved after it reads with the mark',
+    async run(open) {
+      const db = await open();
+      await db.save(fullSave(sampleState()));
+      await db.clear();
+      expectSame(await db.read(), undefined, 'The read of the mark alone');
+      await db.save({ add: [rename('t9')], done: [] });
+      const read = await readState(db, 'The read of a row saved after the clear');
+      expectSame(read.ended, true, 'The mark of the session end');
+      expectSame(read.pending, [rename('t9')], 'The waiting rows after the clear');
+    },
+  },
+  {
+    name: 'the first save of a position with an actor removes the mark and each waiting row with no actor',
+    async run(open) {
+      const db = await open();
+      const actor = { userId: 'ben', organizationId: 'acme' };
+      await db.clear();
+      await db.save({ add: [rename('t1'), { ...rename('t2'), actor }], done: [] });
+      const { position } = fullSave(sampleState()).confirmed ?? {};
+      if (!position) {
+        throw new Error('A full save has a position.');
+      }
+      await db.save({
+        confirmed: { replace: true, put: [], remove: [], position: { ...position, actor } },
+        add: [{ ...rename('t3'), actor }],
+        done: [],
+      });
+      const read = await readState(db, 'The read after the save of the actor');
+      expectSame(read.ended, undefined, 'The mark after the save of the actor');
+      expectSame(
+        read.pending.map(({ id }) => id),
+        ['t2', 't3'],
+        'The waiting rows that stay',
+      );
+    },
+  },
+  {
+    name: 'a second add of a waiting row takes the new row and keeps its place',
+    async run(open) {
+      const db = await open();
+      const actor = { userId: 'ana', organizationId: 'acme' };
+      await db.save({ add: [rename('t1'), rename('t2')], done: [] });
+      await db.save({ add: [{ ...rename('t1'), actor }], done: [] });
+      const read = await readState(db, 'The read after the second add');
+      expectSame(read.pending, [{ ...rename('t1'), actor }, rename('t2')], 'The waiting rows');
+    },
+  },
+  {
     name: 'clear makes the next read undefined, and a save after a clear reads back',
     async run(open) {
       const db = await open();

@@ -196,7 +196,15 @@ A saved copy of another actor is dropped when the server names the actor of
 the connection. A position with an actor of another shape makes the read
 unreadable, like any other position of another shape. Each waiting row holds
 the actor that ran it, and a row of another actor is dropped and never sent.
-A waiting row with an actor of another shape is left out of the read.
+A waiting row with an actor of another shape is left out of the read. A row
+that is saved already keeps its place when a save writes it again, and takes
+the new value. So a row that took the confirmed actor is written again with it.
+
+`clear` leaves the mark of a session end, in the same database transaction.
+It is the key `ended` of the IndexedDB store `position`, or a row of the
+SQLite table `pool_ended`. A read gives it as `ended` while any other row is there.
+The first save whose position names an actor removes it, with each waiting
+row with no actor that the save does not write.
 
 `clear` tells each other tab of the database on the device first. On the
 web, it posts a message on a `BroadcastChannel` with the name of the

@@ -84,7 +84,7 @@ test('the confirmed actor drops each row of another actor, and a row with no act
   expect(lines).toEqual([otherActor]);
 });
 
-test('a run after the actor is known saves the actor in its row, and sends no actor', async () => {
+test('a run offline, before the server confirms anything, saves the actor of the saved copy, and sends no actor', async () => {
   const memory = memoryLocalDatabase(copyOf(ana, []));
   const pool = await loadPool(memory, [], [cards], testStamps());
   pool.run(archive, { id: 'a' });
@@ -111,4 +111,21 @@ test('a read leaves out a waiting row with an actor of another shape', () => {
     { id: 't2', command: 'cards/archive', input: {}, actor: ana },
   ]);
   expect(read?.pending.map(({ id }) => id)).toEqual(['t2']);
+});
+
+test('after a session end, a waiting row with no actor is dropped at the load and never sent', () => {
+  const { pool, lines } = reportingPool();
+  pool.load({ ...copyOf(undefined, [undefined, ana]), ended: true });
+  expect(pool.queue().map(({ id }) => id)).toEqual(['t2']);
+  expect(lines).toEqual([otherActor]);
+  expect(pool.confirmActor(ben)).toBe(true);
+  expect(pool.unsent()).toEqual([]);
+});
+
+test('a copy with no mark and no actor keeps its rows with no actor, as an older copy', () => {
+  const { pool, lines } = reportingPool();
+  pool.load(copyOf(undefined, [undefined]));
+  expect(pool.confirmActor(ana)).toBe(true);
+  expect(pool.unsent().map(({ id }) => id)).toEqual(['t1']);
+  expect(lines).toEqual([]);
 });
