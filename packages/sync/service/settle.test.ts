@@ -21,6 +21,7 @@ function logThat(options: { readonly failures: number; readonly answers: boolean
         return commits > options.failures ? Effect.succeed(7) : Effect.fail('connection lost');
       }),
     head: () => (options.answers ? Effect.succeed(6) : Effect.fail('connection lost')),
+    oldest: () => Effect.succeed(1),
     backlog: () => Stream.empty,
     snapshot: () => Stream.empty,
     subscribe: () => Effect.die('No test subscribes.'),

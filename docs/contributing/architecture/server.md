@@ -159,6 +159,9 @@ count over many rows. `packages/sync/service/jobs.ts` defines the parts.
   lists. `packages/sync/runtime/job-runner.test.ts` tests it.
 - Each interval of a schedule has one job ID, so two servers run it once.
   `sync/sweep-jobs` deletes done jobs after seven days, once an hour.
+  `sync/trim-log` trims the event log once an hour, when
+  `SYNC_LOG_KEEP_DAYS` is set. Without it, the job does nothing. See
+  [the size of the log](./local-first-sync.md#the-size-of-the-log).
 
 `packages/notes/jobs/count-notes.ts` shows the pattern. `create-note.server.ts`
 asks for it in its transaction, and the job commits the note count of the
