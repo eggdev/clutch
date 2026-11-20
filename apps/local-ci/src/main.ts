@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { Config, RepoConfig } from '@/config';
-import { loadConfig, paths, readSecrets } from '@/config';
+import { loadConfig, paths, readPrivate, readSecrets } from '@/config';
 import { api, readToken } from '@/github';
 import type { Outcome, Pull } from '@/plan';
 import { distrust } from '@/plan';
@@ -72,7 +72,7 @@ async function runCheck(config: Config, token: string, repo: string, pull: Pull,
       cpuset: `${at * width}-${at * width + Math.min(limits.cpus, width) - 1}`,
       overrides: config.action_overrides ?? {},
       image: config.image,
-      token,
+      token: config.job_token_file ? readPrivate(config.job_token_file).trim() : token,
       secrets: readSecrets(repo),
       vars: rc.vars ?? {},
       logFile,
@@ -88,7 +88,7 @@ async function runCheck(config: Config, token: string, repo: string, pull: Pull,
   await post(result.state, result.description);
   console.log(`${key} ${sha.slice(0, 8)} ${job}: ${result.state}: ${result.description}`);
   const record = seen.get(key);
-  if (record?.sha === sha && !result.cancelled) {
+  if (record?.sha === sha && record.draft === pull.draft && !result.cancelled) {
     record.done[job] = result.skipped ? 'skipped' : 'done';
     await save();
   }

@@ -12,10 +12,8 @@ export type Limits = { cpus: number; memory: string; timeout_minutes: number };
 export type RepoConfig = {
   /** The job names to run. Each one is the `context` of its commit status. */
   checks: Array<string>;
-  /** The logins whose pull requests run. */
   authors: Array<string>;
   limits?: Record<string, Partial<Limits>>;
-  /** What a job reads as `vars`. */
   vars?: Record<string, string>;
 };
 
@@ -26,6 +24,8 @@ export type Config = {
   image: string;
   /** An action that `act` cannot run as pinned: its repository, and the commit to run in its place. */
   action_overrides?: Record<string, string>;
+  /** A narrower token for `github.token` in jobs. Without it, a job gets the service's token. */
+  job_token_file?: string;
   defaults: Limits;
   repos: Record<string, RepoConfig>;
 };

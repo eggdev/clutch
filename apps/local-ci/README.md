@@ -12,7 +12,8 @@ repository and the author is in `authors`. A fork never runs. For each new head
 commit, it runs each job in `checks`. The job definition is the one in
 `.github/workflows/` at that commit, and [act](https://github.com/nektos/act) runs it.
 The status `context` is the job name. A newer commit cancels the jobs of the older one.
-The service calls GitHub with the `gh` login of its user, and a job gets that token as `github.token`.
+The service calls GitHub with the `gh` login of its user. A job gets that token as `github.token`,
+or the narrower token in `job_token_file`.
 
 Each job runs in a new container of [`image/Dockerfile`](./image/Dockerfile).
 The container mounts nothing from the host and holds its own Docker daemon. Its
@@ -54,10 +55,10 @@ The secrets of a repository are `NAME=value` lines in
 `~/.config/local-ci/secrets/<owner>__<repo>.env`, with mode 600. A value is a
 1Password reference, such as `op://clutch/neon/api-key`, or the secret itself.
 `NAME=` means that the secret is empty on purpose. The `op` CLI reads a
-reference with the service account token in `~/.config/local-ci/op-token`.
+reference with the repository's service account token, in the `.op-token` file next to it.
 
 ## Operate
 
-- State, stop and log: `systemctl --user status local-ci`, `systemctl --user stop local-ci`, `journalctl --user -u local-ci`.
+- Service state and log: `systemctl --user status local-ci` and `journalctl --user -u local-ci`.
 - Job logs and artifacts, kept for `log_days` days: `~/.local/state/local-ci/logs/<owner>__<repo>/<commit>/`.
 - Run a check again: `~/.local/share/local-ci/local-ci rerun <owner>/<repo>#<number> [job]`.

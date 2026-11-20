@@ -74,7 +74,9 @@ export function planJob(files: Record<string, string>, name: string): Plan | nul
     }
     const steps = Array.isArray(job.steps) ? job.steps : [];
     const uses: Array<string> = steps.map((step) => String(step?.uses ?? ''));
-    const named = JSON.stringify([workflow.env, job]).matchAll(/\bsecrets\.([A-Za-z_]\w*)/gu);
+    const named = JSON.stringify([workflow.env, job]).matchAll(
+      /\bsecrets(?:\.|\[\\?["'])([A-Za-z_]\w*)/gu,
+    );
     const secrets = new Set([...named].map((match) => match[1] ?? ''));
     secrets.delete('GITHUB_TOKEN');
     const timeout = job['timeout-minutes'];
@@ -111,12 +113,13 @@ export function outcomeOf(run: {
   if (run.stopped === 'timeout') {
     return { state: 'failure', description: `Timed out after ${run.minutes} min` };
   }
+  const took = duration(run.seconds);
   if (run.exit !== 0) {
-    return { state: 'failure', description: `Failed in ${duration(run.seconds)}` };
+    return { state: 'failure', description: `Failed in ${took}` };
   }
   return run.succeeded
-    ? { state: 'success', description: `Passed in ${duration(run.seconds)}` }
-    : { state: 'success', description: "Skipped: the job's own condition is false", skipped: true };
+    ? { state: 'success', description: `Passed in ${took}` }
+    : { state: 'success', description: `Skipped by its own condition in ${took}`, skipped: true };
 }
 
 /** Replaces each secret value in a log line. A short value would hide ordinary text. */

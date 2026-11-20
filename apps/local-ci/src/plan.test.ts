@@ -39,7 +39,7 @@ jobs:
       - uses: github/codeql-action/init@${sha}
       - uses: docker://semgrep/semgrep:1
       - run: deploy
-        env: { A: "\${{ secrets.NEON_API_KEY }}", B: "\${{ secrets.GITHUB_TOKEN }}", C: "\${{ secrets.NEON_API_KEY }}" }
+        env: { A: "\${{ secrets.NEON_API_KEY }}", B: "\${{ secrets.GITHUB_TOKEN }}", C: "\${{ secrets['OTHER'] }}" }
 `;
 
 test('a plan names the workflow file, the secrets, the pinned actions and the timeout of a job', () => {
@@ -47,7 +47,7 @@ test('a plan names the workflow file, the secrets, the pinned actions and the ti
   const files = { 'a-nightly.yml': nightly, 'b-broken.yml': '{', 'ci.yml': ci };
   expect(planJob(files, 'validate')).toEqual({
     file: 'ci.yml',
-    secrets: ['SHARED_KEY', 'NEON_API_KEY'],
+    secrets: ['SHARED_KEY', 'NEON_API_KEY', 'OTHER'],
     actions: [
       { name: `actions-checkout@${sha}`, repo: 'actions/checkout', ref: sha },
       { name: `github-codeql-action-init@${sha}`, repo: 'github/codeql-action', ref: sha },

@@ -1,4 +1,3 @@
-# Each local CI job on an arm64 machine: act, Docker and what a job expects of a runner.
 FROM ubuntu:26.04
 ARG ACT_VERSION=0.2.98
 ARG ACT_SHA256=a30ba1a1582cb93810c77f743415cac33c16f60fc288116a8e0943144b6a6a4f

@@ -75,10 +75,6 @@ export async function sweep() {
   await rm(path.join(paths.cache, 'runs'), { recursive: true, force: true });
 }
 
-function mirrorOf(repo: string) {
-  return path.join(paths.cache, 'mirrors', `${repo}.git`);
-}
-
 /** Removes the logs and kept artifacts of each commit that is older than `days`. */
 export async function prune(days: number) {
   const logs = path.join(paths.state, 'logs');
@@ -92,7 +88,7 @@ export async function prune(days: number) {
  * argv and of the git config. No job and no developer checkout touches this copy.
  */
 export async function fetchMirror(repo: string, token: string) {
-  const mirror = mirrorOf(repo);
+  const mirror = path.join(paths.cache, 'mirrors', `${repo}.git`);
   await sh(['git', 'init', '--quiet', '--bare', mirror]);
   const basic = Buffer.from(`x-access-token:${token}`).toString('base64');
   const refs = ['+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*/head'];
@@ -106,7 +102,7 @@ export async function fetchMirror(repo: string, token: string) {
 
 const fetching = new Map<string, Promise<string | null>>();
 const shallow =
-  'git init -q "$0" && cd "$0" && git remote add origin "$1" && git fetch -q --depth=1 origin "$2" && git checkout -q --detach FETCH_HEAD && mv "$0" "$3"';
+  'rm -rf "$0" && git init -q "$0" && cd "$0" && git remote add origin "$1" && git fetch -q --depth=1 origin "$2" && git checkout -q --detach FETCH_HEAD && mv "$0" "$3"';
 
 /**
  * A shallow copy of one pinned action, fetched once by the service. Each job gets
@@ -117,7 +113,7 @@ function fetchAction({ name, repo, ref }: Action, other?: string) {
   async function clone() {
     const args = [`${dir}.${process.pid}.tmp`, `https://github.com/${repo}`, other ?? ref, dir];
     const made = existsSync(dir) || (await quiet(sh(['sh', '-c', shallow, ...args]))) !== null;
-    return made ? dir : null;
+    return made ? dir : (fetching.delete(dir), null);
   }
   const pending = fetching.get(dir) ?? clone();
   fetching.set(dir, pending);
@@ -128,7 +124,9 @@ function fetchAction({ name, repo, ref }: Action, other?: string) {
 function workflowsOf(source: string) {
   const dir = path.join(source, '.github/workflows');
   const files: Record<string, string> = {};
-  for (const name of existsSync(dir) ? readdirSync(dir) : []) {
+  const parts = [path.dirname(dir), dir].map((part) => lstatSync(part, { throwIfNoEntry: false }));
+  const real = parts.every((part) => part?.isDirectory());
+  for (const name of real ? readdirSync(dir) : []) {
     if (/\.ya?ml$/u.test(name) && lstatSync(path.join(dir, name)).isFile()) {
       files[name] = readFileSync(path.join(dir, name), 'utf-8');
     }
@@ -137,17 +135,17 @@ function workflowsOf(source: string) {
 }
 
 /** A value of the secrets file: the secret itself, or a 1Password reference to it. */
-async function reveal(name: string, value = '') {
+async function reveal(repo: string, value = '') {
   if (!value.startsWith('op://')) {
     return value;
   }
   try {
-    const token = readPrivate(path.join(paths.config, 'op-token')).trim();
-    return await sh(['op', 'read', '--no-newline', value], undefined, {
-      OP_SERVICE_ACCOUNT_TOKEN: token,
-    });
+    // Each repository has its own service account, so no token reads another's vault.
+    const file = path.join(paths.config, 'secrets', `${repo.replace('/', '__')}.op-token`);
+    const env = { OP_SERVICE_ACCOUNT_TOKEN: readPrivate(file).trim() };
+    return await sh(['op', 'read', '--no-newline', value], undefined, env);
   } catch (error) {
-    console.log(`${name}: 1Password gave no value for ${value}: ${String(error).slice(0, 300)}`);
+    console.log(`1Password gave no value for ${value}: ${String(error).slice(0, 300)}`);
     return null;
   }
 }
@@ -156,15 +154,18 @@ async function reveal(name: string, value = '') {
 async function prepare(request: JobRequest, run: string, source: string) {
   const { repo, pull, job } = request;
   await mkdir(path.join(run, 'lci'), { recursive: true });
-  await sh(['git', 'clone', '--quiet', '--no-checkout', mirrorOf(repo), source]);
+  const mirror = path.join(paths.cache, 'mirrors', `${repo}.git`);
+  await sh(['git', 'clone', '--quiet', '--no-checkout', mirror, source]);
   await sh(['git', '-C', source, 'remote', 'set-url', 'origin', `https://github.com/${repo}.git`]);
   await sh(['git', '-C', source, 'checkout', '--quiet', '--detach', pull.head.sha]);
+  // act reads its own options from this file, so a pull request must not supply it.
+  await rm(path.join(source, '.actrc'), { force: true });
   const plan = planJob(workflowsOf(source), job);
   if (!plan) {
     return `No pull request job named ${job} at this commit`;
   }
   const named = plan.secrets.filter((name) => request.secrets[name] !== undefined);
-  const values = await Promise.all(named.map((name) => reveal(name, request.secrets[name])));
+  const values = await Promise.all(named.map((name) => reveal(repo, request.secrets[name])));
   const missing = plan.secrets.filter((name) => (values[named.indexOf(name)] ?? null) === null);
   if (missing.length > 0) {
     return `Missing secret: ${missing.join(', ')}`.slice(0, 140);
@@ -234,7 +235,7 @@ async function runAct(request: JobRequest, id: string, run: string, ready: Ready
   });
   await mkdir(path.dirname(request.logFile), { recursive: true });
   const log = createWriteStream(request.logFile);
-  const hidden = [request.token, ...Object.values(secrets)];
+  const hidden = [request.token, ...Object.values(secrets)].join('\n').split('\n');
   let succeeded = false;
   let rest = '';
   for await (const chunk of act.stdout.pipeThrough(new TextDecoderStream())) {
@@ -248,7 +249,7 @@ async function runAct(request: JobRequest, id: string, run: string, ready: Ready
   log.end(`${redact(rest, hidden)}\n`);
   const exit = await act.exited;
   clearTimeout(timer);
-  await feed;
+  await Promise.race([feed, Bun.sleep(5000)]);
   if (!stopped) {
     const kept = `${request.logFile.replace(/\.log$/u, '')}-artifacts`;
     await quiet(docker('cp', '--quiet', `${name}:${home}/artifacts`, kept));
