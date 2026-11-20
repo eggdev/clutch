@@ -3,7 +3,7 @@ import { manifestOf } from '@repo/sync/contract/manifest';
 import type { Pool } from '@repo/sync/runtime/pool';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import { sessionEndedCode } from '@repo/sync/types/session-ended';
-import { Effect, Layer, Queue, Schedule, Stream } from 'effect';
+import { Deferred, Effect, Layer, Queue, Schedule, Stream } from 'effect';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
 import type { RpcClientError } from 'effect/rpc/RpcClientError';
 import { Socket } from 'effect/socket';
@@ -49,14 +49,15 @@ function protocol(url: string, onSessionEnded: () => void, headers?: SocketHeade
   );
 }
 
-/** Each group that a gate asks for, starting with the ones asked for before the socket opened. */
 /**
- * How long a push waits before it tries again: 200 ms, then twice as long each
- * time, and never more than 3 seconds. Without the limit, a device that was
- * offline for a while would wait as long again before it sends what it holds.
+ * How long a push or a pull waits before it tries again: 200 ms, then twice
+ * as long each time, and never more than 3 seconds. Without the limit, a
+ * device that was offline for a while would wait as long again before it
+ * sends what it holds.
  */
-const pushRetry = Schedule.min([Schedule.exponential('200 millis'), Schedule.spaced('3 seconds')]);
+const retryWait = Schedule.min([Schedule.exponential('200 millis'), Schedule.spaced('3 seconds')]);
 
+/** Each group that a gate asks for, starting with the ones asked for and not loaded yet. */
 function loadRequests(pool: Pool) {
   return Stream.callback<string>((queue) =>
     Effect.acquireRelease(
@@ -110,14 +111,46 @@ export function engine(
           ),
         ),
     );
-    // After a database restore, the server's log ends before our last sync
-    // ID. Drop the confirmed records, keep the pending transactions, and
-    // load again from 0.
-    yield* pull.pipe(
-      Effect.catchTag('ServerBehind', () =>
-        Effect.sync(() => pool.resetConfirmed()).pipe(Effect.andThen(pull)),
+    // A group that the actor may not load is refused: its gate stops waiting,
+    // and the pool reports it. After any other end of a load, also when the
+    // server could not run it, the request stays and the next pull asks
+    // again. A load never ends the pull that it belongs to.
+    const loads = loadRequests(pool).pipe(
+      Stream.runForEach((group) =>
+        client.Load({ group }).pipe(
+          Effect.catchTag('GroupNotAllowed', () => Effect.sync(() => pool.refuseGroup(group))),
+          Effect.ignoreCause,
+        ),
       ),
-      Effect.catchTag('SessionEnded', () => Effect.sync(onSessionEnded)),
+    );
+    // One pull, with the load requests that belong to it. It gives `true`
+    // when the engine must pull again. A pull ends when the socket drops or
+    // when the server cannot read its log, and the socket then opens again on
+    // its own. The next pull names the last sync ID and the loaded groups
+    // that the pool holds then, so the client gets each event that it missed.
+    // After a database restore, the server's log ends before our last sync
+    // ID: drop the confirmed records, keep the pending transactions, and pull
+    // again from 0. Only an ended session is final: `untilSessionEnded` then
+    // stops the whole engine.
+    const pullOnce = pull.pipe(
+      Effect.raceFirst(loads),
+      Effect.as(true),
+      Effect.catchTag('ServerBehind', () =>
+        Effect.sync(() => {
+          pool.resetConfirmed();
+          return true;
+        }),
+      ),
+      Effect.catchTag('SessionEnded', () =>
+        Effect.sync(() => {
+          onSessionEnded();
+          return false;
+        }),
+      ),
+      Effect.catchCause(() => Effect.succeed(true)),
+    );
+    yield* pullOnce.pipe(
+      Effect.repeat({ while: (again) => again, schedule: retryWait }),
       Effect.forkScoped,
     );
     const push = Effect.gen(function* () {
@@ -141,21 +174,31 @@ export function engine(
         return yield* Effect.fail('The server did not try each write');
       }
     });
-    // A group that the actor may not load is refused: its gate stops waiting,
-    // and the pool reports it. After any other failure the request stays, and
-    // the next connection asks again.
-    yield* loadRequests(pool).pipe(
-      Stream.runForEach((group) =>
-        client.Load({ group }).pipe(
-          Effect.catchTag('GroupNotAllowed', () => Effect.sync(() => pool.refuseGroup(group))),
-          Effect.ignore,
-        ),
-      ),
-      Effect.forkScoped,
-    );
     yield* pendingSignals(pool).pipe(
-      Stream.runForEach(() => push.pipe(Effect.retry(pushRetry), Effect.ignore)),
+      Stream.runForEach(() => push.pipe(Effect.retry(retryWait), Effect.ignore)),
     );
+  });
+}
+
+/**
+ * Runs the work of one connection until its session ends. The server ends a
+ * session in two ways: it closes the socket with code 4401, or `Pull` fails
+ * with `SessionEnded`. `end` tells the app once, and the work stops. The
+ * engine of an ended session then pulls and pushes no more, also when its
+ * socket could open again.
+ */
+export function untilSessionEnded<E, R>(
+  onSessionEnded: () => void,
+  work: (end: () => void) => Effect.Effect<unknown, E, R>,
+): Effect.Effect<void, E, R> {
+  return Effect.suspend(() => {
+    const ended = Deferred.makeUnsafe<null>();
+    const end = () => {
+      if (Deferred.doneUnsafe(ended, Effect.succeed(null))) {
+        onSessionEnded();
+      }
+    };
+    return work(end).pipe(Effect.raceFirst(Deferred.await(ended)), Effect.asVoid);
   });
 }
 
@@ -168,8 +211,9 @@ function session(pool: Pool, contract: string, onSessionEnded: () => void) {
 
 /**
  * Connects the pool to the server. The socket reconnects on its own after a
- * drop. Each `Pull` names the digest of the app's contracts, so the server
- * knows which build it talks to.
+ * drop, and the engine then pulls again. An ended session stops the engine
+ * and closes the socket. Each `Pull` names the digest of the app's contracts,
+ * so the server knows which build it talks to.
  */
 export function connect(
   pool: Pool,
@@ -183,8 +227,10 @@ export function connect(
 ) {
   const contract = manifestOf(options.contracts).digest;
   return Effect.runFork(
-    session(pool, contract, options.onSessionEnded).pipe(
-      Effect.provide(protocol(options.url, options.onSessionEnded, options.headers)),
+    untilSessionEnded(options.onSessionEnded, (end) =>
+      session(pool, contract, end).pipe(
+        Effect.provide(protocol(options.url, end, options.headers)),
+      ),
     ),
   );
 }

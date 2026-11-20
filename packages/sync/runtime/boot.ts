@@ -3,6 +3,7 @@ import type { Contract } from '@repo/sync/contract/define';
 import type { Stamps } from '@repo/sync/contract/fields';
 import { createPool } from '@repo/sync/runtime/pool';
 import type { Pool } from '@repo/sync/runtime/pool';
+import { consoleReport } from '@repo/sync/runtime/pool-doors';
 import type { Report } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase } from '@repo/sync/types/local-database';
 
@@ -33,7 +34,8 @@ function withoutLocalChange(
  * it out too.
  *
  * `report` receives each sentence about a saved copy that does not fit this
- * build. The web leaves it out and gets the console.
+ * build, and about a change that the device could not save. The web leaves it
+ * out and gets the console.
  */
 export async function loadPool(
   database: LocalDatabase,
@@ -60,20 +62,39 @@ export async function loadPool(
   if (state) {
     pool.load(state);
   }
-  // One write at a time, and always the newest state.
+  // One write at a time, and always the newest state. A write that fails,
+  // such as on a full device, is reported once, and the next change to the
+  // pool writes again.
+  const tell = report ?? consoleReport;
   let writing = false;
   let again = false;
+  let failing = false;
   async function save() {
     if (writing) {
       again = true;
       return;
     }
     writing = true;
-    do {
-      again = false;
-      await database.write(pool.snapshot());
-    } while (again);
-    writing = false;
+    try {
+      do {
+        again = false;
+        try {
+          await database.write(pool.snapshot());
+          failing = false;
+        } catch {
+          const first = !failing;
+          failing = true;
+          if (first) {
+            tell(
+              'This device could not save the last change. The change stays on this screen, and the next change saves again.',
+            );
+          }
+        }
+      } while (again);
+    } finally {
+      // Also when `report` throws, so no failure stops the saves that follow.
+      writing = false;
+    }
   }
   pool.onChange(() => {
     void save();
