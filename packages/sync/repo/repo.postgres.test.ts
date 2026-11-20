@@ -1,9 +1,11 @@
 import { expect, test } from 'bun:test';
+import { readdirSync } from 'node:fs';
 
 import { defineContract } from '@repo/sync/contract/define';
 import { organizationGroup } from '@repo/sync/contract/engine-groups';
 import { record } from '@repo/sync/contract/record';
 import { fillRecords } from '@repo/sync/repo/events';
+import * as schema from '@repo/sync/repo/schema';
 import { syncCounters, syncEvents, syncRecords } from '@repo/sync/repo/schema';
 import { trimLog } from '@repo/sync/repo/trim';
 import { DatabasePostgres } from '@repo/sync/runtime/database.server';
@@ -12,7 +14,8 @@ import { Database } from '@repo/sync/service/database';
 import { EventLog, eventLog } from '@repo/sync/service/event-log';
 import { describeOnPostgres, freshDatabase, rowsOf } from '@repo/sync/testing/postgres';
 import type { Change } from '@repo/sync/types/protocol';
-import { asc, sql } from 'drizzle-orm';
+import { asc, getTableName, is, sql } from 'drizzle-orm';
+import { PgTable } from 'drizzle-orm/pg-core';
 import { Context, Effect, Layer, Schema } from 'effect';
 
 /**
@@ -88,6 +91,15 @@ const kept = (organizationId: string) =>
     return { events: events.map((row) => row.syncId), records: records.map((row) => row.id) };
   });
 
+/** The tables that the schema of the log declares, by name. */
+const declaredTables = Object.values(schema)
+  .filter((value) => is(value, PgTable))
+  .map((table) => getTableName(table))
+  .toSorted();
+
+/** How many migrations the sync engine has: one folder each. */
+const migrationCount = readdirSync(new URL('migrations', import.meta.url)).length;
+
 /** How many migrations of the sync engine the database records as applied. */
 const appliedSync = (db: Context.Service.Shape<typeof Database>) =>
   rowsOf(
@@ -113,8 +125,8 @@ describeOnPostgres('the SQL of the log on a real Postgres server', (serverUrl) =
         return { tables: tables.map((row) => row.name), applied: yield* appliedSync(db) };
       }),
     );
-    expect(result.tables).toEqual(['sync_counters', 'sync_events', 'sync_jobs', 'sync_records']);
-    expect(result.applied).toBe(4);
+    expect(result.tables).toEqual(declaredTables);
+    expect(result.applied).toBe(migrationCount);
   }, 20_000);
 
   test('four processes that start at once each migrate the new database, and each migration applies once', async () => {
@@ -131,7 +143,7 @@ describeOnPostgres('the SQL of the log on a real Postgres server', (serverUrl) =
         return first ? yield* appliedSync(first) : 0;
       }).pipe(Effect.scoped),
     );
-    expect(result).toBe(4);
+    expect(result).toBe(migrationCount);
   }, 20_000);
 
   test('the fill builds sync_records from a log that has events and no rows, once', async () => {
