@@ -33,6 +33,7 @@ jobs:
       # The revert label and the comment on the merged PR.
       pull-requests: write
     steps:
+      # nosemgrep: yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout -- the trigger takes only a CI run on main, and the job runs only for a push, so the commit is already on main. It runs no code from a pull request.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
