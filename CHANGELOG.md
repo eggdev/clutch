@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.1 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): log each wake that the timed read finds lost (CL-584)
+
 ## 1.26.0 (2026-11-20)
 
 ### Features
