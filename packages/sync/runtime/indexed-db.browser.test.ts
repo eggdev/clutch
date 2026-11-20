@@ -74,11 +74,30 @@ async function waitForWriter(): Promise<boolean> {
   return held?.isWriter() ?? false;
 }
 
+let clearsHeard = 0;
+let followed: LocalDatabase | undefined;
+
+/** Opens the database of the session end test, and counts each clear of another tab that this page hears. */
+async function followClears(): Promise<void> {
+  followed = await openIndexedDb('tabs');
+  followed.onClearedElsewhere(() => {
+    clearsHeard += 1;
+  });
+}
+
+/** Clears the database of the session end test through the handle that follows. */
+async function clearTabs(): Promise<void> {
+  await followed?.clear();
+}
+
 Object.assign(globalThis, {
   runLocalDatabaseCases: runCases,
   runOldLayout,
   openForLock,
   waitForWriter,
+  followClears,
+  clearTabs,
+  clearsHeard: () => clearsHeard,
 });
 `;
 
@@ -152,5 +171,25 @@ test('one tab writes the confirmed records, and the next tab takes over when it 
   const takeover = second.evaluate<boolean>('globalThis.waitForWriter()');
   await first.close();
   expect(await takeover).toBe(true);
+  await context.close();
+}, 60_000);
+
+test('a clear in one tab wakes each other tab of the database, and not its own', async () => {
+  const context = await browser.newContext();
+  await context.route('https://app.test/', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }),
+  );
+  const open = async () => {
+    const page = await context.newPage();
+    await page.goto('https://app.test/');
+    await page.addScriptTag({ content: bundle });
+    await page.evaluate('globalThis.followClears()');
+    return page;
+  };
+  const other = await open();
+  const clearing = await open();
+  await clearing.evaluate('globalThis.clearTabs()');
+  await other.waitForFunction('globalThis.clearsHeard() === 1');
+  expect(await clearing.evaluate<number>('globalThis.clearsHeard()')).toBe(0);
   await context.close();
 }, 60_000);

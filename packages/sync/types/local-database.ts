@@ -13,6 +13,14 @@ export type RecordMeta = {
 };
 
 /**
+ * One saved waiting transaction, with the actor that ran it. The pool drops
+ * a row of another actor than the one the server confirms, and never sends
+ * it. A row from before the actor was saved, or that the pool made before it
+ * knew its actor, has none. It takes the actor that the server confirms next.
+ */
+export type WaitingRow = Transaction & { readonly actor?: SyncActor };
+
+/**
  * What the pool loads and what a read of the local database gives: the
  * confirmed records, the groups the client loaded, each record's groups, and
  * the transactions that wait. `meta` is keyed by `<model> <id>`.
@@ -22,7 +30,7 @@ export type PoolState = {
   readonly tables: Readonly<Record<string, ReadonlyArray<RecordRow>>>;
   readonly groups: ReadonlyArray<string>;
   readonly meta: Readonly<Record<string, RecordMeta>>;
-  readonly pending: ReadonlyArray<Transaction>;
+  readonly pending: ReadonlyArray<WaitingRow>;
   /**
    * The contract digest of the build that left a record of a delta out of
    * this copy, because it could not read the record. Another build drops the
@@ -80,7 +88,7 @@ export type ConfirmedSave = {
  */
 export type LocalSave = {
   readonly confirmed?: ConfirmedSave;
-  readonly add: ReadonlyArray<Transaction>;
+  readonly add: ReadonlyArray<WaitingRow>;
   readonly done: ReadonlyArray<string>;
 };
 
@@ -102,8 +110,17 @@ export type LocalDatabase = {
   /** Every row as one state, the waiting transactions in the order they were added. */
   readonly read: () => Promise<PoolState | undefined>;
   readonly save: (save: LocalSave) => Promise<void>;
-  /** Removes every row. */
+  /**
+   * Removes every row. A session end calls it. It first tells each other tab
+   * of this database on the device, which then stops its engine and its saves.
+   */
   readonly clear: () => Promise<void>;
+  /**
+   * Wakes when another tab of this database cleared it. It returns the stop
+   * of the listener. A platform with one process has no other tab, so it
+   * never wakes.
+   */
+  readonly onClearedElsewhere: (listener: () => void) => () => void;
   /**
    * Whether this tab writes the confirmed records now. Two tabs hold
    * different groups and positions, so only one tab writes them. A platform

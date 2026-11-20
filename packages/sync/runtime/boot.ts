@@ -5,8 +5,7 @@ import { createPool } from '@repo/sync/runtime/pool';
 import type { Pool } from '@repo/sync/runtime/pool';
 import { consoleReport } from '@repo/sync/runtime/pool-doors';
 import type { Report } from '@repo/sync/runtime/pool-doors';
-import type { LocalDatabase } from '@repo/sync/types/local-database';
-import type { Transaction } from '@repo/sync/types/protocol';
+import type { LocalDatabase, WaitingRow } from '@repo/sync/types/local-database';
 
 /** The commands of the contracts that show at once and have no local change in `changes`. */
 function withoutLocalChange(
@@ -26,9 +25,9 @@ function withoutLocalChange(
  * and that left its queue.
  */
 function queueChanges(
-  queue: ReadonlyArray<Transaction>,
+  queue: ReadonlyArray<WaitingRow>,
   held: ReadonlySet<string>,
-): { readonly add: ReadonlyArray<Transaction>; readonly done: ReadonlyArray<string> } {
+): { readonly add: ReadonlyArray<WaitingRow>; readonly done: ReadonlyArray<string> } {
   const queued = new Set(queue.map(({ id }) => id));
   return {
     add: queue.filter(({ id }) => !held.has(id)),
@@ -192,6 +191,32 @@ export async function endSession(
   disconnect();
   await pool.stop();
   await database.clear();
+}
+
+/**
+ * Follows a session end in another tab of this device. When another tab
+ * clears the local database, this tab stops its engine with `disconnect` and
+ * the saves of its pool at once, before it can write anything back. Then it
+ * calls `restart`, so the app starts again with an empty pool. The tab that
+ * clears never hears its own clear. It follows one end, and returns the
+ * stop of the follow.
+ */
+export function followSessionEnd(
+  database: LocalDatabase,
+  pool: SavedPool,
+  disconnect: () => void,
+  restart: () => void,
+): () => void {
+  const stop = database.onClearedElsewhere(() => {
+    // One end is enough: the start that follows has its own follow.
+    stop();
+    disconnect();
+    void (async () => {
+      await pool.stop();
+      restart();
+    })();
+  });
+  return stop;
 }
 
 /**

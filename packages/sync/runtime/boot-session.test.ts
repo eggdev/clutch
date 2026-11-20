@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 
 import { localChange } from '@repo/sync/contract/command';
 import { defineContract } from '@repo/sync/contract/define';
-import { endSession, loadPool } from '@repo/sync/runtime/boot';
+import { endSession, followSessionEnd, loadPool } from '@repo/sync/runtime/boot';
 import { memoryLocalDatabase } from '@repo/sync/testing/local-database';
 import { poolState, testCommand, testModel } from '@repo/sync/testing/pool-state';
 import type { LocalDatabase } from '@repo/sync/types/local-database';
@@ -90,5 +90,34 @@ test('the end of a session stops the engine and the saves, then clears the local
   pool.run(rename, { id: 'a', title: 'After the end' });
   await settle();
   expect(order).toEqual(['disconnect', 'clear']);
+  expect(await memory.read()).toBeUndefined();
+});
+
+test('a session end in one tab stops the engine and the saves of each other tab, which starts again', async () => {
+  const memory = memoryLocalDatabase(saved());
+  const other = memory.tab(Promise.withResolvers().promise);
+  const here = await loadPool(memory, [renameLocal], [cards]);
+  const there = await loadPool(other, [renameLocal], [cards]);
+  await settle();
+  const heard: Array<string> = [];
+  followSessionEnd(
+    memory,
+    here,
+    () => heard.push('own disconnect'),
+    () => heard.push('own start'),
+  );
+  followSessionEnd(
+    other,
+    there,
+    () => heard.push('disconnect'),
+    () => heard.push('start again'),
+  );
+  await endSession(memory, here, () => {
+    heard.push('end');
+  });
+  // The other tab stopped its saves before it heard of the end, so it writes nothing back.
+  there.run(rename, { id: 'a', title: 'After the end' });
+  await settle();
+  expect(heard).toEqual(['end', 'disconnect', 'start again']);
   expect(await memory.read()).toBeUndefined();
 });

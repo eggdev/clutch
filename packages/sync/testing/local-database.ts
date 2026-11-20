@@ -6,8 +6,8 @@ import type {
   PoolState,
   SavedRecord,
   SyncPosition,
+  WaitingRow,
 } from '@repo/sync/types/local-database';
-import type { Transaction } from '@repo/sync/types/protocol';
 
 /** A local database in memory, with what a test reads about its saves. */
 export type MemoryLocalDatabase = LocalDatabase & {
@@ -31,9 +31,11 @@ export type MemoryLocalDatabase = LocalDatabase & {
  */
 export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
   const records = new Map<string, SavedRecord>();
-  let transactions: Array<Transaction> = [];
+  let transactions: Array<WaitingRow> = [];
   let position: SyncPosition | undefined;
   const log: Array<LocalSave> = [];
+  // The clear listeners of each handle, as a `BroadcastChannel` of each tab.
+  const handles = new Set<Set<() => void>>();
 
   function apply(save: LocalSave) {
     const { confirmed } = save;
@@ -69,6 +71,8 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
   function handle(writer: Promise<unknown>, held: boolean): MemoryLocalDatabase {
     let isWriter = held;
     let writes = 0;
+    const heard = new Set<() => void>();
+    handles.add(heard);
     return {
       read: () => Promise.resolve(structuredClone(stateOf(inKeyOrder(), position, transactions))),
       save: (save) => {
@@ -78,10 +82,20 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
         return Promise.resolve();
       },
       clear: () => {
+        for (const other of handles) {
+          // A message reaches each other handle after the clear starts, as on the web.
+          for (const listener of other === heard ? [] : other) {
+            queueMicrotask(listener);
+          }
+        }
         records.clear();
         transactions = [];
         position = undefined;
         return Promise.resolve();
+      },
+      onClearedElsewhere(listener) {
+        heard.add(listener);
+        return () => heard.delete(listener);
       },
       isWriter: () => isWriter,
       writer: (async () => {

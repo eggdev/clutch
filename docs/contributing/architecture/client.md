@@ -184,7 +184,16 @@ the same page stays the writer. See
 
 A saved copy of another actor is dropped when the server names the actor of
 the connection. A position with an actor of another shape makes the read
-unreadable, like any other position of another shape.
+unreadable, like any other position of another shape. Each waiting row holds
+the actor that ran it, and a row of another actor is dropped and never sent.
+A waiting row with an actor of another shape is left out of the read.
+
+`clear` tells each other tab of the database on the device first. On the
+web, it posts a message on a `BroadcastChannel` with the name of the
+database. `onClearedElsewhere` wakes in each other tab, and
+`followSessionEnd` then stops that tab's engine and saves and starts the app
+again. SQLite on native has one process, so its `onClearedElsewhere` never
+wakes.
 
 ### Older layouts
 
@@ -230,10 +239,11 @@ A start that throws does not leave an empty page. The store in
 shows it with a button that starts again. `apps/app/lib/boot-store.test.ts`
 holds that rule.
 
-The object pool has two files. `packages/sync/runtime/confirmed.ts` holds the
+The object pool has three files. `packages/sync/runtime/confirmed.ts` holds the
 confirmed records: what the server sent, the groups and sync ID of each record,
 and the loaded groups. `packages/sync/runtime/pool.ts` puts each waiting
-transaction on top of them, and holds the watchers that screens use.
+transaction on top of them. `packages/sync/runtime/tables.ts` holds the
+tables that screens see, with their ID lists and watchers.
 
 The object pool is checked against a plain reference model in
 `packages/sync/runtime/pool-conformance.test.ts`.

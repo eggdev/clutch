@@ -9,6 +9,7 @@ import type {
   RecordMeta,
   SavedRecord,
   SyncPosition,
+  WaitingRow,
 } from '@repo/sync/types/local-database';
 import type { SyncActor, Transaction } from '@repo/sync/types/protocol';
 
@@ -195,9 +196,18 @@ function isPosition(value: unknown): value is SyncPosition {
   );
 }
 
-function isTransaction(value: unknown): value is Transaction {
-  return isObject(value) && typeof value['id'] === 'string' && typeof value['command'] === 'string';
+function isTransaction(value: unknown): value is WaitingRow {
+  return (
+    isObject(value) &&
+    typeof value['id'] === 'string' &&
+    typeof value['command'] === 'string' &&
+    (value['actor'] === undefined || isActor(value['actor']))
+  );
 }
+
+/** The one sentence that the pool reports when it drops the waiting rows of another actor. */
+export const otherActorRows =
+  'This device held unsent changes of another account, so the app removed them and did not send them.';
 
 /**
  * Joins the rows of one read into the state that the pool loads. A device

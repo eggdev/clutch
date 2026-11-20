@@ -62,7 +62,8 @@ An event keeps its organization ID, so the log is scoped by tenant too. Its
 An event written before the column existed has no groups, so no client gets
 it. A saved pool state without `groups` and `meta` loads as an empty pool.
 A saved position without `actor` keeps its copy, and takes the actor that the
-server names first. The `records` store holds no record that is in no loaded
+server names first. A waiting transaction row holds `actor` too, with the
+same shape. A row without it takes the actor that the server confirms next. The `records` store holds no record that is in no loaded
 group of the position. A copy at sync ID 0 holds only part of a first load.
 The next pull from 0 drops each record that it does not send again.
 

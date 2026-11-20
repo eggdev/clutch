@@ -179,13 +179,20 @@ client did not get.
 ## The end of a session
 
 One person never sees or sends the saved work of another person on the same
-device. Four rules hold this.
+device. Seven rules hold this.
 
 - The saved copy holds its actor. The position row of the local database
   holds the user and the organization that the copy belongs to. A copy from
   before this rule has none, and takes the actor of the first `Groups`
   message that names one. The local database keeps the name `app`: a browser
   cannot know its user before the server answers.
+- Each saved waiting transaction holds the actor that ran it, once the pool
+  knows its actor. A row of another actor than the saved position, or than
+  the actor that the server confirms, is dropped and never sent. The pool
+  reports one sentence, and the next save deletes the row. A row with no
+  actor is from before this rule, or the pool made it before it knew its
+  actor. It takes the actor that the server confirms next, as the copy does.
+  `packages/sync/runtime/pool-waiting-actor.test.ts` holds this.
 - The engine sends no `Push` on a connection before the first `Groups`
   message of its pull confirmed the actor. When that message names another
   actor, the pool drops the confirmed records, the loaded groups, the
@@ -215,6 +222,14 @@ device. Four rules hold this.
   database. It needs no server. After it, no change of the old pool reaches
   the database, also on native, where no page loads again.
   `packages/sync/runtime/boot-session.test.ts` holds this.
+- A session end reaches each other tab of the device. Before the clear
+  starts, the web adapter posts a message on a `BroadcastChannel` with the
+  name of the database. A tab that hears it stops its engine and the saves of
+  its pool at once, so it writes nothing back. Then it starts again with an
+  empty pool. `followSessionEnd` in `packages/sync/runtime/boot.ts` does
+  this. Native has one process, so it has no other tab. A tab of an older
+  build does not hear the message. The actor of each waiting row then keeps
+  its work from going out as the next person.
 
 `endSessionOnDevice` in `apps/app/lib/boot.ts` calls `endSession`, then starts
 the app again with an empty pool. The app calls it on a 4401 close and on a

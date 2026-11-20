@@ -1,11 +1,11 @@
 import type { Replayable, Waits } from '@repo/sync/contract/command';
 import { stamped } from '@repo/sync/contract/fields';
 import type { CallOf, Fields } from '@repo/sync/contract/fields';
-import type { Model, RecordRow } from '@repo/sync/contract/record';
 import { createConfirmed } from '@repo/sync/runtime/confirmed';
 import {
   consoleReport,
   deviceStamps,
+  otherActorRows,
   runMisfit,
   savedCommandMisfit,
 } from '@repo/sync/runtime/pool-doors';
@@ -15,20 +15,16 @@ import {
   copy,
   draftOver,
   groupWaits,
-  keepUnchanged,
-  listenerMap,
-  readAs,
-  recordKey,
-  sameJson,
-  sortedIds,
+  keepActor,
+  rowOf,
+  sameActor,
+  visibleTables,
   wake,
 } from '@repo/sync/runtime/tables';
-import type { Tables } from '@repo/sync/runtime/tables';
-import type { ConfirmedSave, PoolState } from '@repo/sync/types/local-database';
+import type { Pending } from '@repo/sync/runtime/tables';
+import type { ConfirmedSave, PoolState, WaitingRow } from '@repo/sync/types/local-database';
 import type { Delta, Outcome, SyncActor, Transaction } from '@repo/sync/types/protocol';
 import type { ReadablePool, Rejection } from '@repo/sync/types/records';
-
-type Pending = { readonly transaction: Transaction; sent: boolean; acceptedAt: number | null };
 
 /** The object pool, with the writes that only the sync engine and commands use. */
 export type Pool = ReadablePool & {
@@ -45,7 +41,8 @@ export type Pool = ReadablePool & {
   /**
    * Loads a saved state. The pool then counts the state as saved, so the
    * next save writes only what changes after it. A copy that the pool drops
-   * makes the next save replace every saved record.
+   * makes the next save replace every saved record. A saved copy that names
+   * its actor drops each waiting transaction of another actor, and reports it.
    */
   readonly load: (state: PoolState) => void;
   readonly snapshot: () => PoolState;
@@ -56,8 +53,13 @@ export type Pool = ReadablePool & {
    * for every record itself after it drops its confirmed records.
    */
   readonly confirmedChanges: (everything: boolean) => ConfirmedSave;
-  /** Every transaction in the queue, sent or not, in the order the person ran them. */
-  readonly queue: () => ReadonlyArray<Transaction>;
+  /**
+   * Every transaction in the queue, sent or not, in the order the person ran
+   * them, as the rows that a save writes: each one with its actor, once the
+   * pool knows it.
+   */
+  readonly queue: () => ReadonlyArray<WaitingRow>;
+  /** The transactions to send, without their actor. */
   readonly unsent: () => ReadonlyArray<Transaction>;
   readonly markSent: (ids: ReadonlyArray<string>, sent: boolean) => void;
   readonly applyDeltas: (deltas: ReadonlyArray<Delta>) => void;
@@ -103,7 +105,9 @@ export type Pool = ReadablePool & {
    * names. A copy of another actor is dropped whole: the confirmed records,
    * the loaded groups, the position and each waiting transaction. It returns
    * `false` then, and the engine pulls again from 0. A copy that names no
-   * actor takes this one. With no actor, from an older server, the copy stays.
+   * actor takes this one. In a copy that stays, each waiting transaction of
+   * another actor is dropped, never sent, and reported once, and each one with
+   * no actor takes this one. With no actor, from an older server, the copy stays.
    */
   readonly confirmActor: (actor?: SyncActor) => boolean;
   readonly settle: (outcomes: ReadonlyArray<Outcome>) => void;
@@ -129,8 +133,9 @@ export type Pool = ReadablePool & {
  * reads the clock and makes IDs on the client, so a test that gives its own
  * stamps gets the same records on every run.
  *
- * The confirmed records live in `confirmed.ts`. This file holds what goes on
- * top of them: the waiting transactions, the visible tables and the watchers.
+ * The confirmed records live in `confirmed.ts`, and the visible tables with
+ * their watchers in `visibleTables` of `tables.ts`. This file holds the
+ * waiting transactions that go on top of the confirmed records.
  */
 export function createPool(
   changes: ReadonlyArray<Replayable>,
@@ -142,14 +147,9 @@ export function createPool(
   const byName = new Map(changes.map((change) => [change.name, change]));
   const waits = groupWaits();
   const confirmed = createConfirmed(declarations.records, report, waits.loading);
-  let visible: Tables = new Map();
   let pending: Array<Pending> = [];
   let rejection: Rejection | undefined;
-  // The ID lists handed out, keyed by model and order. A list is rebuilt only
-  // after its model changes, and the old array is kept when the IDs match.
-  const idLists = new Map<string, { ids: ReadonlyArray<string>; stale: boolean }>();
-  const modelWatchers = listenerMap();
-  const recordWatchers = listenerMap();
+  const screen = visibleTables();
   const rejectionWatchers = new Set<() => void>();
   const changeListeners = new Set<() => void>();
   const pendingListeners = new Set<() => void>();
@@ -160,20 +160,7 @@ export function createPool(
     for (const { transaction } of pending) {
       byName.get(transaction.command)?.replay(draft, transaction.input);
     }
-    const changed = keepUnchanged(visible, next);
-    visible = next;
-    const models = new Set(changed.map(([name]) => name));
-    for (const [key, list] of idLists) {
-      if (models.has(key.slice(0, key.indexOf('\u0000')))) {
-        list.stale = true;
-      }
-    }
-    for (const [name, id] of changed) {
-      recordWatchers.wake(recordKey(name, id));
-    }
-    for (const name of models) {
-      modelWatchers.wake(name);
-    }
+    screen.show(next);
     wake(changeListeners);
   }
 
@@ -193,6 +180,20 @@ export function createPool(
     pending = pending.filter(({ acceptedAt }) => acceptedAt === null || acceptedAt > lastSyncId);
   }
 
+  /**
+   * Drops each waiting transaction of another actor, and reports it once. A
+   * transaction with no actor takes this one. It returns whether it dropped one.
+   */
+  function keepRowsOf(actor: SyncActor): boolean {
+    const kept = keepActor(pending, actor);
+    const dropped = kept.length < pending.length;
+    pending = kept;
+    if (dropped) {
+      report(otherActorRows);
+    }
+    return dropped;
+  }
+
   function resetConfirmed() {
     confirmed.reset();
     for (const entry of pending) {
@@ -204,20 +205,10 @@ export function createPool(
   }
 
   return {
-    get: <Row extends RecordRow>(model: Model<Row>, id: string) => readAs(model, visible, id),
-    ids(model, order, where) {
-      const key = `${model.name}\u0000${order ? `${order.by}:${order.direction}` : ''}\u0000${where ? `${where.field}=${where.equals}` : ''}`;
-      const cached = idLists.get(key);
-      if (cached && !cached.stale) {
-        return cached.ids;
-      }
-      const ids = sortedIds(visible.get(model.name), order, where);
-      const kept = cached && sameJson(cached.ids, ids) ? cached.ids : ids;
-      idLists.set(key, { ids: kept, stale: false });
-      return kept;
-    },
-    watchModel: (model, listener) => modelWatchers.add(model.name, listener),
-    watchRecord: (model, id, listener) => recordWatchers.add(recordKey(model.name, id), listener),
+    get: screen.get,
+    ids: screen.ids,
+    watchModel: screen.watchModel,
+    watchRecord: screen.watchRecord,
     lastRejection: () => rejection,
     watchRejection(listener) {
       rejectionWatchers.add(listener);
@@ -239,6 +230,7 @@ export function createPool(
       }
       pending.push({
         transaction: { id, command: command.name, input: filled },
+        actor: confirmed.actor(),
         sent: false,
         acceptedAt: null,
       });
@@ -260,23 +252,27 @@ export function createPool(
       }
       pending = [];
       // A copy with another shape may hold no list of saved commands.
-      for (const transaction of Array.isArray(state.pending) ? state.pending : []) {
+      for (const { actor, ...transaction } of Array.isArray(state.pending) ? state.pending : []) {
         const reason = savedCommandMisfit(transaction, declarations.commands);
         if (reason) {
           report(reason);
           refuse(transaction.id, transaction.command, reason);
         } else {
-          pending.push({ transaction, sent: false, acceptedAt: null });
+          pending.push({ transaction, actor, sent: false, acceptedAt: null });
         }
+      }
+      const owner = confirmed.actor();
+      if (owner) {
+        keepRowsOf(owner);
       }
       recompute();
     },
     snapshot: () => ({
       ...confirmed.snapshot(),
-      pending: pending.map(({ transaction }) => transaction),
+      pending: pending.map(rowOf),
     }),
     confirmedChanges: confirmed.changes,
-    queue: () => pending.map(({ transaction }) => transaction),
+    queue: () => pending.map(rowOf),
     unsent: () => pending.filter(({ sent }) => !sent).map(({ transaction }) => transaction),
     markSent(ids, sent) {
       for (const entry of pending) {
@@ -345,15 +341,19 @@ export function createPool(
       if (!actor) {
         return true;
       }
-      if (saved?.userId === actor.userId && saved.organizationId === actor.organizationId) {
+      if (!saved || sameActor(saved, actor)) {
+        const dropped = keepRowsOf(actor);
+        confirmed.setActor(actor);
+        // The next save writes the actor of the copy, and deletes each dropped row.
+        if (dropped) {
+          recompute();
+          wake(pendingListeners);
+        } else if (!saved) {
+          wake(changeListeners);
+        }
         return true;
       }
       confirmed.setActor(actor);
-      if (!saved) {
-        // The next save writes the actor of the copy.
-        wake(changeListeners);
-        return true;
-      }
       report(
         'This device held the data of another account, so the app removed it, with its unsent changes, and loads this account from the server.',
       );

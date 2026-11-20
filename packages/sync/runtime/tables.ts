@@ -1,14 +1,15 @@
 import type { Draft } from '@repo/sync/contract/command';
 import type { Model, RecordRow } from '@repo/sync/contract/record';
-import type { Outcome, Transaction } from '@repo/sync/types/protocol';
-import type { Rejection } from '@repo/sync/types/records';
+import type { WaitingRow } from '@repo/sync/types/local-database';
+import type { Outcome, SyncActor, Transaction } from '@repo/sync/types/protocol';
+import type { ReadablePool, Rejection } from '@repo/sync/types/records';
 
 /**
  * The plain data helpers of the object pool: tables of records, the draft a
- * local change writes to, the change detection that keeps unchanged records
- * as the same objects, the waits of the gates for a group, and the outcomes
- * of a push. They share
- * one module, because each module of the pool loads before the first paint.
+ * local change writes to, the visible tables that keep unchanged records as
+ * the same objects, the waits of the gates for a group, and the waiting
+ * transactions with the outcomes of a push. They share one module, because
+ * each module of the pool loads before the first paint.
  */
 export type Table = Map<string, RecordRow>;
 export type Tables = Map<string, Table>;
@@ -36,7 +37,7 @@ type FilterBy = { readonly field: string; readonly equals: string };
  * the doors of the pool check each record when it enters, so a stored record
  * always fits its model, and a missing one reads as undefined.
  */
-export function readAs<Row extends RecordRow>(
+function readAs<Row extends RecordRow>(
   model: Model<Row>,
   tables: Tables,
   id: string,
@@ -79,7 +80,7 @@ export function sameJson(a: unknown, b: unknown): boolean {
  * Puts each record of `before` that did not change back into `after`, so it
  * stays the same object. Returns each model and record ID that did change.
  */
-export function keepUnchanged(before: Tables, after: Tables): Array<[model: string, id: string]> {
+function keepUnchanged(before: Tables, after: Tables): Array<[model: string, id: string]> {
   const changed: Array<[model: string, id: string]> = [];
   for (const name of new Set([...before.keys(), ...after.keys()])) {
     const old = before.get(name) ?? new Map<string, RecordRow>();
@@ -102,7 +103,7 @@ export function keepUnchanged(before: Tables, after: Tables): Array<[model: stri
 }
 
 /** Sorts IDs by one field of their records, then by ID. `where` keeps only matching records. */
-export function sortedIds(
+function sortedIds(
   table: Table | undefined,
   order: SortBy | undefined,
   where: FilterBy | undefined,
@@ -117,7 +118,7 @@ export function sortedIds(
 }
 
 /** A set of listeners for each key, so a change wakes only its own listeners. */
-export function listenerMap() {
+function listenerMap() {
   const map = new Map<string, Set<() => void>>();
   return {
     add(key: string, listener: () => void) {
@@ -150,6 +151,55 @@ export function wake(listeners: Iterable<() => void>): void {
 }
 
 export const recordKey = (model: string, id: string) => `${model}\u0000${id}`;
+
+/** What a screen reads from the pool, and how it watches it. */
+type Reads = Pick<ReadablePool, 'get' | 'ids' | 'watchModel' | 'watchRecord'>;
+
+/**
+ * The tables that screens see, with their ID lists and watchers. `show` puts
+ * in the next tables. Each record that did not change stays the same object,
+ * and only the watchers of the records and models that changed wake. An ID
+ * list is built again only after its model changed, and the old array is
+ * kept when the IDs match, so a screen that reads it does not render again.
+ */
+export function visibleTables(): Reads & {
+  readonly show: (next: Tables) => void;
+} {
+  let visible: Tables = new Map();
+  const lists = new Map<string, { ids: ReadonlyArray<string>; changed: boolean }>();
+  const modelWatchers = listenerMap();
+  const recordWatchers = listenerMap();
+  return {
+    show(next) {
+      const changed = keepUnchanged(visible, next);
+      visible = next;
+      const models = new Set(changed.map(([name]) => name));
+      for (const [key, list] of lists) {
+        list.changed ||= models.has(key.slice(0, key.indexOf('\u0000')));
+      }
+      for (const [name, id] of changed) {
+        recordWatchers.wake(recordKey(name, id));
+      }
+      for (const name of models) {
+        modelWatchers.wake(name);
+      }
+    },
+    get: (model, id) => readAs(model, visible, id),
+    ids(model, order, where) {
+      const key = `${model.name}\u0000${order ? `${order.by}:${order.direction}` : ''}\u0000${where ? `${where.field}=${where.equals}` : ''}`;
+      const known = lists.get(key);
+      if (known && !known.changed) {
+        return known.ids;
+      }
+      const ids = sortedIds(visible.get(model.name), order, where);
+      const kept = known && sameJson(known.ids, ids) ? known.ids : ids;
+      lists.set(key, { ids: kept, changed: false });
+      return kept;
+    },
+    watchModel: (model, listener) => modelWatchers.add(model.name, listener),
+    watchRecord: (model, id, listener) => recordWatchers.add(recordKey(model.name, id), listener),
+  };
+}
 
 /**
  * The gates that wait for a group, and the groups that the engine still has
@@ -229,6 +279,30 @@ export function groupWaits(): GroupWaits {
 
 /** A waiting transaction, with the sync ID of the event that accepted it, if one did. */
 type Waiting = { readonly transaction: Transaction; acceptedAt: number | null };
+
+/** A waiting transaction of the pool, with the actor that ran it if the pool knew it. */
+export type Pending = Waiting & { actor: SyncActor | undefined; sent: boolean };
+
+/** The saved row of a waiting transaction, with its actor when it has one. */
+export const rowOf = ({ transaction, actor }: Pending): WaitingRow =>
+  actor ? { ...transaction, actor } : transaction;
+
+/** Whether two actors are the same user in the same organization. */
+export function sameActor(a: SyncActor, b: SyncActor): boolean {
+  return a.userId === b.userId && a.organizationId === b.organizationId;
+}
+
+/**
+ * The waiting transactions that `actor` may send: each one of another actor
+ * is left out, and each one with no actor takes this one.
+ */
+export function keepActor(pending: ReadonlyArray<Pending>, actor: SyncActor): Array<Pending> {
+  const kept = pending.filter((entry) => !entry.actor || sameActor(entry.actor, actor));
+  for (const entry of kept) {
+    entry.actor = actor;
+  }
+  return kept;
+}
 
 /**
  * The waiting transactions after the outcomes of one push, and the last

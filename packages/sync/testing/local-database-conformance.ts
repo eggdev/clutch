@@ -230,6 +230,16 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
     },
   },
   {
+    name: 'a waiting row keeps its actor, and a row with no actor reads with none',
+    async run(open) {
+      const db = await open();
+      const actor = { userId: 'ana', organizationId: 'acme' };
+      await db.save({ add: [{ ...rename('t1'), actor }, rename('t2')], done: [] });
+      const read = await readState(db, 'The read of the waiting rows');
+      expectSame(read.pending, [{ ...rename('t1'), actor }, rename('t2')], 'The waiting rows');
+    },
+  },
+  {
     name: 'clear makes the next read undefined, and a save after a clear reads back',
     async run(open) {
       const db = await open();

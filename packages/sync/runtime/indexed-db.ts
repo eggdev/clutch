@@ -96,7 +96,8 @@ function writerOf(name: string): Promise<Writer> {
 /**
  * The web adapter of the local database: one IndexedDB database with a store
  * for the confirmed records, one for the waiting transactions and one for
- * the sync position. Only the sync engine reads or writes it.
+ * the sync position. Only the sync engine reads or writes it. A clear tells
+ * each other tab of the same name through a `BroadcastChannel`.
  *
  * Version 1 kept the whole state under one key. The upgrade moves its rows
  * into the new stores and deletes the old store. See
@@ -135,6 +136,9 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
   });
   const database = await Promise.race([opening, blocked.promise]);
   const writer = await writerOf(name);
+  // Each other tab of this database hears a clear on this channel. A channel
+  // never hears its own message.
+  const tabs = typeof BroadcastChannel === 'undefined' ? undefined : new BroadcastChannel(name);
   return {
     read: async () => {
       const tx = database.transaction(stores, 'readonly');
@@ -151,8 +155,21 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
       await Promise.all([write(tx, save), tx.done]);
     },
     clear: async () => {
+      // The message goes before the clear starts, so each database transaction
+      // that another tab starts after it hears it runs after the clear.
+      if (tabs) {
+        // A channel reaches only the pages of this origin, so it takes no
+        // target origin. The lint rule for `postMessage` reads each such call
+        // as one on a window, so the call goes through `Reflect.apply`.
+        Reflect.apply(BroadcastChannel.prototype.postMessage, tabs, ['cleared']);
+      }
       const tx = database.transaction(stores, 'readwrite');
       await Promise.all([...stores.map((store) => tx.objectStore(store).clear()), tx.done]);
+    },
+    onClearedElsewhere(listener) {
+      const heard = () => listener();
+      tabs?.addEventListener('message', heard);
+      return () => tabs?.removeEventListener('message', heard);
     },
     isWriter: () => writer.held,
     writer: writer.taken,

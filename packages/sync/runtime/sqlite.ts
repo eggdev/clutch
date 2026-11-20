@@ -26,6 +26,10 @@ function parsed(text: unknown): unknown {
   }
 }
 
+function noOtherTab() {
+  // One process uses the file, so no other tab clears it.
+}
+
 const schema = [
   'create table if not exists pool_records (name text not null, model text not null, id text not null, value text not null, primary key (name, model, id))',
   'create table if not exists pool_transactions (seq integer primary key autoincrement, name text not null, id text not null, value text not null, unique (name, id))',
@@ -142,6 +146,7 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
           }
         }),
       ),
+    onClearedElsewhere: () => noOtherTab,
     // One process uses the file, so it writes from the start.
     isWriter: () => true,
     writer: Promise.resolve(),
