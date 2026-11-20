@@ -196,6 +196,11 @@ A start that throws does not leave an empty page. The store in
 shows it with a button that starts again. `apps/app/lib/boot-store.test.ts`
 holds that rule.
 
+The object pool has two files. `packages/sync/runtime/confirmed.ts` holds the
+confirmed records: what the server sent, the groups and sync ID of each record,
+and the loaded groups. `packages/sync/runtime/pool.ts` puts each waiting
+transaction on top of them, and holds the watchers that screens use.
+
 The object pool is checked against a plain reference model in
 `packages/sync/runtime/pool-conformance.test.ts`.
 

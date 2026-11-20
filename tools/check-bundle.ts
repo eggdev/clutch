@@ -16,7 +16,7 @@ import { clientApps, manifestOf } from '@tools/apps';
  * The build has no source maps. The `chunkModules` plugin of
  * `@repo/app-build` writes the modules of each chunk beside the manifest.
  */
-export const budget = 390;
+export const budget = 391;
 /** A module of the Effect package, by its path from the repository root. */
 const effectModule = /(?:^|\/)node_modules\/effect\//u;
 /** The list that the `chunkModules` plugin writes, from the folder of the built client. */

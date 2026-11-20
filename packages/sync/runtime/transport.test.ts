@@ -8,7 +8,7 @@ import { GroupNotAllowed } from '@repo/sync/types/group-not-allowed';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import type { Outcome, SyncMessage, Transaction } from '@repo/sync/types/protocol';
 import { SessionEnded } from '@repo/sync/types/session-ended';
-import { Effect, Schedule, Stream } from 'effect';
+import { Effect, Queue, Schedule, Schema, Stream } from 'effect';
 import { RpcTest } from 'effect/rpc';
 
 const card = testModel('Card', { id: 'string', title: 'string' });
@@ -273,4 +273,123 @@ test('a pull that fails with an ended session stops the pushes too', async () =>
   expect(pulls).toBe(1);
   expect(pushes).toBe(0);
   expect(pool.unsent()).toHaveLength(1);
+});
+
+test('a queue of more transactions than one push holds goes in more than one push, in order', async () => {
+  const pool = createPool([], declared, { stamps: testStamps() });
+  const ids = Array.from({ length: 250 }, (_, index) => pool.run(archive, { id: `c${index}` }));
+  const pushes: Array<ReadonlyArray<string>> = [];
+  await connected(
+    pool,
+    {
+      push: (transactions) => {
+        pushes.push(transactions.map((transaction) => transaction.id));
+        return transactions.map((transaction) => ({
+          transactionId: transaction.id,
+          status: 'accepted' as const,
+          syncId: 1,
+          reason: null,
+          code: null,
+        }));
+      },
+      allows: () => true,
+    },
+    () => pushes.flat().length === 250,
+  );
+  expect(pushes.map((batch) => batch.length)).toEqual([100, 100, 50]);
+  expect(pushes.flat()).toEqual(ids);
+});
+
+/** A change of card `id` in space x. */
+const inSpace = (id: string, syncId: number) => ({
+  syncId,
+  transactionId: null,
+  changes: [
+    {
+      model: 'Card',
+      id,
+      action: 'upsert' as const,
+      data: { id, title: id },
+      groups: ['space:x'],
+    },
+  ],
+});
+
+test('a client that drops between two pages loads the whole group again on the next pull', async () => {
+  const pool = createPool([], declared, { stamps: testStamps() });
+  const gate = pool.loadGroup('space:x');
+  const pulls: Array<PullCall> = [];
+  const asked: Array<{ group: string; pages: boolean | undefined }> = [];
+  const loads = Effect.runSync(Queue.unbounded<string>());
+  const handlers = SyncRpcs.toLayer({
+    Push: () => Effect.succeed([]),
+    Pull: (call) => {
+      pulls.push({ lastSyncId: call.lastSyncId, groups: call.groups });
+      const first = pulls.length === 1;
+      const opened = Stream.make<Array<SyncMessage>>({
+        _tag: 'Groups',
+        loaded: ['org:a'],
+        backfill: [],
+      });
+      const afterLoad = Stream.unwrap(
+        Effect.map(Queue.take(loads), (): Stream.Stream<SyncMessage> =>
+          first
+            ? Stream.concat(
+                Stream.make<Array<SyncMessage>>({
+                  _tag: 'Page',
+                  group: 'space:x',
+                  backfill: [inSpace('a', 1)],
+                }),
+                Stream.die('The socket dropped.'),
+              )
+            : Stream.concat(
+                Stream.make<Array<SyncMessage>>(
+                  { _tag: 'Page', group: 'space:x', backfill: [inSpace('a', 1)] },
+                  { _tag: 'Groups', loaded: ['org:a', 'space:x'], backfill: [inSpace('b', 2)] },
+                ),
+                Stream.never,
+              ),
+        ),
+      );
+      return Stream.concat(opened, afterLoad);
+    },
+    Load: ({ group, pages }) =>
+      Effect.gen(function* () {
+        asked.push({ group, pages });
+        yield* Queue.offer(loads, group);
+      }),
+  });
+  let loaded = false;
+  void gate.then(() => {
+    loaded = true;
+  });
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(SyncRpcs);
+      yield* Effect.forkScoped(engine(pool, client, 'digest', sessionStays));
+      yield* Effect.suspend(() => (loaded ? Effect.void : Effect.fail('not yet'))).pipe(
+        Effect.retry(Schedule.spaced('10 millis')),
+        Effect.timeout('5 seconds'),
+      );
+    }).pipe(Effect.scoped, Effect.provide(handlers)),
+  );
+  expect(asked).toEqual([
+    { group: 'space:x', pages: true },
+    { group: 'space:x', pages: true },
+  ]);
+  // The second pull does not name the group whose pages stopped half way.
+  expect(pulls.map((call) => call.groups)).toEqual([[], ['org:a']]);
+  expect(pool.loadedGroups().toSorted()).toEqual(['org:a', 'space:x']);
+  expect(pool.ids(card).toSorted()).toEqual(['a', 'b']);
+});
+
+test('an older server reads a load that asks for pages, and a newer one reads a load without it', () => {
+  const older = Schema.Struct({ group: Schema.String });
+  expect(Schema.decodeUnknownSync(older)({ group: 'space:x', pages: true })).toEqual({
+    group: 'space:x',
+  });
+  const load = SyncRpcs.requests.get('Load');
+  expect(load && Schema.decodeUnknownSync(load.payloadSchema)({ group: 'space:x' })).toEqual({
+    group: 'space:x',
+  });
 });

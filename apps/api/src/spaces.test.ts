@@ -22,9 +22,13 @@ const changesOf = (message: SyncMessage) =>
 
 /** A short form of each message: the records it adds, or the loaded groups and the backfill. */
 function summary(message: SyncMessage) {
-  return message._tag === 'Deltas'
-    ? `deltas ${message.deltas.flatMap((delta) => delta.changes.map((change) => change.id)).join(',')}`
-    : `groups ${message.loaded.toSorted().join(',')} backfill ${message.backfill.flatMap((delta) => delta.changes.map((change) => change.id)).join(',')}`;
+  if (message._tag === 'Deltas') {
+    return `deltas ${message.deltas.flatMap((delta) => delta.changes.map((change) => change.id)).join(',')}`;
+  }
+  const backfill = message.backfill.flatMap((delta) => delta.changes.map((change) => change.id));
+  return message._tag === 'Page'
+    ? `page ${message.group} backfill ${backfill.join(',')}`
+    : `groups ${message.loaded.toSorted().join(',')} backfill ${backfill.join(',')}`;
 }
 
 test('two users in different spaces get only the records of their groups', async () => {
