@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.6 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): send a group backfill in pages, and limit one push (CL-577)
+
 ## 1.23.5 (2026-11-20)
 
 ### Fixes and maintenance
