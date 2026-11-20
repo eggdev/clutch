@@ -28,11 +28,10 @@ export type PoolState = {
   readonly unreadable?: true;
 };
 
-/** The key of one saved confirmed record. */
-export type RecordKey = { readonly model: string; readonly id: string };
-
-/** One row of a confirmed record: the record, its groups and the sync ID of its last change. */
-export type SavedRecord = RecordKey & {
+/** One row of a confirmed record, by its model and ID: the record, its groups and the sync ID of its last change. */
+export type SavedRecord = {
+  readonly model: string;
+  readonly id: string;
   readonly row: RecordRow;
   readonly groups: ReadonlyArray<string>;
   readonly syncId: number;
@@ -41,23 +40,17 @@ export type SavedRecord = RecordKey & {
 /** The one row of the sync position: the last sync ID, the loaded groups and `leftOutBy`. */
 export type SyncPosition = Pick<PoolState, 'lastSyncId' | 'groups' | 'leftOutBy'>;
 
-/**
- * The confirmed part of one save: the records that changed, the records that
- * were deleted, and the sync position. `replace` removes every saved record
- * first, and `put` then holds every record of the pool.
- */
+/** The confirmed part of one save: every record of the pool, which replace the saved ones, and the sync position. */
 export type ConfirmedSave = {
-  readonly replace: boolean;
   readonly put: ReadonlyArray<SavedRecord>;
-  readonly remove: ReadonlyArray<RecordKey>;
   readonly position: SyncPosition;
 };
 
 /**
  * One save, which the adapter writes in one database transaction. `add`
  * holds the waiting transactions that this tab ran since its last save, and
- * `done` the IDs of the ones that left its queue. Only the tab that writes
- * the confirmed records sends `confirmed`.
+ * `done` the IDs of the ones that left its queue. A save with no
+ * `confirmed` writes only the waiting transactions.
  */
 export type LocalSave = {
   readonly confirmed?: ConfirmedSave;
@@ -85,12 +78,4 @@ export type LocalDatabase = {
   readonly save: (save: LocalSave) => Promise<void>;
   /** Removes every row. */
   readonly clear: () => Promise<void>;
-  /**
-   * Whether this tab writes the confirmed records now. Two tabs hold
-   * different groups and positions, so only one tab writes them. A platform
-   * with one process has one writer from the start.
-   */
-  readonly isWriter: () => boolean;
-  /** Resolves when this tab becomes the writer, such as after the writer tab closes. */
-  readonly writer: Promise<unknown>;
 };

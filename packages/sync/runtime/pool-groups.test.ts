@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import { defineGroup } from '@repo/sync/contract/groups';
 import { record } from '@repo/sync/contract/record';
 import { createPool } from '@repo/sync/runtime/pool';
+import { fullSave } from '@repo/sync/runtime/pool-doors';
 import { memoryLocalDatabase } from '@repo/sync/testing/local-database';
 import type { Change } from '@repo/sync/types/protocol';
 
@@ -40,14 +41,12 @@ test('losing a group deletes its records, and a record still in another group st
   expect(pool.loadedGroups().toSorted()).toEqual(['org:a', 'space:y']);
 });
 
-test('the purge reaches the local database through the next save, which removes only the purged rows', async () => {
+test('the purge reaches the local database through the next save', async () => {
   const pool = loadedPool();
-  const database = memoryLocalDatabase(pool.snapshot());
-  // The database holds the state now, so the changes before this point are saved.
-  pool.confirmedChanges(false);
+  const database = memoryLocalDatabase();
   const saves: Array<Promise<void>> = [];
   pool.onChange(() => {
-    saves.push(database.save({ confirmed: pool.confirmedChanges(false), add: [], done: [] }));
+    saves.push(database.save(fullSave(pool.snapshot())));
   });
   pool.applyGroups(['org:a'], []);
   // Wait for the save that the purge started, not for a guessed tick.
@@ -56,9 +55,6 @@ test('the purge reaches the local database through the next save, which removes 
   const saved = await database.read();
   expect(saved?.tables.Card ?? []).toEqual([]);
   expect(Object.keys(saved?.meta ?? {})).toEqual([]);
-  const [purge] = database.saves();
-  expect(purge?.confirmed?.replace).toBe(false);
-  expect(purge?.confirmed?.remove.map(({ id }) => id).toSorted()).toEqual(['a', 'b', 'both']);
 });
 
 test('a backfill adds the past records of a new group, and never undoes a later change', () => {

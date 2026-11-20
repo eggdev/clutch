@@ -18,21 +18,13 @@ function rename(id: string, title = 'New'): Transaction {
   return { id, command: 'cards/rename', input: { id: 'a', title } };
 }
 
-/** A state with two confirmed records, a loaded group and one pending transaction. */
+/** A state with a confirmed record, a loaded group and one pending transaction. */
 function sampleState(title = 'Old'): PoolState {
   return {
     lastSyncId: 7,
-    tables: {
-      Card: [
-        { id: 'a', title },
-        { id: 'b', title: 'Kept' },
-      ],
-    },
+    tables: { Card: [{ id: 'a', title }] },
     groups: ['test'],
-    meta: {
-      'Card\u0000a': { groups: ['test'], syncId: 7 },
-      'Card\u0000b': { groups: ['test'], syncId: 5 },
-    },
+    meta: { 'Card\u0000a': { groups: ['test'], syncId: 7 } },
     pending: [rename('t1')],
     leftOutBy: 'old-build',
   };
@@ -118,44 +110,6 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
       };
       await db.save(fullSave(second));
       expectSame(await db.read(), second, 'The read after two full saves');
-    },
-  },
-  {
-    name: 'a save of one change writes that record and the position, and keeps every other record',
-    async run(open) {
-      const db = await open();
-      await db.save(fullSave(sampleState()));
-      await db.save({
-        confirmed: {
-          replace: false,
-          put: [
-            { model: 'Card', id: 'c', row: { id: 'c', title: 'New' }, groups: ['test'], syncId: 8 },
-          ],
-          remove: [{ model: 'Card', id: 'a' }],
-          position: { lastSyncId: 8, groups: ['test'] },
-        },
-        add: [],
-        done: [],
-      });
-      expectSame(
-        await db.read(),
-        {
-          lastSyncId: 8,
-          tables: {
-            Card: [
-              { id: 'b', title: 'Kept' },
-              { id: 'c', title: 'New' },
-            ],
-          },
-          groups: ['test'],
-          meta: {
-            'Card\u0000b': { groups: ['test'], syncId: 5 },
-            'Card\u0000c': { groups: ['test'], syncId: 8 },
-          },
-          pending: [rename('t1')],
-        },
-        'The read after a save of one change',
-      );
     },
   },
   {

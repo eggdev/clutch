@@ -153,11 +153,9 @@ export function deltaRecordMisfit(
 }
 
 /*
- * Door 1, rows. The rows of the local database hold whatever the device
- * kept, so each adapter joins them here, and each row is checked for its
- * outer shape. The checks below then check the records and the commands in
- * them when the pool loads them. A copy in the old layout moves into rows here
- * too.
+ * Door 1, rows. The rows of the local database hold whatever the device kept,
+ * so each adapter joins them here, and each row is checked for its outer shape.
+ * A copy in the old layout moves into rows here too.
  */
 
 function isStrings(value: unknown): value is ReadonlyArray<string> {
@@ -197,9 +195,7 @@ function isTransaction(value: unknown): value is Transaction {
  * with no row reads as `undefined`. A record row or a position row with
  * another shape makes the confirmed part unreadable, so the read keeps no
  * record and no position, and the pool reports it and loads again from the
- * server. A
- * waiting transaction with another shape is left out, since it names no
- * command that could run.
+ * server. A waiting transaction with another shape is left out.
  */
 export function stateOf(
   records: ReadonlyArray<unknown>,
@@ -216,7 +212,7 @@ export function stateOf(
   const tables: Record<string, Array<RecordRow>> = {};
   const meta: Record<string, RecordMeta> = {};
   for (const { model, id, row, groups, syncId } of records) {
-    tables[model] = [...(tables[model] ?? []), row];
+    (tables[model] ??= []).push(row);
     meta[recordKey(model, id)] = { groups, syncId };
   }
   const saved = isPosition(position) ? position : { lastSyncId: 0, groups: [] };
@@ -241,9 +237,7 @@ export function fullSave(state: PoolState): LocalSave {
   }
   return {
     confirmed: {
-      replace: true,
       put,
-      remove: [],
       position: {
         lastSyncId: state.lastSyncId,
         groups: state.groups,
@@ -266,9 +260,8 @@ export function oldLayoutSave(value: unknown): LocalSave {
   if (!isObject(value)) {
     return { add: [], done: [] };
   }
-  const { pending } = value;
+  const { pending, tables, meta } = value;
   const add = Array.isArray(pending) ? pending.filter(isTransaction) : [];
-  const { tables, meta } = value;
   const position = {
     lastSyncId: value['lastSyncId'],
     groups: value['groups'],
@@ -291,5 +284,5 @@ export function oldLayoutSave(value: unknown): LocalSave {
       put.push({ model, id: row.id, row, groups: known['groups'], syncId });
     }
   }
-  return { confirmed: { replace: true, put, remove: [], position }, add, done: [] };
+  return { confirmed: { put, position }, add, done: [] };
 }

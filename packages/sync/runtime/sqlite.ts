@@ -64,16 +64,7 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
   async function write(save: LocalSave): Promise<void> {
     const { confirmed } = save;
     if (confirmed) {
-      if (confirmed.replace) {
-        await driver.run('delete from pool_records where name = ?', [name]);
-      }
-      for (const { model, id } of confirmed.remove) {
-        await driver.run('delete from pool_records where name = ? and model = ? and id = ?', [
-          name,
-          model,
-          id,
-        ]);
-      }
+      await driver.run('delete from pool_records where name = ?', [name]);
       for (const record of confirmed.put) {
         await driver.run(
           'insert into pool_records (name, model, id, value) values (?, ?, ?, ?) on conflict (name, model, id) do update set value = excluded.value',
@@ -142,8 +133,5 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
           }
         }),
       ),
-    // One process uses the file, so it writes from the start.
-    isWriter: () => true,
-    writer: Promise.resolve(),
   };
 }

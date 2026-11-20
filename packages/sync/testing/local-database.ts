@@ -13,37 +13,25 @@ import type { Transaction } from '@repo/sync/types/protocol';
 export type MemoryLocalDatabase = LocalDatabase & {
   /** The number of saves that this handle wrote. */
   readonly writes: () => number;
-  /** Each save that a handle of these rows wrote, in order. */
-  readonly saves: () => ReadonlyArray<LocalSave>;
-  /**
-   * Another handle on the same rows, as a second tab has. It writes the
-   * confirmed records once `writer` resolves.
-   */
-  readonly tab: (writer: Promise<unknown>) => MemoryLocalDatabase;
+  /** Another handle on the same rows, as a second tab has. */
+  readonly tab: () => MemoryLocalDatabase;
 };
 
 /**
  * A local database in memory, for tests. It keeps the same rows as the real
  * adapters: one for each confirmed record, one for each waiting transaction
  * and one for the sync position. It keeps a copy of each value it gets.
- * `initial` is written as the first rows. The first handle writes the
- * confirmed records from the start.
+ * `initial` is written as the first rows.
  */
 export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
   const records = new Map<string, SavedRecord>();
   let transactions: Array<Transaction> = [];
   let position: SyncPosition | undefined;
-  const log: Array<LocalSave> = [];
 
   function apply(save: LocalSave) {
     const { confirmed } = save;
     if (confirmed) {
-      if (confirmed.replace) {
-        records.clear();
-      }
-      for (const { model, id } of confirmed.remove) {
-        records.delete(recordKey(model, id));
-      }
+      records.clear();
       for (const record of confirmed.put) {
         records.set(recordKey(record.model, record.id), structuredClone(record));
       }
@@ -66,14 +54,12 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
     apply(fullSave(initial));
   }
 
-  function handle(writer: Promise<unknown>, held: boolean): MemoryLocalDatabase {
-    let isWriter = held;
+  function handle(): MemoryLocalDatabase {
     let writes = 0;
     return {
       read: () => Promise.resolve(structuredClone(stateOf(inKeyOrder(), position, transactions))),
       save: (save) => {
         apply(save);
-        log.push(structuredClone(save));
         writes += 1;
         return Promise.resolve();
       },
@@ -83,16 +69,10 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
         position = undefined;
         return Promise.resolve();
       },
-      isWriter: () => isWriter,
-      writer: (async () => {
-        await writer;
-        isWriter = true;
-      })(),
       writes: () => writes,
-      saves: () => log,
-      tab: (next) => handle(next, false),
+      tab: () => handle(),
     };
   }
 
-  return handle(Promise.resolve(), true);
+  return handle();
 }

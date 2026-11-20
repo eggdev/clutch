@@ -24,10 +24,7 @@ const renameLocal = localChange(rename, (draft, input) => {
 });
 const cards = defineContract('cards', { records: [card], commands: [rename], loads: [] });
 
-/**
- * A handle whose saves a test can wait for. Ask for `nextSave()` before the act
- * that saves, then await it, so the test waits for the save itself.
- */
+/** A handle whose saves a test can wait for: ask for `nextSave()` before the act that saves. */
 function watched(database: MemoryLocalDatabase): {
   readonly database: LocalDatabase;
   readonly nextSave: () => Promise<LocalSave>;
@@ -52,9 +49,7 @@ test('the pool loads from any local database adapter, and each change is written
     poolState({ lastSyncId: 2, tables: { Card: [{ id: 'a', title: 'Saved' }] } }),
   );
   const { database, nextSave } = watched(memory);
-  const first = nextSave();
   const pool = await loadPool(database, [renameLocal], [cards]);
-  await first;
   expect(pool.get(card, 'a')?.title).toBe('Saved');
   const written = nextSave();
   pool.run(rename, { id: 'a', title: 'Changed' });
@@ -64,70 +59,21 @@ test('the pool loads from any local database adapter, and each change is written
   expect(saved?.lastSyncId).toBe(2);
 });
 
-test('one delta saves only the records that it changed, with the sync position, in one save', async () => {
-  const memory = memoryLocalDatabase(
-    poolState({
-      lastSyncId: 2,
-      tables: {
-        Card: [
-          { id: 'a', title: 'A' },
-          { id: 'b', title: 'B' },
-          { id: 'c', title: 'C' },
-        ],
-      },
-    }),
-  );
-  const { database, nextSave } = watched(memory);
-  const first = nextSave();
-  const pool = await loadPool(database, [renameLocal], [cards]);
-  // The first save after a load that fit writes no record.
-  const afterLoad = await first;
-  expect(afterLoad.confirmed?.put).toEqual([]);
-  const written = nextSave();
-  pool.applyDeltas([
-    {
-      syncId: 3,
-      transactionId: null,
-      changes: [
-        {
-          model: 'Card',
-          id: 'b',
-          action: 'upsert',
-          data: { title: 'New' },
-          groups: [testGroup],
-        },
-      ],
-    },
-  ]);
-  const save = await written;
-  expect(save.confirmed?.replace).toBe(false);
-  expect(save.confirmed?.put.map(({ id, row }) => [id, row.title])).toEqual([['b', 'New']]);
-  expect(save.confirmed?.remove).toEqual([]);
-  expect(save.confirmed?.position.lastSyncId).toBe(3);
-  const saved = await memory.read();
-  expect(saved?.tables.Card?.map(({ title }) => title)).toEqual(['A', 'New', 'C']);
-});
-
 test('two tabs on one database: a waiting transaction of one stays after the saves of the other', async () => {
   const memory = memoryLocalDatabase(
     poolState({ lastSyncId: 2, tables: { Card: [{ id: 'a', title: 'Saved' }] } }),
   );
-  const writerTab = watched(memory);
-  // The second tab gets the lock when the first tab closes.
-  const closes = Promise.withResolvers<null>();
-  const otherTab = watched(memory.tab(closes.promise));
-  const loadedWriter = writerTab.nextSave();
-  const writer = await loadPool(writerTab.database, [renameLocal], [cards], testStamps());
-  await loadedWriter;
-  const other = await loadPool(otherTab.database, [renameLocal], [cards], testStamps('later'));
-  // The other tab runs a command offline. It saves only its waiting transaction.
-  const offline = otherTab.nextSave();
-  const id = other.run(rename, { id: 'a', title: 'Offline' });
-  const offlineSave = await offline;
-  expect(offlineSave.confirmed).toBeUndefined();
-  // The writer tab gets a delta and saves its own state, which has no waiting transaction.
-  const delta = writerTab.nextSave();
-  writer.applyDeltas([
+  const firstTab = watched(memory);
+  const secondTab = watched(memory.tab());
+  const first = await loadPool(firstTab.database, [renameLocal], [cards], testStamps());
+  const second = await loadPool(secondTab.database, [renameLocal], [cards], testStamps('later'));
+  // The second tab runs a command offline.
+  const offline = secondTab.nextSave();
+  const id = second.run(rename, { id: 'a', title: 'Offline' });
+  await offline;
+  // The first tab gets a delta and saves its own state, which has no waiting transaction.
+  const delta = firstTab.nextSave();
+  first.applyDeltas([
     {
       syncId: 3,
       transactionId: null,
@@ -143,25 +89,15 @@ test('two tabs on one database: a waiting transaction of one stays after the sav
     },
   ]);
   await delta;
-  const afterDelta = await memory.read();
-  expect(afterDelta?.pending.map((transaction) => transaction.id)).toEqual([id]);
-  expect(afterDelta?.lastSyncId).toBe(3);
-  // The writer tab closes. The other tab becomes the writer and saves its whole state once.
-  const takeover = otherTab.nextSave();
-  closes.resolve(null);
-  const whole = await takeover;
-  expect(whole.confirmed?.replace).toBe(true);
-  const afterTakeover = await memory.read();
-  expect(afterTakeover?.lastSyncId).toBe(2);
-  expect(afterTakeover?.pending.map((transaction) => transaction.id)).toEqual([id]);
+  const saved = await memory.read();
+  expect(saved?.pending.map((transaction) => transaction.id)).toEqual([id]);
+  expect(saved?.lastSyncId).toBe(3);
 });
 
 test('a tab deletes the row of its transaction when the transaction leaves its queue', async () => {
   const memory = memoryLocalDatabase(poolState({ lastSyncId: 2, tables: { Card: [] } }));
   const tab = watched(memory);
-  const loaded = tab.nextSave();
   const pool = await loadPool(tab.database, [renameLocal], [cards], testStamps());
-  await loaded;
   const ran = tab.nextSave();
   const id = pool.run(rename, { id: 'a', title: 'Mine' });
   await ran;
@@ -169,23 +105,6 @@ test('a tab deletes the row of its transaction when the transaction leaves its q
   pool.applyDeltas([{ syncId: 3, transactionId: id, changes: [] }]);
   const answerSave = await answered;
   expect(answerSave.done).toEqual([id]);
-  const saved = await memory.read();
-  expect(saved?.pending).toEqual([]);
-});
-
-test('a saved command that this build refuses at load leaves the database at the first save', async () => {
-  const memory = memoryLocalDatabase(
-    poolState({
-      lastSyncId: 2,
-      tables: {},
-      pending: [{ id: 'old', command: 'cards/unknown', input: {} }],
-    }),
-  );
-  const { database, nextSave } = watched(memory);
-  const first = nextSave();
-  await loadPool(database, [renameLocal], [cards], testStamps(), () => null);
-  const firstSave = await first;
-  expect(firstSave.done).toEqual(['old']);
   const saved = await memory.read();
   expect(saved?.pending).toEqual([]);
 });
@@ -227,13 +146,13 @@ test('the pool takes its IDs and its time from the stamps of the platform', asyn
   expect(pool.run(rename, { id: 'a', title: 'New' })).toBe('id-1');
 });
 
-test('a save that fails is reported once, and the next change saves every record and the newest queue', async () => {
+test('a save that fails is reported once, and the next change saves the newest state and queue', async () => {
   const memory = memoryLocalDatabase(
     poolState({ lastSyncId: 2, tables: { Card: [{ id: 'a', title: 'Saved' }] } }),
   );
   const lines: Array<string> = [];
-  // The device refuses two saves after the load, as a full device does.
-  let refusals = 0;
+  // The device refuses the first two saves, as a full device does.
+  let refusals = 2;
   let settled = Promise.withResolvers<null>();
   const pool = await loadPool(
     {
@@ -255,8 +174,6 @@ test('a save that fails is reported once, and the next change saves every record
     testStamps(),
     (line) => lines.push(line),
   );
-  await settled.promise;
-  refusals = 2;
   for (const title of ['First', 'Second', 'Third']) {
     settled = Promise.withResolvers<null>();
     pool.run(rename, { id: 'a', title });
@@ -267,9 +184,6 @@ test('a save that fails is reported once, and the next change saves every record
   expect(lines).toEqual([
     'This device could not save the last change. The change stays on this screen, and the next change saves again.',
   ]);
-  const last = memory.saves().at(-1);
-  expect(last?.confirmed?.replace).toBe(true);
-  expect(last?.add).toHaveLength(3);
   const saved = await memory.read();
   expect(saved?.pending).toHaveLength(3);
 });

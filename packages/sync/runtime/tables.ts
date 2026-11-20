@@ -1,6 +1,5 @@
 import type { Draft } from '@repo/sync/contract/command';
 import type { Model, RecordRow } from '@repo/sync/contract/record';
-import type { RecordKey, RecordMeta, SavedRecord } from '@repo/sync/types/local-database';
 
 /**
  * The plain data helpers of the object pool: tables of records, the draft a
@@ -148,30 +147,6 @@ export function wake(listeners: Iterable<() => void>): void {
 }
 
 export const recordKey = (model: string, id: string) => `${model}\u0000${id}`;
-
-/**
- * The rows of the confirmed records with these keys, for a save: a row for
- * each record that the pool holds, and a key to remove for each other one.
- */
-export function savedRows(
-  keys: Iterable<string>,
-  meta: ReadonlyMap<string, RecordMeta>,
-  tables: Tables,
-): { readonly put: Array<SavedRecord>; readonly remove: Array<RecordKey> } {
-  const put: Array<SavedRecord> = [];
-  const remove: Array<RecordKey> = [];
-  for (const key of keys) {
-    const [model = '', id = ''] = key.split('\u0000');
-    const known = meta.get(key);
-    const row = tables.get(model)?.get(id);
-    if (known && row) {
-      put.push({ model, id, row, groups: known.groups, syncId: known.syncId });
-    } else {
-      remove.push({ model, id });
-    }
-  }
-  return { put, remove };
-}
 
 /**
  * The gates that wait for a group, and the groups that the engine still has

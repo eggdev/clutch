@@ -25,12 +25,7 @@ async function write(tx: Writable, save: LocalSave): Promise<void> {
   const requests: Array<Promise<unknown>> = [];
   const { confirmed } = save;
   if (confirmed) {
-    if (confirmed.replace) {
-      requests.push(recordStore.clear());
-    }
-    for (const { model, id } of confirmed.remove) {
-      requests.push(recordStore.delete([model, id]));
-    }
+    requests.push(recordStore.clear());
     for (const record of confirmed.put) {
       requests.push(recordStore.put(record));
     }
@@ -51,58 +46,14 @@ async function write(tx: Writable, save: LocalSave): Promise<void> {
   await Promise.all(requests);
 }
 
-type Writer = { held: boolean; readonly taken: Promise<null> };
-
-/**
- * Whether this page writes the confirmed records of a database name. The
- * page that holds the Web Lock of the name is the writer until it closes.
- * Then the next page gets the lock. The open asks for a free lock first, so
- * the first page knows that it writes before it reads. Each handle of one
- * page shares the answer, so a start again after a sign-out stays the
- * writer. A browser with no Web Locks lets each page write.
- */
-const writers = new Map<string, Promise<Writer>>();
-
-async function takeWriter(name: string): Promise<Writer> {
-  if (typeof navigator === 'undefined' || !('locks' in navigator)) {
-    return { held: true, taken: Promise.resolve(null) };
-  }
-  const lock = `local-database:${name}`;
-  const taken = Promise.withResolvers<null>();
-  const writer: Writer = { held: false, taken: taken.promise };
-  function hold() {
-    writer.held = true;
-    taken.resolve(null);
-    // The lock is held until the page closes.
-    return Promise.withResolvers<never>().promise;
-  }
-  const free = Promise.withResolvers<boolean>();
-  void navigator.locks.request(lock, { ifAvailable: true }, (granted) => {
-    free.resolve(granted !== null);
-    return granted === null ? null : hold();
-  });
-  if (!(await free.promise)) {
-    void navigator.locks.request(lock, hold);
-  }
-  return writer;
-}
-
-function writerOf(name: string): Promise<Writer> {
-  const known = writers.get(name) ?? takeWriter(name);
-  writers.set(name, known);
-  return known;
-}
-
 /**
  * The web adapter of the local database: one IndexedDB database with a store
  * for the confirmed records, one for the waiting transactions and one for
  * the sync position. Only the sync engine reads or writes it.
  *
  * Version 1 kept the whole state under one key. The upgrade moves its rows
- * into the new stores and deletes the old store. A page of an older build
- * that holds the database open blocks the upgrade, so the open fails with a
- * sentence that says to close it. This page closes its own handle when a
- * newer build asks for an upgrade, so it never blocks that build.
+ * into the new stores and deletes the old store. See
+ * docs/contributing/architecture/client.md#older-layouts.
  */
 export async function openIndexedDb(name: string): Promise<LocalDatabase> {
   const blocked = Promise.withResolvers<never>();
@@ -136,7 +87,6 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
     },
   });
   const database = await Promise.race([opening, blocked.promise]);
-  const writer = await writerOf(name);
   return {
     read: async () => {
       const tx = database.transaction(stores, 'readonly');
@@ -156,7 +106,5 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
       const tx = database.transaction(stores, 'readwrite');
       await Promise.all([...stores.map((store) => tx.objectStore(store).clear()), tx.done]);
     },
-    isWriter: () => writer.held,
-    writer: writer.taken,
   };
 }
