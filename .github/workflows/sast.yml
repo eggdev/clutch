@@ -123,9 +123,14 @@ jobs:
           languages: javascript-typescript, actions, python
           build-mode: none
       # Local CI runs this job with act, on the owner's machine. GitHub has no
-      # workflow run for it, so the upload has nothing to attach to and fails.
-      # There the scan keeps its results in the job, and the next step reads
-      # them. On GitHub the results go to the Security tab, as before.
+      # workflow run for it. CodeQL asks GitHub for that run to name its
+      # analysis, and to upload, and both fail. So under local CI this step
+      # names the analysis, as `<workflow file>:<job>`, and the scan uploads
+      # nothing: it keeps its results in the job, where the step after it
+      # reads them. On GitHub the results go to the Security tab, as before.
+      - name: Name the analysis, under local CI
+        if: env.ACT && steps.pick.outputs.engine == 'codeql' && steps.scope.outputs.scan == 'true'
+        run: echo "CODEQL_ACTION_ANALYSIS_KEY=.github/workflows/sast.yml:sast" >> "$GITHUB_ENV"
       - if: steps.pick.outputs.engine == 'codeql' && steps.scope.outputs.scan == 'true'
         id: analyze
         uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
