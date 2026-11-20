@@ -145,7 +145,8 @@ transaction, and one for the sync position. A deleted record keeps a row
 with no record, so the pool remembers the sync ID of the delete. The sync position is the last
 sync ID, the loaded groups, `leftOutBy` and the actor that the copy belongs
 to. `read` joins the rows into one state. `save` writes one change in one database transaction. `clear` removes
-every row.
+every row, and writes a new generation of the database. See
+[the end of a session](#the-end-of-a-session).
 
 A save holds the records that changed since the last save, the records that
 were deleted, and the sync position. So one delta writes only the records
@@ -212,10 +213,22 @@ holds the rule for each adapter.
 
 `clear` tells each other tab of the database on the device first. On the
 web, it posts a message on a `BroadcastChannel` with the name of the
-database. `onClearedElsewhere` wakes in each other tab, and
-`followSessionEnd` then stops that tab's engine and saves and starts the app
-again. SQLite on native has one process, so its `onClearedElsewhere` never
-wakes.
+database. `onLost` wakes in each other tab, and `followSessionEnd` then
+stops that tab's engine and saves and starts the app again.
+
+The message can come late. A socket message of the other tab can start a
+save after the clear and before the tab hears the message. So the local
+database keeps a generation: a random value that each clear writes anew,
+in the same database transaction. Each handle reads the generation when it
+opens. `save` compares it in its own database transaction. When it differs,
+the save writes nothing and gives `cleared`, and `onLost` wakes once. The
+pool of that tab then never saves again, and the app starts again. So a
+late save never writes the records, the position or a waiting row of the
+person who left, and the mark of the session end stays. A database from
+before the generation gets one at its first open. The generation is the
+key `generation` of the IndexedDB store `position`, or a row of the SQLite
+table `pool_generation`. SQLite on native has one process, so only a
+second handle, as in a test, finds another generation.
 
 ### Older layouts
 

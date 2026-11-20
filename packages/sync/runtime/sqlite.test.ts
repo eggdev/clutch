@@ -103,3 +103,18 @@ test('a row that is no JSON reads as a copy that the pool drops and reports, not
   ]);
   database.close();
 });
+
+test('a copy from before the generation gets one at its first open, and each handle saves', async () => {
+  const database = new Database(':memory:');
+  const older = await openSqlite(bunDriver(database), 'app');
+  await older.save(fullSave(oldLayoutCopy));
+  // An older build kept no generation.
+  database.query('delete from pool_generation').run();
+  const first = await openSqlite(bunDriver(database), 'app');
+  const second = await openSqlite(bunDriver(database), 'app');
+  expect(await first.save({ add: [], done: [] })).toBe('saved');
+  expect(await second.save({ add: [], done: [] })).toBe('saved');
+  const kept = await second.read();
+  expect(kept?.pending).toEqual(oldLayoutCopy.pending);
+  database.close();
+});

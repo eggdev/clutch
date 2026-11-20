@@ -1,89 +1,13 @@
 import { fullSave } from '@repo/sync/runtime/pool-doors';
+import {
+  expectSame,
+  readState,
+  rename,
+  sampleState,
+} from '@repo/sync/testing/local-database-samples';
+import type { LocalDatabaseCase } from '@repo/sync/testing/local-database-samples';
+import { sessionCases } from '@repo/sync/testing/local-database-session-cases';
 import type { LocalDatabase, PoolState } from '@repo/sync/types/local-database';
-import type { Transaction } from '@repo/sync/types/protocol';
-
-/** The confirmed part of a save with no record, and a position that names no actor. */
-function positionOnly() {
-  return {
-    replace: false,
-    put: [],
-    remove: [],
-    position: { lastSyncId: 7, groups: ['test'] },
-  };
-}
-
-/**
- * One case that every local database adapter must pass. `run` gets `open`,
- * which gives a handle to one database. A second call in the same case gives
- * a second handle to the same stored data. `run` throws an error that says
- * what was expected and what was found.
- */
-export type LocalDatabaseCase = {
-  readonly name: string;
-  readonly run: (open: () => Promise<LocalDatabase>) => Promise<void>;
-};
-
-/** A waiting transaction that renames the card `a`. */
-function rename(id: string, title = 'New'): Transaction {
-  return { id, command: 'cards/rename', input: { id: 'a', title } };
-}
-
-/** A state of one actor, with two confirmed records, a loaded group and one pending transaction. */
-function sampleState(title = 'Old'): PoolState {
-  return {
-    lastSyncId: 7,
-    tables: {
-      Card: [
-        { id: 'a', title },
-        { id: 'b', title: 'Kept' },
-      ],
-    },
-    groups: ['test'],
-    meta: {
-      'Card\u0000a': { groups: ['test'], syncId: 7 },
-      'Card\u0000b': { groups: ['test'], syncId: 5 },
-    },
-    pending: [rename('t1')],
-    leftOutBy: 'old-build',
-    actor: { userId: 'ana', organizationId: 'acme' },
-  };
-}
-
-/** Whether two JSON values hold the same data, with the keys in any order. */
-function sameJson(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) {
-    return true;
-  }
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((item, index) => sameJson(item, b[index]));
-  }
-  if (a && b && typeof a === 'object' && typeof b === 'object') {
-    const aKeys = Object.keys(a);
-    return (
-      aKeys.length === Object.keys(b).length &&
-      aKeys.every((key) => sameJson(Reflect.get(a, key), Reflect.get(b, key)))
-    );
-  }
-  return false;
-}
-
-/** Throws when a value is not the expected one, and says both. */
-function expectSame(actual: unknown, expected: unknown, what: string): void {
-  if (!sameJson(actual, expected)) {
-    throw new Error(
-      `${what}: expected ${JSON.stringify(expected)}, found ${JSON.stringify(actual)}.`,
-    );
-  }
-}
-
-/** Reads the state, and throws when the database has none. */
-async function readState(db: LocalDatabase, what: string): Promise<PoolState> {
-  const state = await db.read();
-  if (state === undefined) {
-    throw new Error(`${what}: expected a saved state, found undefined.`);
-  }
-  return state;
-}
 
 const { actor: _noActor, ...oldLayout } = sampleState('Old layout');
 
@@ -99,8 +23,7 @@ export async function expectOldLayoutMoved(db: LocalDatabase): Promise<void> {
   expectSame(await db.read(), oldLayoutCopy, 'The read of a copy in the old layout');
 }
 
-/** The cases that every local database adapter must pass, in the order they run. */
-export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
+const rowCases: ReadonlyArray<LocalDatabaseCase> = [
   {
     name: 'a database that was never written reads as undefined',
     async run(open) {
@@ -250,89 +173,6 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
     },
   },
   {
-    name: 'a clear leaves a mark, and a waiting row saved after it reads with the mark',
-    async run(open) {
-      const db = await open();
-      await db.save(fullSave(sampleState()));
-      await db.clear();
-      expectSame(await db.read(), undefined, 'The read of the mark alone');
-      await db.save({ add: [rename('t9')], done: [] });
-      const read = await readState(db, 'The read of a row saved after the clear');
-      expectSame(read.ended, true, 'The mark of the session end');
-      expectSame(read.pending, [rename('t9')], 'The waiting rows after the clear');
-    },
-  },
-  {
-    name: 'the first save of a position with an actor removes the mark and each waiting row with no actor',
-    async run(open) {
-      const db = await open();
-      const actor = { userId: 'ben', organizationId: 'acme' };
-      await db.clear();
-      await db.save({ add: [rename('t1'), { ...rename('t2'), actor }], done: [] });
-      const { position } = fullSave(sampleState()).confirmed ?? {};
-      if (!position) {
-        throw new Error('A full save has a position.');
-      }
-      await db.save({
-        confirmed: { replace: true, put: [], remove: [], position: { ...position, actor } },
-        add: [{ ...rename('t3'), actor }],
-        done: [],
-      });
-      const read = await readState(db, 'The read after the save of the actor');
-      expectSame(read.ended, undefined, 'The mark after the save of the actor');
-      expectSame(
-        read.pending.map(({ id }) => id),
-        ['t2', 't3'],
-        'The waiting rows that stay',
-      );
-    },
-  },
-  {
-    name: 'the first save after a start keeps the mark, and a read after it gives no mark',
-    async run(open) {
-      const db = await open();
-      const actor = { userId: 'ben', organizationId: 'acme' };
-      await db.clear();
-      await db.save({ add: [rename('t1')], done: [], afterLoad: true });
-      const read = await readState(db, 'The read after the first save of a start');
-      expectSame(read.ended, undefined, 'The mark after the first save of a start');
-      expectSame(read.pending, [rename('t1')], 'The waiting rows after the first save');
-      // The mark is still there: the save of an actor removes each row with no actor.
-      await db.save({
-        confirmed: { ...positionOnly(), position: { ...positionOnly().position, actor } },
-        add: [{ ...rename('t2'), actor }],
-        done: [],
-      });
-      const after = await readState(db, 'The read after the save of the actor');
-      expectSame(
-        after.pending.map(({ id }) => id),
-        ['t2'],
-        'The waiting rows after the save of the actor',
-      );
-    },
-  },
-  {
-    name: 'a save after a Groups message that names no actor removes the mark and keeps each waiting row',
-    async run(open) {
-      const db = await open();
-      const actor = { userId: 'ben', organizationId: 'acme' };
-      await db.clear();
-      await db.save({ add: [rename('t1')], done: [] });
-      await db.save({ confirmed: { ...positionOnly(), heardServer: true }, add: [], done: [] });
-      const read = await readState(db, 'The read after the Groups message');
-      expectSame(read.ended, undefined, 'The mark after the Groups message');
-      expectSame(read.pending, [rename('t1')], 'The waiting rows after the Groups message');
-      // The mark is gone: a later save of an actor removes no row.
-      await db.save({
-        confirmed: { ...positionOnly(), position: { ...positionOnly().position, actor } },
-        add: [],
-        done: [],
-      });
-      const after = await readState(db, 'The read after the save of the actor');
-      expectSame(after.pending, [rename('t1')], 'The waiting rows after the save of the actor');
-    },
-  },
-  {
     name: 'a second add of a waiting row takes the new row and keeps its place',
     async run(open) {
       const db = await open();
@@ -383,3 +223,6 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
     },
   },
 ];
+
+/** The cases that every local database adapter must pass, in the order they run. */
+export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [...rowCases, ...sessionCases];

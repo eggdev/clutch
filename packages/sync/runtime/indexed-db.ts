@@ -1,6 +1,6 @@
 import { leftBehind, markAfter, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
 import type { MarkState } from '@repo/sync/runtime/pool-doors';
-import type { LocalDatabase, LocalSave } from '@repo/sync/types/local-database';
+import type { LocalDatabase, LocalSave, SaveResult } from '@repo/sync/types/local-database';
 import { openDB } from 'idb';
 import type { IDBPTransaction } from 'idb';
 
@@ -11,7 +11,8 @@ const transactions = 'transactions';
 /**
  * One row, under the key `position`: the last sync ID, the loaded groups,
  * `leftOutBy` and the actor. A clear leaves the mark of a session end in
- * the same store, under the key `ended`, as its state.
+ * the same store, under the key `ended`, as its state. The generation of the
+ * database is under the key `generation`.
  */
 const position = 'position';
 /** The store of the old layout, which held the whole state under the key `state`. */
@@ -167,10 +168,31 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
     },
   });
   const database = await Promise.race([opening, blocked.promise]);
+  // A database from before the generation gets one at its first open. The
+  // read and the write share one database transaction, so two tabs that
+  // open at once read the same generation.
+  const first = database.transaction(position, 'readwrite');
+  let generation: unknown = await first.store.get('generation');
+  if (generation === undefined) {
+    generation = crypto.randomUUID();
+    await first.store.put(generation, 'generation');
+  }
+  await first.done;
+  let lost = false;
+  const heard = new Set<() => void>();
+  function wake() {
+    if (!lost) {
+      lost = true;
+      for (const listener of heard) {
+        listener();
+      }
+    }
+  }
   const writer = await writerOf(name);
   // Each other tab of this database hears a clear on this channel. A channel
   // never hears its own message.
   const tabs = typeof BroadcastChannel === 'undefined' ? undefined : new BroadcastChannel(name);
+  tabs?.addEventListener('message', wake);
   return {
     read: async () => {
       const tx = database.transaction(stores, 'readonly');
@@ -185,7 +207,13 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
     },
     save: async (save) => {
       const tx = database.transaction(stores, 'readwrite');
-      await Promise.all([write(tx, save), tx.done]);
+      const current: unknown = await tx.objectStore(position).get('generation');
+      const result: SaveResult = current === generation ? 'saved' : 'cleared';
+      await Promise.all([result === 'saved' ? write(tx, save) : undefined, tx.done]);
+      if (result === 'cleared') {
+        wake();
+      }
+      return result;
     },
     clear: async () => {
       // The message goes before the clear starts, so each database transaction
@@ -196,17 +224,19 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
         // as one on a window, so the call goes through `Reflect.apply`.
         Reflect.apply(BroadcastChannel.prototype.postMessage, tabs, ['cleared']);
       }
+      const next = crypto.randomUUID();
       const tx = database.transaction(stores, 'readwrite');
       await Promise.all([
         ...stores.map((store) => tx.objectStore(store).clear()),
         tx.objectStore(position).put('fresh', 'ended'),
+        tx.objectStore(position).put(next, 'generation'),
         tx.done,
       ]);
+      generation = next;
     },
-    onClearedElsewhere(listener) {
-      const heard = () => listener();
-      tabs?.addEventListener('message', heard);
-      return () => tabs?.removeEventListener('message', heard);
+    onLost(listener) {
+      heard.add(listener);
+      return () => heard.delete(listener);
     },
     isWriter: () => writer.held,
     writer: writer.taken,

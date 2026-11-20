@@ -114,10 +114,18 @@ export type LocalSave = {
 };
 
 /**
+ * What a save did: `saved`, or `cleared` when another handle cleared the
+ * database after this handle opened, so the save wrote nothing.
+ */
+export type SaveResult = 'saved' | 'cleared';
+
+/**
  * The seam of the local database. Only the sync engine reads or writes it. It
  * keeps one row for each confirmed record, one row for each waiting
  * transaction and one row for the sync position, so two tabs that share it
- * never erase each other's waiting transactions.
+ * never erase each other's waiting transactions. It also keeps its
+ * generation: a random value that each clear writes anew. Each handle reads
+ * it when it opens, and a database from before it gets one at its first open.
  *
  * Each platform has one adapter: IndexedDB on the web, in
  * `packages/sync/runtime/indexed-db.ts`, and SQLite on native, in
@@ -130,24 +138,33 @@ export type LocalSave = {
 export type LocalDatabase = {
   /** Every row as one state, the waiting transactions in the order they were added. */
   readonly read: () => Promise<PoolState | undefined>;
-  readonly save: (save: LocalSave) => Promise<void>;
+  /**
+   * Writes one save in one database transaction, and gives `saved`. It
+   * gives `cleared` and writes nothing when another handle cleared the
+   * database after this handle opened: the generation of the database is
+   * not the one that this handle read at its open. It then wakes `onLost`.
+   * So a save of an older session never lands after a session end.
+   */
+  readonly save: (save: LocalSave) => Promise<SaveResult>;
   /**
    * Removes every row, and leaves the mark of a session end in the same
    * database transaction. A read reads the mark as `ended` while any other
    * row is there, until a save with `afterLoad` spends it. The first save
    * whose position names an actor removes the mark, fresh or spent, and each
    * waiting row with no actor that it does not write. A save with
-   * `heardServer` removes the mark too. A session end calls it. It first
-   * tells each other tab of this database on the device, which then stops
-   * its engine and its saves.
+   * `heardServer` removes the mark too. The same database transaction writes
+   * a new random generation, which this handle takes. A session end calls
+   * it. It first tells each other tab of this database on the device, which
+   * then stops its engine and its saves.
    */
   readonly clear: () => Promise<void>;
   /**
-   * Wakes when another tab of this database cleared it. It returns the stop
-   * of the listener. A platform with one process has no other tab, so it
-   * never wakes.
+   * Wakes once when this handle can no longer save: another tab cleared the
+   * database, which the tab hears as a message or as a save that gives
+   * `cleared`. It returns the stop of the listener. A platform with one
+   * process has no other tab, so only a second handle of a test clears it.
    */
-  readonly onClearedElsewhere: (listener: () => void) => () => void;
+  readonly onLost: (listener: () => void) => () => void;
   /**
    * Whether this tab writes the confirmed records now. Two tabs hold
    * different groups and positions, so only one tab writes them. A platform

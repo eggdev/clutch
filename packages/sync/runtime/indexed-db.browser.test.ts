@@ -80,7 +80,7 @@ let followed: LocalDatabase | undefined;
 /** Opens the database of the session end test, and counts each clear of another tab that this page hears. */
 async function followClears(): Promise<void> {
   followed = await openIndexedDb('tabs');
-  followed.onClearedElsewhere(() => {
+  followed.onLost(() => {
     clearsHeard += 1;
   });
 }
@@ -90,8 +90,24 @@ async function clearTabs(): Promise<void> {
   await followed?.clear();
 }
 
+/**
+ * Saves a copy, takes away its generation as an older build kept none, and
+ * opens two handles. Returns what a save of each handle gives.
+ */
+async function runNoGeneration(): Promise<Array<string>> {
+  const older = await openIndexedDb('no-generation');
+  await older.save({ add: oldLayoutCopy.pending, done: [] });
+  const raw = await openDB('no-generation');
+  await raw.delete('position', 'generation');
+  raw.close();
+  const first = await openIndexedDb('no-generation');
+  const second = await openIndexedDb('no-generation');
+  return [await first.save({ add: [], done: [] }), await second.save({ add: [], done: [] })];
+}
+
 Object.assign(globalThis, {
   runLocalDatabaseCases: runCases,
+  runNoGeneration,
   runOldLayout,
   openForLock,
   waitForWriter,
@@ -148,9 +164,12 @@ test('the IndexedDB adapter passes every local database case in Chromium, and mo
   const results = await page.evaluate<Array<CaseResult>>('globalThis.runLocalDatabaseCases()');
   // A copy of version 1 moves into the stores of version 2.
   const oldLayout = await page.evaluate<string | null>('globalThis.runOldLayout()');
+  // A copy from before the generation gets one at its first open.
+  const noGeneration = await page.evaluate<Array<string>>('globalThis.runNoGeneration()');
   await context.close();
   expect(results.filter((result) => result.error !== null)).toEqual([]);
   expect(oldLayout).toBeNull();
+  expect(noGeneration).toEqual(['saved', 'saved']);
 }, 60_000);
 
 test('one tab writes the confirmed records, and the next tab takes over when it closes', async () => {

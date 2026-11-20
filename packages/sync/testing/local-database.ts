@@ -12,7 +12,7 @@ import type {
 
 /** A local database in memory, with what a test reads about its saves. */
 export type MemoryLocalDatabase = LocalDatabase & {
-  /** The number of saves that this handle wrote. */
+  /** The number of saves that this handle wrote, not counting a save that wrote nothing. */
   readonly writes: () => number;
   /** Each save that a handle of these rows wrote, in order. */
   readonly saves: () => ReadonlyArray<LocalSave>;
@@ -36,9 +36,11 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
   let position: SyncPosition | undefined;
   // The mark of a session end, which a clear leaves.
   let ended: MarkState | undefined;
+  // The generation of the rows, which each clear writes anew.
+  let generation = 0;
   const log: Array<LocalSave> = [];
-  // The clear listeners of each handle, as a `BroadcastChannel` of each tab.
-  const handles = new Set<Set<() => void>>();
+  // The lost listeners of each handle, as a `BroadcastChannel` of each tab.
+  const handles = new Set<() => void>();
 
   function apply(save: LocalSave) {
     const { confirmed } = save;
@@ -83,33 +85,51 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
   function handle(writer: Promise<unknown>, held: boolean): MemoryLocalDatabase {
     let isWriter = held;
     let writes = 0;
+    // The generation that this handle read when it opened.
+    let mine = generation;
+    let lost = false;
     const heard = new Set<() => void>();
-    handles.add(heard);
+    function wake() {
+      if (!lost) {
+        lost = true;
+        for (const listener of heard) {
+          listener();
+        }
+      }
+    }
+    handles.add(wake);
     return {
       read: () =>
         Promise.resolve(
           structuredClone(stateOf(inKeyOrder(), position, transactions, ended === 'fresh')),
         ),
       save: (save) => {
+        if (mine !== generation) {
+          wake();
+          return Promise.resolve('cleared');
+        }
         apply(save);
         log.push(structuredClone(save));
         writes += 1;
-        return Promise.resolve();
+        return Promise.resolve('saved');
       },
       clear: () => {
         for (const other of handles) {
-          // A message reaches each other handle after the clear starts, as on the web.
-          for (const listener of other === heard ? [] : other) {
-            queueMicrotask(listener);
+          // A message reaches each other handle in a later task, as a
+          // `BroadcastChannel` message does on the web.
+          if (other !== wake) {
+            setTimeout(other, 0);
           }
         }
         records.clear();
         transactions = [];
         position = undefined;
         ended = 'fresh';
+        generation += 1;
+        mine = generation;
         return Promise.resolve();
       },
-      onClearedElsewhere(listener) {
+      onLost(listener) {
         heard.add(listener);
         return () => heard.delete(listener);
       },

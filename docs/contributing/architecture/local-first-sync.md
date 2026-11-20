@@ -285,7 +285,13 @@ device. Eight rules hold this.
   name of the database. A tab that hears it stops its engine and the saves of
   its pool at once, so it writes nothing back. Then it starts again with an
   empty pool. `followSessionEnd` in `packages/sync/runtime/boot.ts` does
-  this. Native has one process, so it has no other tab. A tab of an older
+  this. The message can reach the tab after a save of that tab started. The
+  generation of the local database stops that save: each clear writes a new
+  one, and a save of a handle that read an older one writes nothing. Then
+  the tab stops and starts again, as when it hears the message.
+  `packages/sync/runtime/boot-session.test.ts` holds both orders: the tab
+  that writes the confirmed records, and a tab that writes only its waiting
+  rows. Native has one process, so it has no other tab. A tab of an older
   build does not hear the message. The actor of each waiting row then keeps
   its work from going out as the next person.
 

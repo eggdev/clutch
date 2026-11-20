@@ -34,10 +34,11 @@ function watched(database: MemoryLocalDatabase): {
     database: {
       ...database,
       save: async (save) => {
-        await database.save(save);
+        const result = await database.save(save);
         const done = next;
         next = Promise.withResolvers<LocalSave>();
         done.resolve(save);
+        return result;
       },
     },
     nextSave: () => next.promise,
@@ -241,7 +242,7 @@ test('a save that fails is reported once, and the next change saves every record
             refusals -= 1;
             throw new Error('The device is full.');
           }
-          await memory.save(save);
+          return await memory.save(save);
         } finally {
           settled.resolve(null);
         }

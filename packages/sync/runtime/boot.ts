@@ -132,12 +132,19 @@ export async function loadPool(
           continue;
         }
         try {
-          await database.save({
+          const result = await database.save({
             ...(writer ? { confirmed } : {}),
             add,
             done,
             ...(startSave ? { afterLoad: true } : {}),
           });
+          if (result === 'cleared') {
+            // Another tab ended the session after this one opened. This pool
+            // never saves again, and the database wakes `onLost`, so the app
+            // starts again.
+            stopped = true;
+            break;
+          }
           afterLoad = false;
           held = new Map([...held, ...add.map((row): [string, string] => [row.id, actorOf(row)])]);
           for (const id of done) {
@@ -215,9 +222,10 @@ export async function endSession(
  * Follows a session end in another tab of this device. When another tab
  * clears the local database, this tab stops its engine with `disconnect` and
  * the saves of its pool at once, before it can write anything back. Then it
- * calls `restart`, so the app starts again with an empty pool. The tab that
- * clears never hears its own clear. It follows one end, and returns the
- * stop of the follow.
+ * calls `restart`, so the app starts again with an empty pool. The tab hears
+ * the clear as a message, or as a save that found the database cleared,
+ * whichever comes first. The tab that clears never hears its own clear. It
+ * follows one end, and returns the stop of the follow.
  */
 export function followSessionEnd(
   database: LocalDatabase,
@@ -225,7 +233,7 @@ export function followSessionEnd(
   disconnect: () => void,
   restart: () => void,
 ): () => void {
-  const stop = database.onClearedElsewhere(() => {
+  const stop = database.onLost(() => {
     // One end is enough: the start that follows has its own follow.
     stop();
     disconnect();

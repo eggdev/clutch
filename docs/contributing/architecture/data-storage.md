@@ -69,7 +69,10 @@ A session end leaves a mark: the key `ended` of the IndexedDB store
 state: `fresh` after the clear, and `spent` after the first save of the next
 start (the column `spent` in SQLite). Only the load of a fresh mark drops
 each row without `actor`. The first save after a `Groups` message removes the
-mark. The `records` store holds no record that is in no loaded
+mark. The generation of a local database is a random string: the key
+`generation` of the IndexedDB store `position`, or the column `value` of the
+SQLite table `pool_generation`. Each clear writes a new one. A database
+without it gets one at its first open. The `records` store holds no record that is in no loaded
 group of the position. A copy at sync ID 0 holds only part of a first load.
 The next pull from 0 drops each record that it does not send again.
 

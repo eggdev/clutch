@@ -1,6 +1,6 @@
 import { leftBehind, markAfter, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
 import type { MarkState } from '@repo/sync/runtime/pool-doors';
-import type { LocalDatabase, LocalSave } from '@repo/sync/types/local-database';
+import type { LocalDatabase, LocalSave, SaveResult } from '@repo/sync/types/local-database';
 import type { SqliteDriver } from '@repo/sync/types/sqlite-driver';
 
 /**
@@ -13,6 +13,10 @@ import type { SqliteDriver } from '@repo/sync/types/sqlite-driver';
  *
  * The old layout kept the whole state of a name as one JSON row in the table
  * `pool`. The open moves that row into the new tables and deletes it.
+ *
+ * `pool_generation` holds the generation of each name, which each clear
+ * writes anew. One process uses the file, so no other tab clears it. Only a
+ * second handle, such as in a test, can find another generation.
  */
 
 /** The saved text as a value. Text that is no JSON gives `undefined`, which the read counts as a row with another shape. */
@@ -27,15 +31,12 @@ function parsed(text: unknown): unknown {
   }
 }
 
-function noOtherTab() {
-  // One process uses the file, so no other tab clears it.
-}
-
 const schema = [
   'create table if not exists pool_records (name text not null, model text not null, id text not null, value text not null, primary key (name, model, id))',
   'create table if not exists pool_transactions (seq integer primary key autoincrement, name text not null, id text not null, value text not null, unique (name, id))',
   'create table if not exists pool_position (name text primary key, value text not null)',
   'create table if not exists pool_ended (name text primary key, spent integer not null default 0)',
+  'create table if not exists pool_generation (name text primary key, value text not null)',
 ];
 
 export async function openSqlite(driver: SqliteDriver, name: string): Promise<LocalDatabase> {
@@ -74,6 +75,12 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
       return undefined;
     }
     return mark['spent'] === 1 ? 'spent' : 'fresh';
+  }
+
+  /** The generation of the name now. */
+  async function generationOf(): Promise<unknown> {
+    const [row] = await driver.all('select value from pool_generation where name = ?', [name]);
+    return row?.['value'];
   }
 
   async function write(save: LocalSave): Promise<void> {
@@ -132,6 +139,14 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
   for (const statement of schema) {
     await driver.run(statement);
   }
+  // A database from before the generation gets one at its first open.
+  await driver.run(
+    'insert into pool_generation (name, value) values (?, ?) on conflict (name) do nothing',
+    [name, crypto.randomUUID()],
+  );
+  let generation = await generationOf();
+  let lost = false;
+  const heard = new Set<() => void>();
   const [old] = await driver.all(
     "select name from sqlite_master where type = 'table' and name = 'pool'",
   );
@@ -166,7 +181,26 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
           (await markOf()) === 'fresh',
         );
       }),
-    save: (save) => serial(() => atomically(() => write(save))),
+    save: async (save) => {
+      const result = await serial(async (): Promise<SaveResult> => {
+        let found: SaveResult = 'saved';
+        await atomically(async () => {
+          if ((await generationOf()) === generation) {
+            await write(save);
+          } else {
+            found = 'cleared';
+          }
+        });
+        return found;
+      });
+      if (result === 'cleared' && !lost) {
+        lost = true;
+        for (const listener of heard) {
+          listener();
+        }
+      }
+      return result;
+    },
     clear: () =>
       serial(() =>
         atomically(async () => {
@@ -177,9 +211,18 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
             'insert into pool_ended (name, spent) values (?, 0) on conflict (name) do update set spent = 0',
             [name],
           );
+          const next = crypto.randomUUID();
+          await driver.run(
+            'insert into pool_generation (name, value) values (?, ?) on conflict (name) do update set value = excluded.value',
+            [name, next],
+          );
+          generation = next;
         }),
       ),
-    onClearedElsewhere: () => noOtherTab,
+    onLost(listener) {
+      heard.add(listener);
+      return () => heard.delete(listener);
+    },
     // One process uses the file, so it writes from the start.
     isWriter: () => true,
     writer: Promise.resolve(),
