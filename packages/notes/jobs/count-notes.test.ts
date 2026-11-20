@@ -24,9 +24,8 @@ test('a new note asks for a count, and the job commits the count of its space', 
         );
       }
       const ran = yield* runDueJobs([countNotes]);
-      const head = yield* log.head(testActor.organizationId);
       const pages = yield* Stream.runCollect(
-        log.backfill(testActor.organizationId, head, new Set(['space:general'])),
+        log.snapshot(testActor.organizationId, 'space:general'),
       );
       const counts = pages
         .flatMap((page) => page.deltas)

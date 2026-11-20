@@ -164,7 +164,7 @@ export function SyncServer<R>(
                   ...groups.filter((group) => allowed.lazy.includes(group)),
                 ],
                 // A client that holds data and did not name an eager group,
-                // such as a new one, lacks its history before its last sync ID.
+                // such as a new one, lacks its records. It gets their snapshot.
                 fill:
                   lastSyncId > 0 ? allowed.eager.filter((group) => !groups.includes(group)) : [],
                 pages: pages ?? false,

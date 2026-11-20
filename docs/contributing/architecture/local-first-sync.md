@@ -50,13 +50,27 @@ The protocol has three calls over one WebSocket for each organization, through
   live delta. Each delta holds only the changes of the loaded groups, and a
   delete of each record that left them.
   A client past sync ID 0 that does not name an eager group lacks its
-  history. The first `Groups` message then holds the backfill of that group
-  up to the last sync ID. With `pages`, `Page` messages come before it.
+  records. The first `Groups` message then holds the snapshot of that group.
+  With `pages`, `Page` messages come before it.
+- A client at sync ID 0 holds nothing. Its `Pull` sends the snapshot of each
+  loaded group in place of the deltas. Then it sends one delta with no changes
+  at the head of the log. That delta moves the client's last sync ID to the head, so
+  its next `Pull` asks only for the events after it.
 - `Load` asks the open `Pull` to load one more group. It fails with
   `GroupNotAllowed` when the actor may not load the group. With `pages`, the
-  client reads the backfill in `Page` messages of at most 1,000 events. A
+  client reads the snapshot in `Page` messages of at most 1,000 records. A
   `Groups` message that names the group then brings the last page. A build that
-  does not send `pages` gets the whole backfill in one `Groups` message.
+  does not send `pages` gets the whole snapshot in one `Groups` message.
+
+A snapshot holds the last change of each live record of a group, from
+`sync_records`, as a delta with the sync ID of that change. A deleted record
+is not in it. A record that changed 1,000 times comes once, so a load costs
+what the records cost, not what their history costs. The server reads the
+snapshot in pages, in the order of the record keys. The `Pull` reads the head
+of the log before the first page, and it sends each live delta after that
+head. So a record that changes, leaves or enters the group between two pages
+ends right: the pool keeps the change with the higher sync ID.
+`packages/sync/service/feed-snapshot.test.ts` holds this.
 
 `Pull` fails with `SessionEnded` when the session ends. It fails with
 `ServerBehind` when the client's last sync ID is above the server's newest
@@ -122,7 +136,7 @@ the same, so loading the local database needs no decode.
   once. A background tab gets no frame callback, so it connects after 500 ms.
   Without this limit, it misses live deltas until a person opens it.
 - One `Pull` element holds at most 1,000 deltas, so one decode stays short.
-  A page of a backfill holds at most 1,000 events too.
+  A page of a snapshot holds at most 1,000 records.
 - A sign-out calls `Sessions.end` with the user. Each of the user's sockets
   closes with code 4401, and the client clears its local database.
 - After a database restore, the server's log can end before a client's last
@@ -167,9 +181,10 @@ Product code asserts no types, so these shapes replace each `as` cast. See
 - The event log keeps the last state of each record in `sync_records`: its
   groups, its last change and its data. A commit updates it in the
   transaction of the event. A change then names in `left` the groups that its
-  record left, and the event is indexed under them too.
+  record left, and the event is indexed under them too. Each snapshot reads
+  this table.
 - One function, `seenDelta` in `packages/sync/service/visible.ts`, decides
-  what a connection sees, for the backlog, the backfill and the live stream.
+  what a connection sees, for the backlog and the live stream.
   A change in a loaded group comes as it is. A change of a record that left
   each loaded group comes as a delete with no data. `left` never leaves the
   server.
@@ -202,16 +217,15 @@ open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
 ```
 
 - A loaded group resolves at once, offline too.
-- Otherwise, the engine sends `Load`. The server sends the group's past
-  changes as a backfill, in pages, and the gate resumes after the last page.
-  The server reads each page with its own query, so it never holds the whole
-  history of a group.
+- Otherwise, the engine sends `Load`. The server sends the snapshot of the
+  group, in pages, and the gate resumes after the last page. The server reads
+  each page with its own query, so it never holds every record of a group.
 - The pool applies the records of each page at once. The group is not loaded
   until its `Groups` message. No purge deletes the records of a group whose
   pages have come, until it loads or the server refuses it. A client that
   drops between two pages does not name the group in its next `Pull`, and
   the gate asks for the whole group again.
-- A record that already holds a later change keeps it. The backfill never
+- A record that already holds a later change keeps it. The snapshot never
   undoes a later change.
 - A deleted record stays deleted. The pool keeps the sync ID of the delete,
   and saves it, so an older upsert in a backfill does not bring the record

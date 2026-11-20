@@ -122,18 +122,21 @@ test('two users in different spaces get only the records of their groups', async
   expect(result.refused).toMatchObject({ _tag: 'GroupNotAllowed', group: 'space:design' });
   const summaries = result.messages.map(summary);
   // B loads its organization, its user group and the general space. It may not load design.
-  expect(summaries[0]).toBe('groups org:org-test,space:general,user:user-b backfill ');
+  // The first message holds the snapshot of those groups: the space record.
+  expect(summaries[0]).toBe('groups org:org-test,space:general,user:user-b backfill design');
   // B sees the space record and the general note, never the design note while outside.
-  const seen = result.messages.flatMap((message) =>
-    message._tag === 'Deltas'
-      ? message.deltas.flatMap((delta) => delta.changes.map((change) => change.id))
-      : [],
-  );
+  const seen = result.messages
+    .slice(0, -1)
+    .flatMap((message) =>
+      (message._tag === 'Deltas' ? message.deltas : message.backfill).flatMap((delta) =>
+        delta.changes.map((change) => change.id),
+      ),
+    );
   expect(seen).toContain('design');
   expect(seen).toContain('hello');
   expect(seen).not.toContain('secret');
-  // After B joins, loading design sends the group's past changes as the backfill:
-  // the secret note, then the design note count that the job wrote after it.
+  // After B joins, loading design sends the last state of each record of the
+  // group as the backfill: the secret note and the design note count.
   expect(summaries.at(-1)).toBe(
     'groups org:org-test,space:design,space:general,user:user-b backfill secret,design',
   );
