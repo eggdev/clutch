@@ -21,18 +21,13 @@ import {
   readAs,
   recordKey,
   sameJson,
+  savedRows,
   sortedIds,
   tableOf,
   wake,
 } from '@repo/sync/runtime/tables';
 import type { Tables } from '@repo/sync/runtime/tables';
-import type {
-  ConfirmedSave,
-  PoolState,
-  RecordKey,
-  RecordMeta,
-  SavedRecord,
-} from '@repo/sync/types/local-database';
+import type { ConfirmedSave, PoolState, RecordMeta } from '@repo/sync/types/local-database';
 import type { Change, Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
 import type { ReadablePool, Rejection } from '@repo/sync/types/records';
 
@@ -338,19 +333,7 @@ export function createPool(
     }),
     confirmedChanges(everything) {
       const replace = everything || unsavedAll;
-      const keys = replace ? [...meta.keys()] : [...unsaved];
-      const put: Array<SavedRecord> = [];
-      const remove: Array<RecordKey> = [];
-      for (const key of keys) {
-        const [model = '', id = ''] = key.split('\u0000');
-        const known = meta.get(key);
-        const row = confirmed.get(model)?.get(id);
-        if (known && row) {
-          put.push({ model, id, row, groups: known.groups, syncId: known.syncId });
-        } else {
-          remove.push({ model, id });
-        }
-      }
+      const { put, remove } = savedRows(replace ? meta.keys() : unsaved, meta, confirmed);
       unsaved = new Set();
       unsavedAll = false;
       return {

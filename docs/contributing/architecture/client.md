@@ -166,8 +166,9 @@ Each tab writes its own waiting transactions:
 
 ### Older layouts
 
-Version 1 kept the whole state as one value: under the key `state` in the
-IndexedDB store `pool`, or as one JSON row in the SQLite table `pool`. The
+Version 1 kept the whole state as one value. On the web, it was under the
+key `state` in the IndexedDB store `pool`. On native, it was one JSON row in
+the SQLite table `pool`. The
 open moves its waiting transactions into rows, so no unsent work is lost. It
 moves the records and the position too when each record names its groups.
 Otherwise it drops them, and the pool loads again from the server.

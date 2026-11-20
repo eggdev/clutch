@@ -1,4 +1,4 @@
-import { fullSave } from '@repo/sync/runtime/local-rows';
+import { fullSave } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase, PoolState } from '@repo/sync/types/local-database';
 import type { Transaction } from '@repo/sync/types/protocol';
 

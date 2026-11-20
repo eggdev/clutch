@@ -1,8 +1,8 @@
 import { Database } from 'bun:sqlite';
 import { expect, test } from 'bun:test';
 
-import { fullSave } from '@repo/sync/runtime/local-rows';
 import { createPool } from '@repo/sync/runtime/pool';
+import { fullSave } from '@repo/sync/runtime/pool-doors';
 import { openSqlite } from '@repo/sync/runtime/sqlite';
 import {
   expectOldLayoutMoved,

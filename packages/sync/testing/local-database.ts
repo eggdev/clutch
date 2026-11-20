@@ -1,4 +1,4 @@
-import { fullSave, stateOf } from '@repo/sync/runtime/local-rows';
+import { fullSave, stateOf } from '@repo/sync/runtime/pool-doors';
 import { recordKey } from '@repo/sync/runtime/tables';
 import type {
   LocalDatabase,
