@@ -5,6 +5,7 @@ import type { Contract } from '@repo/sync/contract/define';
 import { manifestOf } from '@repo/sync/contract/manifest';
 import { EventLog } from '@repo/sync/service/event-log';
 import { feed } from '@repo/sync/service/feed';
+import type { LoadRequest } from '@repo/sync/service/feed';
 import { Sessions } from '@repo/sync/service/sessions';
 import { settle } from '@repo/sync/service/settle';
 import { SyncGroups } from '@repo/sync/service/sync-groups';
@@ -95,14 +96,14 @@ export function SyncServer<R>(
       const syncGroups = yield* SyncGroups;
       // The `Load` queue of each open `Pull` stream, by RPC client. A `Load`
       // that comes before its `Pull` stream opens waits for the queue.
-      const requests = new Map<number, Deferred.Deferred<Queue.Queue<string>>>();
+      const requests = new Map<number, Deferred.Deferred<Queue.Queue<LoadRequest>>>();
       const requestsOf = (id: number) =>
         Effect.gen(function* () {
           const known = requests.get(id);
           if (known) {
             return known;
           }
-          const made = yield* Deferred.make<Queue.Queue<string>>();
+          const made = yield* Deferred.make<Queue.Queue<LoadRequest>>();
           requests.set(id, made);
           return made;
         });
@@ -152,7 +153,7 @@ export function SyncServer<R>(
               }
               const granted = syncGroups.groupsFor(actor);
               const allowed = yield* granted.pipe(Effect.orDie);
-              const queue = yield* Queue.unbounded<string>();
+              const queue = yield* Queue.unbounded<LoadRequest>();
               yield* Deferred.succeed(yield* requestsOf(client.id), queue);
               return feed(log, {
                 organizationId: actor.organizationId,
@@ -167,7 +168,7 @@ export function SyncServer<R>(
               }).pipe(Stream.orDie, Stream.ensuring(Effect.sync(() => requests.delete(client.id))));
             }),
           ),
-        Load: ({ group }, { client, headers }) =>
+        Load: ({ group, pages }, { client, headers }) =>
           Effect.gen(function* () {
             const actor = yield* actors.fromHeaders(headers);
             const allowed = yield* syncGroups.groupsFor(actor).pipe(Effect.orDie);
@@ -175,7 +176,7 @@ export function SyncServer<R>(
               return yield* new GroupNotAllowed({ group });
             }
             const queue = yield* Deferred.await(yield* requestsOf(client.id));
-            yield* Queue.offer(queue, group);
+            yield* Queue.offer(queue, { group, pages: pages ?? false });
           }),
       };
     }),

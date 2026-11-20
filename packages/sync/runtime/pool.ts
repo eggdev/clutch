@@ -13,6 +13,7 @@ import {
 } from '@repo/sync/runtime/pool-doors';
 import type { PoolDeclarations, PoolOptions } from '@repo/sync/runtime/pool-doors';
 import {
+  applyOutcomes,
   copy,
   draftOver,
   groupWaits,
@@ -54,6 +55,11 @@ export type Pool = ReadablePool & {
    * deletes each confirmed record that is in no loaded group.
    */
   readonly applyGroups: (loaded: ReadonlyArray<string>, backfill: ReadonlyArray<Delta>) => void;
+  /**
+   * Applies one page of the backfill of a group. The group loads only with
+   * its `Groups` message, and no purge deletes the records of its pages.
+   */
+  readonly applyPage: (group: string, backfill: ReadonlyArray<Delta>) => void;
   /** The groups loaded now, which the engine names when it connects. */
   readonly loadedGroups: () => ReadonlyArray<string>;
   /**
@@ -178,9 +184,18 @@ export function createPool(
     wake(rejectionWatchers);
   }
 
-  /** Deletes each confirmed record that is in no loaded group. */
+  /** Applies each change of a backfill, as `applyChange` does. */
+  function applyBackfill(backfill: ReadonlyArray<Delta>) {
+    for (const delta of backfill) {
+      for (const change of delta.changes) {
+        applyChange(change, delta.syncId);
+      }
+    }
+  }
+
+  /** Deletes each confirmed record that is in no loaded group, and in no group that loads. */
   function purge() {
-    const current = loaded;
+    const current = new Set([...loaded, ...waits.loading()]);
     for (const [key, { groups }] of meta) {
       if (!groups.some((group) => current.has(group))) {
         const [model = '', id = ''] = key.split('\u0000');
@@ -329,14 +344,15 @@ export function createPool(
     },
     applyGroups(groups, backfill) {
       loaded = new Set(groups);
-      for (const delta of backfill) {
-        for (const change of delta.changes) {
-          applyChange(change, delta.syncId);
-        }
-      }
+      applyBackfill(backfill);
       purge();
       recompute();
       wakeLoaded();
+    },
+    applyPage(group, backfill) {
+      waits.paged(group);
+      applyBackfill(backfill);
+      recompute();
     },
     loadedGroups: () => [...loaded],
     loadGroup: (group) => (loaded.has(group) ? Promise.resolve(true) : waits.wait(group)),
@@ -344,7 +360,12 @@ export function createPool(
       report(
         `The server refused to load ${group} for this account, so its screen shows no records.`,
       );
+      const paged = waits.loading().has(group);
       waits.refuse(group);
+      if (paged) {
+        purge();
+        recompute();
+      }
     },
     requestedGroups: waits.requested,
     onLoadRequest: waits.onRequest,
@@ -360,23 +381,7 @@ export function createPool(
     },
     settle(outcomes) {
       const before = rejection;
-      for (const outcome of outcomes) {
-        const entry = pending.find(({ transaction }) => transaction.id === outcome.transactionId);
-        if (!entry) {
-          continue;
-        }
-        if (outcome.status === 'rejected') {
-          pending = pending.filter((item) => item !== entry);
-          rejection = {
-            transactionId: outcome.transactionId,
-            command: entry.transaction.command,
-            code: outcome.code ?? 'failed',
-            reason: outcome.reason ?? 'rejected',
-          };
-        } else {
-          entry.acceptedAt = outcome.syncId;
-        }
-      }
+      ({ pending, rejection } = applyOutcomes(pending, outcomes, rejection));
       dropSettled();
       recompute();
       if (rejection !== before) {

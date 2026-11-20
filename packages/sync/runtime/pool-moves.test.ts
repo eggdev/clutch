@@ -6,6 +6,7 @@ import { record } from '@repo/sync/contract/record';
 import { createPool } from '@repo/sync/runtime/pool';
 import { EventLog, eventLog } from '@repo/sync/service/event-log';
 import { feed } from '@repo/sync/service/feed';
+import type { LoadRequest } from '@repo/sync/service/feed';
 import { DatabaseTest } from '@repo/sync/testing/database';
 import { Change, SyncMessage } from '@repo/sync/types/protocol';
 import { Effect, Layer, Queue, Schema, Stream } from 'effect';
@@ -37,7 +38,7 @@ function messagesFor(loaded: ReadonlyArray<string>) {
       lastSyncId: 0,
       loaded,
       granted: Effect.succeed({ eager: [], lazy: ['space:x', 'space:y'] }),
-      requests: yield* Queue.unbounded<string>(),
+      requests: yield* Queue.unbounded<LoadRequest>(),
     }).pipe(Stream.take(2), Stream.runCollect, Effect.timeout('2 seconds'));
     const wire = Schema.toCodecJson(SyncMessage);
     return messages.map((message) =>
@@ -52,7 +53,7 @@ function apply(messages: ReadonlyArray<SyncMessage>) {
   for (const message of messages) {
     if (message._tag === 'Deltas') {
       pool.applyDeltas(message.deltas);
-    } else {
+    } else if (message._tag === 'Groups') {
       pool.applyGroups(message.loaded, message.backfill);
     }
   }
