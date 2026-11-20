@@ -239,7 +239,8 @@ Each tab writes its own waiting transactions:
 for a save that runs, so no later change of the pool reaches the database.
 `connectAfterPaint` returns the stop of the engine. `endSession` calls both,
 then clears the database. `endSessionOnDevice` in `apps/app/lib/boot.ts`
-calls it, then starts the app again. A project's sign-out calls
+calls it, then starts the app again: native starts it in place, and the web
+loads the page again. A project's sign-out calls
 `endSessionOnDevice`. The Web Lock stays with the page, so the next start in
 the same page stays the writer. See
 [the end of a session](./local-first-sync.md#the-end-of-a-session).
@@ -291,8 +292,9 @@ again from the server.
 A tab of an older build that holds the IndexedDB database open blocks this
 move. The open then fails with a sentence that says to close that tab. A tab
 closes its own handle when a newer build asks for a new version, so it never
-blocks that build. The handle cannot save after that, so `onLost` wakes. `followLostDatabase` then stops the engine and the saves of the tab. It starts the app again, with no clear. On the web the page loads again, with the newer build,
-and opens the new layout.
+blocks that build. The handle cannot save after that, so `onLost` wakes. `followLostDatabase` then stops the engine and the saves of the tab. It starts the app again, with no clear. On the web the page loads again at once, with the newer build,
+and opens the new layout. It does not start the app in the old page first,
+since the old build cannot open the newer layout.
 
 A waiting transaction whose save had not started, or that waits after a
 failed save, is only in the memory of the tab. So before the tab lets the

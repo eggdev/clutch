@@ -57,8 +57,7 @@ const store = bootStore<Pool>(async (report) => {
       disconnect();
     },
     () => {
-      store.restart();
-      afterSessionEnded();
+      afterSessionEnded(store.restart);
     },
   );
   const end = async () => {
@@ -69,8 +68,7 @@ const store = bootStore<Pool>(async (report) => {
     ended = true;
     unfollow();
     await endSession(database, pool, disconnect);
-    store.restart();
-    afterSessionEnded();
+    afterSessionEnded(store.restart);
   };
   disconnect = connectAfterPaint(pool, {
     url: syncUrl(),
