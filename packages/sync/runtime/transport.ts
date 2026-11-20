@@ -54,9 +54,21 @@ function protocol(url: string, onSessionEnded: () => void, headers?: SocketHeade
  * How long a push or a pull waits before it tries again: 200 ms, then twice
  * as long each time, and never more than 3 seconds. Without the limit, a
  * device that was offline for a while would wait as long again before it
- * sends what it holds.
+ * sends what it holds. Each wait is moved by a random part of up to a fifth,
+ * so the clients of a server that comes back do not all pull at once. The
+ * wait is a guess at when the server can take the pull again; CL-921 is the
+ * root fix, in which the server says when.
  */
-const retryWait = Schedule.min([Schedule.exponential('200 millis'), Schedule.spaced('3 seconds')]);
+const retryWait = Schedule.min([
+  Schedule.exponential('200 millis'),
+  Schedule.spaced('3 seconds'),
+]).pipe(Schedule.jittered);
+
+/** The wait after a pull that heard the server: the shortest one, with its random part. */
+const firstWait = Schedule.spaced('200 millis').pipe(Schedule.jittered);
+
+/** How one pull ended: it heard the server, it heard nothing, or the session ended. */
+type PullEnd = 'heard' | 'silent' | 'ended';
 
 /** Each group that a gate asks for, starting with the ones asked for and not loaded yet. */
 function loadRequests(pool: Pool) {
@@ -124,8 +136,11 @@ export function engine(
     // pull would land on the old position. A server that names no actor
     // opens the gate too, and the copy stays.
     const actorKnown = Latch.makeUnsafe(false);
+    // The last pull got its first `Groups` message.
+    let heard = false;
     const pull = Effect.suspend(() => {
       let first = true;
+      heard = false;
       return client
         .Pull({
           lastSyncId: pool.lastSyncId(),
@@ -139,6 +154,7 @@ export function engine(
               return Effect.sync(() => applyMessage(pool, message));
             }
             first = false;
+            heard = true;
             if (!pool.confirmActor(message.actor)) {
               return Effect.fail(new ActorChanged());
             }
@@ -169,26 +185,30 @@ export function engine(
     // ID: drop the confirmed records, keep the pending transactions, and pull
     // again from 0. Only an ended session is final: `untilSessionEnded` then
     // stops the whole engine.
+    const again = (): PullEnd => (heard ? 'heard' : 'silent');
     const pullOnce = pull.pipe(
       Effect.raceFirst(loads),
-      Effect.as(true),
-      Effect.catchTag('ActorChanged', () => Effect.succeed(true)),
+      Effect.map(again),
+      Effect.catchTag('ActorChanged', () => Effect.sync(again)),
       Effect.catchTag('ServerBehind', () =>
         Effect.sync(() => {
           pool.resetConfirmed();
-          return true;
+          return again();
         }),
       ),
       Effect.catchTag('SessionEnded', () =>
-        Effect.sync(() => {
+        Effect.sync((): PullEnd => {
           onSessionEnded();
-          return false;
+          return 'ended';
         }),
       ),
-      Effect.catchCause(() => Effect.succeed(true)),
+      Effect.catchCause(() => Effect.sync(again)),
     );
+    // The wait grows while pulls hear nothing. After a pull that heard the
+    // server, it starts again from its shortest.
     yield* pullOnce.pipe(
-      Effect.repeat({ while: (again) => again, schedule: retryWait }),
+      Effect.repeat({ while: (end) => end === 'silent', schedule: retryWait }),
+      Effect.repeat({ while: (end) => end === 'heard', schedule: firstWait }),
       Effect.forkScoped,
     );
     // One push holds at most `transactionsPerPush` transactions, in their

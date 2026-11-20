@@ -54,9 +54,14 @@ The protocol has three calls over one WebSocket for each organization, through
   loaded groups, and a delete of each record that left them.
   A client past sync ID 0 that does not name an eager group lacks its
   records. The first `Groups` message then holds the snapshot of that group.
-  With `pages`, `Page` messages come before it.
+  With `pages`, the first `Groups` message names the actor and the groups
+  that have no page to come. The `Page` messages follow, and a last `Groups`
+  message loads the group. So the client drops a copy of another actor
+  before the first page.
 - A client at sync ID 0 holds nothing. Its `Pull` sends the snapshot of each
-  loaded group in place of the deltas. Then it sends one delta with no changes
+  loaded group in place of the deltas. With `pages`, a `Groups` message with
+  the actor and no group comes before the first page. A group loads only with
+  its last page. Then it sends one delta with no changes
   at the head of the log. That delta moves the client's last sync ID to the head, so
   its next `Pull` asks only for the events after it.
 - `Load` asks the open `Pull` to load one more group. It fails with
@@ -97,8 +102,11 @@ the same, so loading the local database needs no decode.
 2. The transaction goes to the transaction queue. The pool saves the row of
    the transaction to the local database. See
    [the local database](./client.md#local-database).
-3. The transport sends the unsent transactions with `Push`. A failed push
-   tries again after 200 ms, then twice as long each time, up to 3 seconds.
+3. The transport sends the unsent transactions with `Push`. A failed push or
+   pull tries again after 200 ms, then twice as long each time, up to 3
+   seconds. Each wait moves by a random part of up to a fifth. So the clients
+   of a server that comes back do not all pull at once. After a pull that got
+   its first `Groups` message, the wait starts again from 200 ms.
 4. The server checks the input against its fields, then the access rule. Then
    it runs the server change. In one database transaction, it writes the owner
    records and appends one event to the log.
@@ -111,7 +119,11 @@ the same, so loading the local database needs no decode.
    of the organization in that process. A `Pull` follows the reader only once
    the reader knows where it starts. So the backlog of the `Pull` and the live
    events leave no event out. Each `Pull` sends only the changes of its loaded groups, and a
-   delete of each record that left them. The sender gets its delta too.
+   delete of each record that left them. The sender gets its delta too. When
+   the event holds nothing that the sender sees, the sender's `Pull` gets a
+   delta with no changes at its sync ID. That delta goes out after each event
+   before it. So the sender's last sync ID passes its transaction, and the
+   transaction stops waiting. `apps/api/src/sender-position.test.ts` holds this.
 7. The client applies the delta to its confirmed records, then applies each
    pending local change again on top. This is the rebase.
 8. A rejected transaction leaves the queue, and the object pool drops its
@@ -289,7 +301,9 @@ Product code asserts no types, so these shapes replace each `as` cast. See
 When a change lands in a user's own group, such as a membership, the server
 asks access again. Each group that the actor lost leaves the loaded set. The
 client then deletes each record that is in no loaded group, at once. The next
-save removes them from the local database too.
+save removes them from the local database too. Each eager group that the
+actor gained loads at once, with its snapshot, as at the start of a pull.
+`packages/sync/service/feed-position.test.ts` holds this.
 
 ## Load functions
 

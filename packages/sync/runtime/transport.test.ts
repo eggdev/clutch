@@ -307,3 +307,35 @@ test('a queue of more transactions than one push holds goes in more than one pus
   expect(pushes.map((batch) => batch.length)).toEqual([100, 100, 50]);
   expect(pushes.flat()).toEqual(ids);
 });
+
+test('after a pull that heard the server, the wait before the next pull starts again from its shortest', async () => {
+  const pool = createPool([], declared, { stamps: testStamps() });
+  const starts: Array<number> = [];
+  await connected(
+    pool,
+    {
+      push: () => [],
+      allows: () => true,
+      // Four pulls fail with no message, so the wait grows. The fifth hears
+      // the server, then its socket drops.
+      pull: () => {
+        starts.push(performance.now());
+        if (starts.length < 5) {
+          return Stream.die('The server is down.');
+        }
+        return starts.length === 5
+          ? Stream.concat(
+              Stream.make<Array<SyncMessage>>({ _tag: 'Groups', loaded: [], backfill: [] }),
+              Stream.die('The socket dropped.'),
+            )
+          : Stream.never;
+      },
+    },
+    () => starts.length === 6,
+  );
+  const waits = starts.slice(1).map((start, index) => start - (starts[index] ?? 0));
+  // The waits grow from 200 ms, each with a random part of up to a fifth.
+  expect(waits[3]).toBeGreaterThan(1000);
+  // After the pull that heard the server, the wait is near 200 ms again.
+  expect(waits[4]).toBeLessThan(600);
+});
