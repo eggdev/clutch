@@ -194,8 +194,8 @@ device. Four rules hold this.
 - A client that was offline when its session ended learns it when it
   connects. An `Actors` layer that finds no session dies with `SessionEnded`.
   The sync server then accepts the upgrade of the socket and closes it at
-  once with code 4401, because a browser cannot read the status of a refused
-  upgrade. Each other failure of `Actors` stays a server fault, and the
+  once with code 4401. A browser cannot read the status of a refused
+  upgrade, but it reads the close code. Each other failure of `Actors` stays a server fault, and the
   client keeps its local database. `apps/api/src/sessions.test.ts` holds
   this.
 - An ended session stops the saves before the local database clears.
