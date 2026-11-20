@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.25.0 (2026-11-20)
+
+### Features
+
+- feat(sync): trim the event log and reload a client behind it (CL-917)
+
 ## 1.24.0 (2026-11-20)
 
 ### Features
