@@ -165,7 +165,7 @@ With `SYNC_LOG_KEEP_DAYS` set to D, an organization that writes W events a day
 keeps about D × W events, and at least one. A load reads `sync_records`, so a
 trim never changes what a new client gets. A client that was away for longer
 than D days loads again from 0. The `Pull` checks the oldest event again after
-the backlog, so a trim that runs during a `Pull` cannot drop an event that the
+the backlog. So a trim that runs during a `Pull` cannot drop an event that the
 client did not get.
 
 ## Sync groups
