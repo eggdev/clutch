@@ -6,7 +6,7 @@ import { DatabasePglite } from '@repo/sync/runtime/database.server';
 import { WakePglite } from '@repo/sync/runtime/wake.server';
 import { Database } from '@repo/sync/service/database';
 import type { SyncMessage } from '@repo/sync/types/protocol';
-import { Effect, Layer } from 'effect';
+import { Deferred, Effect, Layer } from 'effect';
 import { HttpServer } from 'effect/http';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
 import { Socket } from 'effect/socket';
@@ -63,6 +63,28 @@ export function socketClient(url: string, userId?: string) {
     Layer.provide(RpcSerialization.layerJson),
   );
 }
+
+/**
+ * An RPC client over a real socket, as `socketClient` gives, and the close
+ * code of its first socket. `closed` waits for that close.
+ */
+export const watchedSocketClient = (url: string) =>
+  Effect.gen(function* () {
+    const code = yield* Deferred.make<number>();
+    const constructor = Layer.succeed(Socket.WebSocketConstructor)((target) => {
+      const socket = new WebSocket(target);
+      socket.addEventListener('close', (event) => {
+        Deferred.doneUnsafe(code, Effect.succeed(event.code));
+      });
+      return socket;
+    });
+    const client = RpcClient.layerProtocolSocket().pipe(
+      Layer.provide(Socket.layerWebSocket(url)),
+      Layer.provide(constructor),
+      Layer.provide(RpcSerialization.layerJson),
+    );
+    return { client, code };
+  });
 
 /** The deltas of a message, for tests that only read deltas. */
 export const deltasOnly = (message: SyncMessage) =>

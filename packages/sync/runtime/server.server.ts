@@ -3,6 +3,7 @@ import type { ServerChange } from '@repo/sync/commands/server-change.server';
 import { originAllowed, syncOrigins } from '@repo/sync/config/origins';
 import type { Contract } from '@repo/sync/contract/define';
 import { manifestOf } from '@repo/sync/contract/manifest';
+import { closeAsEnded, SocketEnds, SocketEndsLive } from '@repo/sync/runtime/socket-ends.server';
 import { EventLog } from '@repo/sync/service/event-log';
 import { feed } from '@repo/sync/service/feed';
 import type { LoadRequest } from '@repo/sync/service/feed';
@@ -13,11 +14,11 @@ import { GroupNotAllowed } from '@repo/sync/types/group-not-allowed';
 import { SyncRpcs } from '@repo/sync/types/protocol';
 import type { Outcome, Transaction } from '@repo/sync/types/protocol';
 import { ServerBehind } from '@repo/sync/types/server-behind';
-import { SessionEnded, sessionEndedCode } from '@repo/sync/types/session-ended';
+import { SessionEnded } from '@repo/sync/types/session-ended';
 import { Deferred, Effect, Layer, Queue, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { RpcServer } from 'effect/rpc';
-import { Socket } from 'effect/socket';
+import type { Rpc } from 'effect/rpc';
 
 /** The path of the sync socket on the server app. */
 const syncPath = '/sync';
@@ -38,8 +39,7 @@ const noSession = (defect: unknown) =>
 const endedSocket = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const socket = yield* Effect.orDie(request.upgrade);
-    const writer = yield* socket.writer;
-    yield* writer.write(new Socket.CloseEvent(sessionEndedCode, 'The session ended.'));
+    yield* closeAsEnded(yield* socket.writer);
     return HttpServerResponse.empty();
   });
 
@@ -47,14 +47,17 @@ const endedSocket = (request: HttpServerRequest.HttpServerRequest) =>
  * The WebSocket protocol of the RPC server, with each socket kept in
  * `Sessions` for its actor. `Sessions.end` can then close the actor's sockets
  * with code 4401. The RPC server upgrades the request itself, so this layer
- * gives it a request whose upgrade also tracks the socket. A request from an
- * origin that `SYNC_ORIGINS` does not list gets 403 before the upgrade.
+ * gives it a request whose upgrade also tracks the socket. `SocketEnds`
+ * ties each RPC client to its socket, so a call can close it with code 4401
+ * too. A request from an origin that `SYNC_ORIGINS` does not list gets 403
+ * before the upgrade.
  */
 const trackedWebsocket = Layer.effect(RpcServer.Protocol)(
   Effect.gen(function* () {
     const { httpEffect, protocol } = yield* RpcServer.makeProtocolWithHttpEffectWebsocket;
     const router = yield* HttpRouter.HttpRouter;
     const sessions = yield* Sessions;
+    const ends = yield* SocketEnds;
     const actors = yield* Actors;
     const origins = yield* syncOrigins;
     yield* router.add('GET', syncPath, (request) => {
@@ -73,16 +76,19 @@ const trackedWebsocket = Layer.effect(RpcServer.Protocol)(
         const tracked: HttpServerRequest.HttpServerRequest = Object.create(request, {
           upgrade: {
             value: request.upgrade.pipe(
-              Effect.tap((socket) => sessions.track(actor.userId, socket)),
+              Effect.tap((socket) =>
+                Effect.andThen(sessions.track(actor.userId, socket), ends.carry(socket)),
+              ),
             ),
           },
         });
         return yield* httpEffect.pipe(
           Effect.provideService(HttpServerRequest.HttpServerRequest, tracked),
+          ends.serve,
         );
       });
     });
-    return protocol;
+    return ends.protocol(protocol);
   }),
 );
 
@@ -121,7 +127,21 @@ export function SyncServer<R>(
       // them, so a missing service fails the typecheck of the server app.
       const services = yield* Effect.context<R>();
       const actors = yield* Actors;
+      const ends = yield* SocketEnds;
       const syncGroups = yield* SyncGroups;
+      // The actor of a call on an open socket. When the session ended since
+      // the upgrade, the socket closes with code 4401, as at the upgrade, and
+      // the call stops. Each other defect stays a server fault.
+      const actorOf = (client: Rpc.ServerClient, headers: Readonly<Record<string, string>>) =>
+        actors
+          .fromHeaders(headers)
+          .pipe(
+            Effect.catchDefect((defect) =>
+              defect instanceof SessionEnded
+                ? Effect.andThen(ends.end(client.id), Effect.interrupt)
+                : Effect.die(defect),
+            ),
+          );
       // The `Load` queue of each open `Pull` stream, by RPC client. A `Load`
       // that comes before its `Pull` stream opens waits for the queue.
       const requests = new Map<number, Deferred.Deferred<Queue.Queue<LoadRequest>>>();
@@ -135,9 +155,13 @@ export function SyncServer<R>(
           requests.set(id, made);
           return made;
         });
-      const push = (transaction: Transaction, headers: Readonly<Record<string, string>>) =>
+      const push = (
+        transaction: Transaction,
+        client: Rpc.ServerClient,
+        headers: Readonly<Record<string, string>>,
+      ) =>
         Effect.gen(function* () {
-          const actor = yield* actors.fromHeaders(headers);
+          const actor = yield* actorOf(client, headers);
           return yield* settle(byName.get(transaction.command), transaction, actor).pipe(
             Effect.provideContext(services),
             Effect.provideService(EventLog, log),
@@ -147,11 +171,11 @@ export function SyncServer<R>(
         // The outcomes come in the order of the transactions. When the database
         // does not answer, the list ends there: that write and each write
         // behind it get no outcome, so the client keeps them in their order.
-        Push: ({ transactions }, { headers }) =>
+        Push: ({ transactions }, { client, headers }) =>
           Effect.gen(function* () {
             const outcomes: Array<Outcome> = [];
             for (const transaction of transactions) {
-              const outcome = yield* push(transaction, headers).pipe(
+              const outcome = yield* push(transaction, client, headers).pipe(
                 Effect.catchTag('ServerUnavailable', () => Effect.void),
               );
               if (!outcome) {
@@ -168,7 +192,7 @@ export function SyncServer<R>(
         Pull: ({ lastSyncId, groups, contract, pages }, { client, headers }) =>
           Stream.unwrap(
             Effect.gen(function* () {
-              const actor = yield* actors.fromHeaders(headers);
+              const actor = yield* actorOf(client, headers);
               // A build of another contract still syncs. The line names it,
               // so the traffic of each older build can be counted by digest.
               if (contract !== manifest.digest) {
@@ -212,7 +236,7 @@ export function SyncServer<R>(
           ),
         Load: ({ group, pages }, { client, headers }) =>
           Effect.gen(function* () {
-            const actor = yield* actors.fromHeaders(headers);
+            const actor = yield* actorOf(client, headers);
             const allowed = yield* syncGroups.groupsFor(actor).pipe(Effect.orDie);
             if (![...allowed.eager, ...allowed.lazy].includes(group)) {
               return yield* new GroupNotAllowed({ group });
@@ -225,5 +249,10 @@ export function SyncServer<R>(
   );
   // The server app provides one `EventLog` for the sync server, the job
   // runner and the routes, so a commit from any of them reaches each client.
-  return RpcServer.layer(SyncRpcs).pipe(Layer.provide(trackedWebsocket), Layer.provide(handlers));
+  // `trackedWebsocket` and the handlers share one `SocketEnds`.
+  return RpcServer.layer(SyncRpcs).pipe(
+    Layer.provide(trackedWebsocket),
+    Layer.provide(handlers),
+    Layer.provide(SocketEndsLive),
+  );
 }
