@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.25.1 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): tie the local database to its user (CL-919)
+
 ## 1.25.0 (2026-11-20)
 
 ### Features
