@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.23.11 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): save only the changed records, from one writer tab (CL-578)
+- fix(sync): keep a deleted record deleted after an old backfill (CL-576)
+- fix(sync): keep each waiting transaction in its own row (CL-575)
+
 ## 1.23.10 (2026-11-20)
 
 ### Fixes and maintenance
