@@ -12,8 +12,7 @@ repository and the author is in `authors`. A fork never runs. For each new head
 commit, it runs each job in `checks`. The job definition is the one in
 `.github/workflows/` at that commit, and [act](https://github.com/nektos/act) runs it.
 The status `context` is the job name. A newer commit cancels the jobs of the older one.
-The service calls GitHub with the `gh` login of its user. A job gets that token as `github.token`,
-or the narrower token in `job_token_file`.
+The service calls GitHub with its user's `gh` login. A job gets that token, or the one in `job_token_file`.
 
 Each job runs in a new container of [`image/Dockerfile`](./image/Dockerfile).
 The container mounts nothing from the host and holds its own Docker daemon. Its
