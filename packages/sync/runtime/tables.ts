@@ -239,11 +239,8 @@ export type GroupWaits = {
   readonly paged: (group: string) => void;
   /** The groups whose pages came, and that are not loaded or refused yet. */
   readonly loading: () => ReadonlySet<string>;
-  /**
-   * Wakes when a gate asks for a group. Only the engine uses it, for the
-   * length of one pull. The leave returns `true` when the last listener left.
-   */
-  readonly onRequest: (listener: (group: string) => void) => () => boolean;
+  /** Wakes when a gate asks for a group. Only the engine uses it, for the length of one pull. */
+  readonly onRequest: (listener: (group: string) => void) => () => void;
   /** Each group whose pages came and that did not load stops loading. It returns `true` when there was one. */
   readonly cutOff: () => boolean;
 };
@@ -284,7 +281,9 @@ export function groupWaits(): GroupWaits {
     loading: () => paged,
     onRequest(listener) {
       listeners.add(listener);
-      return () => listeners.delete(listener) && listeners.size === 0;
+      return () => {
+        listeners.delete(listener);
+      };
     },
     cutOff() {
       const any = paged.size > 0;

@@ -86,14 +86,14 @@ export type Pool = ReadablePool & {
   readonly refuseGroup: (group: string) => void;
   /** The groups that a gate asked for and that are not loaded yet. */
   readonly requestedGroups: () => ReadonlyArray<string>;
-  /**
-   * Wakes when a gate asks for a group. Only the engine uses it, and it
-   * listens for the length of one pull. When it stops, the pull has ended,
-   * and a load that did not finish leaves no record: each group whose pages
-   * came stops loading, and the pool drops each confirmed record that is in
-   * no loaded group.
-   */
+  /** Wakes when a gate asks for a group. Only the engine uses it, for the length of one pull. */
   readonly onLoadRequest: (listener: (group: string) => void) => () => void;
+  /**
+   * The engine calls it when a pull ends, however it ended. A load that did
+   * not finish leaves no record: each group whose pages came stops loading,
+   * and the pool drops each confirmed record that is in no loaded group.
+   */
+  readonly endPull: () => void;
   readonly resetConfirmed: () => void;
   /**
    * The engine names the build by the digest of its contracts. A saved copy
@@ -321,13 +321,11 @@ export function createPool(
       }
     },
     requestedGroups: waits.requested,
-    onLoadRequest(listener) {
-      const leave = waits.onRequest(listener);
-      return () => {
-        if (leave() && confirmed.endPull(waits.cutOff())) {
-          recompute();
-        }
-      };
+    onLoadRequest: waits.onRequest,
+    endPull() {
+      if (confirmed.endPull(waits.cutOff())) {
+        recompute();
+      }
     },
     resetConfirmed,
     nameBuild(digest) {

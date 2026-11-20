@@ -360,12 +360,15 @@ open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
   pages have come, until it loads, the server refuses it, or the pull ends.
 - A record of a group that did not finish loading does not outlive that
   load. When a pull ends, such as when the socket drops between two pages,
-  each group whose pages came stops loading. The pool drops each confirmed
-  record that is in no loaded group. The next `Pull` does not name the
-  group, and the gate asks for the whole group again. So a record that the
-  server deleted, or that moved to a group the person cannot see, between
-  the two loads does not stay. A record that is also in a loaded group stays,
-  and live deltas keep it right.
+  each group whose pages came stops loading. The engine calls `endPull` of
+  the pool at the end of each pull, however it ended: the socket dropped,
+  the server was behind, the actor changed, the session ended, or a defect.
+  `packages/sync/runtime/transport-pull-end.test.ts` holds that rule. The
+  pool drops each confirmed record that is in no loaded group. The next
+  `Pull` does not name the group, and the gate asks for the whole group
+  again. So a record that the server deleted, or that moved to a group the
+  person cannot see, between the two loads does not stay. A record that is
+  also in a loaded group stays, and live deltas keep it right.
 - A save never writes a confirmed record that is in no loaded group. It
   removes the row of such a record, and writes the record once its group
   loads. So a tab that closes in the middle of a load saves none of its records.
