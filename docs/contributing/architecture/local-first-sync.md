@@ -290,9 +290,7 @@ device. Eight rules hold this.
   name of the database. A tab that hears it stops its engine and the saves of
   its pool at once, so it writes nothing back. Then it starts again with an
   empty pool. `followLostDatabase` in `packages/sync/runtime/boot.ts` does
-  this. The message can reach the tab after a save of that tab started. The
-  generation of the local database stops that save: each clear writes a new
-  one, and a save of a handle that read an older one writes nothing. Then
+  this. The message can reach the tab after a save of that tab started. The generation of the local database stops that save. Each clear writes a new one. A save of a handle that read an older one writes nothing. Then
   the tab stops and starts again, as when it hears the message.
   `packages/sync/runtime/boot-session.test.ts` holds both orders: the tab
   that writes the confirmed records, and a tab that writes only its waiting

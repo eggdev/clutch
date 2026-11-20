@@ -54,7 +54,7 @@ export function sampleState(title = 'Old'): PoolState {
 }
 
 /** Whether two JSON values hold the same data, with the keys in any order. */
-export function sameJson(a: unknown, b: unknown): boolean {
+function sameJson(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) {
     return true;
   }

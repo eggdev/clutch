@@ -168,8 +168,7 @@ records are a cache of the server. `loadPool` in
 
 - A save that fails is reported once. The next attempt waits 200 ms, then
   twice as long each time, up to 10 seconds. A change while it waits starts
-  no other attempt: the next attempt saves the newest state. A save that
-  works ends the run of failures, so a single failure behaves as before.
+  no other attempt: the next attempt saves the newest state. A save that works ends the run of failures. So a single failure costs one wait, and the save after it works.
 - A save that fails with a full device, or the third save that fails in a
   row, makes room. `makeRoom` drops every confirmed record and sets the saved
   position to sync ID 0 in one database transaction. It keeps each waiting
@@ -256,9 +255,7 @@ database keeps a generation: a random value that each clear writes anew,
 in the same database transaction. Each handle reads the generation when it
 opens. `save` compares it in its own database transaction. When it differs,
 the save writes nothing and gives `cleared`, and `onLost` wakes once. The
-pool of that tab then never saves again, and the app starts again. So a
-late save never writes the records, the position or a waiting row of the
-person who left, and the mark of the session end stays. A database from
+pool of that tab then never saves again, and the app starts again. So a late save never writes the records, the position or a waiting row of the person who left. The mark of the session end stays. A database from
 before the generation gets one at its first open. The generation is the
 key `generation` of the IndexedDB store `position`, or a row of the SQLite
 table `pool_generation`. SQLite on native has one process, so only a
@@ -276,9 +273,7 @@ again from the server.
 A tab of an older build that holds the IndexedDB database open blocks this
 move. The open then fails with a sentence that says to close that tab. A tab
 closes its own handle when a newer build asks for a new version, so it never
-blocks that build. Then the tab can no longer save, so `onLost` wakes, and
-`followLostDatabase` stops its engine and its saves and starts the app
-again, with no clear. On the web the page loads again, with the newer build,
+blocks that build. The handle cannot save after that, so `onLost` wakes. `followLostDatabase` then stops the engine and the saves of the tab. It starts the app again, with no clear. On the web the page loads again, with the newer build,
 and opens the new layout. Each waiting transaction was saved when the person
 made it, so the new layout has it, and the start sends it.
 `packages/sync/runtime/indexed-db-loss.browser.test.ts` holds this.
