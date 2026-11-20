@@ -222,23 +222,14 @@ test('a live move reaches each client as what it is for that client', async () =
     Effect.gen(function* () {
       const log = yield* EventLog;
       yield* log.commit('org-a', 't1', () => Effect.succeed([change('a', ['space:x'])]));
-      const requests = yield* Queue.unbounded<string>();
+      const reader = (loaded: ReadonlyArray<string>, seen: Queue.Queue<SyncMessage>) =>
+        Queue.unbounded<string>().pipe(
+          Effect.flatMap((requests) => open(log, { loaded, lastSyncId: 1 }, requests, seen, 2)),
+        );
       const oldSeen = yield* Queue.unbounded<SyncMessage>();
       const bothSeen = yield* Queue.unbounded<SyncMessage>();
-      const oldReading = yield* open(
-        log,
-        { loaded: ['org:a', 'space:x'], lastSyncId: 1 },
-        requests,
-        oldSeen,
-        2,
-      );
-      const bothReading = yield* open(
-        log,
-        { loaded: ['org:a', 'space:x', 'space:y'], lastSyncId: 1 },
-        yield* Queue.unbounded<string>(),
-        bothSeen,
-        2,
-      );
+      const oldReading = yield* reader(['org:a', 'space:x'], oldSeen);
+      const bothReading = yield* reader(['org:a', 'space:x', 'space:y'], bothSeen);
       yield* Queue.take(oldSeen);
       yield* Queue.take(bothSeen);
       yield* log.commit('org-a', 't2', () => Effect.succeed([change('a', ['space:y'])]));

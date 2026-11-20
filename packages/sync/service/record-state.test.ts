@@ -9,7 +9,6 @@ import { Database } from '@repo/sync/service/database';
 import { EventLog, eventLog } from '@repo/sync/service/event-log';
 import { DatabaseTest } from '@repo/sync/testing/database';
 import type { Change } from '@repo/sync/types/protocol';
-import { sql } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
 import type { Context } from 'effect';
 
@@ -52,6 +51,18 @@ const recordRows = (db: Context.Service.Shape<typeof Database>) =>
       ),
     );
 
+/** The groups that each change of each event left, and the groups of the event, in log order. */
+const eventRows = (db: Context.Service.Shape<typeof Database>) =>
+  db
+    .select({ changes: syncEvents.changes, groups: syncEvents.groups })
+    .from(syncEvents)
+    .orderBy(syncEvents.organizationId, syncEvents.syncId)
+    .pipe(
+      Effect.map((rows) =>
+        rows.map(({ changes, groups }) => ({ left: changes.map((item) => item.left), groups })),
+      ),
+    );
+
 /** Runs a program with the log and the database itself. */
 function withDatabase<A, E>(program: Effect.Effect<A, E, EventLog | Database>) {
   return Effect.runPromise(
@@ -66,15 +77,10 @@ test('a change that moves a record names the groups it left, and its event is in
       const db = yield* Database;
       yield* log.commit('org-a', 't1', () => Effect.succeed([change('a', ['space:x', 'org:a'])]));
       yield* log.commit('org-a', 't2', () => Effect.succeed([change('a', ['space:y', 'org:a'])]));
-      const events = yield* db
-        .select({ changes: syncEvents.changes, groups: syncEvents.groups })
-        .from(syncEvents)
-        .orderBy(syncEvents.syncId);
-      return { events, records: yield* recordRows(db) };
+      return { events: yield* eventRows(db), records: yield* recordRows(db) };
     }),
   );
-  expect(result.events[0]?.changes[0]?.left).toBeUndefined();
-  expect(result.events[1]?.changes[0]?.left).toEqual(['space:x']);
+  expect(result.events.map((event) => event.left)).toEqual([[undefined], [['space:x']]]);
   expect(result.events[1]?.groups.toSorted()).toEqual(['org:a', 'space:x', 'space:y']);
   expect(result.records).toEqual([
     {
@@ -106,22 +112,10 @@ test('the record state follows each change of one event, and a delete marks it',
       const records = yield* recordRows(db);
       // A record that comes back after a delete left no group: its clients deleted it already.
       yield* log.commit('org-a', 't3', () => Effect.succeed([change('b', ['space:z'])]));
-      const [back] = yield* db
-        .select({ changes: syncEvents.changes })
-        .from(syncEvents)
-        .where(sql`${syncEvents.syncId} = 3`);
-      const [first] = yield* db
-        .select({ changes: syncEvents.changes })
-        .from(syncEvents)
-        .where(sql`${syncEvents.syncId} = 1`);
-      return {
-        records,
-        back: back?.changes[0]?.left,
-        first: first?.changes.map((item) => item.left),
-      };
+      return { records, left: (yield* eventRows(db)).map((event) => event.left) };
     }),
   );
-  expect(result.first).toEqual([undefined, ['space:x'], undefined]);
+  expect(result.left).toEqual([[undefined, ['space:x'], undefined], [undefined], [undefined]]);
   expect(result.records).toEqual([
     {
       recordId: 'a',
@@ -132,7 +126,6 @@ test('the record state follows each change of one event, and a delete marks it',
     },
     { recordId: 'b', groups: ['space:x'], syncId: 2, data: { id: 'b', title: 'b' }, deleted: true },
   ]);
-  expect(result.back).toBeUndefined();
 });
 
 test('a log with events and no record state gets the state of each record from its events', async () => {
@@ -184,23 +177,12 @@ test('a log with events and no record state gets the state of each record from i
       yield* fillRecords(db);
       const again = yield* db.select().from(syncRecords);
       yield* log.commit('org-a', 't5', () => Effect.succeed([change('a', ['space:z'])]));
-      const [moved] = yield* db
-        .select({ changes: syncEvents.changes })
-        .from(syncEvents)
-        .where(sql`${syncEvents.organizationId} = 'org-a' and ${syncEvents.syncId} = 4`);
-      return { filled, again: again.length, left: moved?.changes[0]?.left };
+      const events = yield* eventRows(db);
+      return { filled, again: again.length, left: events[3]?.left };
     }),
   );
-  expect(
-    result.filled.map(({ organizationId, recordId, groups, syncId, data, deleted }) => ({
-      organizationId,
-      recordId,
-      groups,
-      syncId,
-      data,
-      deleted,
-    })),
-  ).toEqual([
+  // Each row also holds its model, which this match leaves out.
+  expect(result.filled).toMatchObject([
     {
       organizationId: 'org-a',
       recordId: 'a',
@@ -227,5 +209,5 @@ test('a log with events and no record state gets the state of each record from i
     },
   ]);
   expect(result.again).toBe(3);
-  expect(result.left).toEqual(['space:y']);
+  expect(result.left).toEqual([['space:y']]);
 });

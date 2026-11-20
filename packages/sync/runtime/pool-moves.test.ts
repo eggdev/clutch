@@ -59,15 +59,12 @@ function apply(messages: ReadonlyArray<SyncMessage>) {
   return pool;
 }
 
-test('a client of the old group does not hold a record after the delta of its move', async () => {
-  const pool = apply(await Effect.runPromise(messagesFor(['space:x'])));
-  expect(pool.get(card, 'a')).toBeUndefined();
-  expect(pool.lastSyncId()).toBe(2);
-});
-
-test('a client of the new group holds the record in its new group', async () => {
-  const pool = apply(await Effect.runPromise(messagesFor(['space:y'])));
-  expect(pool.get(card, 'a')).toEqual({ id: 'a', title: 'A', space: 'y' });
+test('after a move, a client of the old group drops the record and one of the new group holds it', async () => {
+  const old = apply(await Effect.runPromise(messagesFor(['space:x'])));
+  expect(old.get(card, 'a')).toBeUndefined();
+  expect(old.lastSyncId()).toBe(2);
+  const next = apply(await Effect.runPromise(messagesFor(['space:y'])));
+  expect(next.get(card, 'a')).toEqual({ id: 'a', title: 'A', space: 'y' });
 });
 
 test('a change with no `left` key still applies, and an older build reads a change with it', () => {
