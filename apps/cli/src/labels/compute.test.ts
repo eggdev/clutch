@@ -65,6 +65,7 @@ test('changed lines skip lockfiles, snapshots, the tracker, binaries and project
     '10\t5\tsrc/a.ts',
     '400\t300\tbun.lock',
     '50\t0\tsrc/__snapshots__/a.test.ts.snap',
+    '200\t0\tpackages/x/repo/migrations/1_init/snapshot.json',
     '20\t20\t.clutch/TRACKER.md',
     '-\t-\tassets/logo.png',
     '7\t3\tsrc/generated/api.ts',
