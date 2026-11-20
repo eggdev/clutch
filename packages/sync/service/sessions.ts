@@ -1,8 +1,15 @@
 import { Wake } from '@repo/sync/service/wake';
 import { sessionEndedCode } from '@repo/sync/types/session-ended';
-import { Context, Effect, Layer, Stream } from 'effect';
+import { Context, Effect, Layer, Schedule, Stream } from 'effect';
 import type { Scope } from 'effect';
 import { Socket } from 'effect/socket';
+
+/**
+ * How `end` went. `closed` counts the sockets that it closed in this process.
+ * `othersTold` is false when the signal to the other processes failed, so
+ * they may still hold sockets of the user.
+ */
+export type Ended = { readonly closed: number; readonly othersTold: boolean };
 
 /**
  * The open sync sockets of each user. A sign-out ends the session: identity
@@ -18,8 +25,8 @@ export class Sessions extends Context.Service<
       userId: string,
       socket: Socket.Socket,
     ) => Effect.Effect<void, never, Scope.Scope>;
-    /** Closes each open socket of the user. Returns how many it closed in this process. */
-    readonly end: (userId: string) => Effect.Effect<number>;
+    /** Closes each open socket of the user, in this process and through the wake in the others. */
+    readonly end: (userId: string) => Effect.Effect<Ended>;
   }
 >()('sync/Sessions') {}
 
@@ -58,8 +65,21 @@ export const SessionsLive = Layer.effect(Sessions)(
       end: (userId) =>
         Effect.gen(function* () {
           const closed = yield* closeAll(userId);
-          yield* wake.send({ kind: 'end', userId });
-          return closed;
+          // An end has no transaction to send with, so a failed send is tried three more times.
+          const othersTold = yield* wake.send({ kind: 'end', userId }).pipe(
+            Effect.retry({ schedule: Schedule.spaced('100 millis'), times: 3 }),
+            Effect.as(true),
+            Effect.catchCause((cause) =>
+              Effect.as(
+                Effect.logError(
+                  'A sign-out could not tell the other server processes. They may still hold sockets of the user.',
+                  cause,
+                ),
+                false,
+              ),
+            ),
+          );
+          return { closed, othersTold };
         }),
     });
   }),

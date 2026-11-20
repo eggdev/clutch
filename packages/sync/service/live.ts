@@ -4,8 +4,12 @@ import type { Delta } from '@repo/sync/types/protocol';
 import { Effect, PubSub, Queue, Schedule } from 'effect';
 import type { Scope } from 'effect';
 
-/** The live deltas of one organization in this process, and the wakes that make it read. */
-type Reader = { readonly hub: PubSub.PubSub<Delta>; readonly wakes: Queue.Queue<true> };
+/** The live deltas of one organization in this process, the wakes that make it read, and its connections. */
+type Reader = {
+  readonly hub: PubSub.PubSub<Delta>;
+  readonly wakes: Queue.Queue<true>;
+  followers: number;
+};
 
 /** Reads the events after `mark`, a page at a time, publishes each one, and moves `mark`. */
 function readFrom(
@@ -33,7 +37,8 @@ function readFrom(
  * it to the connections of this process. Two wakes that come while it reads
  * make one more read, so no event goes out twice. The order comes from the
  * log, so a connection never gets an older event after a newer one. Each
- * reader runs until the scope closes.
+ * reader runs until the scope closes. A reader that missed a wake catches up
+ * at its next read, because it reads from its mark.
  */
 export function liveDeltas(db: DrizzleDatabase, pageSize: number) {
   return Effect.gen(function* () {
@@ -49,6 +54,7 @@ export function liveDeltas(db: DrizzleDatabase, pageSize: number) {
         const reader: Reader = {
           hub: yield* PubSub.unbounded<Delta>(),
           wakes: yield* Queue.sliding<true>(1),
+          followers: 0,
         };
         readers.set(organizationId, reader);
         // Every event up to the head was committed before the first
@@ -78,18 +84,25 @@ export function liveDeltas(db: DrizzleDatabase, pageSize: number) {
       subscribe: (
         organizationId: string,
       ): Effect.Effect<PubSub.Subscription<Delta>, unknown, Scope.Scope> =>
-        Effect.flatMap(readerOf(organizationId), (reader) => PubSub.subscribe(reader.hub)),
+        Effect.gen(function* () {
+          const reader = yield* readerOf(organizationId);
+          reader.followers += 1;
+          yield* Effect.addFinalizer(() => Effect.sync(() => (reader.followers -= 1)));
+          return yield* PubSub.subscribe(reader.hub);
+        }),
       /** The log of the organization has new events. Nothing reads when no connection follows it. */
       wake: (organizationId: string) =>
         Effect.suspend(() => {
           const reader = readers.get(organizationId);
           return reader ? Queue.offer(reader.wakes, true) : Effect.void;
         }).pipe(Effect.asVoid),
-      /** Each reader reads again, such as after a lost signal. */
+      /** Each reader with a connection reads again, such as after a lost signal. */
       wakeAll: Effect.suspend(() =>
-        Effect.forEach(readers.values(), (reader) => Queue.offer(reader.wakes, true), {
-          discard: true,
-        }),
+        Effect.forEach(
+          [...readers.values()].filter((reader) => reader.followers > 0),
+          (reader) => Queue.offer(reader.wakes, true),
+          { discard: true },
+        ),
       ),
     };
   });

@@ -1,3 +1,4 @@
+import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { Context, Schema } from 'effect';
 import type { Effect, Stream } from 'effect';
 
@@ -24,8 +25,17 @@ export type WakeSignal = typeof WakeSignal.Type;
 export class Wake extends Context.Service<
   Wake,
   {
-    /** Tells each other process. A failed send is logged, and the next commit wakes them again. */
-    readonly send: (signal: WakeSignal) => Effect.Effect<void>;
+    /** Tells each other process now. It fails when the database does not take the signal. */
+    readonly send: (signal: WakeSignal) => Effect.Effect<void, unknown>;
+    /**
+     * Tells each other process when `tx`, a database transaction, commits.
+     * Postgres sends the signal with the commit, and drops it on a rollback.
+     * So a commit that succeeds always sends it, and a failed one never does.
+     */
+    readonly sendOnCommit: (
+      tx: DrizzleDatabase,
+      signal: WakeSignal,
+    ) => Effect.Effect<void, unknown>;
     /** Each signal from another process, from the time the stream starts. */
     readonly signals: Stream.Stream<WakeSignal>;
   }

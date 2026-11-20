@@ -119,7 +119,7 @@ test('a sign-out closes each socket of the user with code 4401', async () => {
       return { ended, code: yield* closed };
     }).pipe(Effect.provide(server)),
   );
-  expect(result).toEqual({ ended: 1, code: 4401 });
+  expect(result).toEqual({ ended: { closed: 1, othersTold: true }, code: 4401 });
 });
 
 test('a socket request from an origin that SYNC_ORIGINS does not list gets 403', async () => {

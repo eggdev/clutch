@@ -11,8 +11,8 @@ import { liveDeltas } from '@repo/sync/service/live';
 import { seenDelta } from '@repo/sync/service/visible';
 import { Wake } from '@repo/sync/service/wake';
 import type { Change, Delta } from '@repo/sync/types/protocol';
-import { Context, Effect, Layer, Option, Stream } from 'effect';
-import type { PubSub, Scope } from 'effect';
+import { Context, Effect, Layer, Option, Schedule, Stream } from 'effect';
+import type { Duration, PubSub, Scope } from 'effect';
 
 /**
  * At most this many events go in one page of the backlog, and this many
@@ -20,6 +20,12 @@ import type { PubSub, Scope } from 'effect';
  * server reads one page at a time.
  */
 const rowsPerPage = 1000;
+
+/**
+ * Each live reader with a connection reads the log again this often, so a
+ * lost wake leaves a connection behind for at most this long.
+ */
+const rereadInterval = '30 seconds';
 
 type Commit = <E, R>(
   organizationId: string,
@@ -34,12 +40,12 @@ export type BacklogPage = { readonly deltas: ReadonlyArray<Delta>; readonly last
 export type SnapshotPage = { readonly deltas: ReadonlyArray<Delta>; readonly more: boolean };
 
 /**
- * The append-only log of one server. `commit` writes the owner records and
- * the event in one database transaction. After the commit, it wakes the live
- * reader of the organization in this process, and each other process through
- * `Wake`. Each reader then reads the new events from the log, in sync ID
- * order. Each change must name its sync groups and a model that a contract
- * declares. `snapshot`, `backlog` and
+ * The append-only log of one server. `commit` writes the owner records, the
+ * event and the wake of each other process in one database transaction, so
+ * the wake goes out exactly when the commit holds. After the commit, it wakes
+ * the live reader of the organization in this process. Each reader then reads
+ * the new events from the log, in sync ID order. Each change must name its
+ * sync groups and a model that a contract declares. `snapshot`, `backlog` and
  * `subscribe` give a connection its records and events; see `service/feed.ts`.
  */
 export class EventLog extends Context.Service<
@@ -138,7 +144,10 @@ function checkRecords(
  */
 export function eventLog(
   contracts: ReadonlyArray<Contract>,
-  options: { readonly pageSize?: number | undefined } = {},
+  options: {
+    readonly pageSize?: number | undefined;
+    readonly rereadEvery?: Duration.Input | undefined;
+  } = {},
 ) {
   const pageSize = options.pageSize ?? rowsPerPage;
   const declared = new Map(
@@ -158,6 +167,11 @@ export function eventLog(
         }
         return signal.kind === 'listening' ? live.wakeAll : Effect.void;
       }).pipe(Effect.forkScoped);
+      // No lost signal leaves a connection behind for longer than this.
+      yield* live.wakeAll.pipe(
+        Effect.repeat(Schedule.spaced(options.rereadEvery ?? rereadInterval)),
+        Effect.forkScoped,
+      );
 
       const commit: Commit = (organizationId, transactionId, write) =>
         Effect.gen(function* () {
@@ -171,12 +185,12 @@ export function eventLog(
               yield* checkGroups(changes);
               yield* checkRecords(declared, changes);
               const stored = yield* appendEvent(tx, organizationId, transactionId, changes);
+              yield* wake.sendOnCommit(tx, { kind: 'commit', organizationId });
               return { syncId: stored.syncId, appended: true };
             }),
           );
           if (result.appended) {
             yield* live.wake(organizationId);
-            yield* wake.send({ kind: 'commit', organizationId });
           }
           return result.syncId;
         });

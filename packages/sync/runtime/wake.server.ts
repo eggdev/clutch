@@ -1,6 +1,7 @@
 import { PgClient } from '@effect/sql-pg';
 import { PgliteClient } from '@effect/sql-pglite';
 import { Wake, WakeSignal } from '@repo/sync/service/wake';
+import { sql } from 'drizzle-orm';
 import { Effect, Layer, Option, PubSub, Schedule, Schema, Stream } from 'effect';
 import type { Scope } from 'effect';
 
@@ -24,6 +25,8 @@ type Channel = {
  * gets its own ID, and drops the signals that it sent. The listener runs for
  * the life of the layer. When the connection drops, it listens again after a
  * second, and says `listening`, because signals sent in between are lost.
+ * `sendOnCommit` sends with `pg_notify` through the transaction, so the
+ * signal goes out only when the transaction commits. Both drivers do this.
  */
 function wakeOver(over: Channel) {
   return Effect.gen(function* () {
@@ -49,11 +52,9 @@ function wakeOver(over: Channel) {
       Effect.forkScoped,
     );
     return Wake.of({
-      send: (signal) =>
-        over.notify(encodeEnvelope({ from: self, signal })).pipe(
-          Effect.tapCause((cause) => Effect.logWarning('The sync wake could not send', cause)),
-          Effect.ignore,
-        ),
+      send: (signal) => over.notify(encodeEnvelope({ from: self, signal })),
+      sendOnCommit: (tx, signal) =>
+        tx.execute(sql`select pg_notify(${channel}, ${encodeEnvelope({ from: self, signal })})`),
       signals: Stream.fromPubSub(heard),
     });
   });

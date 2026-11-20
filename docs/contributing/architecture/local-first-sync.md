@@ -99,10 +99,11 @@ the same, so loading the local database needs no decode.
    records and appends one event to the log.
 5. Appending an event locks the organization's row in `sync_counters`, so sync
    IDs only increase and have no gaps.
-6. After the commit, the server wakes each of its processes. In each process,
-   one reader for each organization reads the new events from the log, in sync
-   ID order. It hands them to every open `Pull` of the organization in that
-   process. Each `Pull` sends only the changes of its loaded groups, and a
+6. The same transaction wakes each other process of the server, so the wake
+   goes out only when the commit holds. After the commit, the server wakes its
+   own process too. In each process, one reader for each organization reads the
+   new events from the log, in sync ID order. It hands them to every open `Pull`
+   of the organization in that process. Each `Pull` sends only the changes of its loaded groups, and a
    delete of each record that left them. The sender gets its delta too.
 7. The client applies the delta to its confirmed records, then applies each
    pending local change again on top. This is the rebase.

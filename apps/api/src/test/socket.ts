@@ -23,8 +23,9 @@ export const testServer = api(DatabasePglite()).pipe(
  * One process of the API over a database that the test provides, such as
  * `DatabaseTest()`. Each process gets its own wake over that database, so a
  * test can run two processes over one database, and reach the database too.
+ * A test can give a wake of its own, such as one that cannot send.
  */
-export const apiProcess = () =>
+export const apiProcess = (wake = WakePglite) =>
   api(
     Layer.merge(
       Layer.effect(Database)(
@@ -32,7 +33,7 @@ export const apiProcess = () =>
           return yield* Database;
         }),
       ),
-      Layer.fresh(WakePglite),
+      Layer.fresh(wake),
     ),
   ).pipe(
     Layer.provide(ActorsTest()),
@@ -60,3 +61,16 @@ export function socketClient(url: string, userId?: string) {
 /** The deltas of a message, for tests that only read deltas. */
 export const deltasOnly = (message: SyncMessage) =>
   message._tag === 'Deltas' ? message.deltas : [];
+
+/** Opens a socket to `url`. The effect that it returns gives the close code, even of a close before it runs. */
+export const openSocket = (url: string) =>
+  Effect.gen(function* () {
+    const socket = new WebSocket(url);
+    const code = new Promise<number>((resolve) => {
+      socket.addEventListener('close', (event) => resolve(event.code));
+    });
+    yield* Effect.callback<true>((resume) => {
+      socket.addEventListener('open', () => resume(Effect.succeed(true)));
+    });
+    return Effect.promise(() => code);
+  });
