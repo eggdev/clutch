@@ -22,8 +22,17 @@ import { parse } from 'yaml';
  */
 const screen = /^features\/[^/]+\/screens\/(?!\.gitkeep$).+$/u;
 const issue = /^\.clutch\/issues\/[^/]+\.md$/u;
-/** A generated tracker, a lockfile and a screenshot baseline are not written work. */
-const alwaysExcluded = ['.clutch/TRACKER.md', '**/*.lock', '**/__screenshots__/**'];
+/**
+ * A generated tracker, a lockfile, a screenshot baseline and the snapshot that
+ * the migration generator writes next to each migration are not written work.
+ * The SQL of a migration still counts.
+ */
+const alwaysExcluded = [
+  '.clutch/TRACKER.md',
+  '**/*.lock',
+  '**/__screenshots__/**',
+  '**/migrations/**/snapshot.json',
+];
 
 export const defaultMax = 1000;
 

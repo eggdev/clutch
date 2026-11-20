@@ -336,3 +336,41 @@ test('a backfill that fills its last page ends with a message that loads the gro
   expect(messages.map((message) => message._tag)).toEqual(['Groups', 'Page', 'Groups']);
   expect(messages[2]?._tag === 'Groups' ? messages[2].backfill : undefined).toEqual([]);
 });
+
+/** Opens a feed whose client holds data up to sync ID 2 and lacks the history of space y. */
+const fillOpen = (pages: boolean, count: number) =>
+  run(
+    Effect.gen(function* () {
+      const log = yield* EventLog;
+      for (const id of ['a', 'b', 'c']) {
+        yield* log.commit('org-a', `t-${id}`, () => Effect.succeed([change(id, ['space:y'])]));
+      }
+      return yield* feed(log, {
+        organizationId: 'org-a',
+        userId: 'u',
+        lastSyncId: 2,
+        loaded: ['org:a', 'space:y'],
+        fill: ['space:y'],
+        pages,
+        granted: Effect.sync(() => access.granted),
+        requests: yield* Queue.unbounded<LoadRequest>(),
+      }).pipe(Stream.take(count), Stream.runCollect, Effect.timeout('2 seconds'));
+    }),
+    1,
+  );
+
+test('a group whose history the client lacks comes as the backfill of the first message', async () => {
+  expect(summary(await fillOpen(false, 2))).toEqual([
+    'groups org:a+space:y backfill a,b',
+    'deltas c',
+  ]);
+});
+
+test('a client that reads pages gets that history in pages before the first Groups message', async () => {
+  expect(summary(await fillOpen(true, 4))).toEqual([
+    'page space:y backfill a',
+    'page space:y backfill b',
+    'groups org:a+space:y backfill ',
+    'deltas c',
+  ]);
+});
