@@ -290,30 +290,21 @@ function listedIds(result: ToolResult) {
   return Array.isArray(items) ? items.map((item: { id: string }) => item.id) : [];
 }
 
+/** Files card `id` in a space, and lists the open space. */
+const file = (id: string, spaceId: string, title: string, message: string) =>
+  fileTools.call('files_file_card', { id, spaceId, title }, actor, message);
+const listOpen = (message: string) =>
+  fileTools.call('files_of_space_list', { id: 'open' }, actor, message);
+
 test('a read tool of a group does not list a record that moved out of it', async () => {
   const [before, after] = await withLog(
     Effect.gen(function* () {
-      yield* fileTools.call(
-        'files_file_card',
-        { id: 'c1', spaceId: 'open', title: 'First' },
-        actor,
-        'm1',
-      );
-      yield* fileTools.call(
-        'files_file_card',
-        { id: 'c2', spaceId: 'open', title: 'Second' },
-        actor,
-        'm2',
-      );
-      const listed = yield* fileTools.call('files_of_space_list', { id: 'open' }, actor, 'm3');
+      yield* file('c1', 'open', 'First', 'm1');
+      yield* file('c2', 'open', 'Second', 'm2');
+      const listed = yield* listOpen('m3');
       // The same card, filed again in another space, leaves the open space.
-      yield* fileTools.call(
-        'files_file_card',
-        { id: 'c1', spaceId: 'other', title: 'First' },
-        actor,
-        'm4',
-      );
-      return [listed, yield* fileTools.call('files_of_space_list', { id: 'open' }, actor, 'm5')];
+      yield* file('c1', 'other', 'First', 'm4');
+      return [listed, yield* listOpen('m5')];
     }),
   );
   expect(listedIds(before)).toEqual(['c1', 'c2']);
