@@ -53,9 +53,15 @@ changes write over the confirmed records, into a small set of writes. The
 pool then compares only those records and the ones that the waiting changes
 wrote the time before. A load or a reset of the confirmed records compares
 every record once. With 100,000 records, one local edit or a delta of 3
-records takes well under a millisecond. An ID list of a changed model is
-still sorted again when a screen reads it.
-`packages/sync/runtime/pool-change-cost.test.ts` holds this.
+records takes well under a millisecond. `packages/sync/runtime/pool-change-cost.test.ts`
+holds this.
+
+An ID list follows what changed too. When a screen reads it after a change,
+it takes out the IDs of the changed records. Then it puts back each one that
+still matches its filter, at its place by the sort key, with a binary search.
+A change to many records sorts the list again. The list keeps the same array
+when its IDs did not change, and gives a new array when they did.
+`packages/sync/runtime/pool-sorted-ids.test.ts` holds this.
 
 ## Pending writes
 

@@ -31,8 +31,6 @@ export function tableOf<Row>(tables: Map<string, Map<string, Row>>, name: string
 
 /** The sort of an ID list, by one field name. */
 type SortBy = { readonly by: string; readonly direction: 'asc' | 'desc' };
-/** The filter of an ID list: one field and the value it must equal. */
-type FilterBy = { readonly field: string; readonly equals: string };
 
 /**
  * One record of a model, read with its type. The type guard is the only check:
@@ -88,19 +86,48 @@ export function sameJson(a: unknown, b: unknown): boolean {
   return false;
 }
 
-/** Sorts IDs by one field of their records, then by ID. `where` keeps only matching records. */
-function sortedIds(
-  table: Table | undefined,
-  order: SortBy | undefined,
-  where: FilterBy | undefined,
-): Array<string> {
-  const rows = [...(table?.values() ?? [])].filter(
-    (row) => !where || row[where.field] === where.equals,
-  );
+/** The order of an ID list: by one field of the records, then by ID. */
+function orderOf(order: SortBy | undefined) {
   const sign = order?.direction === 'desc' ? -1 : 1;
   const key = (row: RecordRow) => String(order ? row[order.by] : '');
-  rows.sort((a, b) => sign * key(a).localeCompare(key(b)) || a.id.localeCompare(b.id));
-  return rows.map((row) => row.id);
+  return (a: RecordRow, b: RecordRow) =>
+    sign * key(a).localeCompare(key(b)) || a.id.localeCompare(b.id);
+}
+
+/**
+ * The IDs of an ID list after the records of `changed` changed. Each changed
+ * ID leaves, and each one that is still in `table` and still `fits` goes back
+ * at its place, which a binary search finds. Every other ID keeps its record,
+ * so its place holds. `ids` is not changed.
+ */
+function placed(
+  ids: ReadonlyArray<string>,
+  changed: ReadonlySet<string>,
+  table: Table | undefined,
+  compare: (a: RecordRow, b: RecordRow) => number,
+  fits: (row: RecordRow) => boolean,
+): Array<string> {
+  const next = ids.filter((id) => !changed.has(id));
+  for (const id of changed) {
+    const row = table?.get(id);
+    if (row && fits(row)) {
+      let low = 0;
+      for (let high = next.length; low < high;) {
+        const middle = (low + high) >> 1;
+        const other = table?.get(next[middle] ?? '');
+        [low, high] = other && compare(other, row) < 0 ? [middle + 1, high] : [low, middle];
+      }
+      next.splice(low, 0, id);
+    }
+  }
+  return next;
+}
+
+/** Calls each listener once. */
+export function wake(listeners: Iterable<() => void>): void {
+  for (const listener of listeners) {
+    listener();
+  }
 }
 
 /** A set of listeners for each key, so a change wakes only its own listeners. */
@@ -121,19 +148,8 @@ function listenerMap() {
         }
       };
     },
-    wake(key: string) {
-      for (const listener of map.get(key) ?? []) {
-        listener();
-      }
-    },
+    wake: (key: string) => wake(map.get(key) ?? []),
   };
-}
-
-/** Calls each listener once. */
-export function wake(listeners: Iterable<() => void>): void {
-  for (const listener of listeners) {
-    listener();
-  }
 }
 
 export const recordKey = (model: string, id: string) => `${model}\u0000${id}`;
@@ -155,15 +171,19 @@ function keysOf(tables: Map<string, Map<string, unknown>>): Array<string> {
  * that the waiting changes wrote, now or the time before, and returns how
  * many it visited. Each record that did not change stays the same object, and
  * only the watchers of the records and models that changed wake. An ID list
- * is built again only after its model changed, and the old array is kept
- * when the IDs match, so a screen that reads it does not render again.
+ * changes only after a record of its model changed. Then it takes out the
+ * changed IDs and puts back each one that still fits at its place, so a
+ * change to a few records costs what it changed. A change to many records
+ * sorts the list again. The old array is kept when the IDs match, so a screen
+ * that reads it does not render again.
  */
 export function visibleTables(): Reads & {
   readonly show: (base: Tables, writes: Writes, touched: ReadonlySet<string> | 'all') => number;
 } {
   const visible: Tables = new Map();
   let lastWrites: Writes = new Map();
-  const lists = new Map<string, { ids: ReadonlyArray<string>; changed: boolean }>();
+  // Each ID list, and the IDs of its model that changed since a screen read it.
+  const lists = new Map<string, { ids: ReadonlyArray<string>; changed: Set<string> }>();
   const modelWatchers = listenerMap();
   const recordWatchers = listenerMap();
   return {
@@ -174,7 +194,7 @@ export function visibleTables(): Reads & {
       }
       lastWrites = writes;
       const changed: Array<string> = [];
-      const models = new Set<string>();
+      const models = new Map<string, Array<string>>();
       for (const key of keys) {
         const [model = '', id = ''] = key.split('\u0000');
         const before = visible.get(model)?.get(id);
@@ -187,16 +207,18 @@ export function visibleTables(): Reads & {
         } else {
           visible.get(model)?.delete(id);
         }
-        models.add(model);
+        models.set(model, [...(models.get(model) ?? []), id]);
         changed.push(key);
       }
       for (const [key, list] of lists) {
-        list.changed ||= models.has(key.slice(0, key.indexOf('\u0000')));
+        for (const id of models.get(key.slice(0, key.indexOf('\u0000'))) ?? []) {
+          list.changed.add(id);
+        }
       }
       for (const key of changed) {
         recordWatchers.wake(key);
       }
-      for (const name of models) {
+      for (const name of models.keys()) {
         modelWatchers.wake(name);
       }
       return keys.size;
@@ -205,12 +227,22 @@ export function visibleTables(): Reads & {
     ids(model, order, where) {
       const key = `${model.name}\u0000${order ? `${order.by}:${order.direction}` : ''}\u0000${where ? `${where.field}=${where.equals}` : ''}`;
       const known = lists.get(key);
-      if (known && !known.changed) {
+      if (known?.changed.size === 0) {
         return known.ids;
       }
-      const ids = sortedIds(visible.get(model.name), order, where);
+      const table = visible.get(model.name);
+      const compare = orderOf(order);
+      const fits = (row: RecordRow) => !where || row[where.field] === where.equals;
+      // A change to a few records places them. A change to many sorts the list again.
+      const ids =
+        known && known.changed.size * 8 < known.ids.length
+          ? placed(known.ids, known.changed, table, compare, fits)
+          : [...(table?.values() ?? [])]
+              .filter(fits)
+              .toSorted(compare)
+              .map((row) => row.id);
       const kept = known && sameJson(known.ids, ids) ? known.ids : ids;
-      lists.set(key, { ids: kept, changed: false });
+      lists.set(key, { ids: kept, changed: new Set() });
       return kept;
     },
     watchModel: (model, listener) => modelWatchers.add(model.name, listener),
