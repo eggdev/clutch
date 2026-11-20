@@ -48,6 +48,9 @@ The protocol has three calls over one WebSocket for each organization, through
 - `Pull` names the groups that the client loaded before. It streams a `Groups`
   message first, then the deltas after the client's last sync ID, then each
   live delta. Each delta holds only the changes of the loaded groups.
+  A client past sync ID 0 that does not name an eager group lacks its
+  history. The first `Groups` message then holds the backfill of that group
+  up to the last sync ID. With `pages`, `Page` messages come before it.
 - `Load` asks the open `Pull` to load one more group. It fails with
   `GroupNotAllowed` when the actor may not load the group. With `pages`, the
   client reads the backfill in `Page` messages of at most 1,000 events. A
