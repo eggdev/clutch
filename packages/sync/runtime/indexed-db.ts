@@ -8,12 +8,7 @@ import {
   stateOf,
 } from '@repo/sync/runtime/pool-doors';
 import type { MarkState } from '@repo/sync/runtime/pool-doors';
-import type {
-  LocalDatabase,
-  LocalSave,
-  SaveResult,
-  SyncPosition,
-} from '@repo/sync/types/local-database';
+import type { LocalDatabase, LocalSave, SaveResult } from '@repo/sync/types/local-database';
 import { openDB } from 'idb';
 import type { IDBPDatabase, IDBPTransaction, OpenDBCallbacks } from 'idb';
 
@@ -98,70 +93,36 @@ async function write(tx: Writable, save: LocalSave): Promise<void> {
   await Promise.all(requests);
 }
 
-/**
- * What a recreate keeps in `localStorage` between the delete of the database
- * and the write of its new rows: the generation, the emptied position, the
- * mark of a session end and each waiting row, in order.
- */
-export type Rescue = {
-  readonly generation: unknown;
-  readonly room?: number;
-  readonly position: SyncPosition | undefined;
-  readonly ended: unknown;
-  readonly waiting: ReadonlyArray<unknown>;
-};
+/** The key of the copies of database `name`. Each copy is under it and `:` and its own ID, so no copy writes over another. */
+const copyKey = (name: string) => `local-database:${name}:rescue`;
 
-function isRescue(value: unknown): value is Rescue {
-  return (
-    typeof value === 'object' && value !== null && Array.isArray(Reflect.get(value, 'waiting'))
+/** Whether a copy of waiting rows under `prefix` waits in `localStorage`. A copy from before each had its own ID is under `prefix` itself. */
+function hasCopy(prefix: string): boolean {
+  const storage = globalThis.localStorage;
+  return Array.from({ length: storage?.length ?? 0 }, (_, index) => storage?.key(index)).some(
+    (key) => key === prefix || key?.startsWith(`${prefix}:`),
   );
-}
-
-/** The copy that a recreate left under `key`, or undefined. */
-function readRescue(key: string): Rescue | undefined {
-  try {
-    const copy: unknown = JSON.parse(globalThis.localStorage?.getItem(key) ?? 'null');
-    return isRescue(copy) ? copy : undefined;
-  } catch {
-    // A copy that is no JSON holds nothing to write back.
-    return undefined;
-  }
 }
 
 /**
  * Reads the generation of `database` and the times that room was made, in
  * one database transaction, so two tabs that open at once read the same. It
- * writes back `rescue` first: each waiting row that the database does not
- * hold, in order, and the generation, count, position and mark that it lacks.
- * A database from before the generation gets a new one.
+ * writes back each copy of `name` first, with the module that only an open
+ * after a lost database or a rebuild loads. A database from before the
+ * generation gets a new one.
  */
 async function openGeneration(
   database: IDBPDatabase,
-  rescue?: Rescue,
+  name: string,
 ): Promise<{ readonly generation: unknown; readonly room: number }> {
+  if (hasCopy(copyKey(name))) {
+    const { writeBack } = await import('@repo/sync/runtime/indexed-db-copies');
+    await writeBack(database, copyKey(name));
+  }
   const tx = database.transaction(stores, 'readwrite');
   const store = tx.objectStore(position);
   const found: unknown = await store.get('generation');
   let generation = found;
-  if (rescue) {
-    const waiting = tx.objectStore(transactions);
-    for (const row of rescue.waiting) {
-      const id: unknown = typeof row === 'object' && row ? Reflect.get(row, 'id') : undefined;
-      if (typeof id === 'string' && (await waiting.index('id').getKey(id)) === undefined) {
-        await waiting.add(row);
-      }
-    }
-    generation ??= rescue.generation;
-    if (rescue.room !== undefined && (await store.get('room')) === undefined) {
-      await store.put(rescue.room, 'room');
-    }
-    if (rescue.position && (await store.get('position')) === undefined) {
-      await store.put(rescue.position, 'position');
-    }
-    if (rescue.ended !== undefined && (await store.get('ended')) === undefined) {
-      await store.put(rescue.ended, 'ended');
-    }
-  }
   generation ??= crypto.randomUUID();
   if (generation !== found) {
     await store.put(generation, 'generation');
@@ -264,39 +225,36 @@ export async function openIndexedDb(name: string, version = 2): Promise<LocalDat
         ),
       );
     },
-    // A tab of a newer build asks for a new version. This handle lets the
-    // database go, so it never blocks that build, and it can no longer save.
-    // `onLost` wakes, so the app starts again on the new layout. Each waiting
-    // transaction was saved when it was made, so the new layout has it.
+    // A tab of a newer build asks for a new version, or a rebuild deletes
+    // the database. This handle lets the database go, so it never blocks
+    // them, and it can no longer save. `onLost` wakes first, so the app keeps
+    // its whole queue in a copy that the next open writes back, then starts
+    // again on the new database.
     blocking(_current, _next, event) {
+      wake();
       if (event.target instanceof IDBDatabase) {
         event.target.close();
       }
-      wake();
     },
   };
   let database = await Promise.race([openDB(name, version, callbacks), blocked.promise]);
-  // A recreate that did not write its rows left a copy of them here.
-  const rescueKey = `local-database:${name}:rescue`;
   // `openedRoom` is the count that this handle read. A save after it changed writes only the waiting rows.
-  let { generation, room: openedRoom } = await openGeneration(database, readRescue(rescueKey));
-  globalThis.localStorage?.removeItem(rescueKey);
+  let { generation, room: openedRoom } = await openGeneration(database, name);
+  // The copy that this handle keeps when it loses its database.
+  const keptKey = `${copyKey(name)}:${crypto.randomUUID()}`;
   const writer = await writerOf(name);
 
   /** Deletes the database and creates it again with only what a device must keep. */
   async function recreate(): Promise<SaveResult> {
-    const { rebuild } = await import('@repo/sync/runtime/indexed-db-rebuild');
+    const { rebuild } = await import('@repo/sync/runtime/indexed-db-copies');
     const rebuilt = await rebuild({
       database,
       name,
       version,
       callbacks,
       generation,
-      key: rescueKey,
-      async reopen(next) {
-        await openGeneration(next, readRescue(rescueKey));
-        localStorage.removeItem(rescueKey);
-      },
+      key: `${copyKey(name)}:${crypto.randomUUID()}`,
+      reopen: (next) => openGeneration(next, name),
     });
     if (rebuilt === 'cleared') {
       return 'cleared';
@@ -393,6 +351,13 @@ export async function openIndexedDb(name: string, version = 2): Promise<LocalDat
     onLost(listener) {
       heard.add(listener);
       return () => heard.delete(listener);
+    },
+    keep(rows) {
+      try {
+        localStorage.setItem(keptKey, JSON.stringify({ generation, waiting: rows }));
+      } catch {
+        // A device too full for the copy keeps only the rows that it saved.
+      }
     },
     isWriter: () => writer.held,
     writer: writer.taken,

@@ -187,6 +187,17 @@ export type LocalDatabase = {
    */
   readonly onLost: (listener: () => void) => () => void;
   /**
+   * Keeps the waiting rows of this tab outside the database, so that the next
+   * open writes them back. A tab that lost its database calls it with its
+   * whole queue before it starts again, so a row whose save had not started,
+   * or waited after a failure, is not lost. A row that the database holds
+   * already is not added again. A row of a session that ended since is not
+   * written back. The web adapter keeps a copy in `localStorage` for each
+   * handle. A platform with one process has no other tab that takes its
+   * database, so it keeps nothing.
+   */
+  readonly keep: (rows: ReadonlyArray<WaitingRow>) => void;
+  /**
    * Whether this tab writes the confirmed records now. Two tabs hold
    * different groups and positions, so only one tab writes them. A platform
    * with one process has one writer from the start.

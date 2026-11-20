@@ -331,3 +331,43 @@ test('a waiting row of a tab that is no writer, saved after a session end in ano
   expect(next.queue()).toEqual([]);
   expect(next.unsent()).toEqual([]);
 });
+
+test('a tab that loses its database keeps its whole queue before it stops, and again before it starts again', async () => {
+  const memory = memoryLocalDatabase(saved());
+  const kept: Array<Array<unknown>> = [];
+  let lose: (() => void) | undefined;
+  const database: LocalDatabase = {
+    ...memory,
+    onLost(listener) {
+      lose = listener;
+      return () => {};
+    },
+    keep: (rows) => kept.push(rows.map(({ input }) => input)),
+  };
+  const pool = await loadPool(database, [renameLocal], [cards]);
+  await settle();
+  const order: Array<string> = [];
+  followLostDatabase(
+    database,
+    pool,
+    () => order.push(`disconnect after ${kept.length} keep`),
+    () => order.push(`restart after ${kept.length} keeps`),
+  );
+  pool.run(rename, { id: 'a', title: 'One' });
+  pool.run(rename, { id: 'a', title: 'Two' });
+  lose?.();
+  pool.run(rename, { id: 'a', title: 'Three' });
+  await settle();
+  expect(order).toEqual(['disconnect after 1 keep', 'restart after 2 keeps']);
+  expect(kept).toEqual([
+    [
+      { id: 'a', title: 'One' },
+      { id: 'a', title: 'Two' },
+    ],
+    [
+      { id: 'a', title: 'One' },
+      { id: 'a', title: 'Two' },
+      { id: 'a', title: 'Three' },
+    ],
+  ]);
+});

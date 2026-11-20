@@ -156,6 +156,9 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
         heard.add(listener);
         return () => heard.delete(listener);
       },
+      keep() {
+        // Only a clear takes these rows from a handle, and a clear ends the session of the rows.
+      },
       isWriter: () => isWriter,
       writer: (async () => {
         await writer;

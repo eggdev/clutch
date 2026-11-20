@@ -298,6 +298,9 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
       heard.add(listener);
       return () => heard.delete(listener);
     },
+    keep() {
+      // One process uses the file, so no other tab takes it, and the rows stay in it.
+    },
     // One process uses the file, so it writes from the start.
     isWriter: () => true,
     writer: Promise.resolve(),

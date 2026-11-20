@@ -50,12 +50,13 @@ unless a migration rewrites every stored copy. See
 
 The template's sync engine holds these frozen contracts:
 
-| Contract                                                                          | Defined in                              |
-| --------------------------------------------------------------------------------- | --------------------------------------- |
-| The `sync_counters`, `sync_events`, `sync_records` and `sync_transactions` tables | `packages/sync/repo/schema.ts`          |
-| The change shape in each event, with its `groups`                                 | `packages/sync/types/protocol.ts`       |
-| The `records`, `transactions` and `position` client stores, and the rescue copy   | `packages/sync/runtime/indexed-db.ts`   |
-| The saved pool state, with `groups`, `meta` and `actor`                           | `packages/sync/types/local-database.ts` |
+| Contract                                                                          | Defined in                                   |
+| --------------------------------------------------------------------------------- | -------------------------------------------- |
+| The `sync_counters`, `sync_events`, `sync_records` and `sync_transactions` tables | `packages/sync/repo/schema.ts`               |
+| The change shape in each event, with its `groups`                                 | `packages/sync/types/protocol.ts`            |
+| The `records`, `transactions` and `position` client stores                        | `packages/sync/runtime/indexed-db.ts`        |
+| The rescue copies of waiting rows in `localStorage`                               | `packages/sync/runtime/indexed-db-copies.ts` |
+| The saved pool state, with `groups`, `meta` and `actor`                           | `packages/sync/types/local-database.ts`      |
 
 An event keeps its organization ID, so the log is scoped by tenant too. Its
 `groups` column holds the sync groups of all its changes, with a GIN index.
@@ -70,11 +71,17 @@ state: `fresh` after the clear, and `spent` after the first save of the next
 start (the column `spent` in SQLite). Only the load of a fresh mark drops
 each row without `actor`. The first save after a `Groups` message removes the
 mark. The generation of a local database is a random string. It is the key `generation` of the IndexedDB store `position`, or the column `value` of the SQLite table `pool_generation`. Each clear writes a new one. A database
-without it gets one at its first open. A recreate of the IndexedDB database
-leaves a copy in `localStorage` under the key `local-database:<name>:rescue`
-until it writes its rows. It is JSON with `generation`, `position`, `ended`
-and `waiting`, the waiting rows in order. The next open writes back each
-waiting row that the database does not hold, and removes the key. The `records` store holds no record that is in no loaded
+without it gets one at its first open. The count of the room made is the key
+`room` of the IndexedDB store `position`, or the column `value` of the SQLite
+table `pool_room`. Each `makeRoom` raises it, and each clear removes it. A
+recreate of the IndexedDB database, and a tab that loses its database, leave
+a copy in `localStorage` under a key that starts with
+`local-database:<name>:rescue:` and ends with the ID of the copy. It is JSON
+with `generation` and `waiting`, the waiting rows in order. The copy of a
+recreate also has `room`, `position` and `ended`. The next open writes back
+each waiting row that the database does not hold, from each copy of its
+generation, and removes the key. It reads the key
+`local-database:<name>:rescue` of an older build too. The `records` store holds no record that is in no loaded
 group of the position. A copy at sync ID 0 holds only part of a first load.
 The next pull from 0 drops each record that it does not send again.
 

@@ -181,6 +181,10 @@ export async function loadPool(
    * next attempt, and a stop ends the wait. It returns whether to save again.
    */
   async function afterFailure(failure: unknown): Promise<boolean> {
+    // A save that fails after a stop, such as on a database that is lost, does nothing more.
+    if (stopped) {
+      return false;
+    }
     everything = true;
     failures += 1;
     if (failures === 1) {
@@ -300,11 +304,16 @@ export async function endSession(
  * Follows the loss of the local database in this tab. Another tab ended the
  * session and cleared the database: the tab hears it as a message, or as a
  * save that found the database cleared, whichever comes first. Or a tab of a
- * newer build took the database for its new layout. This tab then stops its
- * engine with `disconnect` and the saves of its pool at once, before it can
- * write anything back. Then it calls `restart`, so the app starts again on
- * what the database holds now. The tab that clears never hears its own
- * clear. It follows one loss, and returns the stop of the follow.
+ * newer build took the database for its new layout, or another tab deletes
+ * it to make room. This tab then keeps its whole queue of waiting
+ * transactions with `keep`, also each one whose save had not started or
+ * waits after a failure. It stops its engine with `disconnect` and the saves
+ * of its pool at once, before it can write anything back, keeps its queue
+ * again with what ran since, and calls `restart`. So the app starts again on
+ * what the database holds now, with each waiting transaction. The adapter
+ * writes back no row of a session that a clear ended. The tab that clears
+ * never hears its own clear. It follows one loss, and returns the stop of the
+ * follow.
  */
 export function followLostDatabase(
   database: LocalDatabase,
@@ -315,9 +324,11 @@ export function followLostDatabase(
   const stop = database.onLost(() => {
     // One end is enough: the start that follows has its own follow.
     stop();
+    database.keep(pool.queue());
     disconnect();
     void (async () => {
       await pool.stop();
+      database.keep(pool.queue());
       restart();
     })();
   });

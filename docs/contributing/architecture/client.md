@@ -182,8 +182,10 @@ records are a cache of the server. `loadPool` in
 - When that cannot be written either, the IndexedDB adapter deletes the
   database, creates it again, and writes the waiting transactions into it.
   Between the delete and the write, a copy of them waits in `localStorage`
-  under the key `local-database:<name>:rescue`. The next open writes the copy
-  back when the write did not happen. The SQLite file holds other names too,
+  under a key of its own that starts with `local-database:<name>:rescue:`.
+  The next open writes the copy back when the write did not happen. Each
+  other tab lets the old database go before the delete, and keeps its own
+  queue in a copy too, as [a lost database](#older-layouts) does. The SQLite file holds other names too,
   so the SQLite adapter deletes the records in small steps instead. It first
   commits the emptied position and the count of the room made, so a delete
   that stops part way leaves sync ID 0 with some records. The next start
@@ -290,9 +292,21 @@ A tab of an older build that holds the IndexedDB database open blocks this
 move. The open then fails with a sentence that says to close that tab. A tab
 closes its own handle when a newer build asks for a new version, so it never
 blocks that build. The handle cannot save after that, so `onLost` wakes. `followLostDatabase` then stops the engine and the saves of the tab. It starts the app again, with no clear. On the web the page loads again, with the newer build,
-and opens the new layout. Each waiting transaction was saved when the person
-made it, so the new layout has it, and the start sends it.
-`packages/sync/runtime/indexed-db-loss.browser.test.ts` holds this.
+and opens the new layout.
+
+A waiting transaction whose save had not started, or that waits after a
+failed save, is only in the memory of the tab. So before the tab lets the
+database go, and again before it starts again, `followLostDatabase` calls
+`keep` with the whole queue of the tab. The IndexedDB adapter writes it to
+`localStorage`, under a key of its own handle that starts with
+`local-database:<name>:rescue:`, so two tabs never write over each other.
+Each open writes back every copy, then removes each copy that no tab wrote
+again. A row that the database holds already is not added again, so a crash
+between the two adds no row twice. A copy of another generation is the work
+of a session that ended, so the open drops it. The same happens in each
+other tab when one tab deletes the database to make room.
+`packages/sync/runtime/indexed-db-loss.browser.test.ts` and
+`packages/sync/runtime/indexed-db-keep.browser.test.ts` hold this.
 
 `openLocalDatabase` in `packages/sync/runtime/local-database.ts` opens IndexedDB
 on the web. `packages/sync/runtime/local-database.native.ts` replaces it on a
