@@ -151,7 +151,8 @@ export const recordKey = (model: string, id: string) => `${model}\u0000${id}`;
 
 /**
  * The rows of the confirmed records with these keys, for a save: a row for
- * each record that the pool holds, and a key to remove for each other one.
+ * each record that the pool holds, a row with no record for each deleted
+ * record, and a key to remove for each other one.
  */
 export function savedRows(
   keys: Iterable<string>,
@@ -163,8 +164,8 @@ export function savedRows(
   for (const key of keys) {
     const [model = '', id = ''] = key.split('\u0000');
     const known = meta.get(key);
-    const row = tables.get(model)?.get(id);
-    if (known && row) {
+    const row = known?.deleted ? null : tables.get(model)?.get(id);
+    if (known && row !== undefined) {
       put.push({ model, id, row, groups: known.groups, syncId: known.syncId });
     } else {
       remove.push({ model, id });

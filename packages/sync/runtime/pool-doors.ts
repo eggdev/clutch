@@ -171,7 +171,7 @@ function isSavedRecord(value: unknown): value is SavedRecord {
     isObject(value) &&
     typeof value['model'] === 'string' &&
     typeof value['id'] === 'string' &&
-    isRow(value['row']) &&
+    (value['row'] === null || isRow(value['row'])) &&
     isStrings(value['groups']) &&
     typeof value['syncId'] === 'number'
   );
@@ -212,8 +212,12 @@ export function stateOf(
   const tables: Record<string, Array<RecordRow>> = {};
   const meta: Record<string, RecordMeta> = {};
   for (const { model, id, row, groups, syncId } of records) {
-    (tables[model] ??= []).push(row);
-    meta[recordKey(model, id)] = { groups, syncId };
+    if (row === null) {
+      meta[recordKey(model, id)] = { groups, syncId, deleted: true };
+    } else {
+      (tables[model] ??= []).push(row);
+      meta[recordKey(model, id)] = { groups, syncId };
+    }
   }
   const saved = isPosition(position) ? position : { lastSyncId: 0, groups: [] };
   return {
@@ -233,6 +237,12 @@ export function fullSave(state: PoolState): LocalSave {
     for (const row of rows) {
       const known = state.meta[recordKey(model, row.id)];
       put.push({ model, id: row.id, row, groups: known?.groups ?? [], syncId: known?.syncId ?? 0 });
+    }
+  }
+  for (const [key, known] of Object.entries(state.meta)) {
+    if (known.deleted) {
+      const [model = '', id = ''] = key.split('\u0000');
+      put.push({ model, id, row: null, groups: known.groups, syncId: known.syncId });
     }
   }
   return {

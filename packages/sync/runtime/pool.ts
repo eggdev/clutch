@@ -125,7 +125,12 @@ export function createPool(
   let pending: Array<Pending> = [];
   let lastSyncId = 0;
   let rejection: Rejection | undefined;
-  // The groups and last sync ID of each confirmed record, by `recordKey`.
+  // The groups and last sync ID of each confirmed record, by `recordKey`. A
+  // deleted record keeps an entry marked `deleted`, so an older upsert of it
+  // does not bring it back. The pool forgets these marks only in
+  // `resetConfirmed` and when it drops a saved copy, so they grow with the
+  // deletes that the device sees. Snapshots of the server (CL-917) may make
+  // them unnecessary.
   let meta = new Map<string, RecordMeta>();
   let loaded = new Set<string>();
   // The keys of the confirmed records that changed since the last save, or
@@ -187,7 +192,7 @@ export function createPool(
       meta.set(key, { groups: change.groups, syncId });
     } else {
       tableOf(confirmed, change.model).delete(change.id);
-      meta.delete(key);
+      meta.set(key, { groups: change.groups, syncId, deleted: true });
     }
     unsaved.add(key);
   }
@@ -201,8 +206,9 @@ export function createPool(
   /** Deletes each confirmed record that is in no loaded group. */
   function purge() {
     const current = loaded;
-    for (const [key, { groups }] of meta) {
-      if (!groups.some((group) => current.has(group))) {
+    for (const [key, { groups, deleted }] of meta) {
+      // A deleted record keeps its mark, so a later backfill of another group cannot bring it back.
+      if (!deleted && !groups.some((group) => current.has(group))) {
         const [model = '', id = ''] = key.split('\u0000');
         confirmed.get(model)?.delete(id);
         meta.delete(key);

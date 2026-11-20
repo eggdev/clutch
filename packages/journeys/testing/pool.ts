@@ -18,7 +18,10 @@ export type PoolRow = RecordRow;
 /** A transaction that the page ran and that the server has not answered yet. */
 export type PoolPending = Transaction;
 
-/** The rows of the pool: one for each confirmed record, and one for each transaction without an answer. */
+/**
+ * The rows of the pool: one for each confirmed record, and one for each
+ * transaction without an answer. A deleted record has a row with no record.
+ */
 export type PoolState = {
   readonly records: ReadonlyArray<SavedRecord>;
   readonly pending: ReadonlyArray<PoolPending>;
@@ -80,7 +83,11 @@ export function poolState(page: Page): Promise<PoolState | undefined> {
 /** The records of one model in the pool, such as `Note`, or none when the pool has none of them. */
 export async function records(page: Page, model: string): Promise<ReadonlyArray<PoolRow>> {
   const state = await poolState(page);
-  return state?.records.filter((record) => record.model === model).map(({ row }) => row) ?? [];
+  return (
+    state?.records.flatMap((record) =>
+      record.model === model && record.row !== null ? [record.row] : [],
+    ) ?? []
+  );
 }
 
 /** The commands that the page has sent and the server has not answered yet, by name. */

@@ -159,6 +159,42 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
     },
   },
   {
+    name: 'a deleted record keeps its sync ID, with no record, in a full save and in a save of one change',
+    async run(open) {
+      const db = await open();
+      const state: PoolState = {
+        ...sampleState(),
+        meta: {
+          ...sampleState().meta,
+          'Card\u0000gone': { groups: ['test'], syncId: 6, deleted: true },
+        },
+      };
+      await db.save(fullSave(state));
+      expectSame(await db.read(), state, 'The read after a full save with a deleted record');
+      await db.save({
+        confirmed: {
+          replace: false,
+          put: [{ model: 'Card', id: 'b', row: null, groups: ['test'], syncId: 8 }],
+          remove: [],
+          position: { lastSyncId: 8, groups: ['test'] },
+        },
+        add: [],
+        done: [],
+      });
+      const after = await readState(db, 'The read after a delete of b');
+      expectSame(
+        after.tables,
+        { Card: [{ id: 'a', title: 'Old' }] },
+        'The records after a delete of b',
+      );
+      expectSame(
+        after.meta['Card\u0000b'],
+        { groups: ['test'], syncId: 8, deleted: true },
+        'The entry of b after its delete',
+      );
+    },
+  },
+  {
     name: 'a waiting transaction of one tab stays after a save of another tab',
     async run(open) {
       const first = await open();

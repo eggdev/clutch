@@ -131,7 +131,8 @@ One is the usual choice for native. A project with no client deletes
 The sync engine keeps its state on the device through one seam,
 `LocalDatabase` in `packages/sync/types/local-database.ts`. It keeps three
 kinds of rows: one for each confirmed record, one for each waiting
-transaction, and one for the sync position. The sync position is the last
+transaction, and one for the sync position. A deleted record keeps a row
+with no record, so the pool remembers the sync ID of the delete. The sync position is the last
 sync ID, the loaded groups and `leftOutBy`. `read` joins the rows into one
 state. `save` writes one change in one database transaction. `clear` removes
 every row.

@@ -187,6 +187,10 @@ open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
   changes as a backfill, and the gate resumes when they are in the pool.
 - A record that already holds a later change keeps it. The backfill never
   undoes a later change.
+- A deleted record stays deleted. The pool keeps the sync ID of the delete,
+  and saves it, so an older upsert in a backfill does not bring the record
+  back. The pool forgets these sync IDs only when it drops its confirmed
+  records. `packages/sync/runtime/pool-groups.test.ts` holds this.
 - After 3 seconds, or offline, the gate stops waiting and opens the screen
   with what the pool has.
 - When the server refuses the group, the gate stops waiting at once. The pool

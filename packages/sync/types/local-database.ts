@@ -1,8 +1,16 @@
 import type { RecordRow } from '@repo/sync/contract/record';
 import type { Transaction } from '@repo/sync/types/protocol';
 
-/** The sync groups of one confirmed record, and the sync ID of its last change. */
-export type RecordMeta = { readonly groups: ReadonlyArray<string>; readonly syncId: number };
+/**
+ * The sync groups of one confirmed record, and the sync ID of its last change.
+ * `deleted` marks a record that the server deleted: the pool keeps its sync ID,
+ * so an older upsert of it, such as from a backfill, does not bring it back.
+ */
+export type RecordMeta = {
+  readonly groups: ReadonlyArray<string>;
+  readonly syncId: number;
+  readonly deleted?: true;
+};
 
 /**
  * What the pool loads and what a read of the local database gives: the
@@ -31,9 +39,12 @@ export type PoolState = {
 /** The key of one saved confirmed record. */
 export type RecordKey = { readonly model: string; readonly id: string };
 
-/** One row of a confirmed record: the record, its groups and the sync ID of its last change. */
+/**
+ * One row of a confirmed record: the record, its groups and the sync ID of its
+ * last change. `row` is null for a deleted record, whose sync ID the pool keeps.
+ */
 export type SavedRecord = RecordKey & {
-  readonly row: RecordRow;
+  readonly row: RecordRow | null;
   readonly groups: ReadonlyArray<string>;
   readonly syncId: number;
 };

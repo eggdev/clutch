@@ -98,7 +98,7 @@ test('one delta saves only the records that it changed, with the sync position, 
   ]);
   const save = await written;
   expect(save.confirmed?.replace).toBe(false);
-  expect(save.confirmed?.put.map(({ id, row }) => [id, row.title])).toEqual([['b', 'New']]);
+  expect(save.confirmed?.put.map(({ id, row }) => [id, row?.title])).toEqual([['b', 'New']]);
   expect(save.confirmed?.remove).toEqual([]);
   expect(save.confirmed?.position.lastSyncId).toBe(3);
   const saved = await memory.read();

@@ -125,3 +125,67 @@ test('a saved copy that names no group for its records is dropped, and the pool 
     'The saved copy names no group for its records, so this build cannot read it. Its records were dropped, and the pool loads again from the server.',
   ]);
 });
+
+const remove = (id: string, groups: ReadonlyArray<string>): Change => ({
+  model: 'Card',
+  id,
+  action: 'delete',
+  data: null,
+  groups,
+});
+
+/**
+ * A client that loaded group x. Record r moved from group y to x at sync ID
+ * 2, and was deleted at sync ID 3. The backfill of y holds only the old
+ * change of r in y, at sync ID 1.
+ */
+function deletedAfterMove() {
+  const pool = createPool([], declared);
+  pool.applyGroups(['org:a', 'space:x'], []);
+  pool.applyDeltas([
+    { syncId: 2, transactionId: null, changes: [put('r', ['space:x'])] },
+    { syncId: 3, transactionId: null, changes: [remove('r', ['space:x'])] },
+  ]);
+  return pool;
+}
+const oldBackfill = [{ syncId: 1, transactionId: null, changes: [put('r', ['space:y'])] }];
+
+test('a backfill that holds an older upsert of a deleted record does not bring it back', () => {
+  const pool = deletedAfterMove();
+  pool.applyGroups(['org:a', 'space:x', 'space:y'], oldBackfill);
+  expect(pool.get(card, 'r')).toBeUndefined();
+  expect(pool.ids(card)).toEqual([]);
+});
+
+test('a deleted record stays deleted after its group leaves the loaded set', () => {
+  const pool = deletedAfterMove();
+  pool.applyGroups(['org:a'], []);
+  pool.applyGroups(['org:a', 'space:y'], oldBackfill);
+  expect(pool.get(card, 'r')).toBeUndefined();
+});
+
+test('a later upsert brings a deleted record back', () => {
+  const pool = deletedAfterMove();
+  pool.applyDeltas([{ syncId: 4, transactionId: null, changes: [put('r', ['space:x'], 'Back')] }]);
+  expect(pool.get(card, 'r')?.title).toBe('Back');
+});
+
+test('a saved copy keeps a deleted record deleted after a reload', async () => {
+  const pool = deletedAfterMove();
+  const database = memoryLocalDatabase();
+  await database.save({ confirmed: pool.confirmedChanges(true), add: [], done: [] });
+  const saved = await database.read();
+  const next = createPool([], declared);
+  if (saved) {
+    next.load(saved);
+  }
+  next.applyGroups(['org:a', 'space:x', 'space:y'], oldBackfill);
+  expect(next.get(card, 'r')).toBeUndefined();
+});
+
+test('a reset of the confirmed records forgets each deleted record', () => {
+  const pool = deletedAfterMove();
+  pool.resetConfirmed();
+  pool.applyGroups(['org:a', 'space:x', 'space:y'], oldBackfill);
+  expect(pool.get(card, 'r')?.title).toBe('r');
+});
