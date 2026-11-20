@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.5 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): tell the clients of a group when a record leaves it (CL-530)
+
 ## 1.23.4 (2026-11-20)
 
 ### Fixes and maintenance
