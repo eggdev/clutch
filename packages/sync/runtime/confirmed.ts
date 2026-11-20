@@ -50,6 +50,17 @@ export type Confirmed = {
   readonly applyDelta: (delta: Delta) => boolean;
   /** Applies each change of a backfill. A backfill does not move the sync position. */
   readonly applyBackfill: (backfill: ReadonlyArray<Delta>) => void;
+  /**
+   * A `Groups` message ended a load. The first one of a pull from sync ID 0
+   * ends the snapshot of every loaded group, so each record that the pull did
+   * not send goes.
+   */
+  readonly endLoad: () => void;
+  /**
+   * The pull ended, and the next one sends its records again. When a load was
+   * `cutOff`, it purges, and it returns whether it did.
+   */
+  readonly endPull: (cutOff: boolean) => boolean;
   readonly setLoaded: (groups: ReadonlyArray<string>) => void;
   /** Deletes each record that is in no loaded group, and in no group that loads. */
   readonly purge: () => void;
@@ -62,27 +73,34 @@ export type Confirmed = {
 
 /**
  * The rows of the confirmed records with these keys, for a save: a row for
- * each record that the pool holds, a row with no record for each deleted
- * record, and a key to remove for each other one.
+ * each record that the pool holds in a loaded group, a row with no record for
+ * each deleted record, and a key to remove for each other one. A record that
+ * is in no loaded group is not written: its key is removed, and it is `held`
+ * for the save after its group loads.
  */
 function savedRows(
   keys: Iterable<string>,
   meta: ReadonlyMap<string, RecordMeta>,
   tables: Tables,
-): { readonly put: Array<SavedRecord>; readonly remove: Array<RecordKey> } {
+  loaded: ReadonlySet<string>,
+) {
   const put: Array<SavedRecord> = [];
   const remove: Array<RecordKey> = [];
+  const held: Array<string> = [];
   for (const key of keys) {
     const [model = '', id = ''] = key.split('\u0000');
     const known = meta.get(key);
     const row = known?.deleted ? null : tables.get(model)?.get(id);
-    if (known && row !== undefined) {
+    if (known && row !== undefined && (row === null || known.groups.some((g) => loaded.has(g)))) {
       put.push({ model, id, row, groups: known.groups, syncId: known.syncId });
     } else {
       remove.push({ model, id });
+      if (known && row) {
+        held.push(key);
+      }
     }
   }
-  return { put, remove };
+  return { put, remove, held };
 }
 
 /**
@@ -113,6 +131,10 @@ export function createConfirmed(
   let leftOutBy: string | undefined;
   let build = 'unnamed';
   let actor: SyncActor | undefined;
+  // The keys of the records that a backfill of this pull sent since its last
+  // `Groups` message, and whether a `Groups` message of this pull came.
+  let sent = new Set<string>();
+  let opened = false;
 
   /** Applies one change unless the record already holds a later one. Door 2 checks each record. */
   function applyChange(change: Change, syncId: number) {
@@ -136,6 +158,23 @@ export function createConfirmed(
       meta.set(key, { groups: change.groups, syncId, deleted: true });
     }
     unsaved.add(key);
+  }
+
+  function drop(key: string) {
+    const [model = '', id = ''] = key.split('\u0000');
+    tables.get(model)?.delete(id);
+    meta.delete(key);
+    unsaved.add(key);
+  }
+
+  function purge() {
+    const current = new Set([...loaded, ...loading()]);
+    for (const [key, { groups, deleted }] of meta) {
+      // A deleted record keeps its mark, so a later backfill of another group cannot bring it back.
+      if (!deleted && !groups.some((group) => current.has(group))) {
+        drop(key);
+      }
+    }
   }
 
   function reset() {
@@ -185,8 +224,9 @@ export function createConfirmed(
     }),
     changes(everything) {
       const replace = everything || unsavedAll;
-      const { put, remove } = savedRows(replace ? meta.keys() : unsaved, meta, tables);
-      unsaved = new Set();
+      const keys = replace ? meta.keys() : unsaved;
+      const { put, remove, held } = savedRows(keys, meta, tables, loaded);
+      unsaved = new Set(held);
       unsavedAll = false;
       return {
         replace,
@@ -219,24 +259,31 @@ export function createConfirmed(
       for (const delta of backfill) {
         for (const change of delta.changes) {
           applyChange(change, delta.syncId);
+          sent.add(recordKey(change.model, change.id));
         }
       }
+    },
+    endLoad() {
+      for (const [key, { deleted }] of opened || lastSyncId > 0 ? [] : meta) {
+        if (!deleted && !sent.has(key)) {
+          drop(key);
+        }
+      }
+      sent = new Set();
+      opened = true;
+    },
+    endPull(cutOff) {
+      sent = new Set();
+      opened = false;
+      if (cutOff) {
+        purge();
+      }
+      return cutOff;
     },
     setLoaded(groups) {
       loaded = new Set(groups);
     },
-    purge() {
-      const current = new Set([...loaded, ...loading()]);
-      for (const [key, { groups, deleted }] of meta) {
-        // A deleted record keeps its mark, so a later backfill of another group cannot bring it back.
-        if (!deleted && !groups.some((group) => current.has(group))) {
-          const [model = '', id = ''] = key.split('\u0000');
-          tables.get(model)?.delete(id);
-          meta.delete(key);
-          unsaved.add(key);
-        }
-      }
-    },
+    purge,
     nameBuild(digest) {
       build = digest;
       return leftOutBy !== undefined && leftOutBy !== digest;

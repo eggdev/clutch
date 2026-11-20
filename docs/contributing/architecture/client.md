@@ -142,6 +142,12 @@ were deleted, and the sync position. So one delta writes only the records
 that it changed. After the pool drops its confirmed records, or after a save
 fails, the next save replaces every record.
 
+A save writes no record that is in no loaded group, such as a record of a
+page whose group is still loading. It removes the row of such a record, and
+writes the record once its group loads. So the device never keeps part of a
+load that was cut off. See
+[load functions](./local-first-sync.md#load-functions).
+
 ### Two tabs
 
 Each tab has its own pool. Two tabs can hold different groups and positions,

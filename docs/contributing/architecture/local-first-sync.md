@@ -54,7 +54,7 @@ The protocol has three calls over one WebSocket for each organization, through
   A client past sync ID 0 that does not name an eager group lacks its
   records. The first `Groups` message then holds the snapshot of that group.
   With `pages`, `Page` messages come before it.
-- A client at sync ID 0 holds nothing. Its `Pull` sends the snapshot of each
+- A client at sync ID 0 holds at most part of a first load. Its `Pull` sends the snapshot of each
   loaded group in place of the deltas. Then it sends one delta with no changes
   at the head of the log. That delta moves the client's last sync ID to the head, so
   its next `Pull` asks only for the events after it.
@@ -299,9 +299,24 @@ open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
   each page with its own query, so it never holds every record of a group.
 - The pool applies the records of each page at once. The group is not loaded
   until its `Groups` message. No purge deletes the records of a group whose
-  pages have come, until it loads or the server refuses it. A client that
-  drops between two pages does not name the group in its next `Pull`, and
-  the gate asks for the whole group again.
+  pages have come, until it loads, the server refuses it, or the pull ends.
+- A record of a group that did not finish loading does not outlive that
+  load. When a pull ends, such as when the socket drops between two pages,
+  each group whose pages came stops loading. The pool drops each confirmed
+  record that is in no loaded group. The next `Pull` does not name the
+  group, and the gate asks for the whole group again. So a record that the
+  server deleted, or that moved to a group the person cannot see, between
+  the two loads does not stay. A record that is also in a loaded group stays,
+  and live deltas keep it right.
+- A save never writes a confirmed record that is in no loaded group. It
+  removes the row of such a record, and writes the record once its group
+  loads. So a tab that closes in the middle of a load saves none of its records.
+- A pull from sync ID 0 sends the snapshot of every loaded group. The first
+  `Groups` message of that pull ends it, and the pool then drops each
+  confirmed record that the pull did not send. A copy at sync ID 0 holds
+  only part of a first load, such as a page that an older build saved. So a
+  record that the server deleted since then goes.
+  `packages/sync/runtime/pool-cut-off.test.ts` holds these rules.
 - A record that already holds a later change keeps it. The snapshot never
   undoes a later change.
 - A deleted record stays deleted. The pool keeps the sync ID of the delete,
