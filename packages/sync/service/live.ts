@@ -54,7 +54,11 @@ export function liveDeltas(db: DrizzleDatabase, pageSize: number) {
         // Every event up to the head was committed before the first
         // subscriber: its connection reads it from the log. A commit after it
         // wakes the reader, because the reader is in `readers` already.
-        const mark = { last: yield* headOf(db, organizationId) };
+        // When the head cannot be read, the reader goes, and the next connection tries again.
+        const head = yield* headOf(db, organizationId).pipe(
+          Effect.tapError(() => Effect.sync(() => readers.delete(organizationId))),
+        );
+        const mark = { last: head };
         const read = readFrom(db, pageSize, organizationId, reader.hub, mark).pipe(
           Effect.tapCause((cause) =>
             Effect.logWarning('A live reader could not read the log', cause),
