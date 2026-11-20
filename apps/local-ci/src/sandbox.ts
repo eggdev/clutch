@@ -92,7 +92,7 @@ export async function fetchMirror(repo: string, token: string) {
   await sh(['git', 'init', '--quiet', '--bare', mirror]);
   const basic = Buffer.from(`x-access-token:${token}`).toString('base64');
   const refs = ['+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*/head'];
-  const fetch = ['fetch', '--quiet', '--prune', '--no-tags', `https://github.com/${repo}.git`];
+  const fetch = ['fetch', '--quiet', '--prune', '--tags', `https://github.com/${repo}.git`];
   await sh(['git', '-C', mirror, ...fetch, ...refs], undefined, {
     GIT_CONFIG_COUNT: '1',
     GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
