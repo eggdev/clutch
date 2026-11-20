@@ -165,3 +165,111 @@ test('a change to the user group asks access again, and a lost group leaves the 
     'groups org:a+user:u backfill ',
   ]);
 });
+
+/** Each change of each message as `id action`, with the backfill of a `Groups` message. */
+function actions(messages: ReadonlyArray<SyncMessage>) {
+  return messages.map((message) => {
+    const deltas = message._tag === 'Deltas' ? message.deltas : message.backfill;
+    const changes = deltas.flatMap((delta) =>
+      delta.changes.map((item) => `${item.id} ${item.action}`),
+    );
+    return `${message._tag} ${changes.join(',')}`;
+  });
+}
+
+/** Card `a` is filed in space x, then moves to space y. */
+const moveCard = (log: Context.Service.Shape<typeof EventLog>) =>
+  Effect.gen(function* () {
+    yield* log.commit('org-a', 't1', () => Effect.succeed([change('a', ['space:x'])]));
+    yield* log.commit('org-a', 't2', () => Effect.succeed([change('a', ['space:y'])]));
+  });
+
+test('the backlog shows a move as a delete to a client of the old group, and as an upsert to one of the new group', async () => {
+  const [old, next, neither] = await run(
+    Effect.gen(function* () {
+      const log = yield* EventLog;
+      yield* moveCard(log);
+      const read = (loaded: ReadonlyArray<string>) =>
+        Effect.gen(function* () {
+          const requests = yield* Queue.unbounded<string>();
+          const seen = yield* Queue.unbounded<SyncMessage>();
+          const reading = yield* open(log, { loaded }, requests, seen, 2);
+          return yield* Fiber.join(reading).pipe(Effect.timeout('2 seconds'));
+        });
+      const ofOld = yield* read(['org:a', 'space:x']);
+      const ofNew = yield* read(['org:a', 'space:y']);
+      // A client of neither group gets nothing of the move: its next message is a later change.
+      yield* log.commit('org-a', 't3', () => Effect.succeed([change('z', ['org:a'])]));
+      return [ofOld, ofNew, yield* read(['org:a'])];
+    }),
+  );
+  expect(actions(old)).toEqual(['Groups ', 'Deltas a upsert,a delete']);
+  expect(actions(next)).toEqual(['Groups ', 'Deltas a upsert']);
+  expect(actions(neither)).toEqual(['Groups ', 'Deltas z upsert']);
+  // The delete names no data, so a client of the old group does not see where the record went.
+  const removal = old[1]?._tag === 'Deltas' ? old[1].deltas[1]?.changes[0] : undefined;
+  expect(removal).toEqual({
+    model: 'Card',
+    id: 'a',
+    action: 'delete',
+    data: null,
+    groups: ['space:x'],
+  });
+});
+
+test('a live move reaches each client as what it is for that client', async () => {
+  const [old, both] = await run(
+    Effect.gen(function* () {
+      const log = yield* EventLog;
+      yield* log.commit('org-a', 't1', () => Effect.succeed([change('a', ['space:x'])]));
+      const requests = yield* Queue.unbounded<string>();
+      const oldSeen = yield* Queue.unbounded<SyncMessage>();
+      const bothSeen = yield* Queue.unbounded<SyncMessage>();
+      const oldReading = yield* open(
+        log,
+        { loaded: ['org:a', 'space:x'], lastSyncId: 1 },
+        requests,
+        oldSeen,
+        2,
+      );
+      const bothReading = yield* open(
+        log,
+        { loaded: ['org:a', 'space:x', 'space:y'], lastSyncId: 1 },
+        yield* Queue.unbounded<string>(),
+        bothSeen,
+        2,
+      );
+      yield* Queue.take(oldSeen);
+      yield* Queue.take(bothSeen);
+      yield* log.commit('org-a', 't2', () => Effect.succeed([change('a', ['space:y'])]));
+      return [
+        yield* Fiber.join(oldReading).pipe(Effect.timeout('2 seconds')),
+        yield* Fiber.join(bothReading).pipe(Effect.timeout('2 seconds')),
+      ];
+    }),
+  );
+  expect(actions(old)).toEqual(['Groups ', 'Deltas a delete']);
+  expect(actions(both)).toEqual(['Groups ', 'Deltas a upsert']);
+});
+
+test('a backfill shows a move by the groups that the client has loaded, not only the new one', async () => {
+  const [old, withNew] = await run(
+    Effect.gen(function* () {
+      const log = yield* EventLog;
+      yield* moveCard(log);
+      const loadOld = (loaded: ReadonlyArray<string>) =>
+        Effect.gen(function* () {
+          const requests = yield* Queue.unbounded<string>();
+          const seen = yield* Queue.unbounded<SyncMessage>();
+          const reading = yield* open(log, { loaded, lastSyncId: 2 }, requests, seen, 2);
+          yield* Queue.take(seen);
+          yield* Queue.offer(requests, 'space:x');
+          return yield* Fiber.join(reading).pipe(Effect.timeout('2 seconds'));
+        });
+      return [yield* loadOld(['org:a']), yield* loadOld(['org:a', 'space:y'])];
+    }),
+  );
+  expect(actions(old)).toEqual(['Groups ', 'Groups a upsert,a delete']);
+  // The client holds the card through space y, so the move is an upsert for it.
+  expect(actions(withNew)).toEqual(['Groups ', 'Groups a upsert,a upsert']);
+});

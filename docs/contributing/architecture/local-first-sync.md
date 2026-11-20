@@ -153,6 +153,15 @@ Product code asserts no types, so these shapes replace each `as` cast. See
   the record and the organization, and it adds the groups of the record.
 - The event log stores the groups of all changes of an event in an array
   column. A GIN index covers it. A change with no group fails the commit.
+- The event log keeps the last state of each record in `sync_records`: its
+  groups, its last change and its data. A commit updates it in the
+  transaction of the event. A change then names in `left` the groups that its
+  record left, and the event is indexed under them too.
+- One function, `seenDelta` in `packages/sync/service/visible.ts`, decides
+  what a connection sees, for the backlog, the backfill and the live stream.
+  A change in a loaded group comes as it is. A change of a record that left
+  each loaded group comes as a delete with no data. `left` never leaves the
+  server.
 - `SyncGroups.groupsFor(actor)` names the groups that an actor may load.
   `packages/access` fills it. See [authorization](./authorization.md).
 - A client loads each `eager` group when it connects: its organization and its
