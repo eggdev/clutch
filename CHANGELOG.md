@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.26.7 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): move the sender past its accepted event, and more (CL-592)
+
+## 1.26.6 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): prove the wake on real Postgres, lock migrations (CL-920)
+
 ## 1.26.5 (2026-11-20)
 
 ### Fixes and maintenance

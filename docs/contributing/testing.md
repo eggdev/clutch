@@ -180,6 +180,33 @@ inside each test. Do not hide setup in `beforeEach`. Examples:
 - `packages/notes/testing/notes.ts` runs the notes commands through the Test
   Layers.
 
+## Real Postgres
+
+Most tests of the sync engine run on PGlite, a Postgres in the process. A few
+paths need a real Postgres server: `LISTEN` and `NOTIFY` between two
+processes, a dropped connection, and two processes that start at once. Their
+tests are in files named `*.postgres.test.ts`. They read the server from
+`SYNC_TEST_DATABASE_URL`, and never from `DATABASE_URL`, so a test cannot
+touch your database. Each test creates its own database on the server and
+drops it at the end. A run that the test runner stops early can leave a
+`sync_test_*` database behind.
+
+Without the variable, the tests skip, and each file prints one line that says
+why. To run them, start a throwaway server and name it:
+
+```sh
+docker run --rm -d --name sync-test-postgres -e POSTGRES_PASSWORD=sync-test -p 55432:5432 postgres:17.6
+SYNC_TEST_DATABASE_URL=postgres://postgres:sync-test@localhost:55432/postgres \
+  mise exec -- bun test $(git ls-files '*.postgres.test.ts' | sed 's#^#./#')
+docker stop sync-test-postgres
+```
+
+CI runs them in the job `validate`, against a Postgres service, with
+`SYNC_TEST_POSTGRES_REQUIRED=1`. A missing server then fails each file. The
+step `sync tests on a real Postgres server` also fails when it finds no such
+file, when a test skips, or when no test passes.
+`packages/sync/testing/postgres.ts` holds the helpers.
+
 ## Split a test file
 
 When a test file passes its size limit, split it by workflow. Compare the test

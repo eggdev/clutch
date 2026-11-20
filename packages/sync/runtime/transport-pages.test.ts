@@ -139,3 +139,52 @@ test('a pull says that the client reads pages', async () => {
   );
   expect(asked).toEqual([true]);
 });
+
+/** A change of card `id` in the organization. */
+const inOrganization = (id: string, syncId: number) => ({
+  ...inSpace(id, syncId),
+  changes: inSpace(id, syncId).changes.map((change) => ({ ...change, groups: ['org:a'] })),
+});
+
+test('a pull that names its actor before the first page ends with each record of a part-finished first load', async () => {
+  const pool = createPool([], declared, { stamps: testStamps() });
+  // A first load was cut off: the copy holds a record at sync ID 0 that the server deleted since.
+  pool.load({
+    lastSyncId: 0,
+    groups: [],
+    tables: { Card: [{ id: 'gone', title: 'gone' }] },
+    meta: { 'Card\u0000gone': { groups: ['org:a'], syncId: 1 } },
+    pending: [],
+  });
+  const handlers = SyncRpcs.toLayer({
+    Push: () => Effect.succeed([]),
+    // The server names the actor first, with no group loaded yet, then sends the pages.
+    Pull: () =>
+      Stream.concat(
+        Stream.make<Array<SyncMessage>>(
+          {
+            _tag: 'Groups',
+            loaded: [],
+            backfill: [],
+            actor: { userId: 'u', organizationId: 'a' },
+          },
+          { _tag: 'Page', group: 'org:a', backfill: [inOrganization('a', 2)] },
+          { _tag: 'Groups', loaded: ['org:a'], backfill: [inOrganization('b', 3)] },
+          { _tag: 'Deltas', deltas: [{ syncId: 3, transactionId: null, changes: [] }] },
+        ),
+        Stream.never,
+      ),
+    Load: () => Effect.void,
+  });
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(SyncRpcs);
+      yield* Effect.forkScoped(engine(pool, client, 'digest', sessionStays));
+      yield* Effect.sync(() => pool.lastSyncId()).pipe(
+        Effect.repeat({ until: (last) => last === 3, schedule: Schedule.spaced('10 millis') }),
+      );
+    }).pipe(Effect.scoped, Effect.provide(handlers)),
+  );
+  expect(pool.loadedGroups()).toEqual(['org:a']);
+  expect(pool.ids(card).toSorted()).toEqual(['a', 'b']);
+});

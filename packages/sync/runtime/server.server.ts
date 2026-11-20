@@ -155,6 +155,10 @@ export function SyncServer<R>(
           requests.set(id, made);
           return made;
         });
+      // The accepted sync IDs of each open `Pull` stream, by RPC client. A
+      // `Push` puts each accepted transaction there, so its sender moves past
+      // the event, also when the event holds nothing that the sender sees.
+      const positions = new Map<number, Queue.Queue<number>>();
       const push = (
         transaction: Transaction,
         client: Rpc.ServerClient,
@@ -193,6 +197,15 @@ export function SyncServer<R>(
               }
               outcomes.push(outcome);
             }
+            const position = positions.get(client.id);
+            if (position) {
+              yield* Queue.offerAll(
+                position,
+                outcomes.flatMap((outcome) =>
+                  outcome.status === 'accepted' && outcome.syncId !== null ? [outcome.syncId] : [],
+                ),
+              );
+            }
             return outcomes;
           }),
         // After a database restore, the log can end before the client's last
@@ -217,6 +230,8 @@ export function SyncServer<R>(
               const allowed = yield* granted.pipe(Effect.orDie);
               const queue = yield* Queue.unbounded<LoadRequest>();
               yield* Deferred.succeed(yield* requestsOf(client.id), queue);
+              const accepted = yield* Queue.unbounded<number>();
+              positions.set(client.id, accepted);
               return feed(log, {
                 organizationId: actor.organizationId,
                 userId: actor.userId,
@@ -232,6 +247,7 @@ export function SyncServer<R>(
                 pages: pages ?? false,
                 granted,
                 requests: queue,
+                accepted,
               }).pipe(
                 // `ServerBehind` reaches the client. Any other failure is a defect.
                 Stream.catchIf(
@@ -239,7 +255,14 @@ export function SyncServer<R>(
                   (behind) => Stream.fail(behind),
                   (other) => Stream.die(other),
                 ),
-                Stream.ensuring(Effect.sync(() => requests.delete(client.id))),
+                Stream.ensuring(
+                  Effect.sync(() => {
+                    requests.delete(client.id);
+                    if (positions.get(client.id) === accepted) {
+                      positions.delete(client.id);
+                    }
+                  }),
+                ),
               );
             }),
           ),
