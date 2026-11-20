@@ -141,7 +141,13 @@ test('a client at sync ID 0 gets the snapshot of its groups, then an empty delta
       group: 'org:a',
       backfill: [{ syncId: 2, transactionId: null, changes: [upsert('a', ['org:a'], 'a2')] }],
     },
-    { _tag: 'Groups', loaded: ['org:a'], backfill: [] },
+    // The first `Groups` message names the actor of the connection.
+    {
+      _tag: 'Groups',
+      loaded: ['org:a'],
+      backfill: [],
+      actor: { userId: 'u', organizationId: 'org-a' },
+    },
     // The head is 3, so the next pull of the client starts after the event of space y.
     { _tag: 'Deltas', deltas: [{ syncId: 3, transactionId: null, changes: [] }] },
   ]);

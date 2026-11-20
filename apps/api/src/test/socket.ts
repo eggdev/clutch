@@ -1,4 +1,5 @@
 import { BunHttpServer } from '@effect/platform-bun';
+import type { Actors } from '@repo/identity/service/actors';
 import { ActorsTest } from '@repo/identity/testing/actor';
 import { WebhookSignatureTest } from '@repo/notes/testing/webhook';
 import { DatabasePglite } from '@repo/sync/runtime/database.server';
@@ -12,12 +13,17 @@ import { Socket } from 'effect/socket';
 
 import { api } from '@/server';
 
+/** The whole API on a test HTTP server, over a fresh in-memory database, with these actors. */
+export function testServerWith(actors: Layer.Layer<Actors>) {
+  return api(DatabasePglite()).pipe(
+    Layer.provide(actors),
+    Layer.provide(WebhookSignatureTest),
+    Layer.provideMerge(BunHttpServer.layerTest),
+  );
+}
+
 /** The whole API on a test HTTP server, over a fresh in-memory database. */
-export const testServer = api(DatabasePglite()).pipe(
-  Layer.provide(ActorsTest()),
-  Layer.provide(WebhookSignatureTest),
-  Layer.provideMerge(BunHttpServer.layerTest),
-);
+export const testServer = testServerWith(ActorsTest());
 
 /**
  * One process of the API over a database that the test provides, such as

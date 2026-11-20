@@ -1,5 +1,5 @@
 import type { RecordRow } from '@repo/sync/contract/record';
-import type { Transaction } from '@repo/sync/types/protocol';
+import type { SyncActor, Transaction } from '@repo/sync/types/protocol';
 
 /**
  * The sync groups of one confirmed record, and the sync ID of its last change.
@@ -30,6 +30,11 @@ export type PoolState = {
    */
   readonly leftOutBy?: string;
   /**
+   * The actor that this copy belongs to. A copy from before the actor was
+   * saved has none, and takes the actor that the server names first.
+   */
+  readonly actor?: SyncActor;
+  /**
    * The read found a record row or a position row with another shape, so it
    * kept no record and no position. The pool reports it and loads again.
    */
@@ -49,8 +54,11 @@ export type SavedRecord = RecordKey & {
   readonly syncId: number;
 };
 
-/** The one row of the sync position: the last sync ID, the loaded groups and `leftOutBy`. */
-export type SyncPosition = Pick<PoolState, 'lastSyncId' | 'groups' | 'leftOutBy'>;
+/**
+ * The one row of the sync position: the last sync ID, the loaded groups,
+ * `leftOutBy`, and the actor that the copy belongs to.
+ */
+export type SyncPosition = Pick<PoolState, 'lastSyncId' | 'groups' | 'leftOutBy' | 'actor'>;
 
 /**
  * The confirmed part of one save: the records that changed, the records that

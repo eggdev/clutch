@@ -14,7 +14,7 @@ import type {
   RecordMeta,
   SavedRecord,
 } from '@repo/sync/types/local-database';
-import type { Change, Delta } from '@repo/sync/types/protocol';
+import type { Change, Delta, SyncActor } from '@repo/sync/types/protocol';
 
 /** The part of a saved state that the confirmed records keep. The pool adds the waiting transactions. */
 type ConfirmedState = Omit<PoolState, 'pending'>;
@@ -40,8 +40,12 @@ export type Confirmed = {
    * every record. A load of a dropped copy and a reset ask for every record too.
    */
   readonly changes: (everything: boolean) => ConfirmedSave;
-  /** Forgets every record and the sync position. The loaded groups stay. */
+  /** Forgets every record and the sync position. The loaded groups and the actor stay. */
   readonly reset: () => void;
+  /** The actor that these records belong to, or `undefined` for a copy that names none. */
+  readonly actor: () => SyncActor | undefined;
+  /** Names the actor of these records. The next save writes it with the position. */
+  readonly setActor: (actor: SyncActor) => void;
   /** Applies a delta and returns `true`, or returns `false` when the pool already has it. */
   readonly applyDelta: (delta: Delta) => boolean;
   /** Applies each change of a backfill. A backfill does not move the sync position. */
@@ -108,6 +112,7 @@ export function createConfirmed(
   // The build that left a record of a delta out of the confirmed records, if one did.
   let leftOutBy: string | undefined;
   let build = 'unnamed';
+  let actor: SyncActor | undefined;
 
   /** Applies one change unless the record already holds a later one. Door 2 checks each record. */
   function applyChange(change: Change, syncId: number) {
@@ -147,6 +152,9 @@ export function createConfirmed(
     lastSyncId: () => lastSyncId,
     loaded: () => loaded,
     load(state) {
+      // A copy that does not fit keeps its actor, because its waiting
+      // transactions stay and belong to that actor.
+      ({ actor } = state);
       const misfit = savedRecordsMisfit(state, declared);
       if (misfit) {
         report(misfit);
@@ -173,6 +181,7 @@ export function createConfirmed(
       meta: Object.fromEntries(meta),
       tables: Object.fromEntries([...tables].map(([name, table]) => [name, [...table.values()]])),
       ...(leftOutBy === undefined ? {} : { leftOutBy }),
+      ...(actor === undefined ? {} : { actor }),
     }),
     changes(everything) {
       const replace = everything || unsavedAll;
@@ -187,10 +196,15 @@ export function createConfirmed(
           lastSyncId,
           groups: [...loaded],
           ...(leftOutBy === undefined ? {} : { leftOutBy }),
+          ...(actor === undefined ? {} : { actor }),
         },
       };
     },
     reset,
+    actor: () => actor,
+    setActor(next) {
+      actor = next;
+    },
     applyDelta(delta) {
       if (delta.syncId <= lastSyncId) {
         return false;

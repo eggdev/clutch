@@ -4,7 +4,7 @@ import type { Pool } from '@repo/sync/runtime/pool';
 import { SyncRpcs, transactionsPerPush } from '@repo/sync/types/protocol';
 import type { SyncMessage } from '@repo/sync/types/protocol';
 import { sessionEndedCode } from '@repo/sync/types/session-ended';
-import { Deferred, Effect, Layer, Queue, Schedule, Stream } from 'effect';
+import { Data, Deferred, Effect, Fiber, Latch, Layer, Queue, Schedule, Stream } from 'effect';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
 import type { RpcClientError } from 'effect/rpc/RpcClientError';
 import { Socket } from 'effect/socket';
@@ -88,6 +88,9 @@ function applyMessage(pool: Pool, message: SyncMessage) {
   }
 }
 
+/** The first `Groups` message of a pull named another actor, so the pool dropped its copy. */
+class ActorChanged extends Data.TaggedError('ActorChanged') {}
+
 /** One signal each time the pool has new transactions to send. */
 function pendingSignals(pool: Pool) {
   return Stream.callback<true>((queue) =>
@@ -114,16 +117,37 @@ export function engine(
   return Effect.gen(function* () {
     // A copy that another build left a record out of loads again from 0, before the first pull.
     pool.nameBuild(contract);
-    const pull = Effect.suspend(() =>
-      client
+    // No push goes on a connection before the first `Groups` message of its
+    // pull confirmed the actor. Otherwise the waiting transactions of the
+    // last person on the device could go as the new one. A copy of another
+    // actor is dropped, and the engine pulls again from 0: the rest of this
+    // pull would land on the old position. A server that names no actor
+    // opens the gate too, and the copy stays.
+    const actorKnown = Latch.makeUnsafe(false);
+    const pull = Effect.suspend(() => {
+      let first = true;
+      return client
         .Pull({
           lastSyncId: pool.lastSyncId(),
           groups: pool.loadedGroups(),
           contract,
           pages: true,
         })
-        .pipe(Stream.runForEach((message) => Effect.sync(() => applyMessage(pool, message)))),
-    );
+        .pipe(
+          Stream.runForEach((message) => {
+            if (!first || message._tag !== 'Groups') {
+              return Effect.sync(() => applyMessage(pool, message));
+            }
+            first = false;
+            if (!pool.confirmActor(message.actor)) {
+              return Effect.fail(new ActorChanged());
+            }
+            applyMessage(pool, message);
+            return actorKnown.open;
+          }),
+          Effect.ensuring(actorKnown.close),
+        );
+    });
     // A group that the actor may not load is refused: its gate stops waiting,
     // and the pool reports it. After any other end of a load, also when the
     // server could not run it, the request stays and the next pull asks
@@ -148,6 +172,7 @@ export function engine(
     const pullOnce = pull.pipe(
       Effect.raceFirst(loads),
       Effect.as(true),
+      Effect.catchTag('ActorChanged', () => Effect.succeed(true)),
       Effect.catchTag('ServerBehind', () =>
         Effect.sync(() => {
           pool.resetConfirmed();
@@ -169,6 +194,7 @@ export function engine(
     // One push holds at most `transactionsPerPush` transactions, in their
     // order. The rest go in the next push, straight after this one.
     const pushBatch = Effect.gen(function* () {
+      yield* actorKnown.await;
       const batch = pool.unsent().slice(0, transactionsPerPush);
       if (batch.length === 0) {
         return false;
@@ -230,7 +256,8 @@ function session(pool: Pool, contract: string, onSessionEnded: () => void) {
  * Connects the pool to the server. The socket reconnects on its own after a
  * drop, and the engine then pulls again. An ended session stops the engine
  * and closes the socket. Each `Pull` names the digest of the app's contracts,
- * so the server knows which build it talks to.
+ * so the server knows which build it talks to. It returns the stop of the
+ * engine, which closes the socket too.
  */
 export function connect(
   pool: Pool,
@@ -241,13 +268,16 @@ export function connect(
     /** A native app names its actor here. A browser leaves it out and sends its cookies. */
     readonly headers?: SocketHeaders;
   },
-) {
+): () => void {
   const contract = manifestOf(options.contracts).digest;
-  return Effect.runFork(
+  const fiber = Effect.runFork(
     untilSessionEnded(options.onSessionEnded, (end) =>
       session(pool, contract, end).pipe(
         Effect.provide(protocol(options.url, end, options.headers)),
       ),
     ),
   );
+  return () => {
+    Effect.runFork(Fiber.interrupt(fiber));
+  };
 }

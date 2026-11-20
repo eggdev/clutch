@@ -49,7 +49,8 @@ Render first, then connect. The composition root, `apps/app/lib/boot.ts`, loads
 the object pool from the local database. It renders the pool at once and
 connects the sync engine after the first paint. When
 the server ends the session, it closes the socket with code 4401. The client
-then clears the local database and opens the sign-in layout.
+then clears the local database and opens the sign-in layout. A sign-out on the
+device clears it too, with no server.
 
 ## Example
 

@@ -36,6 +36,16 @@ function queueChanges(
   };
 }
 
+/** The object pool of the app, and the stop of its saves. */
+export type SavedPool = Pool & {
+  /**
+   * Stops the saves of this pool. It detaches the save listener and waits
+   * for a save that runs. After it, no change of this pool reaches the local
+   * database. A session end calls it before it clears the database.
+   */
+  readonly stop: () => Promise<void>;
+};
+
 /**
  * Loads the object pool from the local database before the first paint. Each
  * change to the pool is written back: the records that changed and the sync
@@ -62,7 +72,7 @@ export async function loadPool(
   contracts: ReadonlyArray<Contract>,
   stamps?: Stamps,
   report?: Report,
-): Promise<Pool> {
+): Promise<SavedPool> {
   const missing = withoutLocalChange(contracts, changes);
   if (missing.length) {
     throw new Error(
@@ -96,14 +106,15 @@ export async function loadPool(
   let again = false;
   let failing = false;
   let everything = false;
-  async function save() {
-    if (writing) {
-      again = true;
-      return;
-    }
-    writing = true;
+  let stopped = false;
+  let running: Promise<void> = Promise.resolve();
+  async function saveAll() {
     try {
       do {
+        // A save that waits behind the running one never starts after a stop.
+        if (stopped) {
+          break;
+        }
         again = false;
         const full = everything;
         everything = false;
@@ -132,6 +143,18 @@ export async function loadPool(
       writing = false;
     }
   }
+  function save(): Promise<void> {
+    if (stopped) {
+      return running;
+    }
+    if (writing) {
+      again = true;
+      return running;
+    }
+    writing = true;
+    running = saveAll();
+    return running;
+  }
   void (async () => {
     await database.writer;
     if (!writer) {
@@ -140,12 +163,35 @@ export async function loadPool(
       await save();
     }
   })();
-  pool.onChange(() => {
+  const detach = pool.onChange(() => {
     void save();
   });
   // The first save removes what the load dropped, such as a saved command that this build refused.
   void save();
-  return pool;
+  return Object.assign(pool, {
+    stop: async () => {
+      stopped = true;
+      detach();
+      // A save that fails still ends the stop, so the session end goes on.
+      await Promise.allSettled([running]);
+    },
+  });
+}
+
+/**
+ * Ends the session on this device, with no server: it stops the sync engine
+ * with `disconnect`, stops the saves of the pool, then clears the local
+ * database. A sign-out calls it, also offline, and so does the app when the
+ * server ends the session. Then the app starts again with an empty pool.
+ */
+export async function endSession(
+  database: LocalDatabase,
+  pool: SavedPool,
+  disconnect: () => void,
+): Promise<void> {
+  disconnect();
+  await pool.stop();
+  await database.clear();
 }
 
 /**
@@ -181,6 +227,8 @@ export function afterFirstPaint(start: () => void): void {
 /**
  * Starts the sync engine after the first paint. The transport and its Effect
  * code are a separate chunk that loads here, never before the screen shows.
+ * It returns the stop of the engine. A stop before the engine starts keeps
+ * it from starting.
  */
 export function connectAfterPaint(
   pool: Pool,
@@ -192,9 +240,17 @@ export function connectAfterPaint(
     /** The headers of the socket. Only a native app can send them. */
     readonly headers?: Readonly<Record<string, string>>;
   },
-) {
+): () => void {
+  let stopped = false;
+  let stopEngine: (() => void) | undefined;
   afterFirstPaint(async () => {
     const { connect } = await import('@repo/sync/runtime/transport');
-    connect(pool, options);
+    if (!stopped) {
+      stopEngine = connect(pool, options);
+    }
   });
+  return () => {
+    stopped = true;
+    stopEngine?.();
+  };
 }

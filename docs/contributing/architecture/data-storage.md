@@ -55,12 +55,14 @@ The template's sync engine holds these frozen contracts:
 | The `sync_counters`, `sync_events` and `sync_records` tables | `packages/sync/repo/schema.ts`          |
 | The change shape in each event, with its `groups`            | `packages/sync/types/protocol.ts`       |
 | The `records`, `transactions` and `position` client stores   | `packages/sync/runtime/indexed-db.ts`   |
-| The saved pool state, with `groups` and `meta`               | `packages/sync/types/local-database.ts` |
+| The saved pool state, with `groups`, `meta` and `actor`      | `packages/sync/types/local-database.ts` |
 
 An event keeps its organization ID, so the log is scoped by tenant too. Its
 `groups` column holds the sync groups of all its changes, with a GIN index.
 An event written before the column existed has no groups, so no client gets
 it. A saved pool state without `groups` and `meta` loads as an empty pool.
+A saved position without `actor` keeps its copy, and takes the actor that the
+server names first.
 
 `sync_events` grows with each write. Its retention rule is
 `SYNC_LOG_KEEP_DAYS`, which has no value in the template, so the log keeps

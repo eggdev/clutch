@@ -45,14 +45,25 @@ export type Delta = typeof Delta.Type;
 const DeltasMessage = Schema.TaggedStruct('Deltas', { deltas: Schema.Array(Delta) });
 
 /**
+ * The user and the organization of a connection. Sync IDs belong to one
+ * organization, so the same user in another organization is another actor.
+ */
+export const SyncActor = Schema.Struct({ userId: Schema.String, organizationId: Schema.String });
+export type SyncActor = typeof SyncActor.Type;
+
+/**
  * The groups that the client has loaded now. The client deletes each record
  * that is in none of them. `backfill` holds the snapshot of each group that
  * the client loaded just now: the last change of each live record of the
- * group, with the sync ID of that change.
+ * group, with the sync ID of that change. The first `Groups` message of a
+ * pull names the `actor` of the connection. The client drops a saved copy of
+ * another actor before it sends anything. It is an optional key, so an older
+ * client ignores it, and an older server does not send it.
  */
 const GroupsMessage = Schema.TaggedStruct('Groups', {
   loaded: Schema.Array(Schema.String),
   backfill: Schema.Array(Delta),
+  actor: Schema.optionalKey(SyncActor),
 });
 
 /**
