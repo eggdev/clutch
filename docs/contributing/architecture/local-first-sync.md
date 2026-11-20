@@ -53,8 +53,8 @@ The protocol has three calls over one WebSocket for each organization, through
   records. The first `Groups` message then holds the snapshot of that group.
   With `pages`, `Page` messages come before it.
 - A client at sync ID 0 holds nothing. Its `Pull` sends the snapshot of each
-  loaded group in place of the deltas, then one delta with no changes at the
-  head of the log. That delta moves the client's last sync ID to the head, so
+  loaded group in place of the deltas. Then it sends one delta with no changes
+  at the head of the log. That delta moves the client's last sync ID to the head, so
   its next `Pull` asks only for the events after it.
 - `Load` asks the open `Pull` to load one more group. It fails with
   `GroupNotAllowed` when the actor may not load the group. With `pages`, the
