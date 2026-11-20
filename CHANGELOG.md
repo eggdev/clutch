@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.3 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): give a connection its live reader once its start is known (CL-590)
+
 ## 1.26.2 (2026-11-20)
 
 ### Fixes and maintenance
