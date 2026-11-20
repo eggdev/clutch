@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.0 (2026-11-20)
+
+### Features
+
+- feat(sync): load a group from the last state of its records (CL-583)
+
 ## 1.23.11 (2026-11-20)
 
 ### Fixes and maintenance
