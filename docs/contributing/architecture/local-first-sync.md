@@ -42,7 +42,8 @@ The protocol has three calls over one WebSocket for each organization, through
 `effect/rpc`:
 
 - `Push` sends a batch of at most 100 transactions and returns one outcome
-  for each write that the server tried. A longer queue goes in more pushes,
+  for each write that the server tried. The server refuses a longer batch
+  whole, and runs none of it. A client never sends one. A longer queue goes in more pushes,
   in order, one straight after the other. When the database does not answer, the list
   ends at that write. The client keeps each write with no outcome and sends
   it again. `packages/sync/runtime/transport.test.ts` holds this.
@@ -107,7 +108,9 @@ the same, so loading the local database needs no decode.
    goes out only when the commit holds. After the commit, the server wakes its
    own process too. In each process, one reader for each organization reads the
    new events from the log, in sync ID order. It hands them to every open `Pull`
-   of the organization in that process. Each `Pull` sends only the changes of its loaded groups, and a
+   of the organization in that process. A `Pull` follows the reader only once
+   the reader knows where it starts. So the backlog of the `Pull` and the live
+   events leave no event out. Each `Pull` sends only the changes of its loaded groups, and a
    delete of each record that left them. The sender gets its delta too.
 7. The client applies the delta to its confirmed records, then applies each
    pending local change again on top. This is the rebase.
@@ -124,7 +127,8 @@ the same, so loading the local database needs no decode.
   rule `repo-determinism/no-ambient-time` rejects `Date.now()` and the other
   clock and random calls in client code outside `packages/sync`.
 - Each transaction has an ID. The server applies a transaction once, also when
-  the client sends it again.
+  the client sends it again. This holds after the trim deleted its event too.
+  The accepted outcome then names the sync ID of that first event.
 - The queue survives a reload. A transaction made offline goes to the server
   when the socket opens again.
 - After a socket drops, it opens again, and the engine pulls again. The new
@@ -168,9 +172,19 @@ job `sync/trim-log` trims the log of each organization:
 - It keeps the newest event of each organization, so the head stays right.
 - It deletes each record of `sync_records` that is marked deleted, and whose
   delete is older than the oldest event kept.
+- It moves the transaction ID of each event that it deletes to
+  `sync_transactions`, in the statement that deletes the event. A client can
+  hold an accepted transaction as waiting, such as when its tab closed before
+  the delta came. When it sends the transaction again, the server finds it
+  there, and does not apply it a second time.
 
 With `SYNC_LOG_KEEP_DAYS` set to D, an organization that writes W events a day
-keeps about D × W events, and at least one. A load reads `sync_records`, so a
+keeps about D × W events, and at least one. `sync_transactions` keeps one
+row for each client transaction that a trim deleted, for good. A saved copy
+has no age limit, so a client can send a waiting transaction again after any
+time. A row that went before then would let the change apply twice. A row
+costs about 200 bytes with its index, so a million trimmed transactions cost
+about 200 MB. A load reads `sync_records`, so a
 trim never changes what a new client gets. A client that was away for longer
 than D days loads again from 0. The `Pull` checks the oldest event again after
 the backlog. So a trim that runs during a `Pull` cannot drop an event that the

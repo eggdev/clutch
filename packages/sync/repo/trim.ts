@@ -1,4 +1,4 @@
-import { syncEvents, syncRecords } from '@repo/sync/repo/schema';
+import { syncEvents, syncRecords, syncTransactions } from '@repo/sync/repo/schema';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { eq, min, sql } from 'drizzle-orm';
 import { Effect } from 'effect';
@@ -17,7 +17,10 @@ export function oldestOf(db: DrizzleDatabase, organizationId: string) {
  * one written before `before`, so the log keeps one run of sync IDs with no
  * gap. A cut by time alone could leave a gap, because an event gets its time
  * when its transaction starts, and its sync ID when it takes the lock. The
- * newest event of each organization stays, so its head stays right. Then it
+ * newest event of each organization stays, so its head stays right. The
+ * same statement moves the transaction ID of each deleted event to
+ * `sync_transactions`, so a transaction that a client sends again still
+ * applies once. Then it
  * deletes each record marked deleted whose last change is older than the
  * oldest event kept. A client that missed that delete is behind the log, and
  * loads again from 0.
@@ -31,12 +34,19 @@ export function trimLog(db: DrizzleDatabase, before: Date) {
             max(sync_id) as head
           from ${syncEvents}
           group by organization_id
+        ),
+        gone as (
+          delete from ${syncEvents} as event
+          using bound
+          where event.organization_id = bound.organization_id
+            and event.sync_id <= bound.upto
+            and event.sync_id < bound.head
+          returning event.organization_id, event.transaction_id, event.sync_id, event.created_at
         )
-        delete from ${syncEvents} as event
-        using bound
-        where event.organization_id = bound.organization_id
-          and event.sync_id <= bound.upto
-          and event.sync_id < bound.head`,
+        insert into ${syncTransactions} (organization_id, transaction_id, sync_id, created_at)
+        select organization_id, transaction_id, sync_id, created_at from gone
+        where transaction_id is not null
+        on conflict do nothing`,
     );
     yield* db.execute(
       sql`delete from ${syncRecords} as record
