@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.2 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): close an open sync socket when its session ended (CL-585)
+
 ## 1.26.1 (2026-11-20)
 
 ### Fixes and maintenance
