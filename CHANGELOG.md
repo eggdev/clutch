@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.4 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): recover from a socket drop and a failed save (CL-574)
+
 ## 1.23.3 (2026-11-18)
 
 ### Fixes and maintenance
