@@ -105,7 +105,10 @@ export function areaOf(file: string, workspaces: Array<string>) {
   return parts.length === 1 ? 'root' : parts[0].replace(/^\.+/u, '');
 }
 
-/** Files whose changed lines never count toward the size: lockfiles, snapshots and the tracker. */
+/**
+ * Files whose changed lines never count toward the size: lockfiles, test
+ * snapshots, the snapshot that the migration generator writes, and the tracker.
+ */
 const sizeExcluded = [
   'bun.lock',
   '**/bun.lock',
@@ -113,6 +116,7 @@ const sizeExcluded = [
   'pnpm-lock.yaml',
   'yarn.lock',
   '**/*.snap',
+  '**/migrations/**/snapshot.json',
   '.clutch/**',
 ];
 
