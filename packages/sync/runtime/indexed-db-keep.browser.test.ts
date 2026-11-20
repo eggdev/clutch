@@ -145,6 +145,8 @@ async function clearedElsewhere() {
   const { database, pool } = await start('cleared', 2, () => failing, () => new Error('The disk is busy.'));
   await sleep(50);
   follow(database, pool, 'cleared', 2);
+  // The row names its actor, so only the generation of its copy keeps it out of the next session.
+  pool.confirmActor({ userId: 'ana', organizationId: 'acme' });
   failing = true;
   pool.run(rename, { id: 'a', title: 'before the sign-out' });
   await sleep(50);
