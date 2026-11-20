@@ -40,20 +40,25 @@ test('losing a group deletes its records, and a record still in another group st
   expect(pool.loadedGroups().toSorted()).toEqual(['org:a', 'space:y']);
 });
 
-test('the purge reaches the local database through the next save', async () => {
+test('the purge reaches the local database through the next save, which removes only the purged rows', async () => {
   const pool = loadedPool();
-  const database = memoryLocalDatabase();
+  const database = memoryLocalDatabase(pool.snapshot());
+  // The database holds the state now, so the changes before this point are saved.
+  pool.confirmedChanges(false);
   const saves: Array<Promise<void>> = [];
   pool.onChange(() => {
-    saves.push(database.write(pool.snapshot()));
+    saves.push(database.save({ confirmed: pool.confirmedChanges(false), add: [], done: [] }));
   });
   pool.applyGroups(['org:a'], []);
   // Wait for the save that the purge started, not for a guessed tick.
   expect(saves.length).toBeGreaterThan(0);
   await Promise.all(saves);
   const saved = await database.read();
-  expect(saved?.tables.Card).toEqual([]);
+  expect(saved?.tables.Card ?? []).toEqual([]);
   expect(Object.keys(saved?.meta ?? {})).toEqual([]);
+  const [purge] = database.saves();
+  expect(purge?.confirmed?.replace).toBe(false);
+  expect(purge?.confirmed?.remove.map(({ id }) => id).toSorted()).toEqual(['a', 'b', 'both']);
 });
 
 test('a backfill adds the past records of a new group, and never undoes a later change', () => {
@@ -119,6 +124,70 @@ test('a saved copy that names no group for its records is dropped, and the pool 
   expect(lines).toEqual([
     'The saved copy names no group for its records, so this build cannot read it. Its records were dropped, and the pool loads again from the server.',
   ]);
+});
+
+const remove = (id: string, groups: ReadonlyArray<string>): Change => ({
+  model: 'Card',
+  id,
+  action: 'delete',
+  data: null,
+  groups,
+});
+
+/**
+ * A client that loaded group x. Record r moved from group y to x at sync ID
+ * 2, and was deleted at sync ID 3. The backfill of y holds only the old
+ * change of r in y, at sync ID 1.
+ */
+function deletedAfterMove() {
+  const pool = createPool([], declared);
+  pool.applyGroups(['org:a', 'space:x'], []);
+  pool.applyDeltas([
+    { syncId: 2, transactionId: null, changes: [put('r', ['space:x'])] },
+    { syncId: 3, transactionId: null, changes: [remove('r', ['space:x'])] },
+  ]);
+  return pool;
+}
+const oldBackfill = [{ syncId: 1, transactionId: null, changes: [put('r', ['space:y'])] }];
+
+test('a backfill that holds an older upsert of a deleted record does not bring it back', () => {
+  const pool = deletedAfterMove();
+  pool.applyGroups(['org:a', 'space:x', 'space:y'], oldBackfill);
+  expect(pool.get(card, 'r')).toBeUndefined();
+  expect(pool.ids(card)).toEqual([]);
+});
+
+test('a deleted record stays deleted after its group leaves the loaded set', () => {
+  const pool = deletedAfterMove();
+  pool.applyGroups(['org:a'], []);
+  pool.applyGroups(['org:a', 'space:y'], oldBackfill);
+  expect(pool.get(card, 'r')).toBeUndefined();
+});
+
+test('a later upsert brings a deleted record back', () => {
+  const pool = deletedAfterMove();
+  pool.applyDeltas([{ syncId: 4, transactionId: null, changes: [put('r', ['space:x'], 'Back')] }]);
+  expect(pool.get(card, 'r')?.title).toBe('Back');
+});
+
+test('a saved copy keeps a deleted record deleted after a reload', async () => {
+  const pool = deletedAfterMove();
+  const database = memoryLocalDatabase();
+  await database.save({ confirmed: pool.confirmedChanges(true), add: [], done: [] });
+  const saved = await database.read();
+  const next = createPool([], declared);
+  if (saved) {
+    next.load(saved);
+  }
+  next.applyGroups(['org:a', 'space:x', 'space:y'], oldBackfill);
+  expect(next.get(card, 'r')).toBeUndefined();
+});
+
+test('a reset of the confirmed records forgets each deleted record', () => {
+  const pool = deletedAfterMove();
+  pool.resetConfirmed();
+  pool.applyGroups(['org:a', 'space:x', 'space:y'], oldBackfill);
+  expect(pool.get(card, 'r')?.title).toBe('r');
 });
 
 /** Lets each pending promise callback run, so a gate that resolved has set its flag. */

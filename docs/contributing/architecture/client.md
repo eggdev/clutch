@@ -129,9 +129,55 @@ One is the usual choice for native. A project with no client deletes
 ## Local database
 
 The sync engine keeps its state on the device through one seam,
-`LocalDatabase` in `packages/sync/types/local-database.ts`. It has three
-operations: `read`, `write` and `clear`. Each one takes or gives the whole
-pool state: the confirmed records, the last sync ID and the transaction queue.
+`LocalDatabase` in `packages/sync/types/local-database.ts`. It keeps three
+kinds of rows: one for each confirmed record, one for each waiting
+transaction, and one for the sync position. A deleted record keeps a row
+with no record, so the pool remembers the sync ID of the delete. The sync position is the last
+sync ID, the loaded groups and `leftOutBy`. `read` joins the rows into one
+state. `save` writes one change in one database transaction. `clear` removes
+every row.
+
+A save holds the records that changed since the last save, the records that
+were deleted, and the sync position. So one delta writes only the records
+that it changed. After the pool drops its confirmed records, or after a save
+fails, the next save replaces every record.
+
+### Two tabs
+
+Each tab has its own pool. Two tabs can hold different groups and positions,
+so only one tab writes the confirmed records and the sync position. On the
+web, it is the tab that holds the Web Lock of the database name. When that
+tab closes, the next tab gets the lock and writes its whole confirmed state
+once. A browser with no Web Locks lets each tab write. A native app has one
+process, so its pool always writes.
+
+Each tab writes its own waiting transactions:
+
+- A tab adds the row of a transaction when the person runs the command.
+- A tab deletes the row when the transaction leaves its queue: its delta
+  arrived, or the server refused it. A tab never deletes a row that it does
+  not hold.
+- At its start, a tab loads every waiting row, also the rows of another open
+  tab, and sends them. The server applies a transaction once, so a second
+  send is safe.
+- No tab tells another tab about a new transaction. The other tab gets the
+  change from the server.
+
+`packages/sync/runtime/boot.test.ts` holds these rules.
+
+### Older layouts
+
+Version 1 kept the whole state as one value. On the web, it was under the
+key `state` in the IndexedDB store `pool`. On native, it was one JSON row in
+the SQLite table `pool`. The open moves its waiting transactions into rows,
+so no unsent work is lost. It moves the records and the position too when
+each record names its groups. Otherwise it drops them, and the pool loads
+again from the server.
+
+A tab of an older build that holds the IndexedDB database open blocks this
+move. The open then fails with a sentence that says to close that tab. A tab
+closes its own handle when a newer build asks for a new version, so it never
+blocks that build.
 
 `openLocalDatabase` in `packages/sync/runtime/local-database.ts` opens IndexedDB
 on the web. `packages/sync/runtime/local-database.native.ts` replaces it on a

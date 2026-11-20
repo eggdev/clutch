@@ -72,8 +72,9 @@ the same, so loading the local database needs no decode.
 
 1. A screen calls a command with its input, and no ID or time. The pool fills
    each stamp, then runs the local change at once.
-2. The transaction goes to the transaction queue. The pool writes its state,
-   queue included, to the local database.
+2. The transaction goes to the transaction queue. The pool saves the row of
+   the transaction to the local database. See
+   [the local database](./client.md#local-database).
 3. The transport sends the unsent transactions with `Push`. A failed push
    tries again after 200 ms, then twice as long each time, up to 3 seconds.
 4. The server checks the input against its fields, then the access rule. Then
@@ -212,6 +213,10 @@ open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
   the gate asks for the whole group again.
 - A record that already holds a later change keeps it. The backfill never
   undoes a later change.
+- A deleted record stays deleted. The pool keeps the sync ID of the delete,
+  and saves it, so an older upsert in a backfill does not bring the record
+  back. The pool forgets these sync IDs only when it drops its confirmed
+  records. `packages/sync/runtime/pool-groups.test.ts` holds this.
 - After 3 seconds, or offline, the gate stops waiting and opens the screen
   with what the pool has.
 - When the server refuses the group, the gate stops waiting at once. The pool

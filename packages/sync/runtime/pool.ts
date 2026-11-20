@@ -24,7 +24,7 @@ import {
   wake,
 } from '@repo/sync/runtime/tables';
 import type { Tables } from '@repo/sync/runtime/tables';
-import type { PoolState } from '@repo/sync/types/local-database';
+import type { ConfirmedSave, PoolState } from '@repo/sync/types/local-database';
 import type { Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
 import type { ReadablePool, Rejection } from '@repo/sync/types/records';
 
@@ -42,8 +42,22 @@ export type Pool = ReadablePool & {
   ) => string;
   readonly isPending: (transactionId: string) => boolean;
   readonly lastSyncId: () => number;
+  /**
+   * Loads a saved state. The pool then counts the state as saved, so the
+   * next save writes only what changes after it. A copy that the pool drops
+   * makes the next save replace every saved record.
+   */
   readonly load: (state: PoolState) => void;
   readonly snapshot: () => PoolState;
+  /**
+   * The confirmed records that changed since the last call, the records that
+   * were deleted, and the sync position, for the next save. `everything`
+   * asks for every record, such as after a save that failed. The pool asks
+   * for every record itself after it drops its confirmed records.
+   */
+  readonly confirmedChanges: (everything: boolean) => ConfirmedSave;
+  /** Every transaction in the queue, sent or not, in the order the person ran them. */
+  readonly queue: () => ReadonlyArray<Transaction>;
   readonly unsent: () => ReadonlyArray<Transaction>;
   readonly markSent: (ids: ReadonlyArray<string>, sent: boolean) => void;
   readonly applyDeltas: (deltas: ReadonlyArray<Delta>) => void;
@@ -245,6 +259,8 @@ export function createPool(
       ...confirmed.snapshot(),
       pending: pending.map(({ transaction }) => transaction),
     }),
+    confirmedChanges: confirmed.changes,
+    queue: () => pending.map(({ transaction }) => transaction),
     unsent: () => pending.filter(({ sent }) => !sent).map(({ transaction }) => transaction),
     markSent(ids, sent) {
       for (const entry of pending) {

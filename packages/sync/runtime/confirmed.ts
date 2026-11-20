@@ -7,7 +7,13 @@ import {
 import type { Report } from '@repo/sync/runtime/pool-doors';
 import { recordKey, tableOf } from '@repo/sync/runtime/tables';
 import type { Tables } from '@repo/sync/runtime/tables';
-import type { PoolState, RecordMeta } from '@repo/sync/types/local-database';
+import type {
+  ConfirmedSave,
+  PoolState,
+  RecordKey,
+  RecordMeta,
+  SavedRecord,
+} from '@repo/sync/types/local-database';
 import type { Change, Delta } from '@repo/sync/types/protocol';
 
 /** The part of a saved state that the confirmed records keep. The pool adds the waiting transactions. */
@@ -28,6 +34,12 @@ export type Confirmed = {
    */
   readonly load: (state: PoolState) => boolean;
   readonly snapshot: () => ConfirmedState;
+  /**
+   * The records that changed since the last call, the records that were
+   * deleted, and the sync position, for the next save. `everything` asks for
+   * every record. A load of a dropped copy and a reset ask for every record too.
+   */
+  readonly changes: (everything: boolean) => ConfirmedSave;
   /** Forgets every record and the sync position. The loaded groups stay. */
   readonly reset: () => void;
   /** Applies a delta and returns `true`, or returns `false` when the pool already has it. */
@@ -45,6 +57,31 @@ export type Confirmed = {
 };
 
 /**
+ * The rows of the confirmed records with these keys, for a save: a row for
+ * each record that the pool holds, a row with no record for each deleted
+ * record, and a key to remove for each other one.
+ */
+function savedRows(
+  keys: Iterable<string>,
+  meta: ReadonlyMap<string, RecordMeta>,
+  tables: Tables,
+): { readonly put: Array<SavedRecord>; readonly remove: Array<RecordKey> } {
+  const put: Array<SavedRecord> = [];
+  const remove: Array<RecordKey> = [];
+  for (const key of keys) {
+    const [model = '', id = ''] = key.split('\u0000');
+    const known = meta.get(key);
+    const row = known?.deleted ? null : tables.get(model)?.get(id);
+    if (known && row !== undefined) {
+      put.push({ model, id, row, groups: known.groups, syncId: known.syncId });
+    } else {
+      remove.push({ model, id });
+    }
+  }
+  return { put, remove };
+}
+
+/**
  * Creates the confirmed records. Doors 1 and 2 check each saved record and
  * each record of a delta against `records`. `loading` names the groups whose pages are coming, so
  * a purge keeps their records.
@@ -57,9 +94,17 @@ export function createConfirmed(
   const declared = declarationsByName(records);
   let tables: Tables = new Map();
   let lastSyncId = 0;
-  // The groups and last sync ID of each confirmed record, by `recordKey`.
+  // The groups and last sync ID of each confirmed record, by `recordKey`. A
+  // deleted record keeps an entry marked `deleted`, so an older upsert of it
+  // does not bring it back. The pool forgets these marks only in `reset` and
+  // when it drops a saved copy, so they grow with the deletes that the device
+  // sees. Snapshots of the server (CL-917) may make them unnecessary.
   let meta = new Map<string, RecordMeta>();
   let loaded = new Set<string>();
+  // The keys of the records that changed since the last save, or every
+  // record after the confirmed records were dropped.
+  let unsaved = new Set<string>();
+  let unsavedAll = false;
   // The build that left a record of a delta out of the confirmed records, if one did.
   let leftOutBy: string | undefined;
   let build = 'unnamed';
@@ -83,13 +128,16 @@ export function createConfirmed(
       meta.set(key, { groups: change.groups, syncId });
     } else {
       tableOf(tables, change.model).delete(change.id);
-      meta.delete(key);
+      meta.set(key, { groups: change.groups, syncId, deleted: true });
     }
+    unsaved.add(key);
   }
 
   function reset() {
     tables = new Map();
     meta = new Map();
+    unsaved = new Set();
+    unsavedAll = true;
     lastSyncId = 0;
     leftOutBy = undefined;
   }
@@ -115,6 +163,8 @@ export function createConfirmed(
         ]),
       );
       ({ lastSyncId, leftOutBy } = state);
+      unsaved = new Set();
+      unsavedAll = false;
       return true;
     },
     snapshot: () => ({
@@ -124,6 +174,22 @@ export function createConfirmed(
       tables: Object.fromEntries([...tables].map(([name, table]) => [name, [...table.values()]])),
       ...(leftOutBy === undefined ? {} : { leftOutBy }),
     }),
+    changes(everything) {
+      const replace = everything || unsavedAll;
+      const { put, remove } = savedRows(replace ? meta.keys() : unsaved, meta, tables);
+      unsaved = new Set();
+      unsavedAll = false;
+      return {
+        replace,
+        put,
+        remove: replace ? [] : remove,
+        position: {
+          lastSyncId,
+          groups: [...loaded],
+          ...(leftOutBy === undefined ? {} : { leftOutBy }),
+        },
+      };
+    },
     reset,
     applyDelta(delta) {
       if (delta.syncId <= lastSyncId) {
@@ -147,11 +213,13 @@ export function createConfirmed(
     },
     purge() {
       const current = new Set([...loaded, ...loading()]);
-      for (const [key, { groups }] of meta) {
-        if (!groups.some((group) => current.has(group))) {
+      for (const [key, { groups, deleted }] of meta) {
+        // A deleted record keeps its mark, so a later backfill of another group cannot bring it back.
+        if (!deleted && !groups.some((group) => current.has(group))) {
           const [model = '', id = ''] = key.split('\u0000');
           tables.get(model)?.delete(id);
           meta.delete(key);
+          unsaved.add(key);
         }
       }
     },

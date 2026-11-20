@@ -2,8 +2,13 @@ import { Database } from 'bun:sqlite';
 import { expect, test } from 'bun:test';
 
 import { createPool } from '@repo/sync/runtime/pool';
+import { fullSave } from '@repo/sync/runtime/pool-doors';
 import { openSqlite } from '@repo/sync/runtime/sqlite';
-import { localDatabaseCases } from '@repo/sync/testing/local-database-conformance';
+import {
+  expectOldLayoutMoved,
+  localDatabaseCases,
+  oldLayoutCopy,
+} from '@repo/sync/testing/local-database-conformance';
 import { poolState } from '@repo/sync/testing/pool-state';
 import type { SqlValue, SqliteDriver } from '@repo/sync/types/sqlite-driver';
 
@@ -32,8 +37,8 @@ test('two names in one SQLite file keep separate states', async () => {
   const database = new Database(':memory:');
   const first = await openSqlite(bunDriver(database), 'first');
   const second = await openSqlite(bunDriver(database), 'second');
-  await first.write(poolState({ lastSyncId: 1, tables: {} }));
-  await second.write(poolState({ lastSyncId: 2, tables: {} }));
+  await first.save(fullSave(poolState({ lastSyncId: 1, tables: {} })));
+  await second.save(fullSave(poolState({ lastSyncId: 2, tables: {} })));
   await first.clear();
   expect(await first.read()).toBeUndefined();
   const kept = await second.read();
@@ -41,10 +46,44 @@ test('two names in one SQLite file keep separate states', async () => {
   database.close();
 });
 
-test('saved text that is no JSON reads as a copy that the pool drops and reports, not as a throw', async () => {
+test('a copy in the old layout moves into the rows, its waiting transactions included', async () => {
+  const database = new Database(':memory:');
+  database.query('create table pool (name text primary key, state text not null)').run();
+  database
+    .query('insert into pool (name, state) values (?, ?)')
+    .run('app', JSON.stringify(oldLayoutCopy));
+  database.query('insert into pool (name, state) values (?, ?)').run('other', '{}');
+  await expectOldLayoutMoved(await openSqlite(bunDriver(database), 'app'));
+  expect(database.query('select name from pool').all()).toEqual([{ name: 'other' }]);
+  // A second open finds no old copy, and reads the same rows.
+  await expectOldLayoutMoved(await openSqlite(bunDriver(database), 'app'));
+  database.close();
+});
+
+test('an old copy whose records name no groups moves only its waiting transactions', async () => {
+  const database = new Database(':memory:');
+  database.query('create table pool (name text primary key, state text not null)').run();
+  const { meta: _meta, ...noGroups } = oldLayoutCopy;
+  database
+    .query('insert into pool (name, state) values (?, ?)')
+    .run('app', JSON.stringify(noGroups));
+  const local = await openSqlite(bunDriver(database), 'app');
+  const saved = await local.read();
+  expect(saved).toEqual({
+    lastSyncId: 0,
+    tables: {},
+    groups: [],
+    meta: {},
+    pending: oldLayoutCopy.pending,
+  });
+  database.close();
+});
+
+test('a row that is no JSON reads as a copy that the pool drops and reports, not as a throw', async () => {
   const database = new Database(':memory:');
   const local = await openSqlite(bunDriver(database), 'app');
-  database.query("insert into pool (name, state) values ('app', '{not json')").run();
+  await local.save(fullSave(oldLayoutCopy));
+  database.query("update pool_records set value = '{not json' where id = 'a'").run();
   const lines: Array<string> = [];
   const pool = createPool(
     [],
@@ -52,12 +91,15 @@ test('saved text that is no JSON reads as a copy that the pool drops and reports
     { report: (line) => lines.push(line) },
   );
   const saved = await local.read();
-  expect<unknown>(saved).toEqual({});
+  expect(saved?.tables).toEqual({});
+  expect(saved?.pending).toEqual(oldLayoutCopy.pending);
   if (saved) {
     pool.load(saved);
   }
+  // The pool declares no command, so it refuses the waiting transaction that the read kept.
   expect(lines).toEqual([
     'The saved copy has another shape than this build reads, so it was dropped, and the pool loads again from the server.',
+    'The saved command cards/rename is not declared by this build, so it was not sent.',
   ]);
   database.close();
 });

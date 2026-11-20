@@ -14,8 +14,14 @@ import type { Browser } from '@playwright/test';
 
 const root = path.join(import.meta.dir, '..', '..', '..');
 const entrySource = `
+import { openDB } from 'idb';
 import { openIndexedDb } from '@repo/sync/runtime/indexed-db';
-import { localDatabaseCases } from '@repo/sync/testing/local-database-conformance';
+import {
+  expectOldLayoutMoved,
+  localDatabaseCases,
+  oldLayoutCopy,
+} from '@repo/sync/testing/local-database-conformance';
+import type { LocalDatabase } from '@repo/sync/types/local-database';
 
 type Result = { readonly name: string; readonly error: string | null };
 
@@ -36,7 +42,44 @@ async function runCases(): Promise<Array<Result>> {
   return results;
 }
 
-Object.assign(globalThis, { runLocalDatabaseCases: runCases });
+/** Stores a copy where version 1 kept it, then opens the adapter. Returns the error, or null. */
+async function runOldLayout(): Promise<string | null> {
+  const old = await openDB('old-layout', 1, {
+    upgrade(upgrade) {
+      upgrade.createObjectStore('pool');
+    },
+  });
+  await old.put('pool', oldLayoutCopy, 'state');
+  old.close();
+  try {
+    const db = await openIndexedDb('old-layout');
+    await expectOldLayoutMoved(db);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+let held: LocalDatabase | undefined;
+
+/** Opens the database of the lock test, and says whether this page writes the confirmed records. */
+async function openForLock(): Promise<boolean> {
+  held = await openIndexedDb('lock');
+  return held.isWriter();
+}
+
+/** Waits until this page becomes the writer. */
+async function waitForWriter(): Promise<boolean> {
+  await held?.writer;
+  return held?.isWriter() ?? false;
+}
+
+Object.assign(globalThis, {
+  runLocalDatabaseCases: runCases,
+  runOldLayout,
+  openForLock,
+  waitForWriter,
+});
 `;
 
 /** One case of the bundle, with the message of its error or null. */
@@ -74,7 +117,7 @@ afterAll(async () => {
   await rm(folder, { recursive: true, force: true });
 });
 
-test('the IndexedDB adapter passes every local database case in Chromium', async () => {
+test('the IndexedDB adapter passes every local database case in Chromium, and moves a copy of version 1', async () => {
   const context = await browser.newContext();
   // IndexedDB needs an origin, so the page is served from one.
   await context.route('https://app.test/', (route) =>
@@ -84,6 +127,30 @@ test('the IndexedDB adapter passes every local database case in Chromium', async
   await page.goto('https://app.test/');
   await page.addScriptTag({ content: bundle });
   const results = await page.evaluate<Array<CaseResult>>('globalThis.runLocalDatabaseCases()');
+  // A copy of version 1 moves into the stores of version 2.
+  const oldLayout = await page.evaluate<string | null>('globalThis.runOldLayout()');
   await context.close();
   expect(results.filter((result) => result.error !== null)).toEqual([]);
+  expect(oldLayout).toBeNull();
+}, 60_000);
+
+test('one tab writes the confirmed records, and the next tab takes over when it closes', async () => {
+  const context = await browser.newContext();
+  await context.route('https://app.test/', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }),
+  );
+  const open = async () => {
+    const page = await context.newPage();
+    await page.goto('https://app.test/');
+    await page.addScriptTag({ content: bundle });
+    return page;
+  };
+  const first = await open();
+  expect(await first.evaluate<boolean>('globalThis.openForLock()')).toBe(true);
+  const second = await open();
+  expect(await second.evaluate<boolean>('globalThis.openForLock()')).toBe(false);
+  const takeover = second.evaluate<boolean>('globalThis.waitForWriter()');
+  await first.close();
+  expect(await takeover).toBe(true);
+  await context.close();
 }, 60_000);
