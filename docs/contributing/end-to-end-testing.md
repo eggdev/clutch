@@ -180,7 +180,7 @@ Four helpers in `@repo/journeys/testing` do that:
 - `callTool(page, 'notes_create', input)` calls an agent tool as the organization of the page. It posts a JSON-RPC `tools/call` to `/mcp`, and it throws with the code and the reason when the tool refuses.
 
 A journey does not need the name of the page's database. `poolState` reads the
-one database that has the `pool` store. See
+one database that has the stores `records` and `transactions`. See
 [the pool helper](../../packages/journeys/testing/pool.ts).
 
 The [notes journey](../../features/notes/journeys/notes-sync.journey.ts) uses all four.

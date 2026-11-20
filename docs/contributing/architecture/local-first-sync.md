@@ -64,8 +64,9 @@ the same, so loading the local database needs no decode.
 
 1. A screen calls a command with its input, and no ID or time. The pool fills
    each stamp, then runs the local change at once.
-2. The transaction goes to the transaction queue. The pool writes its state,
-   queue included, to the local database.
+2. The transaction goes to the transaction queue. The pool saves the row of
+   the transaction to the local database. See
+   [the local database](./client.md#local-database).
 3. The transport sends the unsent transactions with `Push`. A failed push
    tries again after 200 ms, then twice as long each time, up to 3 seconds.
 4. The server checks the input against its fields, then the access rule. Then

@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { RecordRow } from '@repo/sync/contract/record';
-import type { PoolState as SyncPoolState } from '@repo/sync/types/local-database';
+import type { SavedRecord } from '@repo/sync/types/local-database';
 import type { Transaction } from '@repo/sync/types/protocol';
 
 /**
@@ -18,15 +18,18 @@ export type PoolRow = RecordRow;
 /** A transaction that the page ran and that the server has not answered yet. */
 export type PoolPending = Transaction;
 
-/** The state of the pool: the records by model, the groups loaded and the transactions without an answer. */
-export type PoolState = SyncPoolState;
+/** The rows of the pool: one for each confirmed record, and one for each transaction without an answer. */
+export type PoolState = {
+  readonly records: ReadonlyArray<SavedRecord>;
+  readonly pending: ReadonlyArray<PoolPending>;
+};
 
 /**
- * What the page's IndexedDB holds under the store `pool` and the key `state`,
- * or `undefined` when no database has that store yet. The journey does not
+ * What the page's IndexedDB holds in the stores `records` and `transactions`,
+ * or `undefined` when no database has those stores yet. The journey does not
  * know the name that the app gave its database: it reads the one database
- * that has the store. Each database it opens exists already, so no open
- * creates one or blocks the app's own upgrade. Two databases with the store
+ * that has the stores. Each database it opens exists already, so no open
+ * creates one or blocks the app's own upgrade. Two databases with the stores
  * are an error, because the journey cannot tell which one the app reads.
  */
 export function poolState(page: Page): Promise<PoolState | undefined> {
@@ -41,7 +44,7 @@ export function poolState(page: Page): Promise<PoolState | undefined> {
         request.addEventListener('success', () => resolve(request.result));
         request.addEventListener('error', () => reject(request.error));
       });
-      if (db.objectStoreNames.contains('pool')) {
+      if (db.objectStoreNames.contains('records') && db.objectStoreNames.contains('transactions')) {
         found.push(db);
       } else {
         db.close();
@@ -57,17 +60,19 @@ export function poolState(page: Page): Promise<PoolState | undefined> {
         item.close();
       }
       throw new Error(
-        `${found.length} databases of this page have a \`pool\` store: ${names}. The journey reads one.`,
+        `${found.length} databases of this page have the stores of the pool: ${names}. The journey reads one.`,
       );
     }
-    return new Promise<PoolState | null>((resolve, reject) => {
-      const get = db.transaction('pool', 'readonly').objectStore('pool').get('state');
-      get.addEventListener('success', () => {
-        db.close();
-        resolve((get.result as PoolState | undefined) ?? null);
+    const tx = db.transaction(['records', 'transactions'], 'readonly');
+    const all = (store: string) =>
+      new Promise<Array<unknown>>((resolve, reject) => {
+        const get = tx.objectStore(store).getAll();
+        get.addEventListener('success', () => resolve(get.result));
+        get.addEventListener('error', () => reject(get.error));
       });
-      get.addEventListener('error', () => reject(get.error));
-    });
+    const [rows, pending] = await Promise.all([all('records'), all('transactions')]);
+    db.close();
+    return { records: rows, pending } as PoolState;
   });
   return state.then((value) => value ?? undefined);
 }
@@ -75,7 +80,7 @@ export function poolState(page: Page): Promise<PoolState | undefined> {
 /** The records of one model in the pool, such as `Note`, or none when the pool has none of them. */
 export async function records(page: Page, model: string): Promise<ReadonlyArray<PoolRow>> {
   const state = await poolState(page);
-  return state?.tables[model] ?? [];
+  return state?.records.filter((record) => record.model === model).map(({ row }) => row) ?? [];
 }
 
 /** The commands that the page has sent and the server has not answered yet, by name. */

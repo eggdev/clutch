@@ -66,7 +66,11 @@ export function savedRecordsMisfit(
   declared: ReadonlyMap<string, RecordDeclaration>,
 ): string | undefined {
   const { tables } = state;
-  if (!isObject(tables) || Object.values(tables).some((rows) => !Array.isArray(rows))) {
+  if (
+    state.unreadable ||
+    !isObject(tables) ||
+    Object.values(tables).some((rows) => !Array.isArray(rows))
+  ) {
     return 'The saved copy has another shape than this build reads, so it was dropped, and the pool loads again from the server.';
   }
   if (!isObject(state.meta) || !Array.isArray(state.groups)) {

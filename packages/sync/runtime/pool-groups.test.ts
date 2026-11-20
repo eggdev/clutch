@@ -40,20 +40,25 @@ test('losing a group deletes its records, and a record still in another group st
   expect(pool.loadedGroups().toSorted()).toEqual(['org:a', 'space:y']);
 });
 
-test('the purge reaches the local database through the next save', async () => {
+test('the purge reaches the local database through the next save, which removes only the purged rows', async () => {
   const pool = loadedPool();
-  const database = memoryLocalDatabase();
+  const database = memoryLocalDatabase(pool.snapshot());
+  // The database holds the state now, so the changes before this point are saved.
+  pool.confirmedChanges(false);
   const saves: Array<Promise<void>> = [];
   pool.onChange(() => {
-    saves.push(database.write(pool.snapshot()));
+    saves.push(database.save({ confirmed: pool.confirmedChanges(false), add: [], done: [] }));
   });
   pool.applyGroups(['org:a'], []);
   // Wait for the save that the purge started, not for a guessed tick.
   expect(saves.length).toBeGreaterThan(0);
   await Promise.all(saves);
   const saved = await database.read();
-  expect(saved?.tables.Card).toEqual([]);
+  expect(saved?.tables.Card ?? []).toEqual([]);
   expect(Object.keys(saved?.meta ?? {})).toEqual([]);
+  const [purge] = database.saves();
+  expect(purge?.confirmed?.replace).toBe(false);
+  expect(purge?.confirmed?.remove.map(({ id }) => id).toSorted()).toEqual(['a', 'b', 'both']);
 });
 
 test('a backfill adds the past records of a new group, and never undoes a later change', () => {

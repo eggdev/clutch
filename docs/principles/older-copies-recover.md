@@ -44,8 +44,11 @@ the app.
 - Each drop and each refusal is reported in one sentence that names the record
   or the command. `packages/sync/runtime/pool.test.ts` and
   `packages/sync/runtime/pool-doors.test.ts` check each door.
-- There is no migration of a local copy. An older copy is dropped or refused,
-  and it is never rewritten.
+- There is no migration of the records or commands in a local copy. An older
+  copy is dropped or refused, and its content is never rewritten. A new
+  layout of the local database moves each row of the old layout as it is,
+  so no waiting transaction is lost. The doors check the rows when the pool
+  loads them.
 - A change to a server rule, a field or a stored shape adds a test. The test
   feeds the older copy through today's code and asserts that the session
   recovers.

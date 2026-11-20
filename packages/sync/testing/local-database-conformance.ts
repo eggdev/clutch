@@ -1,4 +1,6 @@
+import { fullSave } from '@repo/sync/runtime/local-rows';
 import type { LocalDatabase, PoolState } from '@repo/sync/types/local-database';
+import type { Transaction } from '@repo/sync/types/protocol';
 
 /**
  * One case that every local database adapter must pass. `run` gets `open`,
@@ -11,14 +13,28 @@ export type LocalDatabaseCase = {
   readonly run: (open: () => Promise<LocalDatabase>) => Promise<void>;
 };
 
-/** A state with a confirmed record, a loaded group and one pending transaction. */
+/** A waiting transaction that renames the card `a`. */
+function rename(id: string, title = 'New'): Transaction {
+  return { id, command: 'cards/rename', input: { id: 'a', title } };
+}
+
+/** A state with two confirmed records, a loaded group and one pending transaction. */
 function sampleState(title = 'Old'): PoolState {
   return {
     lastSyncId: 7,
-    tables: { Card: [{ id: 'a', title }] },
+    tables: {
+      Card: [
+        { id: 'a', title },
+        { id: 'b', title: 'Kept' },
+      ],
+    },
     groups: ['test'],
-    meta: { 'Card\u0000a': { groups: ['test'], syncId: 7 } },
-    pending: [{ id: 't1', command: 'cards/rename', input: { id: 'a', title: 'New' } }],
+    meta: {
+      'Card\u0000a': { groups: ['test'], syncId: 7 },
+      'Card\u0000b': { groups: ['test'], syncId: 5 },
+    },
+    pending: [rename('t1')],
+    leftOutBy: 'old-build',
   };
 }
 
@@ -58,6 +74,18 @@ async function readState(db: LocalDatabase, what: string): Promise<PoolState> {
   return state;
 }
 
+/**
+ * A copy in the old layout: one value that held the whole state. An adapter
+ * test stores it where the old adapter kept it, opens the adapter, and passes
+ * the handle to `expectOldLayoutMoved`.
+ */
+export const oldLayoutCopy: PoolState = sampleState('Old layout');
+
+/** Throws unless the handle reads the old copy whole, its waiting transaction included. */
+export async function expectOldLayoutMoved(db: LocalDatabase): Promise<void> {
+  expectSame(await db.read(), oldLayoutCopy, 'The read of a copy in the old layout');
+}
+
 /** The cases that every local database adapter must pass, in the order they run. */
 export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
   {
@@ -68,34 +96,110 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
     },
   },
   {
-    name: 'a written state reads back deep-equal, with every field',
+    name: 'a full save reads back deep-equal, with every field',
     async run(open) {
       const db = await open();
       const state = sampleState();
-      await db.write(state);
-      expectSame(await db.read(), state, 'The read after one write');
+      await db.save(fullSave(state));
+      expectSame(await db.read(), state, 'The read after one save');
     },
   },
   {
-    name: 'a second write replaces the first',
+    name: 'a second full save replaces the confirmed records and the position of the first',
     async run(open) {
       const db = await open();
-      await db.write(sampleState('Old'));
-      const second = sampleState('Second');
-      await db.write(second);
-      expectSame(await db.read(), second, 'The read after two writes');
+      await db.save(fullSave(sampleState('Old')));
+      const second: PoolState = {
+        lastSyncId: 9,
+        tables: { Card: [{ id: 'c', title: 'Only' }] },
+        groups: ['other'],
+        meta: { 'Card\u0000c': { groups: ['other'], syncId: 9 } },
+        pending: [rename('t1')],
+      };
+      await db.save(fullSave(second));
+      expectSame(await db.read(), second, 'The read after two full saves');
     },
   },
   {
-    name: 'clear makes the next read undefined, and a write after a clear reads back',
+    name: 'a save of one change writes that record and the position, and keeps every other record',
     async run(open) {
       const db = await open();
-      await db.write(sampleState());
+      await db.save(fullSave(sampleState()));
+      await db.save({
+        confirmed: {
+          replace: false,
+          put: [
+            { model: 'Card', id: 'c', row: { id: 'c', title: 'New' }, groups: ['test'], syncId: 8 },
+          ],
+          remove: [{ model: 'Card', id: 'a' }],
+          position: { lastSyncId: 8, groups: ['test'] },
+        },
+        add: [],
+        done: [],
+      });
+      expectSame(
+        await db.read(),
+        {
+          lastSyncId: 8,
+          tables: {
+            Card: [
+              { id: 'b', title: 'Kept' },
+              { id: 'c', title: 'New' },
+            ],
+          },
+          groups: ['test'],
+          meta: {
+            'Card\u0000b': { groups: ['test'], syncId: 5 },
+            'Card\u0000c': { groups: ['test'], syncId: 8 },
+          },
+          pending: [rename('t1')],
+        },
+        'The read after a save of one change',
+      );
+    },
+  },
+  {
+    name: 'a waiting transaction of one tab stays after a save of another tab',
+    async run(open) {
+      const first = await open();
+      const second = await open();
+      await first.save({ add: [rename('mine', 'Offline')], done: [] });
+      // The other tab saves its whole state, with its own queue, and its own transaction leaves its queue.
+      await second.save(fullSave({ ...sampleState(), pending: [rename('theirs')] }));
+      await second.save({ add: [], done: ['theirs'] });
+      const after = await readState(first, 'The read after the save of the other tab');
+      expectSame(
+        after.pending,
+        [rename('mine', 'Offline')],
+        'The waiting transactions after the save of the other tab',
+      );
+    },
+  },
+  {
+    name: 'waiting transactions read in the order they were added, and a second add keeps the first place',
+    async run(open) {
+      const db = await open();
+      await db.save({ add: [rename('t1'), rename('t2')], done: [] });
+      await db.save({ add: [rename('t3'), rename('t1')], done: ['unknown'] });
+      await db.save({ add: [], done: ['t2'] });
+      const after = await readState(db, 'The read after three saves');
+      expectSame(
+        after.pending.map(({ id }) => id),
+        ['t1', 't3'],
+        'The order of the waiting transactions',
+      );
+    },
+  },
+  {
+    name: 'clear makes the next read undefined, and a save after a clear reads back',
+    async run(open) {
+      const db = await open();
+      await db.save(fullSave(sampleState()));
       await db.clear();
       expectSame(await db.read(), undefined, 'The read after clear');
       const after = sampleState('After');
-      await db.write(after);
-      expectSame(await db.read(), after, 'The read after a write that follows clear');
+      await db.save(fullSave(after));
+      expectSame(await db.read(), after, 'The read after a save that follows clear');
     },
   },
   {
@@ -103,7 +207,7 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
     async run(open) {
       const db = await open();
       const state = sampleState();
-      await db.write(state);
+      await db.save(fullSave(state));
       // The types are readonly, so the writes go through Reflect, which the types allow.
       const first = await readState(db, 'The first read');
       Reflect.set(first, 'lastSyncId', 999);
@@ -120,7 +224,7 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
     async run(open) {
       const first = await open();
       const state = sampleState();
-      await first.write(state);
+      await first.save(fullSave(state));
       const second = await open();
       expectSame(await second.read(), state, 'The read through the second handle');
     },
