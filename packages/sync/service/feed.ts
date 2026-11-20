@@ -25,6 +25,12 @@ export type Connection = {
   readonly granted: Effect.Effect<Granted, unknown>;
   /** Groups that `Load` asked for. */
   readonly requests: Queue.Queue<LoadRequest>;
+  /**
+   * The sync ID of each transaction of this client that the server accepted.
+   * The client's position moves there, also when the event holds nothing
+   * that the client sees.
+   */
+  readonly accepted?: Queue.Queue<number>;
 };
 
 /** One `Load`: the group, and whether the client reads its snapshot in pages. */
@@ -32,7 +38,14 @@ export type LoadRequest = { readonly group: string; readonly pages: boolean };
 
 type Input =
   | { readonly kind: 'delta'; readonly delta: Delta }
-  | { readonly kind: 'load'; readonly request: LoadRequest };
+  | { readonly kind: 'load'; readonly request: LoadRequest }
+  | { readonly kind: 'accepted'; readonly syncId: number };
+
+/** A delta with no changes, which moves the client's last sync ID to `syncId`. */
+const emptyDelta = (syncId: number): SyncMessage => ({
+  _tag: 'Deltas',
+  deltas: [{ syncId, transactionId: null, changes: [] }],
+});
 
 /**
  * The messages of one connection. It sends the loaded groups first, with the
@@ -47,12 +60,18 @@ type Input =
  * message comes between two pages. A client whose last sync ID is older than
  * the log, after a trim, gets `ServerBehind`, and loads again from 0. A change in the user's own
  * group, such as a membership, makes it ask access again; each group the
- * actor lost leaves the loaded set, and the client deletes its records.
+ * actor lost leaves the loaded set, and the client deletes its records, and
+ * each eager group that it gained loads, with its snapshot. The first
+ * message names the actor, also when pages come before the first loaded
+ * group. When a transaction of this client is accepted, the client gets an
+ * empty delta at its sync ID once each event before it went out, so the
+ * client stops waiting for it even when it sees none of its changes.
  */
 export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Connection) {
   return Stream.unwrap(
     Effect.gen(function* () {
       const { organizationId, userId } = connection;
+      const readsPages = connection.pages ?? false;
       // The first `Groups` message names the actor, so the client drops a
       // saved copy of another actor before it sends anything.
       let named = false;
@@ -74,42 +93,34 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
       // hold a newer change of a record, and the live event of that change
       // comes too: the pool keeps the change with the higher sync ID.
       let watermark = Math.max(connection.lastSyncId, yield* log.head(organizationId));
+      // The last sync ID that the client holds, after each delta sent to it.
+      let position = connection.lastSyncId;
+      // The sync IDs of accepted transactions that the feed has not reached yet.
+      let accepted: ReadonlyArray<number> = [];
+      // Moves the client to the newest accepted sync ID that the feed has
+      // reached, when no delta took it there. Each event up to the watermark
+      // went out before, so the client misses none.
+      const moveToAccepted = (): ReadonlyArray<SyncMessage> => {
+        const reached = accepted.filter((syncId) => syncId <= watermark);
+        accepted = accepted.filter((syncId) => syncId > watermark);
+        const newest = Math.max(0, ...reached);
+        if (newest <= position) {
+          return [];
+        }
+        position = newest;
+        return [emptyDelta(newest)];
+      };
 
       const backlog = log.backlog(organizationId, connection.lastSyncId, loaded).pipe(
         Stream.tap((page) =>
           Effect.sync(() => {
             watermark = Math.max(watermark, page.last);
+            position = Math.max(position, page.deltas.at(-1)?.syncId ?? 0);
           }),
         ),
         Stream.filter((page) => page.deltas.length > 0),
         Stream.map((page): SyncMessage => ({ _tag: 'Deltas', deltas: page.deltas })),
       );
-
-      const onDelta = (delta: Delta) =>
-        Effect.gen(function* () {
-          if (delta.syncId <= watermark) {
-            return [];
-          }
-          watermark = delta.syncId;
-          const out: Array<SyncMessage> = [];
-          const seen = seenDelta(delta, loaded);
-          if (seen) {
-            out.push({ _tag: 'Deltas', deltas: [seen] });
-          }
-          const own = userGroup.of(connection.userId);
-          if (delta.changes.some((change) => change.groups.includes(own))) {
-            const granted = yield* connection.granted;
-            const allowed = new Set([...granted.eager, ...granted.lazy]);
-            const lost = [...loaded].filter((group) => !allowed.has(group));
-            if (lost.length) {
-              for (const group of lost) {
-                loaded.delete(group);
-              }
-              out.push(groupsMessage(loaded, []));
-            }
-          }
-          return out;
-        });
 
       // The snapshot of `groups`. A client that reads pages gets `Page`
       // messages, and the last page in the `Groups` message. Another client
@@ -147,14 +158,69 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
                     if (!more && group === lastGroup) {
                       return Stream.make(groupsMessage(now, deltas));
                     }
+                    if (!deltas.length) {
+                      return Stream.empty;
+                    }
                     const page: SyncMessage = { _tag: 'Page', group, backfill: deltas };
-                    return deltas.length ? Stream.make(page) : Stream.empty;
+                    // The first message of a pull names the actor, so the
+                    // client drops a copy of another actor before the first
+                    // page. It loads only the groups that have no page to come.
+                    return named
+                      ? Stream.make(page)
+                      : Stream.make(
+                          groupsMessage(
+                            new Set([...now].filter((known) => !groups.includes(known))),
+                            [],
+                          ),
+                          page,
+                        );
                   }),
                 ),
               ),
             );
           }),
         );
+
+      // A change in the user's own group asks access again. Each group that
+      // the actor lost leaves the loaded set. Each eager group that it gained
+      // loads, as at the start of a pull, and its snapshot names the groups.
+      const regrant = (): Stream.Stream<SyncMessage, unknown> =>
+        Stream.unwrap(
+          Effect.gen(function* () {
+            const granted = yield* connection.granted;
+            const allowed = new Set([...granted.eager, ...granted.lazy]);
+            const lost = [...loaded].filter((group) => !allowed.has(group));
+            const gained = granted.eager.filter((group) => !loaded.has(group));
+            for (const group of lost) {
+              loaded.delete(group);
+            }
+            for (const group of gained) {
+              loaded.add(group);
+            }
+            if (gained.length) {
+              return snapshotMessages(gained, readsPages);
+            }
+            return lost.length ? Stream.make(groupsMessage(loaded, [])) : Stream.empty;
+          }),
+        );
+
+      const onDelta = (delta: Delta): Stream.Stream<SyncMessage, unknown> => {
+        if (delta.syncId <= watermark) {
+          return Stream.empty;
+        }
+        watermark = delta.syncId;
+        const out: Array<SyncMessage> = [];
+        const seen = seenDelta(delta, loaded);
+        if (seen) {
+          position = delta.syncId;
+          out.push({ _tag: 'Deltas', deltas: [seen] });
+        }
+        out.push(...moveToAccepted());
+        const own = userGroup.of(connection.userId);
+        return delta.changes.some((change) => change.groups.includes(own))
+          ? Stream.concat(Stream.fromIterable(out), regrant())
+          : Stream.fromIterable(out);
+      };
 
       const onLoad = ({
         group,
@@ -172,33 +238,43 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
           return snapshotMessages([group], pages);
         });
 
-      const live = Stream.merge(
-        Stream.fromSubscription(subscription).pipe(
-          Stream.map((delta): Input => ({ kind: 'delta', delta })),
-        ),
-        Stream.fromQueue(connection.requests).pipe(
-          Stream.map((request): Input => ({ kind: 'load', request })),
-        ),
+      const live = Stream.mergeAll(
+        [
+          Stream.fromSubscription(subscription).pipe(
+            Stream.map((delta): Input => ({ kind: 'delta', delta })),
+          ),
+          Stream.fromQueue(connection.requests).pipe(
+            Stream.map((request): Input => ({ kind: 'load', request })),
+          ),
+          connection.accepted
+            ? Stream.fromQueue(connection.accepted).pipe(
+                Stream.map((syncId): Input => ({ kind: 'accepted', syncId })),
+              )
+            : Stream.empty,
+        ],
+        { concurrency: 'unbounded' },
       ).pipe(
-        Stream.flatMap((input) =>
-          input.kind === 'delta'
-            ? Stream.unwrap(Effect.map(onDelta(input.delta), (out) => Stream.fromIterable(out)))
-            : Stream.unwrap(onLoad(input.request)),
-        ),
+        Stream.flatMap((input) => {
+          if (input.kind === 'delta') {
+            return onDelta(input.delta);
+          }
+          if (input.kind === 'load') {
+            return Stream.unwrap(onLoad(input.request));
+          }
+          accepted = [...accepted, input.syncId];
+          return Stream.fromIterable(moveToAccepted());
+        }),
       );
 
-      const pages = connection.pages ?? false;
       if (connection.lastSyncId === 0) {
         // A client at sync ID 0 holds nothing: it gets the snapshot of each
         // loaded group. The empty delta at the head then moves its last sync
         // ID there, so its next pull asks only for the events after it.
         const head = watermark;
-        const atHead: ReadonlyArray<SyncMessage> =
-          head > 0
-            ? [{ _tag: 'Deltas', deltas: [{ syncId: head, transactionId: null, changes: [] }] }]
-            : [];
+        position = head;
+        const atHead: ReadonlyArray<SyncMessage> = head > 0 ? [emptyDelta(head)] : [];
         return Stream.concat(
-          Stream.concat(snapshotMessages([...loaded], pages), Stream.fromIterable(atHead)),
+          Stream.concat(snapshotMessages([...loaded], readsPages), Stream.fromIterable(atHead)),
           live,
         );
       }
@@ -218,7 +294,7 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
       // first, so when the oldest is still in reach, no event was missed.
       const opening = snapshotMessages(
         (connection.fill ?? []).filter((group) => loaded.has(group)),
-        pages,
+        readsPages,
       );
       return Stream.concat(
         Stream.concat(opening, backlog),

@@ -129,25 +129,27 @@ test('a client at sync ID 0 gets the snapshot of its groups, then an empty delta
       yield* log.commit('org-a', 't-y', () => Effect.succeed([upsert('y', ['space:y'])]));
       const requests = yield* Queue.unbounded<LoadRequest>();
       return yield* open(log, { loaded: ['org:a'] }, requests).pipe(
-        Stream.take(3),
+        Stream.take(4),
         Stream.runCollect,
         Effect.timeout('2 seconds'),
       );
     }),
   );
   expect(messages).toEqual([
+    // The first message names the actor of the connection, before any page.
+    // It loads no group yet: a group loads with its last page.
+    {
+      _tag: 'Groups',
+      loaded: [],
+      backfill: [],
+      actor: { userId: 'u', organizationId: 'org-a' },
+    },
     {
       _tag: 'Page',
       group: 'org:a',
       backfill: [{ syncId: 2, transactionId: null, changes: [upsert('a', ['org:a'], 'a2')] }],
     },
-    // The first `Groups` message names the actor of the connection.
-    {
-      _tag: 'Groups',
-      loaded: ['org:a'],
-      backfill: [],
-      actor: { userId: 'u', organizationId: 'org-a' },
-    },
+    { _tag: 'Groups', loaded: ['org:a'], backfill: [] },
     // The head is 3, so the next pull of the client starts after the event of space y.
     { _tag: 'Deltas', deltas: [{ syncId: 3, transactionId: null, changes: [] }] },
   ]);

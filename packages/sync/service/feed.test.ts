@@ -378,8 +378,9 @@ test('a group whose records the client lacks comes as the backfill of the first 
   ]);
 });
 
-test('a client that reads pages gets those records in pages before the first Groups message', async () => {
-  expect(summary(await fillOpen(true, 5))).toEqual([
+test('a client that reads pages gets those records in pages, after a Groups message that names the actor', async () => {
+  expect(summary(await fillOpen(true, 6))).toEqual([
+    'groups org:a backfill ',
     'page space:y backfill a',
     'page space:y backfill b',
     'page space:y backfill c',
