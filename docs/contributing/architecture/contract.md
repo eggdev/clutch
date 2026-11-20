@@ -373,8 +373,13 @@ The sync server gives the built-in codes. `invalid-input` means the input does
 not match its fields. `not-found` means the `group` function found no record.
 `forbidden` means the actor may not use the group, or lacks the permission.
 `failed` means the server half raised an error twice while the database
-answered. A write that met a database that did not answer gets no outcome, so
-it stays queued. `packages/sync/service/settle.test.ts` holds both cases.
+answered. A failure of the database that passes runs the server half up to 5
+more times first, with a wait that grows from 20 ms: a serialization failure
+(`40001`), a deadlock (`40P01`), a lock that is not free (`55P03`), or a
+connection that dropped. Only then is it `failed`. A write that met a database
+that did not answer gets no outcome, so it stays queued.
+`packages/sync/service/settle.test.ts` holds these cases. See
+[the event log](./server.md#the-event-log).
 
 ## Manifest and digest
 

@@ -120,7 +120,9 @@ the same, so loading the local database needs no decode.
    its first `Groups` message, the wait starts again from 200 ms.
 4. The server checks the input against its fields, then the access rule. Then
    it runs the server change. In one database transaction, it writes the owner
-   records and appends one event to the log.
+   records and appends one event to the log. A deadlock or another failure of
+   the database that passes runs the change again, up to 5 times. See
+   [the event log](./server.md#the-event-log).
 5. Appending an event locks the organization's row in `sync_counters`, so sync
    IDs only increase and have no gaps.
 6. The same transaction wakes each other process of the server, so the wake
