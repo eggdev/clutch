@@ -4,6 +4,7 @@ import type { RecordDeclaration } from '@repo/sync/contract/record';
 import { appendEvent, eventsAfter, findTransaction, headOf } from '@repo/sync/repo/events';
 import { liveRecords } from '@repo/sync/repo/records';
 import type { RecordCursor } from '@repo/sync/repo/records';
+import { oldestOf } from '@repo/sync/repo/trim';
 import { Database } from '@repo/sync/service/database';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import { seenDelta } from '@repo/sync/service/visible';
@@ -42,6 +43,8 @@ export class EventLog extends Context.Service<
   {
     readonly commit: Commit;
     readonly head: (organizationId: string) => Effect.Effect<number, unknown>;
+    /** The oldest sync ID that the log still holds, or 0 when it holds none. A trim moves it up. */
+    readonly oldest: (organizationId: string) => Effect.Effect<number, unknown>;
     /** The events after a sync ID that touch the groups, in pages, as a client of the groups sees them. */
     readonly backlog: (
       organizationId: string,
@@ -183,6 +186,7 @@ export function eventLog(
       return {
         commit,
         head: (organizationId: string) => headOf(db, organizationId),
+        oldest: (organizationId: string) => oldestOf(db, organizationId),
         // The events after `after` that touch `groups`, a page at a time. A
         // page that is not full is the last.
         backlog: (organizationId, after, groups) =>

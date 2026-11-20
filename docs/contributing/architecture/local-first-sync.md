@@ -74,8 +74,11 @@ ends right: the pool keeps the change with the higher sync ID.
 `packages/sync/service/feed-snapshot.test.ts` holds this.
 
 `Pull` fails with `SessionEnded` when the session ends. It fails with
-`ServerBehind` when the client's last sync ID is above the server's newest
-event. A socket with no session opens and closes at once with code 4401. See
+`ServerBehind` when the server cannot send each event after the client's last
+sync ID. That happens when the last sync ID is above the server's newest
+event, or below the oldest event that the log still holds, minus 1. In the
+second case, the error names that oldest sync ID in `oldest`. A socket with
+no session opens and closes at once with code 4401. See
 [the end of a session](#the-end-of-a-session).
 
 `Pull` also sends the digest of the app's contracts. See
@@ -143,9 +146,31 @@ the same, so loading the local database needs no decode.
   closes with code 4401, and the client clears its local database. See
   [the end of a session](#the-end-of-a-session).
 - After a database restore, the server's log can end before a client's last
-  sync ID. `Pull` then fails with `ServerBehind`. The client drops its
-  confirmed records and sets its last sync ID to 0. It keeps its pending
-  transactions, sends them again, and pulls again from 0.
+  sync ID. After a trim, the log can start after it. `Pull` then fails with
+  `ServerBehind`. The client drops its confirmed records and sets its last
+  sync ID to 0. It keeps its pending transactions, sends them again, and
+  pulls again from 0. `apps/api/src/trimmed-log.test.ts` holds this.
+- The server decides when a client must load again. A saved copy has no age
+  limit on the client. A copy older than the kept log gets `ServerBehind`.
+
+## The size of the log
+
+The log keeps every event by default. How long to keep them is the owner's
+decision. Set `SYNC_LOG_KEEP_DAYS` to a whole number of days, and the hourly
+job `sync/trim-log` trims the log of each organization:
+
+- It deletes each event up to the newest one older than that many days. So the
+  log keeps one run of sync IDs with no gap.
+- It keeps the newest event of each organization, so the head stays right.
+- It deletes each record of `sync_records` that is marked deleted, and whose
+  delete is older than the oldest event kept.
+
+With `SYNC_LOG_KEEP_DAYS` set to D, an organization that writes W events a day
+keeps about D × W events, and at least one. A load reads `sync_records`, so a
+trim never changes what a new client gets. A client that was away for longer
+than D days loads again from 0. The `Pull` checks the oldest event again after
+the backlog. So a trim that runs during a `Pull` cannot drop an event that the
+client did not get.
 
 ## The end of a session
 

@@ -64,6 +64,12 @@ it. A saved pool state without `groups` and `meta` loads as an empty pool.
 A saved position without `actor` keeps its copy, and takes the actor that the
 server names first.
 
+`sync_events` grows with each write. Its retention rule is
+`SYNC_LOG_KEEP_DAYS`, which has no value in the template, so the log keeps
+every event. With a value, the hourly `sync/trim-log` job deletes the older
+events and the deleted records of `sync_records` that they leave behind. See
+[the size of the log](./local-first-sync.md#the-size-of-the-log).
+
 <!-- kickoff: Each other frozen contract: each key format, object name and stored JSON shape, with the file that defines it. -->
 
 ## What to read when changing it

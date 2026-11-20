@@ -163,7 +163,8 @@ export function SyncServer<R>(
             return outcomes;
           }),
         // After a database restore, the log can end before the client's last
-        // sync ID. The client then loads again from 0.
+        // sync ID. After a trim, it can start after it. The client then loads
+        // again from 0.
         Pull: ({ lastSyncId, groups, contract, pages }, { client, headers }) =>
           Stream.unwrap(
             Effect.gen(function* () {
@@ -198,7 +199,15 @@ export function SyncServer<R>(
                 pages: pages ?? false,
                 granted,
                 requests: queue,
-              }).pipe(Stream.orDie, Stream.ensuring(Effect.sync(() => requests.delete(client.id))));
+              }).pipe(
+                // `ServerBehind` reaches the client. Any other failure is a defect.
+                Stream.catchIf(
+                  (error): error is ServerBehind => error instanceof ServerBehind,
+                  (behind) => Stream.fail(behind),
+                  (other) => Stream.die(other),
+                ),
+                Stream.ensuring(Effect.sync(() => requests.delete(client.id))),
+              );
             }),
           ),
         Load: ({ group, pages }, { client, headers }) =>

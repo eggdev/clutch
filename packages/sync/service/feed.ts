@@ -3,6 +3,7 @@ import type { EventLog } from '@repo/sync/service/event-log';
 import type { Granted } from '@repo/sync/service/sync-groups';
 import { seenDelta } from '@repo/sync/service/visible';
 import type { Delta, SyncMessage } from '@repo/sync/types/protocol';
+import { ServerBehind } from '@repo/sync/types/server-behind';
 import { Effect, Stream } from 'effect';
 import type { Context, Queue } from 'effect';
 
@@ -43,7 +44,8 @@ type Input =
  * reads pages, else in one `Groups` message. A snapshot holds the last change
  * of each live record, so its cost follows the records, not their history.
  * The messages of one input go out before the next input runs, so no other
- * message comes between two pages. A change in the user's own
+ * message comes between two pages. A client whose last sync ID is older than
+ * the log, after a trim, gets `ServerBehind`, and loads again from 0. A change in the user's own
  * group, such as a membership, makes it ask access again; each group the
  * actor lost leaves the loaded set, and the client deletes its records.
  */
@@ -198,13 +200,28 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
           live,
         );
       }
+      // The log must still hold each event after the last sync ID. A trim
+      // drops the oldest events, so a client behind the log loads again.
+      const keptSince = Effect.gen(function* () {
+        const oldest = yield* log.oldest(organizationId);
+        return connection.lastSyncId < oldest - 1
+          ? yield* new ServerBehind({ head: watermark, oldest })
+          : undefined;
+      });
+      yield* keptSince;
       // The first `Groups` message holds the snapshot of each group to fill.
-      // The backlog sends the events after the last sync ID.
+      // The backlog sends the events after the last sync ID. A trim that ran
+      // while the backlog was read can have dropped some of them, so the log
+      // is checked again after it. A trim drops a run of sync IDs from the
+      // first, so when the oldest is still in reach, no event was missed.
       const opening = snapshotMessages(
         (connection.fill ?? []).filter((group) => loaded.has(group)),
         pages,
       );
-      return Stream.concat(Stream.concat(opening, backlog), live);
+      return Stream.concat(
+        Stream.concat(opening, backlog),
+        Stream.concat(Stream.fromEffect(keptSince).pipe(Stream.drain), live),
+      );
     }),
   );
 }
