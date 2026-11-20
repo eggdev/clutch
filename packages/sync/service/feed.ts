@@ -64,7 +64,9 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
         named = true;
         return { _tag: 'Groups', loaded: [...loaded], backfill, ...actor };
       };
-      // Subscribe before the backlog, so no event falls between the two.
+      // Subscribe before the backlog, so no event falls between the two. The
+      // subscription sends each event after the start of the reader, and the
+      // head read next is at or after that start.
       const subscription = yield* log.subscribe(organizationId);
       const loaded = new Set(connection.loaded);
       // Every event up to the head is in the backlog, the snapshot, or in no

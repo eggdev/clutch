@@ -107,7 +107,9 @@ the same, so loading the local database needs no decode.
    goes out only when the commit holds. After the commit, the server wakes its
    own process too. In each process, one reader for each organization reads the
    new events from the log, in sync ID order. It hands them to every open `Pull`
-   of the organization in that process. Each `Pull` sends only the changes of its loaded groups, and a
+   of the organization in that process. A `Pull` follows the reader only once
+   the reader knows where it starts. So the backlog of the `Pull` and the live
+   events leave no event out. Each `Pull` sends only the changes of its loaded groups, and a
    delete of each record that left them. The sender gets its delta too.
 7. The client applies the delta to its confirmed records, then applies each
    pending local change again on top. This is the rebase.

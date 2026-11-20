@@ -1,7 +1,7 @@
 import { eventsSince, headOf } from '@repo/sync/repo/events';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import type { Delta } from '@repo/sync/types/protocol';
-import { Effect, PubSub, Queue, Schedule } from 'effect';
+import { Deferred, Effect, PubSub, Queue, Schedule } from 'effect';
 import type { Scope } from 'effect';
 
 /** The live deltas of one organization in this process, the wakes that make it read, and its connections. */
@@ -13,6 +13,8 @@ type Reader = {
   heard: boolean;
   /** The read that runs now came from the timer alone, with no wake before it. */
   timed: boolean;
+  /** The head of the log when the reader started. It publishes each event after it. */
+  readonly start: Deferred.Deferred<number, unknown>;
 };
 
 /**
@@ -94,16 +96,24 @@ export function liveDeltas(db: DrizzleDatabase, pageSize: number) {
           followers: 0,
           heard: false,
           timed: false,
+          start: yield* Deferred.make<number, unknown>(),
         };
+        // The reader is in `readers` before it reads the head, so a commit
+        // after that read wakes it. A connection gets it only once the head
+        // is known; see `subscribe`. The head is read in a fiber of the
+        // reader's scope, so a first connection that stops cannot leave a
+        // reader that never starts. When the head cannot be read, the reader
+        // goes, each waiting connection fails, and the next one tries again.
         readers.set(organizationId, reader);
-        // Every event up to the head was committed before the first
-        // subscriber: its connection reads it from the log. A commit after it
-        // wakes the reader, because the reader is in `readers` already.
-        // When the head cannot be read, the reader goes, and the next connection tries again.
-        const head = yield* headOf(db, organizationId).pipe(
-          Effect.tapError(() => Effect.sync(() => readers.delete(organizationId))),
+        const head = headOf(db, organizationId).pipe(
+          Effect.tapCause((cause) =>
+            Effect.andThen(
+              Effect.sync(() => readers.delete(organizationId)),
+              Deferred.failCause(reader.start, cause),
+            ),
+          ),
         );
-        const mark = { last: head };
+        const mark = { last: 0 };
         const read = readFrom(db, pageSize, organizationId, reader, mark).pipe(
           Effect.tapCause((cause) =>
             Effect.logWarning('A live reader could not read the log', cause),
@@ -115,22 +125,38 @@ export function liveDeltas(db: DrizzleDatabase, pageSize: number) {
           reader.timed = !reader.heard;
           reader.heard = false;
         });
-        yield* Queue.take(reader.wakes).pipe(
-          Effect.andThen(begin),
-          Effect.andThen(read),
-          Effect.forever,
+        yield* head.pipe(
+          Effect.tap((last) => {
+            mark.last = last;
+            return Deferred.succeed(reader.start, last);
+          }),
+          Effect.andThen(
+            Queue.take(reader.wakes).pipe(
+              Effect.andThen(begin),
+              Effect.andThen(read),
+              Effect.forever,
+            ),
+          ),
+          Effect.ignore,
           Effect.forkIn(scope),
         );
         return reader;
       });
 
     return {
-      /** Every new event of the organization, from now on, in sync ID order. */
+      /**
+       * Every event of the organization after the start of its reader, in
+       * sync ID order. It returns once the reader knows its start, so each
+       * event up to that start is in the log before the caller reads it: a
+       * head that the caller reads next is at or after the start, and its
+       * backlog and this stream leave no event out.
+       */
       subscribe: (
         organizationId: string,
       ): Effect.Effect<PubSub.Subscription<Delta>, unknown, Scope.Scope> =>
         Effect.gen(function* () {
           const reader = yield* readerOf(organizationId);
+          yield* Deferred.await(reader.start);
           reader.followers += 1;
           yield* Effect.addFinalizer(() => Effect.sync(() => (reader.followers -= 1)));
           return yield* PubSub.subscribe(reader.hub);
