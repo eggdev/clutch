@@ -58,6 +58,17 @@ The protocol has three calls over one WebSocket for each organization, through
   that have no page to come. The `Page` messages follow, and a last `Groups`
   message loads the group. So the client drops a copy of another actor
   before the first page.
+  After the backlog, the `Pull` sends one delta with no changes at the head
+  of the log, unless the last delta of the backlog was there already. Each
+  event between is in no loaded group. So a transaction that the server
+  accepted while no `Pull` of the client was open, such as when the socket
+  dropped right after a `Push`, stops waiting at the next `Pull`, also in a
+  quiet organization. A `Pull` at the head sends nothing more. The delta
+  goes only after the server checked that a trim did not drop an event of
+  the backlog, so a client behind the trimmed log still gets
+  `ServerBehind`. `packages/sync/service/feed-position.test.ts`,
+  `packages/sync/service/feed-trim.test.ts` and
+  `apps/api/src/sender-position.test.ts` hold this.
 - A client at sync ID 0 holds at most part of a first load. Its `Pull` sends the snapshot of each
   loaded group in place of the deltas. With `pages`, a `Groups` message with
   the actor and no group comes before the first page. A group loads only with
@@ -123,7 +134,9 @@ the same, so loading the local database needs no decode.
    the event holds nothing that the sender sees, the sender's `Pull` gets a
    delta with no changes at its sync ID. That delta goes out after each event
    before it. So the sender's last sync ID passes its transaction, and the
-   transaction stops waiting. `apps/api/src/sender-position.test.ts` holds this.
+   transaction stops waiting. When the socket drops before that delta, the
+   next `Pull` ends its backlog with a delta at the head of the log, which
+   passes the transaction too. `apps/api/src/sender-position.test.ts` holds this.
 7. The client applies the delta to its confirmed records, then applies each
    pending local change again on top. This is the rebase. The pending changes
    write over the confirmed records and never into them. Then the pool

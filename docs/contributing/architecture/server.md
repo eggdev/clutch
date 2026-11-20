@@ -131,7 +131,7 @@ A commit first looks for its transaction ID, so a transaction that a client send
 
 `Push` refuses a list of more than `transactionsPerPush` (100) transactions before it runs any of them. The client sends at most that many, so only a broken or hostile client meets the refusal. `apps/api/src/push-limit.test.ts` holds this.
 
-The sync server keeps a queue of accepted sync IDs for the open `Pull` of each RPC client. After a `Push`, each accepted transaction goes into the queue of the same client. The feed of that `Pull` then sends an empty delta at that sync ID, once it sent each event before it. Only the sender gets it.
+The sync server keeps a queue of accepted sync IDs for the open `Pull` of each RPC client. After a `Push`, each accepted transaction goes into the queue of the same client. The feed of that `Pull` then sends an empty delta at that sync ID, once it sent each event before it. Only the sender gets it. Each `Pull` past sync ID 0 also ends its backlog with an empty delta at the head of the log, after the check for a trim, unless the client is there already. So a transaction accepted while no `Pull` of its client was open stops waiting at the next `Pull`.
 
 A load reads the snapshot of a group from `sync_records`, not the history of the log. The snapshot holds the last change of each live record, in pages by the record key. See [the protocol](./local-first-sync.md).
 
