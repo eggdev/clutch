@@ -1,4 +1,4 @@
-import { oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import { leftBehind, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase, LocalSave } from '@repo/sync/types/local-database';
 import { openDB } from 'idb';
 import type { IDBPTransaction } from 'idb';
@@ -7,7 +7,11 @@ import type { IDBPTransaction } from 'idb';
 const records = 'records';
 /** One row for each waiting transaction, in the order the tabs added them. */
 const transactions = 'transactions';
-/** One row, under the key `position`: the last sync ID, the loaded groups, `leftOutBy` and the actor. */
+/**
+ * One row, under the key `position`: the last sync ID, the loaded groups,
+ * `leftOutBy` and the actor. A clear leaves the mark of a session end in
+ * the same store, under the key `ended`.
+ */
 const position = 'position';
 /** The store of the old layout, which held the whole state under the key `state`. */
 const oldStore = 'pool';
@@ -43,9 +47,18 @@ async function write(tx: Writable, save: LocalSave): Promise<void> {
     }
   }
   for (const transaction of save.add) {
-    // A transaction that is saved already keeps its place in the order.
-    if ((await waiting.index('id').getKey(transaction.id)) === undefined) {
-      requests.push(waiting.add(transaction));
+    // A transaction that is saved already keeps its place in the order, and takes the new row.
+    const key = await waiting.index('id').getKey(transaction.id);
+    requests.push(key === undefined ? waiting.add(transaction) : waiting.put(transaction, key));
+  }
+  // The first save that names the actor of the next session removes the mark,
+  // and each other waiting row with no actor, which may be the work of the person who left.
+  if (confirmed?.position.actor && (await tx.objectStore(position).get('ended')) !== undefined) {
+    requests.push(tx.objectStore(position).delete('ended'));
+    for (let cursor = await waiting.openCursor(); cursor; cursor = await cursor.continue()) {
+      if (leftBehind(cursor.value, save)) {
+        requests.push(cursor.delete());
+      }
     }
   }
   await Promise.all(requests);
@@ -142,13 +155,14 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
   return {
     read: async () => {
       const tx = database.transaction(stores, 'readonly');
-      const [rows, waiting, saved] = await Promise.all([
+      const [rows, waiting, saved, ended] = await Promise.all([
         tx.objectStore(records).getAll(),
         tx.objectStore(transactions).getAll(),
         tx.objectStore(position).get('position'),
+        tx.objectStore(position).get('ended'),
         tx.done,
       ]);
-      return stateOf(rows, saved, waiting);
+      return stateOf(rows, saved, waiting, ended !== undefined);
     },
     save: async (save) => {
       const tx = database.transaction(stores, 'readwrite');
@@ -164,7 +178,11 @@ export async function openIndexedDb(name: string): Promise<LocalDatabase> {
         Reflect.apply(BroadcastChannel.prototype.postMessage, tabs, ['cleared']);
       }
       const tx = database.transaction(stores, 'readwrite');
-      await Promise.all([...stores.map((store) => tx.objectStore(store).clear()), tx.done]);
+      await Promise.all([
+        ...stores.map((store) => tx.objectStore(store).clear()),
+        tx.objectStore(position).put(true, 'ended'),
+        tx.done,
+      ]);
     },
     onClearedElsewhere(listener) {
       const heard = () => listener();

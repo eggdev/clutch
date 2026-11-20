@@ -182,10 +182,12 @@ export function createPool(
 
   /**
    * Drops each waiting transaction of another actor, and reports it once. A
-   * transaction with no actor takes this one. It returns whether it dropped one.
+   * transaction with no actor takes this one, or with `untagged: 'drop'`, as
+   * after a session end, goes too. It returns whether it dropped one.
    */
-  function keepRowsOf(actor: SyncActor): boolean {
-    const kept = keepActor(pending, actor);
+  function keepRowsOf(actor: SyncActor | undefined, untagged: 'adopt' | 'drop' = 'adopt'): boolean {
+    const named = untagged === 'drop' ? pending.filter((entry) => entry.actor) : pending;
+    const kept = actor ? keepActor(named, actor) : named;
     const dropped = kept.length < pending.length;
     pending = kept;
     if (dropped) {
@@ -261,10 +263,8 @@ export function createPool(
           pending.push({ transaction, actor, sent: false, acceptedAt: null });
         }
       }
-      const owner = confirmed.actor();
-      if (owner) {
-        keepRowsOf(owner);
-      }
+      // After a session end, a row with no actor may be the work of the person who left.
+      keepRowsOf(confirmed.actor(), state.ended ? 'drop' : 'adopt');
       recompute();
     },
     snapshot: () => ({

@@ -121,3 +121,69 @@ test('a session end in one tab stops the engine and the saves of each other tab,
   expect(heard).toEqual(['end', 'disconnect', 'start again']);
   expect(await memory.read()).toBeUndefined();
 });
+
+const ana = { userId: 'ana', organizationId: 'acme' };
+const ben = { userId: 'ben', organizationId: 'acme' };
+
+/**
+ * The order of the sign-out race. Tab A ends Ana's session and clears the
+ * database. Tab B heard nothing and saves a row of Ana with `row`: before
+ * the next start of tab A reads the database, or after it. Ben signs in on
+ * tab A, and runs his own command. It returns what the start after that
+ * sends, and each sentence that the pools reported.
+ */
+async function raceAfterSessionEnd(
+  row: (tab: LocalDatabase) => Promise<void>,
+  when: 'before the next start' | 'after the next start',
+) {
+  const lines: Array<string> = [];
+  const memory = memoryLocalDatabase({ ...saved(), actor: ana });
+  const start = () =>
+    loadPool(memory, [renameLocal], [cards], undefined, (line) => lines.push(line));
+  const here = await start();
+  await settle();
+  await endSession(memory, here, () => {
+    // The engine of this test never started.
+  });
+  const tab = memory.tab(Promise.withResolvers().promise);
+  if (when === 'before the next start') {
+    await row(tab);
+  }
+  const next = await start();
+  if (when === 'after the next start') {
+    await row(tab);
+  }
+  expect(next.confirmActor(ben)).toBe(true);
+  next.run(rename, { id: 'a', title: "Ben's" });
+  await settle();
+  await next.stop();
+  const restart = await start();
+  expect(restart.confirmActor(ben)).toBe(true);
+  return { sent: restart.unsent().map(({ input }) => input), lines };
+}
+
+const anasRow = (tab: LocalDatabase) =>
+  tab.save({
+    add: [{ id: 'anas', command: 'cards/rename', input: { id: 'a', title: "Ana's" }, actor: ana }],
+    done: [],
+  });
+const untaggedRow = (tab: LocalDatabase) =>
+  tab.save({
+    add: [{ id: 'old', command: 'cards/rename', input: { id: 'a', title: "Ana's" } }],
+    done: [],
+  });
+const otherActor =
+  'This device held unsent changes of another account, so the app removed them and did not send them.';
+
+for (const when of ['before the next start', 'after the next start'] as const) {
+  test(`after a session end, a row of the old actor that another tab saves ${when} is never sent as the next one`, async () => {
+    const { sent, lines } = await raceAfterSessionEnd(anasRow, when);
+    expect(sent).toEqual([{ id: 'a', title: "Ben's" }]);
+    expect(lines).toEqual([otherActor]);
+  });
+
+  test(`after a session end, a row with no actor that another tab saves ${when} is never sent as the next one`, async () => {
+    const { sent } = await raceAfterSessionEnd(untaggedRow, when);
+    expect(sent).toEqual([{ id: 'a', title: "Ben's" }]);
+  });
+}

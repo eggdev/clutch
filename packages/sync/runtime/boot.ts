@@ -19,19 +19,24 @@ function withoutLocalChange(
     .map((declared) => declared.name);
 }
 
+/** The actor of a waiting row as one string, empty for a row with no actor. */
+const actorOf = ({ actor }: WaitingRow) =>
+  actor ? `${actor.userId}\u0000${actor.organizationId}` : '';
+
 /**
  * The waiting transactions to add and to delete: each one in the queue that
- * the database does not hold for this tab, and each one that this tab holds
- * and that left its queue.
+ * the database does not hold for this tab, or holds with another actor, such
+ * as a row that took the confirmed actor, and each one that this tab holds
+ * and that left its queue. `held` maps each row of this tab to its actor.
  */
 function queueChanges(
   queue: ReadonlyArray<WaitingRow>,
-  held: ReadonlySet<string>,
+  held: ReadonlyMap<string, string>,
 ): { readonly add: ReadonlyArray<WaitingRow>; readonly done: ReadonlyArray<string> } {
   const queued = new Set(queue.map(({ id }) => id));
   return {
-    add: queue.filter(({ id }) => !held.has(id)),
-    done: [...held].filter((id) => !queued.has(id)),
+    add: queue.filter((row) => held.get(row.id) !== actorOf(row)),
+    done: [...held.keys()].filter((id) => !queued.has(id)),
   };
 }
 
@@ -96,7 +101,7 @@ export async function loadPool(
   }
   // The waiting transactions of this tab in the database: each one that it
   // loaded, and each one that it added since. A tab deletes only these.
-  let held = new Set(state?.pending.map(({ id }) => id));
+  let held = new Map(state?.pending.map((row) => [row.id, actorOf(row)]));
   // One save at a time, and always the newest state. A save that fails, such
   // as on a full device, is reported once, and the next change to the pool
   // saves again, with every record.
@@ -124,7 +129,10 @@ export async function loadPool(
         }
         try {
           await database.save(writer ? { confirmed, add, done } : { add, done });
-          held = new Set([...held, ...add.map(({ id }) => id)].filter((id) => !done.includes(id)));
+          held = new Map([...held, ...add.map((row): [string, string] => [row.id, actorOf(row)])]);
+          for (const id of done) {
+            held.delete(id);
+          }
           failing = false;
         } catch {
           everything = true;

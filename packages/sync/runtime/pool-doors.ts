@@ -205,13 +205,25 @@ function isTransaction(value: unknown): value is WaitingRow {
   );
 }
 
+/**
+ * Whether a saved waiting row is left behind by the save that removes the
+ * mark of a session end: it names no actor, and the save does not add it. A
+ * tab that saves the actor of the next session gave its own rows that actor.
+ */
+export function leftBehind(row: unknown, save: LocalSave): boolean {
+  return (
+    isObject(row) && row['actor'] === undefined && !save.add.some(({ id }) => id === row['id'])
+  );
+}
+
 /** The one sentence that the pool reports when it drops the waiting rows of another actor. */
 export const otherActorRows =
   'This device held unsent changes of another account, so the app removed them and did not send them.';
 
 /**
  * Joins the rows of one read into the state that the pool loads. A device
- * with no row reads as `undefined`. A record row or a position row with
+ * with no row, or with only the mark of a session end, reads as `undefined`.
+ * `ended` says that the mark is there. A record row or a position row with
  * another shape makes the confirmed part unreadable, so the read keeps no
  * record and no position, and the pool reports it and loads again from the
  * server. A waiting transaction with another shape is left out.
@@ -220,13 +232,15 @@ export function stateOf(
   records: ReadonlyArray<unknown>,
   position: unknown,
   transactions: ReadonlyArray<unknown>,
+  ended = false,
 ): PoolState | undefined {
   if (records.length === 0 && position === undefined && transactions.length === 0) {
     return undefined;
   }
   const pending = transactions.filter(isTransaction);
+  const mark: { readonly ended?: true } = ended ? { ended: true } : {};
   if (!records.every(isSavedRecord) || (position !== undefined && !isPosition(position))) {
-    return { lastSyncId: 0, tables: {}, groups: [], meta: {}, pending, unreadable: true };
+    return { lastSyncId: 0, tables: {}, groups: [], meta: {}, pending, unreadable: true, ...mark };
   }
   const tables: Record<string, Array<RecordRow>> = {};
   const meta: Record<string, RecordMeta> = {};
@@ -247,6 +261,7 @@ export function stateOf(
     pending,
     ...(saved.leftOutBy === undefined ? {} : { leftOutBy: saved.leftOutBy }),
     ...(saved.actor === undefined ? {} : { actor: saved.actor }),
+    ...mark,
   };
 }
 

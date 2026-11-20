@@ -43,6 +43,12 @@ export type PoolState = {
    */
   readonly actor?: SyncActor;
   /**
+   * A session ended on this device, and no save has named the actor of the
+   * next session yet. The pool drops each waiting row with no actor, because
+   * it may be the work of the person who left.
+   */
+  readonly ended?: true;
+  /**
    * The read found a record row or a position row with another shape, so it
    * kept no record and no position. The pool reports it and loads again.
    */
@@ -83,7 +89,8 @@ export type ConfirmedSave = {
 /**
  * One save, which the adapter writes in one database transaction. `add`
  * holds the waiting transactions that this tab ran since its last save, and
- * `done` the IDs of the ones that left its queue. Only the tab that writes
+ * the ones whose actor changed. A row that is saved already keeps its place
+ * and takes the new value. `done` holds the IDs of the ones that left its queue. Only the tab that writes
  * the confirmed records sends `confirmed`.
  */
 export type LocalSave = {
@@ -111,8 +118,12 @@ export type LocalDatabase = {
   readonly read: () => Promise<PoolState | undefined>;
   readonly save: (save: LocalSave) => Promise<void>;
   /**
-   * Removes every row. A session end calls it. It first tells each other tab
-   * of this database on the device, which then stops its engine and its saves.
+   * Removes every row, and leaves the mark of a session end in the same
+   * database transaction. A read reads the mark as `ended` while any other
+   * row is there. The first save whose position names an actor removes the
+   * mark and each waiting row with no actor. A session end calls it. It
+   * first tells each other tab of this database on the device, which then
+   * stops its engine and its saves.
    */
   readonly clear: () => Promise<void>;
   /**

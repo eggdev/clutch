@@ -1,4 +1,4 @@
-import { fullSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import { fullSave, leftBehind, stateOf } from '@repo/sync/runtime/pool-doors';
 import { recordKey } from '@repo/sync/runtime/tables';
 import type {
   LocalDatabase,
@@ -33,6 +33,8 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
   const records = new Map<string, SavedRecord>();
   let transactions: Array<WaitingRow> = [];
   let position: SyncPosition | undefined;
+  // The mark of a session end, which a clear leaves.
+  let ended = false;
   const log: Array<LocalSave> = [];
   // The clear listeners of each handle, as a `BroadcastChannel` of each tab.
   const handles = new Set<Set<() => void>>();
@@ -53,9 +55,16 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
     }
     transactions = transactions.filter(({ id }) => !save.done.includes(id));
     for (const transaction of save.add) {
-      if (!transactions.some(({ id }) => id === transaction.id)) {
-        transactions.push(structuredClone(transaction));
-      }
+      const at = transactions.findIndex(({ id }) => id === transaction.id);
+      transactions.splice(
+        at === -1 ? transactions.length : at,
+        at === -1 ? 0 : 1,
+        structuredClone(transaction),
+      );
+    }
+    if (ended && confirmed?.position.actor) {
+      ended = false;
+      transactions = transactions.filter((row) => !leftBehind(row, save));
     }
   }
 
@@ -66,6 +75,7 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
 
   if (initial) {
     apply(fullSave(initial));
+    ended = initial.ended === true;
   }
 
   function handle(writer: Promise<unknown>, held: boolean): MemoryLocalDatabase {
@@ -74,7 +84,8 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
     const heard = new Set<() => void>();
     handles.add(heard);
     return {
-      read: () => Promise.resolve(structuredClone(stateOf(inKeyOrder(), position, transactions))),
+      read: () =>
+        Promise.resolve(structuredClone(stateOf(inKeyOrder(), position, transactions, ended))),
       save: (save) => {
         apply(save);
         log.push(structuredClone(save));
@@ -91,6 +102,7 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
         records.clear();
         transactions = [];
         position = undefined;
+        ended = true;
         return Promise.resolve();
       },
       onClearedElsewhere(listener) {
