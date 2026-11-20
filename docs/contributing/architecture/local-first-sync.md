@@ -112,7 +112,10 @@ the same, so loading the local database needs no decode.
    each stamp, then runs the local change at once.
 2. The transaction goes to the transaction queue. The pool saves the row of
    the transaction to the local database. See
-   [the local database](./client.md#local-database).
+   [the local database](./client.md#local-database). A device that cannot
+   save gives up its copy of the confirmed records first, and keeps the
+   waiting transactions. See
+   [a device that cannot save](./client.md#a-device-that-cannot-save).
 3. The transport sends the unsent transactions with `Push`. A failed push or
    pull tries again after 200 ms, then twice as long each time, up to 3
    seconds. Each wait moves by a random part of up to a fifth. So the clients

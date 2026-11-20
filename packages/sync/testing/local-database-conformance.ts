@@ -1,4 +1,5 @@
 import { fullSave } from '@repo/sync/runtime/pool-doors';
+import { roomCases } from '@repo/sync/testing/local-database-room-cases';
 import {
   expectSame,
   readState,
@@ -225,4 +226,8 @@ const rowCases: ReadonlyArray<LocalDatabaseCase> = [
 ];
 
 /** The cases that every local database adapter must pass, in the order they run. */
-export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [...rowCases, ...sessionCases];
+export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
+  ...rowCases,
+  ...sessionCases,
+  ...roomCases,
+];

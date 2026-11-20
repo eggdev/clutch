@@ -1,26 +1,18 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 
-import { chromium } from '@playwright/test';
-import type { Browser } from '@playwright/test';
+import { startBundle } from '@repo/sync/testing/browser-bundle';
+import type { BrowserBundle } from '@repo/sync/testing/browser-bundle';
 
 /**
  * The IndexedDB adapter, run against every local database case in a real
- * Chromium, since IndexedDB exists only in a browser. It needs the Chromium of
- * `playwright install`, so it runs in the `journeys` CI job, not in validate.
- * Run it with `mise exec -- bun test ./packages/sync/runtime/indexed-db.browser.test.ts`.
+ * Chromium. `indexed-db-loss.browser.test.ts` holds a database that a tab
+ * loses or makes again. Run it with
+ * `mise exec -- bun test ./packages/sync/runtime/indexed-db.browser.test.ts`.
  */
 
-const root = path.join(import.meta.dir, '..', '..', '..');
 const entrySource = `
 import { openDB } from 'idb';
-import { localChange } from '@repo/sync/contract/command';
-import { defineContract } from '@repo/sync/contract/define';
-import { followLostDatabase, loadPool } from '@repo/sync/runtime/boot';
-import type { SavedPool } from '@repo/sync/runtime/boot';
 import { openIndexedDb } from '@repo/sync/runtime/indexed-db';
-import { testCommand, testModel } from '@repo/sync/testing/pool-state';
 import {
   expectOldLayoutMoved,
   localDatabaseCases,
@@ -110,58 +102,9 @@ async function runNoGeneration(): Promise<Array<string>> {
   return [await first.save({ add: [], done: [] }), await second.save({ add: [], done: [] })];
 }
 
-const card = testModel('Card', { id: 'string', title: 'string' });
-const rename = testCommand('cards/rename', { id: 'string', title: 'string' }, 'local');
-const renameLocal = localChange(rename, (draft, input) => {
-  draft.put(card, input);
-});
-const cards = defineContract('cards', { records: [card], commands: [rename], loads: [] });
-
-let restarted: SavedPool | undefined;
-let disconnects = 0;
-
-/**
- * Starts the app on the database of the upgrade test, as the composition root
- * does, and runs one command. A start again opens the database at version 3,
- * as the page of the newer build does. It resolves when the command is saved.
- */
-async function startBeforeUpgrade(): Promise<void> {
-  const database = await openIndexedDb('upgrade');
-  const pool = await loadPool(database, [renameLocal], [cards]);
-  followLostDatabase(
-    database,
-    pool,
-    () => {
-      disconnects += 1;
-    },
-    async () => {
-      restarted = await loadPool(await openIndexedDb('upgrade', 3), [renameLocal], [cards]);
-    },
-  );
-  pool.run(rename, { id: 'a', title: 'Before the upgrade' });
-  for (let saved = await database.read(); !saved?.pending.length; saved = await database.read()) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-}
-
-/** Opens the database of the upgrade test at version 3, as a tab of a newer build does. */
-async function upgrade(): Promise<void> {
-  await openIndexedDb('upgrade', 3);
-}
-
-/** What the start after the upgrade sends, once it has started, and how often the engine stopped. */
-function afterUpgrade() {
-  return restarted
-    ? { unsent: restarted.unsent().map(({ input }) => input), disconnects }
-    : undefined;
-}
-
 Object.assign(globalThis, {
   runLocalDatabaseCases: runCases,
   runNoGeneration,
-  startBeforeUpgrade,
-  upgrade,
-  afterUpgrade,
   runOldLayout,
   openForLock,
   waitForWriter,
@@ -174,47 +117,19 @@ Object.assign(globalThis, {
 /** One case of the bundle, with the message of its error or null. */
 type CaseResult = { readonly name: string; readonly error: string | null };
 
-let browser: Browser;
-let folder: string;
-let bundle: string;
+let chromium: BrowserBundle;
 
 beforeAll(async () => {
-  // The entry lives under .data/ so that its @repo/... imports resolve through the repository's tsconfig.
-  await mkdir(path.join(root, '.data'), { recursive: true });
-  folder = await mkdtemp(path.join(root, '.data', 'indexed-db-'));
-  const entry = path.join(folder, 'entry.ts');
-  await writeFile(entry, entrySource);
-  const built = await Bun.build({
-    entrypoints: [entry],
-    target: 'browser',
-    format: 'iife',
-    tsconfig: path.join(root, 'tsconfig.base.json'),
-  });
-  if (!built.success) {
-    throw new Error(built.logs.map((log) => log.message).join('\n'));
-  }
-  const output = built.outputs[0];
-  if (!output) {
-    throw new Error('Bun.build made no output.');
-  }
-  bundle = await output.text();
-  browser = await chromium.launch();
+  chromium = await startBundle(entrySource);
 });
 
 afterAll(async () => {
-  await browser.close();
-  await rm(folder, { recursive: true, force: true });
+  await chromium.close();
 });
 
 test('the IndexedDB adapter passes every local database case in Chromium, and moves a copy of version 1', async () => {
-  const context = await browser.newContext();
-  // IndexedDB needs an origin, so the page is served from one.
-  await context.route('https://app.test/', (route) =>
-    route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }),
-  );
-  const page = await context.newPage();
-  await page.goto('https://app.test/');
-  await page.addScriptTag({ content: bundle });
+  const { context, open } = await chromium.context();
+  const page = await open();
   const results = await page.evaluate<Array<CaseResult>>('globalThis.runLocalDatabaseCases()');
   // A copy of version 1 moves into the stores of version 2.
   const oldLayout = await page.evaluate<string | null>('globalThis.runOldLayout()');
@@ -227,16 +142,7 @@ test('the IndexedDB adapter passes every local database case in Chromium, and mo
 }, 60_000);
 
 test('one tab writes the confirmed records, and the next tab takes over when it closes', async () => {
-  const context = await browser.newContext();
-  await context.route('https://app.test/', (route) =>
-    route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }),
-  );
-  const open = async () => {
-    const page = await context.newPage();
-    await page.goto('https://app.test/');
-    await page.addScriptTag({ content: bundle });
-    return page;
-  };
+  const { context, open } = await chromium.context();
   const first = await open();
   expect(await first.evaluate<boolean>('globalThis.openForLock()')).toBe(true);
   const second = await open();
@@ -248,14 +154,9 @@ test('one tab writes the confirmed records, and the next tab takes over when it 
 }, 60_000);
 
 test('a clear in one tab wakes each other tab of the database, and not its own', async () => {
-  const context = await browser.newContext();
-  await context.route('https://app.test/', (route) =>
-    route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }),
-  );
+  const { context, open: openPage } = await chromium.context();
   const open = async () => {
-    const page = await context.newPage();
-    await page.goto('https://app.test/');
-    await page.addScriptTag({ content: bundle });
+    const page = await openPage();
     await page.evaluate('globalThis.followClears()');
     return page;
   };
@@ -264,29 +165,5 @@ test('a clear in one tab wakes each other tab of the database, and not its own',
   await clearing.evaluate('globalThis.clearTabs()');
   await other.waitForFunction('globalThis.clearsHeard() === 1');
   expect(await clearing.evaluate<number>('globalThis.clearsHeard()')).toBe(0);
-  await context.close();
-}, 60_000);
-
-test('a tab whose database a newer build upgrades starts again, and still sends its waiting command', async () => {
-  const context = await browser.newContext();
-  await context.route('https://app.test/', (route) =>
-    route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }),
-  );
-  const open = async () => {
-    const page = await context.newPage();
-    await page.goto('https://app.test/');
-    await page.addScriptTag({ content: bundle });
-    return page;
-  };
-  const older = await open();
-  await older.evaluate('globalThis.startBeforeUpgrade()');
-  const newer = await open();
-  // The open waits until the older tab lets the database go.
-  await newer.evaluate('globalThis.upgrade()');
-  await older.waitForFunction('globalThis.afterUpgrade() !== undefined');
-  expect(await older.evaluate('globalThis.afterUpgrade()')).toEqual({
-    unsent: [{ id: 'a', title: 'Before the upgrade' }],
-    disconnects: 1,
-  });
   await context.close();
 }, 60_000);

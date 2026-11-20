@@ -1,8 +1,19 @@
-import { leftBehind, markAfter, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import {
+  emptiedPosition,
+  leftBehind,
+  markAfter,
+  oldLayoutSave,
+  stateOf,
+} from '@repo/sync/runtime/pool-doors';
 import type { MarkState } from '@repo/sync/runtime/pool-doors';
-import type { LocalDatabase, LocalSave, SaveResult } from '@repo/sync/types/local-database';
-import { openDB } from 'idb';
-import type { IDBPTransaction } from 'idb';
+import type {
+  LocalDatabase,
+  LocalSave,
+  SaveResult,
+  SyncPosition,
+} from '@repo/sync/types/local-database';
+import { deleteDB, openDB } from 'idb';
+import type { IDBPDatabase, IDBPTransaction, OpenDBCallbacks } from 'idb';
 
 /** One row for each confirmed record, keyed by its model and ID. */
 const records = 'records';
@@ -84,6 +95,71 @@ async function write(tx: Writable, save: LocalSave): Promise<void> {
   await Promise.all(requests);
 }
 
+/**
+ * What a recreate keeps in `localStorage` between the delete of the database
+ * and the write of its new rows: the generation, the emptied position, the
+ * mark of a session end and each waiting row, in order.
+ */
+type Rescue = {
+  readonly generation: unknown;
+  readonly position: SyncPosition | undefined;
+  readonly ended: unknown;
+  readonly waiting: ReadonlyArray<unknown>;
+};
+
+function isRescue(value: unknown): value is Rescue {
+  return (
+    typeof value === 'object' && value !== null && Array.isArray(Reflect.get(value, 'waiting'))
+  );
+}
+
+/** The copy that a recreate left under `key`, or undefined. */
+function readRescue(key: string): Rescue | undefined {
+  try {
+    const copy: unknown = JSON.parse(globalThis.localStorage?.getItem(key) ?? 'null');
+    return isRescue(copy) ? copy : undefined;
+  } catch {
+    // A copy that is no JSON holds nothing to write back.
+    return undefined;
+  }
+}
+
+/**
+ * Reads the generation of `database` in one database transaction, so two
+ * tabs that open at once read the same one. It writes back `rescue` first:
+ * each waiting row that the database does not hold, in order, and the
+ * generation, position and mark that it lacks. A database from before the
+ * generation gets a new one.
+ */
+async function openGeneration(database: IDBPDatabase, rescue?: Rescue): Promise<unknown> {
+  const tx = database.transaction(stores, 'readwrite');
+  const store = tx.objectStore(position);
+  const found: unknown = await store.get('generation');
+  let generation = found;
+  if (rescue) {
+    const waiting = tx.objectStore(transactions);
+    for (const row of rescue.waiting) {
+      const id: unknown = typeof row === 'object' && row ? Reflect.get(row, 'id') : undefined;
+      if (typeof id === 'string' && (await waiting.index('id').getKey(id)) === undefined) {
+        await waiting.add(row);
+      }
+    }
+    generation ??= rescue.generation;
+    if (rescue.position && (await store.get('position')) === undefined) {
+      await store.put(rescue.position, 'position');
+    }
+    if (rescue.ended !== undefined && (await store.get('ended')) === undefined) {
+      await store.put(rescue.ended, 'ended');
+    }
+  }
+  generation ??= crypto.randomUUID();
+  if (generation !== found) {
+    await store.put(generation, 'generation');
+  }
+  await tx.done;
+  return generation;
+}
+
 type Writer = { held: boolean; readonly taken: Promise<null> };
 
 /**
@@ -132,6 +208,11 @@ function writerOf(name: string): Promise<Writer> {
  * the sync position. Only the sync engine reads or writes it. A clear tells
  * each other tab of the same name through a `BroadcastChannel`.
  *
+ * `makeRoom` drops the confirmed records in one database transaction. When
+ * that fails too, it deletes the database and creates it again, with a copy
+ * of the waiting rows in `localStorage` until it writes them. An open writes
+ * back a copy that is still there.
+ *
  * Version 1 kept the whole state under one key. The upgrade moves its rows
  * into the new stores and deletes the old store. `version` is the version of
  * the layout. A test passes a later one, as a tab of a newer build does. See
@@ -149,7 +230,7 @@ export async function openIndexedDb(name: string, version = 2): Promise<LocalDat
     }
   }
   const blocked = Promise.withResolvers<never>();
-  const opening = openDB(name, version, {
+  const callbacks: OpenDBCallbacks<unknown> = {
     async upgrade(upgrade, oldVersion, _newVersion, tx) {
       if (oldVersion >= 2) {
         return;
@@ -182,19 +263,63 @@ export async function openIndexedDb(name: string, version = 2): Promise<LocalDat
       }
       wake();
     },
-  });
-  const database = await Promise.race([opening, blocked.promise]);
-  // A database from before the generation gets one at its first open. The
-  // read and the write share one database transaction, so two tabs that
-  // open at once read the same generation.
-  const first = database.transaction(position, 'readwrite');
-  let generation: unknown = await first.store.get('generation');
-  if (generation === undefined) {
-    generation = crypto.randomUUID();
-    await first.store.put(generation, 'generation');
-  }
-  await first.done;
+  };
+  let database = await Promise.race([openDB(name, version, callbacks), blocked.promise]);
+  // A recreate that did not write its rows left a copy of them here.
+  const rescueKey = `local-database:${name}:rescue`;
+  let generation = await openGeneration(database, readRescue(rescueKey));
+  globalThis.localStorage?.removeItem(rescueKey);
   const writer = await writerOf(name);
+
+  /**
+   * Deletes the database and creates it again with only what a device must
+   * keep: each waiting row, the generation, the emptied position and the
+   * mark. A copy waits in `localStorage` until the new rows are written.
+   */
+  async function recreate(): Promise<SaveResult> {
+    const tx = database.transaction(stores, 'readonly');
+    const [waiting, saved, ended, current] = await Promise.all([
+      tx.objectStore(transactions).getAll(),
+      tx.objectStore(position).get('position'),
+      tx.objectStore(position).get('ended'),
+      tx.objectStore(position).get('generation'),
+      tx.done,
+    ]);
+    if (current !== generation) {
+      return 'cleared';
+    }
+    const rescue: Rescue = { generation, position: emptiedPosition(saved), ended, waiting };
+    // With no copy, the delete could lose the waiting rows, so it does not run.
+    localStorage.setItem(rescueKey, JSON.stringify(rescue));
+    database.close();
+    await deleteDB(name);
+    database = await openDB(name, version, callbacks);
+    await openGeneration(database, rescue);
+    localStorage.removeItem(rescueKey);
+    return 'saved';
+  }
+
+  /** Drops each confirmed record and empties the position, in one database transaction. */
+  async function dropRecords(): Promise<SaveResult> {
+    const tx = database.transaction(stores, 'readwrite');
+    const store = tx.objectStore(position);
+    const [current, saved]: Array<unknown> = await Promise.all([
+      store.get('generation'),
+      store.get('position'),
+    ]);
+    if (current !== generation) {
+      await tx.done;
+      return 'cleared';
+    }
+    const emptied = emptiedPosition(saved);
+    await Promise.all([
+      emptied ? store.put(emptied, 'position') : store.delete('position'),
+      tx.objectStore(records).clear(),
+      tx.done,
+    ]);
+    return 'saved';
+  }
+
   // Each other tab of this database hears a clear on this channel. A channel
   // never hears its own message.
   const tabs = typeof BroadcastChannel === 'undefined' ? undefined : new BroadcastChannel(name);
@@ -216,6 +341,18 @@ export async function openIndexedDb(name: string, version = 2): Promise<LocalDat
       const current: unknown = await tx.objectStore(position).get('generation');
       const result: SaveResult = current === generation ? 'saved' : 'cleared';
       await Promise.all([result === 'saved' ? write(tx, save) : undefined, tx.done]);
+      if (result === 'cleared') {
+        wake();
+      }
+      return result;
+    },
+    makeRoom: async () => {
+      let result: SaveResult;
+      try {
+        result = await dropRecords();
+      } catch {
+        result = await recreate();
+      }
       if (result === 'cleared') {
         wake();
       }

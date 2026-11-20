@@ -1,4 +1,10 @@
-import { leftBehind, markAfter, oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import {
+  emptiedPosition,
+  leftBehind,
+  markAfter,
+  oldLayoutSave,
+  stateOf,
+} from '@repo/sync/runtime/pool-doors';
 import type { MarkState } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase, LocalSave, SaveResult } from '@repo/sync/types/local-database';
 import type { SqliteDriver } from '@repo/sync/types/sqlite-driver';
@@ -147,6 +153,26 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
   let generation = await generationOf();
   let lost = false;
   const heard = new Set<() => void>();
+  function wake() {
+    if (!lost) {
+      lost = true;
+      for (const listener of heard) {
+        listener();
+      }
+    }
+  }
+
+  /** Sets the saved position to sync ID 0, with its groups and actor. */
+  async function writeEmptiedPosition(): Promise<void> {
+    const [row] = await driver.all('select value from pool_position where name = ?', [name]);
+    const emptied = emptiedPosition(row ? parsed(row['value']) : undefined);
+    await (emptied
+      ? driver.run('update pool_position set value = ? where name = ?', [
+          JSON.stringify(emptied),
+          name,
+        ])
+      : driver.run('delete from pool_position where name = ?', [name]));
+  }
   const [old] = await driver.all(
     "select name from sqlite_master where type = 'table' and name = 'pool'",
   );
@@ -193,11 +219,42 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
         });
         return found;
       });
-      if (result === 'cleared' && !lost) {
-        lost = true;
-        for (const listener of heard) {
-          listener();
+      if (result === 'cleared') {
+        wake();
+      }
+      return result;
+    },
+    makeRoom: async () => {
+      const result = await serial(async (): Promise<SaveResult> => {
+        if ((await generationOf()) !== generation) {
+          return 'cleared';
         }
+        try {
+          await atomically(async () => {
+            await driver.run('delete from pool_records where name = ?', [name]);
+            await writeEmptiedPosition();
+          });
+        } catch {
+          // A full device may not hold the journal of one large delete, and a
+          // small delete needs less of it. The waiting rows are never touched.
+          for (;;) {
+            await driver.run(
+              'delete from pool_records where rowid in (select rowid from pool_records where name = ? limit 500)',
+              [name],
+            );
+            const [left] = await driver.all('select 1 from pool_records where name = ? limit 1', [
+              name,
+            ]);
+            if (!left) {
+              break;
+            }
+          }
+          await atomically(writeEmptiedPosition);
+        }
+        return 'saved';
+      });
+      if (result === 'cleared') {
+        wake();
       }
       return result;
     },

@@ -1,4 +1,5 @@
 import type { Replayable } from '@repo/sync/contract/command';
+import { withoutLocalChange } from '@repo/sync/contract/define';
 import type { Contract } from '@repo/sync/contract/define';
 import type { Stamps } from '@repo/sync/contract/fields';
 import { createPool } from '@repo/sync/runtime/pool';
@@ -6,18 +7,6 @@ import type { Pool } from '@repo/sync/runtime/pool';
 import { consoleReport } from '@repo/sync/runtime/pool-doors';
 import type { Report } from '@repo/sync/runtime/pool-doors';
 import type { LocalDatabase, WaitingRow } from '@repo/sync/types/local-database';
-
-/** The commands of the contracts that show at once and have no local change in `changes`. */
-function withoutLocalChange(
-  contracts: ReadonlyArray<Contract>,
-  changes: ReadonlyArray<Replayable>,
-): Array<string> {
-  const known = new Set(changes.map((change) => change.name));
-  return contracts
-    .flatMap((contract) => contract.commands)
-    .filter((declared) => declared.waits === 'local' && !known.has(declared.name))
-    .map((declared) => declared.name);
-}
 
 /** The actor of a waiting row as one string, empty for a row with no actor. */
 const actorOf = ({ actor }: WaitingRow) =>
@@ -38,6 +27,39 @@ function queueChanges(
     add: queue.filter((row) => held.get(row.id) !== actorOf(row)),
     done: [...held.keys()].filter((id) => !queued.has(id)),
   };
+}
+
+/** The first wait after a failed save, in milliseconds. Each wait after it is twice as long. */
+const firstWait = 200;
+/** The longest wait between two saves that fail, in milliseconds. */
+const longestWait = 10_000;
+/** The saves that fail in a row before the pool makes room, also with no sign of a full device. */
+const failuresBeforeRoom = 3;
+
+const couldNotSave =
+  'This device could not save the last change. The change stays on this screen, and the next change saves again.';
+const madeRoom =
+  'This device could not save, so the app removed its saved copy of the server data to make room, and nothing you did is lost.';
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * Whether a failed save says that the device is full. IndexedDB names the
+ * error `QuotaExceededError`, and SQLite says it in its message.
+ */
+function isQuotaError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+  const message: unknown = Reflect.get(error, 'message');
+  return (
+    Reflect.get(error, 'name') === 'QuotaExceededError' ||
+    (typeof message === 'string' && /SQLITE_FULL|disk is full/iu.test(message))
+  );
 }
 
 /** The object pool of the app, and the stop of its saves. */
@@ -69,6 +91,14 @@ export type SavedPool = Pool & {
  * `report` receives each sentence about a saved copy that does not fit this
  * build, and about a change that the device could not save. The web leaves it
  * out and gets the console.
+ *
+ * `wait` is how a save waits after a failure. The app leaves it out and gets
+ * a timer. A test passes waits that it ends itself.
+ *
+ * The waiting transactions are what a device must never lose, and the
+ * confirmed records are a cache of the server. So a save that fails with a
+ * full device, or `failuresBeforeRoom` saves that fail in a row, make room:
+ * the database drops its confirmed records and keeps the waiting ones.
  */
 export async function loadPool(
   database: LocalDatabase,
@@ -76,6 +106,7 @@ export async function loadPool(
   contracts: ReadonlyArray<Contract>,
   stamps?: Stamps,
   report?: Report,
+  wait?: (ms: number) => Promise<void>,
 ): Promise<SavedPool> {
   const missing = withoutLocalChange(contracts, changes);
   if (missing.length) {
@@ -102,19 +133,71 @@ export async function loadPool(
   // The waiting transactions of this tab in the database: each one that it
   // loaded, and each one that it added since. A tab deletes only these.
   let held = new Map(state?.pending.map((row) => [row.id, actorOf(row)]));
-  // One save at a time, and always the newest state. A save that fails, such
-  // as on a full device, is reported once, and the next change to the pool
-  // saves again, with every record.
+  // One save at a time, and always the newest state. A save that fails is
+  // reported once, and the next attempt waits, longer each time, then saves
+  // every record. A device that is full, or that keeps failing, makes room:
+  // see `makeRoom`.
   const tell = report ?? consoleReport;
+  const pause = wait ?? sleep;
   let writing = false;
   let again = false;
-  let failing = false;
+  let failures = 0;
+  let waits = 0;
+  let roomMade = false;
   let everything = false;
   let stopped = false;
   // The load dropped what a fresh mark of a session end asked for. The first
   // save spends the mark, so no later start drops a row again.
   let afterLoad = true;
   let running: Promise<void> = Promise.resolve();
+  const stopping = Promise.withResolvers<null>();
+
+  /**
+   * Gives up the confirmed records on the device, which are a cache of the
+   * server, so the waiting transactions fit. For the rest of this session
+   * the pool saves only its waiting transactions, so it cannot fill the
+   * device again. The records in memory stay. The next start loads again
+   * from the server. It returns whether the pool saves again at once.
+   */
+  async function makeRoom(): Promise<boolean> {
+    try {
+      if ((await database.makeRoom()) === 'cleared') {
+        stopped = true;
+        return false;
+      }
+    } catch {
+      // The next failure tries again.
+      return false;
+    }
+    roomMade = true;
+    tell(madeRoom);
+    return true;
+  }
+
+  /**
+   * Follows a failed save: it reports the first failure of a run, makes room
+   * when the device is full or keeps failing, and else waits, twice as long
+   * each time, up to `longestWait`. A change while it waits saves with the
+   * next attempt, and a stop ends the wait. It returns whether to save again.
+   */
+  async function afterFailure(failure: unknown): Promise<boolean> {
+    everything = true;
+    failures += 1;
+    if (failures === 1) {
+      tell(couldNotSave);
+    }
+    const full = isQuotaError(failure) || failures >= failuresBeforeRoom;
+    if (!roomMade && full && (await makeRoom())) {
+      return true;
+    }
+    if (stopped) {
+      return false;
+    }
+    await Promise.race([pause(Math.min(firstWait * 2 ** waits, longestWait)), stopping.promise]);
+    waits += 1;
+    return !stopped;
+  }
+
   async function saveAll() {
     try {
       do {
@@ -123,17 +206,16 @@ export async function loadPool(
           break;
         }
         again = false;
-        const full = everything;
-        everything = false;
-        const confirmed = pool.confirmedChanges(full);
+        const confirmed = writer && !roomMade ? pool.confirmedChanges(everything) : undefined;
+        everything &&= !confirmed;
         const { add, done } = queueChanges(pool.queue(), held);
         const startSave = afterLoad;
-        if (!writer && !startSave && add.length === 0 && done.length === 0) {
+        if (!confirmed && !startSave && add.length === 0 && done.length === 0) {
           continue;
         }
         try {
           const result = await database.save({
-            ...(writer ? { confirmed } : {}),
+            ...(confirmed ? { confirmed } : {}),
             add,
             done,
             ...(startSave ? { afterLoad: true } : {}),
@@ -150,16 +232,10 @@ export async function loadPool(
           for (const id of done) {
             held.delete(id);
           }
-          failing = false;
-        } catch {
-          everything = true;
-          const first = !failing;
-          failing = true;
-          if (first) {
-            tell(
-              'This device could not save the last change. The change stays on this screen, and the next change saves again.',
-            );
-          }
+          failures = 0;
+          waits = 0;
+        } catch (error) {
+          again = await afterFailure(error);
         }
       } while (again);
     } finally {
@@ -171,6 +247,7 @@ export async function loadPool(
     if (stopped) {
       return running;
     }
+    // A change while a save runs or waits saves with it.
     if (writing) {
       again = true;
       return running;
@@ -195,6 +272,7 @@ export async function loadPool(
   return Object.assign(pool, {
     stop: async () => {
       stopped = true;
+      stopping.resolve(null);
       detach();
       // A save that fails still ends the stop, so the session end goes on.
       await Promise.allSettled([running]);

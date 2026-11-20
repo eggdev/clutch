@@ -159,6 +159,18 @@ export type LocalDatabase = {
    */
   readonly clear: () => Promise<void>;
   /**
+   * Makes room on a device that cannot save. In one database transaction it
+   * drops every confirmed record and sets the saved position to sync ID 0,
+   * with its groups and actor. It keeps each waiting transaction, the
+   * generation and the mark of a session end. When that cannot be written
+   * either, the web adapter deletes the database, creates it again, and
+   * writes the waiting transactions into it. It keeps a copy of them in
+   * `localStorage` for the time between, and writes that copy back at the
+   * next open when the write did not happen. It gives `cleared` and writes
+   * nothing when another handle cleared the database, as `save` does.
+   */
+  readonly makeRoom: () => Promise<SaveResult>;
+  /**
    * Wakes once when this handle can no longer save. Another tab cleared the
    * database, which the tab hears as a message or as a save that gives
    * `cleared`. Or a tab of a newer build asked for a new version of the

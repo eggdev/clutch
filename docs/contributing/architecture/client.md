@@ -151,13 +151,47 @@ every row, and writes a new generation of the database. See
 A save holds the records that changed since the last save, the records that
 were deleted, and the sync position. So one delta writes only the records
 that it changed. After the pool drops its confirmed records, or after a save
-fails, the next save replaces every record.
+fails, the next save replaces every record. See
+[a device that cannot save](#a-device-that-cannot-save).
 
 A save writes no record that is in no loaded group, such as a record of a
 page whose group is still loading. It removes the row of such a record, and
 writes the record once its group loads. So the device never keeps part of a
 load that was cut off. See
 [load functions](./local-first-sync.md#load-functions).
+
+### A device that cannot save
+
+The waiting transactions are what a device must never lose. The confirmed
+records are a cache of the server. `loadPool` in
+`packages/sync/runtime/boot.ts` holds this rule:
+
+- A save that fails is reported once. The next attempt waits 200 ms, then
+  twice as long each time, up to 10 seconds. A change while it waits starts
+  no other attempt: the next attempt saves the newest state. A save that
+  works ends the run of failures, so a single failure behaves as before.
+- A save that fails with a full device, or the third save that fails in a
+  row, makes room. `makeRoom` drops every confirmed record and sets the saved
+  position to sync ID 0 in one database transaction. It keeps each waiting
+  transaction, the actor, the generation and the mark of a session end.
+- When that cannot be written either, the IndexedDB adapter deletes the
+  database, creates it again, and writes the waiting transactions into it.
+  Between the delete and the write, a copy of them waits in `localStorage`
+  under the key `local-database:<name>:rescue`. The next open writes the copy
+  back when the write did not happen. The SQLite file holds other names too,
+  so the SQLite adapter deletes the records in small steps instead. It never
+  touches the waiting rows.
+- After it makes room, the pool saves only its waiting transactions for the
+  rest of the session, so it cannot fill the device again. The records in
+  memory stay, and the screen keeps working. The pool reports one sentence
+  that says what happened and that nothing the person did is lost.
+- At the next start, the device holds its waiting transactions at sync ID 0.
+  The pool loads again from the server and sends what waits.
+
+`packages/sync/runtime/boot-room.test.ts` holds the rule, and the cases in
+`packages/sync/testing/local-database-room-cases.ts` hold `makeRoom` for
+each adapter. `packages/sync/runtime/indexed-db-loss.browser.test.ts` holds
+the recreate of the IndexedDB database and the copy in `localStorage`.
 
 ### Two tabs
 
@@ -247,7 +281,7 @@ blocks that build. Then the tab can no longer save, so `onLost` wakes, and
 again, with no clear. On the web the page loads again, with the newer build,
 and opens the new layout. Each waiting transaction was saved when the person
 made it, so the new layout has it, and the start sends it.
-`packages/sync/runtime/indexed-db.browser.test.ts` holds this.
+`packages/sync/runtime/indexed-db-loss.browser.test.ts` holds this.
 
 `openLocalDatabase` in `packages/sync/runtime/local-database.ts` opens IndexedDB
 on the web. `packages/sync/runtime/local-database.native.ts` replaces it on a

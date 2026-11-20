@@ -216,6 +216,19 @@ function isTransaction(value: unknown): value is WaitingRow {
 }
 
 /**
+ * The position that `makeRoom` leaves: sync ID 0 and no `leftOutBy`, with
+ * the loaded groups and the actor of `saved`. No position, or one of
+ * another shape, leaves none.
+ */
+export function emptiedPosition(saved: unknown): SyncPosition | undefined {
+  if (!isPosition(saved)) {
+    return undefined;
+  }
+  const { groups, actor } = saved;
+  return { lastSyncId: 0, groups, ...(actor === undefined ? {} : { actor }) };
+}
+
+/**
  * Whether a saved waiting row is left behind by the save that removes the
  * mark of a session end: it names no actor, and the save does not add it. A
  * tab that saves the actor of the next session gave its own rows that actor.

@@ -118,3 +118,40 @@ test('a copy from before the generation gets one at its first open, and each han
   expect(kept?.pending).toEqual(oldLayoutCopy.pending);
   database.close();
 });
+
+test('making room deletes the records in small steps when one large delete fails, and keeps each waiting row', async () => {
+  const database = new Database(':memory:');
+  const driver = bunDriver(database);
+  let full = false;
+  let refused = false;
+  const local = await openSqlite(
+    {
+      ...driver,
+      run: (sql, params) => {
+        // A full device cannot hold the journal of one large delete.
+        if (sql === 'delete from pool_records where name = ?' && full && !refused) {
+          refused = true;
+          return Promise.reject(new Error('database or disk is full'));
+        }
+        return driver.run(sql, params);
+      },
+    },
+    'app',
+  );
+  await local.save(
+    fullSave({ ...oldLayoutCopy, actor: { userId: 'ana', organizationId: 'acme' } }),
+  );
+  full = true;
+  expect(await local.makeRoom()).toBe('saved');
+  expect(refused).toBe(true);
+  const read = await local.read();
+  expect(read).toEqual({
+    lastSyncId: 0,
+    tables: {},
+    groups: oldLayoutCopy.groups,
+    meta: {},
+    pending: oldLayoutCopy.pending,
+    actor: { userId: 'ana', organizationId: 'acme' },
+  });
+  database.close();
+});

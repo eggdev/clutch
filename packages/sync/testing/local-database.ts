@@ -1,4 +1,10 @@
-import { fullSave, leftBehind, markAfter, stateOf } from '@repo/sync/runtime/pool-doors';
+import {
+  emptiedPosition,
+  fullSave,
+  leftBehind,
+  markAfter,
+  stateOf,
+} from '@repo/sync/runtime/pool-doors';
 import type { MarkState } from '@repo/sync/runtime/pool-doors';
 import { recordKey } from '@repo/sync/runtime/tables';
 import type {
@@ -111,6 +117,15 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
         apply(save);
         log.push(structuredClone(save));
         writes += 1;
+        return Promise.resolve('saved');
+      },
+      makeRoom: () => {
+        if (mine !== generation) {
+          wake();
+          return Promise.resolve('cleared');
+        }
+        records.clear();
+        position = emptiedPosition(position);
         return Promise.resolve('saved');
       },
       clear: () => {

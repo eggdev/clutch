@@ -253,6 +253,21 @@ export function clientPackage<
 }
 
 /**
+ * The commands of the contracts that show at once and have no local change
+ * in `changes`. The object pool stops at its start when one has none.
+ */
+export function withoutLocalChange(
+  contracts: ReadonlyArray<Contract>,
+  changes: ReadonlyArray<Replayable>,
+): Array<string> {
+  const known = new Set(changes.map((change) => change.name));
+  return contracts
+    .flatMap((contract) => contract.commands)
+    .filter((declared) => declared.waits === 'local' && !known.has(declared.name))
+    .map((declared) => declared.name);
+}
+
+/**
  * The parts of a list of client packages that the object pool and the sync
  * client take: each contract, and the local change of each command.
  */
