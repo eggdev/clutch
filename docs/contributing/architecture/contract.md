@@ -104,11 +104,14 @@ A record has a string `id`, and it names at least one sync group.
 - `when(field, values, group)` names the group at a write only if the field has one of the values.
 - `unless(field, values, group)` names the group at a write only if the field has none of the values.
 
-A group is chosen as the record is written. The engine of the template does
-not tell the clients of a group that a record left it. A client that loaded
-the old group keeps its copy until it loads the group again. CL-530 in
-`.clutch/issues/` tracks that. A record must name one group at each write, or
-the commit stops.
+A group is chosen as the record is written. A changed group field, or a
+`when` or `unless` condition that flips, moves the record to other groups.
+The event log keeps the groups of each record, so the change names the
+groups that the record left. A client that loaded one of the new groups gets
+the upsert. A client that loaded only groups that the record left gets a
+delete of the record, with no data. A record must name one group at each
+write, or the commit stops. A server change that wants a record gone deletes
+it.
 
 The built-in groups, `organizationGroup` and `userGroup`, live in
 `packages/sync/contract/engine-groups.ts`. The engine owns that file. Import

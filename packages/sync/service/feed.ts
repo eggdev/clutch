@@ -1,6 +1,7 @@
 import { userGroup } from '@repo/sync/contract/engine-groups';
 import type { EventLog } from '@repo/sync/service/event-log';
 import type { Granted } from '@repo/sync/service/sync-groups';
+import { seenDelta } from '@repo/sync/service/visible';
 import type { Delta, SyncMessage } from '@repo/sync/types/protocol';
 import { Effect, Stream } from 'effect';
 import type { Context, Queue } from 'effect';
@@ -22,14 +23,6 @@ const groupsMessage = (
   loaded: ReadonlySet<string>,
   backfill: ReadonlyArray<Delta>,
 ): SyncMessage => ({ _tag: 'Groups', loaded: [...loaded], backfill });
-
-/** The part of a delta in the loaded groups, or nothing. */
-function visible(delta: Delta, loaded: ReadonlySet<string>): Delta | undefined {
-  const changes = delta.changes.filter((change) =>
-    change.groups.some((group) => loaded.has(group)),
-  );
-  return changes.length ? { ...delta, changes } : undefined;
-}
 
 type Input =
   | { readonly kind: 'delta'; readonly delta: Delta }
@@ -70,7 +63,7 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
           }
           watermark = delta.syncId;
           const out: Array<SyncMessage> = [];
-          const seen = visible(delta, loaded);
+          const seen = seenDelta(delta, loaded);
           if (seen) {
             out.push({ _tag: 'Deltas', deltas: [seen] });
           }
@@ -99,7 +92,7 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
             return [];
           }
           loaded.add(group);
-          const backfill = yield* log.backfill(organizationId, watermark, new Set([group]));
+          const backfill = yield* log.backfill(organizationId, watermark, new Set([group]), loaded);
           return [groupsMessage(loaded, backfill)];
         });
 

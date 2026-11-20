@@ -14,6 +14,10 @@ const RecordData = Schema.Record(Schema.String, Schema.Unknown);
  * One record that a server change wrote or deleted, with its sync groups. A
  * client gets the change only when it has loaded one of those groups. A
  * delete carries the last data of the record, so its groups are known.
+ * `left` names the groups that the record was in before the change and is
+ * not in now. The log stores it, and a client of only those groups gets a
+ * delete instead. It is an optional key, so each build reads a change with
+ * or without it.
  */
 export const Change = Schema.Struct({
   model: Schema.String,
@@ -21,6 +25,7 @@ export const Change = Schema.Struct({
   action: Schema.Literals(['upsert', 'delete']),
   data: Schema.NullOr(RecordData),
   groups: Schema.Array(Schema.String),
+  left: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type Change = typeof Change.Type;
 

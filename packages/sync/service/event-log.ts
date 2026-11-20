@@ -10,6 +10,7 @@ import {
 } from '@repo/sync/repo/events';
 import { Database } from '@repo/sync/service/database';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
+import { seenDelta } from '@repo/sync/service/visible';
 import type { Change, Delta } from '@repo/sync/types/protocol';
 import { Context, Effect, Layer, Option, PubSub, Stream } from 'effect';
 import type { Scope } from 'effect';
@@ -38,17 +39,22 @@ export class EventLog extends Context.Service<
   {
     readonly commit: Commit;
     readonly head: (organizationId: string) => Effect.Effect<number, unknown>;
-    /** The events after a sync ID that touch the groups, in pages. */
+    /** The events after a sync ID that touch the groups, in pages, as a client of the groups sees them. */
     readonly backlog: (
       organizationId: string,
       lastSyncId: number,
       groups: ReadonlySet<string>,
     ) => Stream.Stream<BacklogPage, unknown>;
-    /** Every event up to a sync ID that touches the groups. */
+    /**
+     * Every event up to a sync ID that touches the groups, as a client that
+     * loaded `loaded` sees it. `loaded` holds `groups` and every other group
+     * of the client, and is `groups` when left out.
+     */
     readonly backfill: (
       organizationId: string,
       upTo: number,
       groups: ReadonlySet<string>,
+      loaded?: ReadonlySet<string>,
     ) => Effect.Effect<ReadonlyArray<Delta>, unknown>;
     /** Every new event of the organization, from now on. */
     readonly subscribe: (
@@ -148,8 +154,13 @@ export function eventLog(contracts: ReadonlyArray<Contract>) {
               const changes = yield* write(tx);
               yield* checkGroups(changes);
               yield* checkRecords(declared, changes);
-              const syncId = yield* appendEvent(tx, organizationId, transactionId, changes);
-              return { syncId, delta: { syncId, transactionId, changes } };
+              const stored = yield* appendEvent(tx, organizationId, transactionId, changes);
+              const delta: Delta = {
+                syncId: stored.syncId,
+                transactionId,
+                changes: stored.changes,
+              };
+              return { syncId: stored.syncId, delta };
             }),
           );
           if (result.delta) {
@@ -163,8 +174,9 @@ export function eventLog(contracts: ReadonlyArray<Contract>) {
           eventsAfter(db, organizationId, cursor, groups, deltasPerElement).pipe(
             Effect.map((page) => {
               const last = page.last ?? cursor;
+              const deltas = page.deltas.flatMap((delta) => seenDelta(delta, groups) ?? []);
               return [
-                page.last === undefined ? [] : [{ deltas: page.deltas, last }],
+                page.last === undefined ? [] : [{ deltas, last }],
                 page.full ? Option.some(last) : Option.none(),
               ] as const;
             }),
@@ -175,7 +187,12 @@ export function eventLog(contracts: ReadonlyArray<Contract>) {
         commit,
         head: (organizationId: string) => headOf(db, organizationId),
         backlog,
-        backfill: (organizationId, upTo, groups) => eventsUpTo(db, organizationId, upTo, groups),
+        backfill: (organizationId, upTo, groups, loaded = groups) =>
+          eventsUpTo(db, organizationId, upTo, groups).pipe(
+            Effect.map((deltas) =>
+              deltas.flatMap((delta) => seenDelta(delta, loaded, groups) ?? []),
+            ),
+          ),
         subscribe: (organizationId) =>
           Effect.flatMap(hubOf(organizationId), (hub) => PubSub.subscribe(hub)),
       };
