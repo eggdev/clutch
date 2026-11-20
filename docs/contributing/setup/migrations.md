@@ -24,7 +24,10 @@ with a `snapshot.json`. Each package's `drizzle.config.ts` names both paths.
 The API runs the sync tables first, then each package's migrations, by package
 name. A package owns its tables: `repo/` is private to it, so no migration
 needs the table of another package.
-The same migrator runs on PGlite and on Postgres.
+The same migrator runs on PGlite and on Postgres. Each package's run is one
+transaction that first takes a Postgres advisory lock. So two API processes
+that start at once do not both apply a migration. The second waits, then finds
+each migration applied.
 
 <!-- kickoff: The command that dry-runs a migration against a copy of production data. -->
 
