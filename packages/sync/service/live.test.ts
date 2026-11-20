@@ -11,7 +11,7 @@ import { Wake } from '@repo/sync/service/wake';
 import type { WakeSignal } from '@repo/sync/service/wake';
 import { DatabaseTest } from '@repo/sync/testing/database';
 import type { Change, SyncMessage } from '@repo/sync/types/protocol';
-import { Context, Deferred, Effect, Fiber, Layer, Queue, Stream } from 'effect';
+import { Context, Deferred, Effect, Fiber, Layer, Logger, Queue, References, Stream } from 'effect';
 import type { Duration } from 'effect';
 
 const cardRecord = record('Card', {
@@ -31,6 +31,26 @@ const upsert = (id: string): Change => ({
 /** One server process: an event log with its own wake, over the database of the test. */
 const serverProcess = (wake = WakePglite) =>
   Layer.fresh(eventLog([cards]).pipe(Layer.provide(Layer.fresh(wake))));
+
+/** A warning that the program logged, with its annotations. */
+type Warning = { readonly message: unknown; readonly annotations: Record<string, unknown> };
+
+/** Runs the program with a logger that keeps each warning, and gives its result and the warnings. */
+function withWarnings<A, E>(program: Effect.Effect<A, E>) {
+  const warnings: Array<Warning> = [];
+  const keep = Logger.make(({ logLevel, message, fiber }) => {
+    if (logLevel === 'Warn') {
+      warnings.push({ message, annotations: fiber.getRef(References.CurrentLogAnnotations) });
+    }
+  });
+  return program.pipe(
+    Effect.map((result) => ({ result, warnings })),
+    Effect.provide(Logger.layer([keep])),
+  );
+}
+
+/** The text of the warning that a lost wake makes. */
+const lostWake = 'A timed read of the log found events that no wake announced';
 
 /** A wake over the database whose `send` always fails. A commit does not use `send`. */
 const failingSend = Layer.effect(Wake)(
@@ -145,16 +165,42 @@ test('an event committed while a process does not listen reaches it when it list
   expect(syncIds).toEqual([1]);
 });
 
-test('a process that hears no signal reads the log again at a fixed interval', async () => {
-  const syncIds = await Effect.runPromise(
-    Effect.gen(function* () {
-      const writer = Context.get(yield* Layer.build(serverProcess()), EventLog);
-      const reader = Context.get(
-        yield* Layer.build(deafProcess(Stream.never, '50 millis')),
-        EventLog,
-      );
-      return yield* liveSyncIds(reader, writeMany(writer));
-    }).pipe(Effect.scoped, Effect.provide(DatabaseTest())),
+test('a process that hears no signal reads the log again at a fixed interval, and logs each lost wake', async () => {
+  const { result: syncIds, warnings } = await Effect.runPromise(
+    withWarnings(
+      Effect.gen(function* () {
+        const writer = Context.get(yield* Layer.build(serverProcess()), EventLog);
+        const reader = Context.get(
+          yield* Layer.build(deafProcess(Stream.never, '50 millis')),
+          EventLog,
+        );
+        return yield* liveSyncIds(reader, writeMany(writer));
+      }).pipe(Effect.scoped, Effect.provide(DatabaseTest())),
+    ),
   );
   expect(syncIds).toEqual(inOrder);
+  // Each event came by a timed read, so the warnings name each one, once, in order.
+  const lost = warnings.filter((warning) => String(warning.message).startsWith(lostWake));
+  expect(lost.length).toBeGreaterThan(0);
+  expect(lost.every((warning) => warning.annotations['organizationId'] === 'org-a')).toBe(true);
+  const covered = lost.flatMap((warning) => {
+    const { events, firstSyncId, lastSyncId } = warning.annotations;
+    expect(Number(lastSyncId) - Number(firstSyncId) + 1).toBe(Number(events));
+    return Array.from({ length: Number(events) }, (_, index) => Number(firstSyncId) + index);
+  });
+  expect(covered).toEqual(inOrder);
+});
+
+test('a process whose wake works logs no lost wake', async () => {
+  const { result: syncIds, warnings } = await Effect.runPromise(
+    withWarnings(
+      Effect.gen(function* () {
+        const writer = Context.get(yield* Layer.build(serverProcess()), EventLog);
+        const reader = Context.get(yield* Layer.build(serverProcess()), EventLog);
+        return yield* liveSyncIds(reader, writeMany(writer));
+      }).pipe(Effect.scoped, Effect.provide(DatabaseTest())),
+    ),
+  );
+  expect(syncIds).toEqual(inOrder);
+  expect(warnings.filter((warning) => String(warning.message).startsWith(lostWake))).toEqual([]);
 });

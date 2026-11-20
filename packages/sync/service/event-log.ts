@@ -23,7 +23,9 @@ const rowsPerPage = 1000;
 
 /**
  * Each live reader with a connection reads the log again this often, so a
- * lost wake leaves a connection behind for at most this long.
+ * lost wake leaves a connection behind for at most this long. When this read
+ * finds events that no wake announced, it logs a warning, so each lost wake
+ * shows. CL-920 is the root fix: a test of the wake on a real Postgres server.
  */
 const rereadInterval = '30 seconds';
 
@@ -167,8 +169,8 @@ export function eventLog(
         }
         return signal.kind === 'listening' ? live.wakeAll : Effect.void;
       }).pipe(Effect.forkScoped);
-      // No lost signal leaves a connection behind for longer than this.
-      yield* live.wakeAll.pipe(
+      // No lost signal leaves a connection behind for longer than this. Each loss logs a warning.
+      yield* live.reread.pipe(
         Effect.repeat(Schedule.spaced(options.rereadEvery ?? rereadInterval)),
         Effect.forkScoped,
       );
