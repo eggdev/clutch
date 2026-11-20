@@ -45,6 +45,23 @@ export const syncEvents = pgTable(
 );
 
 /**
+ * The proof that a transaction applied, for each event that the trim
+ * deleted: its organization, its ID, the sync ID of its event and the time of
+ * that event. The trim moves the row here in the statement that deletes the
+ * event, so a transaction that a client sends again applies once.
+ */
+export const syncTransactions = pgTable(
+  'sync_transactions',
+  {
+    organizationId: text('organization_id').notNull(),
+    transactionId: text('transaction_id').notNull(),
+    syncId: bigint('sync_id', { mode: 'number' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.organizationId, table.transactionId] })],
+);
+
+/**
  * The last state of each record that the log holds: its groups, the sync ID
  * of its last change, its last data, and whether that change deleted it. A
  * commit updates the row in the transaction of its event, so the next change

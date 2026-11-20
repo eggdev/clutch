@@ -147,3 +147,32 @@ test('the trim job keeps the days that SYNC_LOG_KEEP_DAYS names', async () => {
   );
   expect(result.events).toEqual([2, 3]);
 });
+
+test('a transaction sent again after the trim deleted its event applies once, with its first sync ID', async () => {
+  const result = await run(
+    Effect.gen(function* () {
+      yield* writeAged([upsert('a'), upsert('b')], [30, 1]);
+      const db = yield* Database;
+      yield* trimLog(db, new Date(Date.now() - 10 * day));
+      const before = yield* kept;
+      // The client never saw the delta of t1, so it sends t1 again, with another title.
+      const syncId = yield* (yield* EventLog).commit('org-a', 't1', () =>
+        Effect.succeed([{ ...upsert('a'), data: { id: 'a', title: 'again' } }]),
+      );
+      const titles = yield* db
+        .select({ data: syncRecords.data })
+        .from(syncRecords)
+        .orderBy(asc(syncRecords.recordId));
+      return {
+        before,
+        after: yield* kept,
+        syncId,
+        titles: titles.map((row) => row.data?.['title']),
+      };
+    }),
+  );
+  expect(result.before.events).toEqual([2]);
+  expect(result.syncId).toBe(1);
+  expect(result.after.events).toEqual([2]);
+  expect(result.titles).toEqual(['a', 'b']);
+});

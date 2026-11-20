@@ -127,6 +127,10 @@ listed contract has no server change. `serverOf(packages)` gives both lists from
 
 `eventLog(contracts)` in `packages/sync/service/event-log.ts` is the door that every change passes before a client gets it. Each commit checks its changes against the contracts that the server serves. A change of a model that no contract declares stops the commit. An upsert whose data does not fit its record also stops it, and the error names the fields that do not fit. A delete checks only its model. A failed check dies inside the transaction, so no event is appended. `packages/sync/service/event-log.test.ts` tests each rule.
 
+A commit first looks for its transaction ID, so a transaction that a client sends again applies once. `findTransaction` in `packages/sync/repo/events.ts` reads the log and `sync_transactions` in one statement. The trim moves the transaction ID of each event that it deletes to `sync_transactions`, so the proof outlives the event. Those rows are never dropped; see [the size of the log](./local-first-sync.md#the-size-of-the-log). `packages/sync/jobs/trim-log.test.ts` and `apps/api/src/trimmed-log.test.ts` hold this.
+
+`Push` refuses a list of more than `transactionsPerPush` (100) transactions before it runs any of them. The client sends at most that many, so only a broken or hostile client meets the refusal. `apps/api/src/push-limit.test.ts` holds this.
+
 A load reads the snapshot of a group from `sync_records`, not the history of the log. The snapshot holds the last change of each live record, in pages by the record key. See [the protocol](./local-first-sync.md).
 
 ## More than one process
