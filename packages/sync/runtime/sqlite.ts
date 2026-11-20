@@ -3,6 +3,8 @@ import {
   leftBehind,
   markAfter,
   oldLayoutSave,
+  roomCount,
+  roomSave,
   stateOf,
 } from '@repo/sync/runtime/pool-doors';
 import type { MarkState } from '@repo/sync/runtime/pool-doors';
@@ -23,6 +25,10 @@ import type { SqliteDriver } from '@repo/sync/types/sqlite-driver';
  * `pool_generation` holds the generation of each name, which each clear
  * writes anew. One process uses the file, so no other tab clears it. Only a
  * second handle, such as in a test, can find another generation.
+ *
+ * `pool_room` counts the times that room was made for each name. Each handle
+ * reads it when it opens, and a save after it changed writes only the waiting
+ * rows, until the next start.
  */
 
 /** The saved text as a value. Text that is no JSON gives `undefined`, which the read counts as a row with another shape. */
@@ -43,6 +49,7 @@ const schema = [
   'create table if not exists pool_position (name text primary key, value text not null)',
   'create table if not exists pool_ended (name text primary key, spent integer not null default 0)',
   'create table if not exists pool_generation (name text primary key, value text not null)',
+  'create table if not exists pool_room (name text primary key, value integer not null)',
 ];
 
 export async function openSqlite(driver: SqliteDriver, name: string): Promise<LocalDatabase> {
@@ -87,6 +94,12 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
   async function generationOf(): Promise<unknown> {
     const [row] = await driver.all('select value from pool_generation where name = ?', [name]);
     return row?.['value'];
+  }
+
+  /** The times that room was made for the name. */
+  async function roomOf(): Promise<number> {
+    const [row] = await driver.all('select value from pool_room where name = ?', [name]);
+    return roomCount(row?.['value']);
   }
 
   async function write(save: LocalSave): Promise<void> {
@@ -151,6 +164,7 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
     [name, crypto.randomUUID()],
   );
   let generation = await generationOf();
+  let openedRoom = await roomOf();
   let lost = false;
   const heard = new Set<() => void>();
   function wake() {
@@ -162,8 +176,12 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
     }
   }
 
-  /** Sets the saved position to sync ID 0, with its groups and actor. */
+  /** Sets the saved position to sync ID 0, with its groups and actor, and counts the room made. */
   async function writeEmptiedPosition(): Promise<void> {
+    await driver.run(
+      'insert into pool_room (name, value) values (?, 1) on conflict (name) do update set value = value + 1',
+      [name],
+    );
     const [row] = await driver.all('select value from pool_position where name = ?', [name]);
     const emptied = emptiedPosition(row ? parsed(row['value']) : undefined);
     await (emptied
@@ -212,7 +230,7 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
         let found: SaveResult = 'saved';
         await atomically(async () => {
           if ((await generationOf()) === generation) {
-            await write(save);
+            await write(roomSave(save, openedRoom, await roomOf()));
           } else {
             found = 'cleared';
           }
@@ -261,7 +279,7 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
     clear: () =>
       serial(() =>
         atomically(async () => {
-          for (const table of ['pool_records', 'pool_transactions', 'pool_position']) {
+          for (const table of ['pool_records', 'pool_transactions', 'pool_position', 'pool_room']) {
             await driver.run(`delete from ${table} where name = ?`, [name]);
           }
           await driver.run(
@@ -274,6 +292,7 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
             [name, next],
           );
           generation = next;
+          openedRoom = 0;
         }),
       ),
     onLost(listener) {

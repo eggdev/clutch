@@ -3,6 +3,8 @@ import {
   leftBehind,
   markAfter,
   oldLayoutSave,
+  roomCount,
+  roomSave,
   stateOf,
 } from '@repo/sync/runtime/pool-doors';
 import type { MarkState } from '@repo/sync/runtime/pool-doors';
@@ -12,7 +14,7 @@ import type {
   SaveResult,
   SyncPosition,
 } from '@repo/sync/types/local-database';
-import { deleteDB, openDB } from 'idb';
+import { openDB } from 'idb';
 import type { IDBPDatabase, IDBPTransaction, OpenDBCallbacks } from 'idb';
 
 /** One row for each confirmed record, keyed by its model and ID. */
@@ -23,7 +25,8 @@ const transactions = 'transactions';
  * One row, under the key `position`: the last sync ID, the loaded groups,
  * `leftOutBy` and the actor. A clear leaves the mark of a session end in
  * the same store, under the key `ended`, as its state. The generation of the
- * database is under the key `generation`.
+ * database is under the key `generation`, and the times that room was made
+ * under the key `room`.
  */
 const position = 'position';
 /** The store of the old layout, which held the whole state under the key `state`. */
@@ -100,8 +103,9 @@ async function write(tx: Writable, save: LocalSave): Promise<void> {
  * and the write of its new rows: the generation, the emptied position, the
  * mark of a session end and each waiting row, in order.
  */
-type Rescue = {
+export type Rescue = {
   readonly generation: unknown;
+  readonly room?: number;
   readonly position: SyncPosition | undefined;
   readonly ended: unknown;
   readonly waiting: ReadonlyArray<unknown>;
@@ -125,13 +129,16 @@ function readRescue(key: string): Rescue | undefined {
 }
 
 /**
- * Reads the generation of `database` in one database transaction, so two
- * tabs that open at once read the same one. It writes back `rescue` first:
- * each waiting row that the database does not hold, in order, and the
- * generation, position and mark that it lacks. A database from before the
- * generation gets a new one.
+ * Reads the generation of `database` and the times that room was made, in
+ * one database transaction, so two tabs that open at once read the same. It
+ * writes back `rescue` first: each waiting row that the database does not
+ * hold, in order, and the generation, count, position and mark that it lacks.
+ * A database from before the generation gets a new one.
  */
-async function openGeneration(database: IDBPDatabase, rescue?: Rescue): Promise<unknown> {
+async function openGeneration(
+  database: IDBPDatabase,
+  rescue?: Rescue,
+): Promise<{ readonly generation: unknown; readonly room: number }> {
   const tx = database.transaction(stores, 'readwrite');
   const store = tx.objectStore(position);
   const found: unknown = await store.get('generation');
@@ -145,6 +152,9 @@ async function openGeneration(database: IDBPDatabase, rescue?: Rescue): Promise<
       }
     }
     generation ??= rescue.generation;
+    if (rescue.room !== undefined && (await store.get('room')) === undefined) {
+      await store.put(rescue.room, 'room');
+    }
     if (rescue.position && (await store.get('position')) === undefined) {
       await store.put(rescue.position, 'position');
     }
@@ -156,8 +166,9 @@ async function openGeneration(database: IDBPDatabase, rescue?: Rescue): Promise<
   if (generation !== found) {
     await store.put(generation, 'generation');
   }
+  const room = roomCount(await store.get('room'));
   await tx.done;
-  return generation;
+  return { generation, room };
 }
 
 type Writer = { held: boolean; readonly taken: Promise<null> };
@@ -267,45 +278,41 @@ export async function openIndexedDb(name: string, version = 2): Promise<LocalDat
   let database = await Promise.race([openDB(name, version, callbacks), blocked.promise]);
   // A recreate that did not write its rows left a copy of them here.
   const rescueKey = `local-database:${name}:rescue`;
-  let generation = await openGeneration(database, readRescue(rescueKey));
+  // `openedRoom` is the count that this handle read. A save after it changed writes only the waiting rows.
+  let { generation, room: openedRoom } = await openGeneration(database, readRescue(rescueKey));
   globalThis.localStorage?.removeItem(rescueKey);
   const writer = await writerOf(name);
 
-  /**
-   * Deletes the database and creates it again with only what a device must
-   * keep: each waiting row, the generation, the emptied position and the
-   * mark. A copy waits in `localStorage` until the new rows are written.
-   */
+  /** Deletes the database and creates it again with only what a device must keep. */
   async function recreate(): Promise<SaveResult> {
-    const tx = database.transaction(stores, 'readonly');
-    const [waiting, saved, ended, current] = await Promise.all([
-      tx.objectStore(transactions).getAll(),
-      tx.objectStore(position).get('position'),
-      tx.objectStore(position).get('ended'),
-      tx.objectStore(position).get('generation'),
-      tx.done,
-    ]);
-    if (current !== generation) {
+    const { rebuild } = await import('@repo/sync/runtime/indexed-db-rebuild');
+    const rebuilt = await rebuild({
+      database,
+      name,
+      version,
+      callbacks,
+      generation,
+      key: rescueKey,
+      async reopen(next) {
+        await openGeneration(next, readRescue(rescueKey));
+        localStorage.removeItem(rescueKey);
+      },
+    });
+    if (rebuilt === 'cleared') {
       return 'cleared';
     }
-    const rescue: Rescue = { generation, position: emptiedPosition(saved), ended, waiting };
-    // With no copy, the delete could lose the waiting rows, so it does not run.
-    localStorage.setItem(rescueKey, JSON.stringify(rescue));
-    database.close();
-    await deleteDB(name);
-    database = await openDB(name, version, callbacks);
-    await openGeneration(database, rescue);
-    localStorage.removeItem(rescueKey);
+    database = rebuilt;
     return 'saved';
   }
 
-  /** Drops each confirmed record and empties the position, in one database transaction. */
+  /** Drops each confirmed record, empties the position and counts the room made, in one database transaction. */
   async function dropRecords(): Promise<SaveResult> {
     const tx = database.transaction(stores, 'readwrite');
     const store = tx.objectStore(position);
-    const [current, saved]: Array<unknown> = await Promise.all([
+    const [current, saved, room]: Array<unknown> = await Promise.all([
       store.get('generation'),
       store.get('position'),
+      store.get('room'),
     ]);
     if (current !== generation) {
       await tx.done;
@@ -314,6 +321,7 @@ export async function openIndexedDb(name: string, version = 2): Promise<LocalDat
     const emptied = emptiedPosition(saved);
     await Promise.all([
       emptied ? store.put(emptied, 'position') : store.delete('position'),
+      store.put(roomCount(room) + 1, 'room'),
       tx.objectStore(records).clear(),
       tx.done,
     ]);
@@ -338,9 +346,13 @@ export async function openIndexedDb(name: string, version = 2): Promise<LocalDat
     },
     save: async (save) => {
       const tx = database.transaction(stores, 'readwrite');
-      const current: unknown = await tx.objectStore(position).get('generation');
+      const [current, room]: Array<unknown> = await Promise.all([
+        tx.objectStore(position).get('generation'),
+        tx.objectStore(position).get('room'),
+      ]);
       const result: SaveResult = current === generation ? 'saved' : 'cleared';
-      await Promise.all([result === 'saved' ? write(tx, save) : undefined, tx.done]);
+      const written = roomSave(save, openedRoom, roomCount(room));
+      await Promise.all([result === 'saved' ? write(tx, written) : undefined, tx.done]);
       if (result === 'cleared') {
         wake();
       }
@@ -376,6 +388,7 @@ export async function openIndexedDb(name: string, version = 2): Promise<LocalDat
         tx.done,
       ]);
       generation = next;
+      openedRoom = 0;
     },
     onLost(listener) {
       heard.add(listener);

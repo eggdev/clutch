@@ -3,6 +3,7 @@ import {
   fullSave,
   leftBehind,
   markAfter,
+  roomSave,
   stateOf,
 } from '@repo/sync/runtime/pool-doors';
 import type { MarkState } from '@repo/sync/runtime/pool-doors';
@@ -44,6 +45,8 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
   let ended: MarkState | undefined;
   // The generation of the rows, which each clear writes anew.
   let generation = 0;
+  // The times that room was made, which each handle reads when it opens.
+  let room = 0;
   const log: Array<LocalSave> = [];
   // The lost listeners of each handle, as a `BroadcastChannel` of each tab.
   const handles = new Set<() => void>();
@@ -93,6 +96,7 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
     let writes = 0;
     // The generation that this handle read when it opened.
     let mine = generation;
+    let openedRoom = room;
     let lost = false;
     const heard = new Set<() => void>();
     function wake() {
@@ -114,8 +118,9 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
           wake();
           return Promise.resolve('cleared');
         }
-        apply(save);
-        log.push(structuredClone(save));
+        const written = roomSave(save, openedRoom, room);
+        apply(written);
+        log.push(structuredClone(written));
         writes += 1;
         return Promise.resolve('saved');
       },
@@ -126,6 +131,7 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
         }
         records.clear();
         position = emptiedPosition(position);
+        room += 1;
         return Promise.resolve('saved');
       },
       clear: () => {
@@ -142,6 +148,8 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
         ended = 'fresh';
         generation += 1;
         mine = generation;
+        room = 0;
+        openedRoom = 0;
         return Promise.resolve();
       },
       onLost(listener) {

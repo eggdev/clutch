@@ -194,3 +194,83 @@ test('a device that keeps failing waits longer between saves, and never writes e
   expect(lines).toEqual([couldNotSave, madeRoom]);
   await pool.stop();
 });
+
+/** The stamps of a second tab, whose IDs differ from those of `testStamps`. */
+function tabStamps(prefix: string) {
+  let count = 0;
+  return { ...testStamps(), newId: () => `${prefix}-${(count += 1)}` };
+}
+
+/** A live delta at `syncId` that renames one card. */
+const liveDelta = (syncId: number, id: string): Delta => ({
+  syncId,
+  transactionId: null,
+  changes: [{ model: 'Card', id, action: 'upsert', data: { title: 'Live' }, groups: [testGroup] }],
+});
+
+test('a tab that is not the writer makes room, and the writer then saves no record and no position over it', async () => {
+  const memory = memoryLocalDatabase(manyRecords());
+  let full = false;
+  // The other tab cannot save until it makes room.
+  const other = failingDevice(memory.tab(new Promise(() => {})), (rooms) =>
+    full && rooms === 0 ? quotaError() : undefined,
+  );
+  const writer = await loadPool(memory, [renameLocal], [cards], testStamps(), () => {});
+  const tab = await loadPool(other.database, [renameLocal], [cards], tabStamps('n'), () => {});
+  await settle();
+  full = true;
+  tab.run(rename, { id: 'c1', title: 'From the other tab' });
+  await settle();
+  expect(other.rooms()).toBe(1);
+  writer.applyDeltas([liveDelta(41, 'c5')]);
+  writer.run(rename, { id: 'c2', title: 'From the writer' });
+  await settle();
+  const saved = await memory.read();
+  expect(saved?.lastSyncId).toBe(0);
+  expect(saved?.tables).toEqual({});
+  expect(saved?.pending.map(({ input }) => input)).toEqual([
+    { id: 'c1', title: 'From the other tab' },
+    { id: 'c2', title: 'From the writer' },
+  ]);
+  await writer.stop();
+  await tab.stop();
+  // The next start reads sync ID 0, so the pool loads every record again from the server.
+  const next = await loadPool(
+    memory.tab(Promise.resolve()),
+    [renameLocal],
+    [cards],
+    testStamps('later'),
+  );
+  expect(next.lastSyncId()).toBe(0);
+  expect(next.queue()).toHaveLength(2);
+});
+
+test('the writer makes room, a tab that is not the writer saves a row after it, and a start in the middle saves records again', async () => {
+  const memory = memoryLocalDatabase(manyRecords());
+  const device = failingDevice(memory, (rooms) => (rooms === 0 ? quotaError() : undefined));
+  const other = memory.tab(new Promise(() => {}));
+  const writer = await loadPool(device.database, [renameLocal], [cards], testStamps(), () => {});
+  await settle();
+  expect(device.rooms()).toBe(1);
+  const tab = await loadPool(other, [renameLocal], [cards], tabStamps('n'), () => {});
+  tab.run(rename, { id: 'c1', title: 'From the other tab' });
+  writer.applyDeltas([liveDelta(41, 'c5')]);
+  await settle();
+  const emptied = await memory.read();
+  expect(emptied?.lastSyncId).toBe(0);
+  expect(emptied?.pending).toHaveLength(1);
+  // The other tab starts again in the middle, then becomes the writer: its saves write records again.
+  await tab.stop();
+  await writer.stop();
+  const restartedHandle = memory.tab(Promise.resolve());
+  const restarted = await loadPool(restartedHandle, [renameLocal], [cards], tabStamps('r'));
+  expect(restarted.lastSyncId()).toBe(0);
+  expect(restarted.confirmActor(ana)).toBe(true);
+  restarted.applyGroups([testGroup], [liveDelta(60, 'c9')]);
+  restarted.applyDeltas([{ syncId: 60, transactionId: null, changes: [] }]);
+  await settle();
+  const saved = await memory.read();
+  expect(saved?.lastSyncId).toBe(60);
+  expect(saved?.tables.Card).toEqual([{ id: 'c9', title: 'Live' }]);
+  expect(saved?.pending).toHaveLength(1);
+});

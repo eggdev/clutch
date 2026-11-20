@@ -190,6 +190,13 @@ records are a cache of the server. `loadPool` in
   rest of the session, so it cannot fill the device again. The records in
   memory stay, and the screen keeps working. The pool reports one sentence
   that says what happened and that nothing the person did is lost.
+- Any tab can make room, also a tab that does not write the confirmed
+  records. So `makeRoom` also raises a count of the room made, in the same
+  database transaction. Each handle reads the count when it opens, and each
+  save compares it in its own database transaction. When the count changed,
+  the save writes only its waiting rows, with no record and no position. So
+  no tab writes a position above 0 over the emptied records before the next
+  start. A clear sets the count back, with the new generation.
 - At the next start, the device holds its waiting transactions at sync ID 0.
   The pool loads again from the server and sends what waits.
 

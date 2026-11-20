@@ -228,6 +228,21 @@ export function emptiedPosition(saved: unknown): SyncPosition | undefined {
   return { lastSyncId: 0, groups, ...(actor === undefined ? {} : { actor }) };
 }
 
+/** The saved count of the times that room was made on the device. A database from before it has 0. */
+export const roomCount = (saved: unknown): number => (typeof saved === 'number' ? saved : 0);
+
+/**
+ * What a handle writes of `save`: only its waiting rows once room was made
+ * after the handle opened, so the count `now` is not the count `opened`. A
+ * record or a position above 0 never lands over the emptied records.
+ */
+export function roomSave(save: LocalSave, opened: number, now: number): LocalSave {
+  if (opened === now || !save.confirmed) {
+    return save;
+  }
+  return { add: save.add, done: save.done, ...(save.afterLoad ? { afterLoad: true } : {}) };
+}
+
 /**
  * Whether a saved waiting row is left behind by the save that removes the
  * mark of a session end: it names no actor, and the save does not add it. A
