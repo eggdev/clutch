@@ -283,3 +283,30 @@ test('a get tool returns the whole record, and the refusals of a read name the c
     reason: 'You may not read the records of this space.',
   });
 }, 30_000);
+
+/** The IDs that a list tool gave. */
+function listedIds(result: ToolResult) {
+  const { items } = dataOf(result);
+  return Array.isArray(items) ? items.map((item: { id: string }) => item.id) : [];
+}
+
+/** Files card `id` in a space, and lists the open space. */
+const file = (id: string, spaceId: string, title: string, message: string) =>
+  fileTools.call('files_file_card', { id, spaceId, title }, actor, message);
+const listOpen = (message: string) =>
+  fileTools.call('files_of_space_list', { id: 'open' }, actor, message);
+
+test('a read tool of a group does not list a record that moved out of it', async () => {
+  const [before, after] = await withLog(
+    Effect.gen(function* () {
+      yield* file('c1', 'open', 'First', 'm1');
+      yield* file('c2', 'open', 'Second', 'm2');
+      const listed = yield* listOpen('m3');
+      // The same card, filed again in another space, leaves the open space.
+      yield* file('c1', 'other', 'First', 'm4');
+      return [listed, yield* listOpen('m5')];
+    }),
+  );
+  expect(listedIds(before)).toEqual(['c1', 'c2']);
+  expect(listedIds(after)).toEqual(['c2']);
+}, 30_000);

@@ -2,17 +2,16 @@ import type { Replayable, Waits } from '@repo/sync/contract/command';
 import { stamped } from '@repo/sync/contract/fields';
 import type { CallOf, Fields } from '@repo/sync/contract/fields';
 import type { Model, RecordRow } from '@repo/sync/contract/record';
+import { createConfirmed } from '@repo/sync/runtime/confirmed';
 import {
   consoleReport,
-  declarationsByName,
-  deltaRecordMisfit,
   deviceStamps,
   runMisfit,
   savedCommandMisfit,
-  savedRecordsMisfit,
 } from '@repo/sync/runtime/pool-doors';
 import type { PoolDeclarations, PoolOptions } from '@repo/sync/runtime/pool-doors';
 import {
+  applyOutcomes,
   copy,
   draftOver,
   groupWaits,
@@ -21,14 +20,12 @@ import {
   readAs,
   recordKey,
   sameJson,
-  savedRows,
   sortedIds,
-  tableOf,
   wake,
 } from '@repo/sync/runtime/tables';
 import type { Tables } from '@repo/sync/runtime/tables';
-import type { ConfirmedSave, PoolState, RecordMeta } from '@repo/sync/types/local-database';
-import type { Change, Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
+import type { ConfirmedSave, PoolState } from '@repo/sync/types/local-database';
+import type { Delta, Outcome, Transaction } from '@repo/sync/types/protocol';
 import type { ReadablePool, Rejection } from '@repo/sync/types/records';
 
 type Pending = { readonly transaction: Transaction; sent: boolean; acceptedAt: number | null };
@@ -69,6 +66,11 @@ export type Pool = ReadablePool & {
    * deletes each confirmed record that is in no loaded group.
    */
   readonly applyGroups: (loaded: ReadonlyArray<string>, backfill: ReadonlyArray<Delta>) => void;
+  /**
+   * Applies one page of the backfill of a group. The group loads only with
+   * its `Groups` message, and no purge deletes the records of its pages.
+   */
+  readonly applyPage: (group: string, backfill: ReadonlyArray<Delta>) => void;
   /** The groups loaded now, which the engine names when it connects. */
   readonly loadedGroups: () => ReadonlyArray<string>;
   /**
@@ -110,6 +112,9 @@ export type Pool = ReadablePool & {
  * `options.stamps` gives each new ID and the time of each run. Only the pool
  * reads the clock and makes IDs on the client, so a test that gives its own
  * stamps gets the same records on every run.
+ *
+ * The confirmed records live in `confirmed.ts`. This file holds what goes on
+ * top of them: the waiting transactions, the visible tables and the watchers.
  */
 export function createPool(
   changes: ReadonlyArray<Replayable>,
@@ -118,24 +123,12 @@ export function createPool(
 ): Pool {
   const stamps = options.stamps ?? deviceStamps;
   const report = options.report ?? consoleReport;
-  const declared = declarationsByName(declarations.records);
   const byName = new Map(changes.map((change) => [change.name, change]));
-  let confirmed: Tables = new Map();
+  const waits = groupWaits();
+  const confirmed = createConfirmed(declarations.records, report, waits.loading);
   let visible: Tables = new Map();
   let pending: Array<Pending> = [];
-  let lastSyncId = 0;
   let rejection: Rejection | undefined;
-  // The groups and last sync ID of each confirmed record, by `recordKey`.
-  let meta = new Map<string, RecordMeta>();
-  let loaded = new Set<string>();
-  // The keys of the confirmed records that changed since the last save, or
-  // every record when the pool dropped its confirmed records.
-  let unsaved = new Set<string>();
-  let unsavedAll = false;
-  // The build that left a record of a delta out of the confirmed records, if one did.
-  let leftOutBy: string | undefined;
-  let build = 'unnamed';
-  const waits = groupWaits();
   // The ID lists handed out, keyed by model and order. A list is rebuilt only
   // after its model changes, and the old array is kept when the IDs match.
   const idLists = new Map<string, { ids: ReadonlyArray<string>; stale: boolean }>();
@@ -146,7 +139,7 @@ export function createPool(
   const pendingListeners = new Set<() => void>();
 
   function recompute() {
-    const next = copy(confirmed);
+    const next = copy(confirmed.tables());
     const draft = draftOver(next);
     for (const { transaction } of pending) {
       byName.get(transaction.command)?.replay(draft, transaction.input);
@@ -168,64 +161,24 @@ export function createPool(
     wake(changeListeners);
   }
 
-  /** Applies one change unless the record already holds a later one. Door 2 checks each record. */
-  function applyChange(change: Change, syncId: number) {
-    const key = recordKey(change.model, change.id);
-    const known = meta.get(key);
-    if (known && known.syncId > syncId) {
-      return;
-    }
-    if (change.action === 'upsert' && change.data !== null) {
-      const row = { ...change.data, id: change.id };
-      const misfit = deltaRecordMisfit(declared, change.model, change.id, row);
-      if (misfit) {
-        report(misfit);
-        leftOutBy = build;
-        return;
-      }
-      tableOf(confirmed, change.model).set(change.id, row);
-      meta.set(key, { groups: change.groups, syncId });
-    } else {
-      tableOf(confirmed, change.model).delete(change.id);
-      meta.delete(key);
-    }
-    unsaved.add(key);
-  }
-
   /** Records a refusal the way the server's refusal is recorded, and wakes the rejection watchers. */
   function refuse(transactionId: string, command: string, reason: string) {
     rejection = { transactionId, command, code: 'invalid-input', reason };
     wake(rejectionWatchers);
   }
 
-  /** Deletes each confirmed record that is in no loaded group. */
-  function purge() {
-    const current = loaded;
-    for (const [key, { groups }] of meta) {
-      if (!groups.some((group) => current.has(group))) {
-        const [model = '', id = ''] = key.split('\u0000');
-        confirmed.get(model)?.delete(id);
-        meta.delete(key);
-        unsaved.add(key);
-      }
-    }
-  }
-
   function wakeLoaded() {
+    const loaded = confirmed.loaded();
     waits.wake((group) => loaded.has(group));
   }
 
   function dropSettled() {
+    const lastSyncId = confirmed.lastSyncId();
     pending = pending.filter(({ acceptedAt }) => acceptedAt === null || acceptedAt > lastSyncId);
   }
 
   function resetConfirmed() {
-    confirmed = new Map();
-    meta = new Map();
-    unsavedAll = true;
-    unsaved = new Set();
-    lastSyncId = 0;
-    leftOutBy = undefined;
+    confirmed.reset();
     for (const entry of pending) {
       entry.sent = false;
       entry.acceptedAt = null;
@@ -279,35 +232,16 @@ export function createPool(
     },
     isPending: (transactionId) =>
       pending.some(({ transaction }) => transaction.id === transactionId),
-    lastSyncId: () => lastSyncId,
+    lastSyncId: confirmed.lastSyncId,
     load(state) {
-      const misfit = savedRecordsMisfit(state, declared);
-      if (misfit) {
-        report(misfit);
-        meta = new Map();
-        loaded = new Set();
-        confirmed = new Map();
-        lastSyncId = 0;
-        leftOutBy = undefined;
-        unsavedAll = true;
+      if (confirmed.load(state)) {
+        wakeLoaded();
+      } else {
         // The pool asks the server again for each group of the dropped copy.
         for (const group of Array.isArray(state.groups) ? state.groups : []) {
           waits.keep(group);
         }
-      } else {
-        meta = new Map(Object.entries(state.meta));
-        loaded = new Set(state.groups);
-        confirmed = new Map(
-          Object.entries(state.tables).map(([name, rows]) => [
-            name,
-            new Map(rows.map((row) => [row.id, row])),
-          ]),
-        );
-        ({ lastSyncId, leftOutBy } = state);
-        unsavedAll = false;
-        wakeLoaded();
       }
-      unsaved = new Set();
       pending = [];
       // A copy with another shape may hold no list of saved commands.
       for (const transaction of Array.isArray(state.pending) ? state.pending : []) {
@@ -322,31 +256,10 @@ export function createPool(
       recompute();
     },
     snapshot: () => ({
-      lastSyncId,
-      groups: [...loaded],
-      meta: Object.fromEntries(meta),
-      tables: Object.fromEntries(
-        [...confirmed].map(([name, table]) => [name, [...table.values()]]),
-      ),
+      ...confirmed.snapshot(),
       pending: pending.map(({ transaction }) => transaction),
-      ...(leftOutBy === undefined ? {} : { leftOutBy }),
     }),
-    confirmedChanges(everything) {
-      const replace = everything || unsavedAll;
-      const { put, remove } = savedRows(replace ? meta.keys() : unsaved, meta, confirmed);
-      unsaved = new Set();
-      unsavedAll = false;
-      return {
-        replace,
-        put,
-        remove: replace ? [] : remove,
-        position: {
-          lastSyncId,
-          groups: [...loaded],
-          ...(leftOutBy === undefined ? {} : { leftOutBy }),
-        },
-      };
-    },
+    confirmedChanges: confirmed.changes,
     queue: () => pending.map(({ transaction }) => transaction),
     unsent: () => pending.filter(({ sent }) => !sent).map(({ transaction }) => transaction),
     markSent(ids, sent) {
@@ -358,43 +271,45 @@ export function createPool(
     },
     applyDeltas(deltas) {
       for (const delta of deltas) {
-        if (delta.syncId <= lastSyncId) {
+        if (!confirmed.applyDelta(delta)) {
           continue;
         }
-        for (const change of delta.changes) {
-          applyChange(change, delta.syncId);
-        }
-        lastSyncId = delta.syncId;
         pending = pending.filter(({ transaction }) => transaction.id !== delta.transactionId);
       }
       dropSettled();
       recompute();
     },
     applyGroups(groups, backfill) {
-      loaded = new Set(groups);
-      for (const delta of backfill) {
-        for (const change of delta.changes) {
-          applyChange(change, delta.syncId);
-        }
-      }
-      purge();
+      confirmed.setLoaded(groups);
+      confirmed.applyBackfill(backfill);
+      confirmed.purge();
       recompute();
       wakeLoaded();
     },
-    loadedGroups: () => [...loaded],
-    loadGroup: (group) => (loaded.has(group) ? Promise.resolve(true) : waits.wait(group)),
+    applyPage(group, backfill) {
+      waits.paged(group);
+      confirmed.applyBackfill(backfill);
+      recompute();
+    },
+    loadedGroups: () => [...confirmed.loaded()],
+    loadGroup: (group) =>
+      confirmed.loaded().has(group) ? Promise.resolve(true) : waits.wait(group),
     refuseGroup(group) {
       report(
         `The server refused to load ${group} for this account, so its screen shows no records.`,
       );
+      const paged = waits.loading().has(group);
       waits.refuse(group);
+      if (paged) {
+        confirmed.purge();
+        recompute();
+      }
     },
     requestedGroups: waits.requested,
     onLoadRequest: waits.onRequest,
     resetConfirmed,
     nameBuild(digest) {
-      build = digest;
-      if (leftOutBy !== undefined && leftOutBy !== digest) {
+      if (confirmed.nameBuild(digest)) {
         report(
           'Another build of this app left out a record that it could not read, so this build loads each record again from the server.',
         );
@@ -403,23 +318,7 @@ export function createPool(
     },
     settle(outcomes) {
       const before = rejection;
-      for (const outcome of outcomes) {
-        const entry = pending.find(({ transaction }) => transaction.id === outcome.transactionId);
-        if (!entry) {
-          continue;
-        }
-        if (outcome.status === 'rejected') {
-          pending = pending.filter((item) => item !== entry);
-          rejection = {
-            transactionId: outcome.transactionId,
-            command: entry.transaction.command,
-            code: outcome.code ?? 'failed',
-            reason: outcome.reason ?? 'rejected',
-          };
-        } else {
-          entry.acceptedAt = outcome.syncId;
-        }
-      }
+      ({ pending, rejection } = applyOutcomes(pending, outcomes, rejection));
       dropSettled();
       recompute();
       if (rejection !== before) {

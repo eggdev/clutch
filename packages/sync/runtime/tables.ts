@@ -1,11 +1,13 @@
 import type { Draft } from '@repo/sync/contract/command';
 import type { Model, RecordRow } from '@repo/sync/contract/record';
-import type { RecordKey, RecordMeta, SavedRecord } from '@repo/sync/types/local-database';
+import type { Outcome, Transaction } from '@repo/sync/types/protocol';
+import type { Rejection } from '@repo/sync/types/records';
 
 /**
  * The plain data helpers of the object pool: tables of records, the draft a
  * local change writes to, the change detection that keeps unchanged records
- * as the same objects, and the waits of the gates for a group. They share
+ * as the same objects, the waits of the gates for a group, and the outcomes
+ * of a push. They share
  * one module, because each module of the pool loads before the first paint.
  */
 export type Table = Map<string, RecordRow>;
@@ -150,33 +152,10 @@ export function wake(listeners: Iterable<() => void>): void {
 export const recordKey = (model: string, id: string) => `${model}\u0000${id}`;
 
 /**
- * The rows of the confirmed records with these keys, for a save: a row for
- * each record that the pool holds, and a key to remove for each other one.
- */
-export function savedRows(
-  keys: Iterable<string>,
-  meta: ReadonlyMap<string, RecordMeta>,
-  tables: Tables,
-): { readonly put: Array<SavedRecord>; readonly remove: Array<RecordKey> } {
-  const put: Array<SavedRecord> = [];
-  const remove: Array<RecordKey> = [];
-  for (const key of keys) {
-    const [model = '', id = ''] = key.split('\u0000');
-    const known = meta.get(key);
-    const row = tables.get(model)?.get(id);
-    if (known && row) {
-      put.push({ model, id, row, groups: known.groups, syncId: known.syncId });
-    } else {
-      remove.push({ model, id });
-    }
-  }
-  return { put, remove };
-}
-
-/**
  * The gates that wait for a group, and the groups that the engine still has
  * to ask the server for. A wait ends in one of two ways: the group is loaded,
- * or the server refuses it.
+ * or the server refuses it. A group whose backfill comes in pages loads from
+ * its first page until that end.
  */
 export type GroupWaits = {
   /** Waits for a group and wakes the engine. `true` means loaded, `false` means refused. */
@@ -189,6 +168,10 @@ export type GroupWaits = {
   readonly refuse: (group: string) => void;
   /** The groups asked for and not loaded yet. */
   readonly requested: () => ReadonlyArray<string>;
+  /** Notes that a page of the backfill of a group came. */
+  readonly paged: (group: string) => void;
+  /** The groups whose pages came, and that are not loaded or refused yet. */
+  readonly loading: () => ReadonlySet<string>;
   /** Wakes when a gate asks for a group. Only the engine uses it. */
   readonly onRequest: (listener: (group: string) => void) => () => void;
 };
@@ -196,10 +179,12 @@ export type GroupWaits = {
 export function groupWaits(): GroupWaits {
   const waiters = new Map<string, Array<(loaded: boolean) => void>>();
   const listeners = new Set<(group: string) => void>();
+  const paged = new Set<string>();
 
   function end(group: string, loaded: boolean) {
     const resolves = waiters.get(group) ?? [];
     waiters.delete(group);
+    paged.delete(group);
     for (const resolve of resolves) {
       resolve(loaded);
     }
@@ -217,15 +202,53 @@ export function groupWaits(): GroupWaits {
       waiters.set(group, waiters.get(group) ?? []);
     },
     wake(isLoaded) {
-      for (const group of [...waiters.keys()].filter(isLoaded)) {
+      for (const group of new Set([...waiters.keys(), ...paged].filter(isLoaded))) {
         end(group, true);
       }
     },
     refuse: (group) => end(group, false),
     requested: () => [...waiters.keys()],
+    paged: (group) => paged.add(group),
+    loading: () => paged,
     onRequest(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
   };
+}
+
+/** A waiting transaction, with the sync ID of the event that accepted it, if one did. */
+type Waiting = { readonly transaction: Transaction; acceptedAt: number | null };
+
+/**
+ * The waiting transactions after the outcomes of one push, and the last
+ * refusal. A rejected transaction leaves the queue and becomes the refusal.
+ * An accepted one stays, with its sync ID, until its delta arrives. An
+ * outcome of a transaction that is not waiting changes nothing.
+ */
+export function applyOutcomes<W extends Waiting>(
+  pending: ReadonlyArray<W>,
+  outcomes: ReadonlyArray<Outcome>,
+  rejection: Rejection | undefined,
+): { readonly pending: Array<W>; readonly rejection: Rejection | undefined } {
+  let left = [...pending];
+  let last = rejection;
+  for (const outcome of outcomes) {
+    const entry = left.find(({ transaction }) => transaction.id === outcome.transactionId);
+    if (!entry) {
+      continue;
+    }
+    if (outcome.status === 'rejected') {
+      left = left.filter((item) => item !== entry);
+      last = {
+        transactionId: outcome.transactionId,
+        command: entry.transaction.command,
+        code: outcome.code ?? 'failed',
+        reason: outcome.reason ?? 'rejected',
+      };
+    } else {
+      entry.acceptedAt = outcome.syncId;
+    }
+  }
+  return { pending: left, rejection: last };
 }

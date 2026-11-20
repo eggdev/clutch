@@ -24,7 +24,7 @@ The engine is our own code, not a vendor.
 
 | Part           | File                                                                              | Runs on                       |
 | -------------- | --------------------------------------------------------------------------------- | ----------------------------- |
-| Object pool    | `packages/sync/runtime/pool.ts`                                                   | Client                        |
+| Object pool    | `packages/sync/runtime/pool.ts`, `runtime/confirmed.ts` (the confirmed records)   | Client                        |
 | Local database | `packages/sync/types/local-database.ts` (the seam), `runtime/indexed-db.ts` (web) | Client                        |
 | Boot           | `packages/sync/runtime/boot.ts`                                                   | Client                        |
 | Transport      | `packages/sync/runtime/transport.ts`                                              | Client, after the first paint |
@@ -40,15 +40,19 @@ The engine is our own code, not a vendor.
 The protocol has three calls over one WebSocket for each organization, through
 `effect/rpc`:
 
-- `Push` sends a batch of transactions and returns one outcome for each
-  write that the server tried. When the database does not answer, the list
+- `Push` sends a batch of at most 100 transactions and returns one outcome
+  for each write that the server tried. A longer queue goes in more pushes,
+  in order, one straight after the other. When the database does not answer, the list
   ends at that write. The client keeps each write with no outcome and sends
   it again. `packages/sync/runtime/transport.test.ts` holds this.
 - `Pull` names the groups that the client loaded before. It streams a `Groups`
   message first, then the deltas after the client's last sync ID, then each
   live delta. Each delta holds only the changes of the loaded groups.
 - `Load` asks the open `Pull` to load one more group. It fails with
-  `GroupNotAllowed` when the actor may not load the group.
+  `GroupNotAllowed` when the actor may not load the group. With `pages`, the
+  client reads the backfill in `Page` messages of at most 1,000 events. A
+  `Groups` message that names the group then brings the last page. A build that
+  does not send `pages` gets the whole backfill in one `Groups` message.
 
 `Pull` fails with `SessionEnded` when the session ends. It fails with
 `ServerBehind` when the client's last sync ID is above the server's newest
@@ -113,6 +117,7 @@ the same, so loading the local database needs no decode.
   once. A background tab gets no frame callback, so it connects after 500 ms.
   Without this limit, it misses live deltas until a person opens it.
 - One `Pull` element holds at most 1,000 deltas, so one decode stays short.
+  A page of a backfill holds at most 1,000 events too.
 - A sign-out calls `Sessions.end` with the user. Each of the user's sockets
   closes with code 4401, and the client clears its local database.
 - After a database restore, the server's log can end before a client's last
@@ -154,6 +159,15 @@ Product code asserts no types, so these shapes replace each `as` cast. See
   the record and the organization, and it adds the groups of the record.
 - The event log stores the groups of all changes of an event in an array
   column. A GIN index covers it. A change with no group fails the commit.
+- The event log keeps the last state of each record in `sync_records`: its
+  groups, its last change and its data. A commit updates it in the
+  transaction of the event. A change then names in `left` the groups that its
+  record left, and the event is indexed under them too.
+- One function, `seenDelta` in `packages/sync/service/visible.ts`, decides
+  what a connection sees, for the backlog, the backfill and the live stream.
+  A change in a loaded group comes as it is. A change of a record that left
+  each loaded group comes as a delete with no data. `left` never leaves the
+  server.
 - `SyncGroups.groupsFor(actor)` names the groups that an actor may load.
   `packages/access` fills it. See [authorization](./authorization.md).
 - A client loads each `eager` group when it connects: its organization and its
@@ -184,7 +198,14 @@ open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
 
 - A loaded group resolves at once, offline too.
 - Otherwise, the engine sends `Load`. The server sends the group's past
-  changes as a backfill, and the gate resumes when they are in the pool.
+  changes as a backfill, in pages, and the gate resumes after the last page.
+  The server reads each page with its own query, so it never holds the whole
+  history of a group.
+- The pool applies the records of each page at once. The group is not loaded
+  until its `Groups` message. No purge deletes the records of a group whose
+  pages have come, until it loads or the server refuses it. A client that
+  drops between two pages does not name the group in its next `Pull`, and
+  the gate asks for the whole group again.
 - A record that already holds a later change keeps it. The backfill never
   undoes a later change.
 - After 3 seconds, or offline, the gate stops waiting and opens the screen
@@ -238,7 +259,8 @@ screen shows nothing in its place.
 
 ## What to read when changing it
 
-- `packages/sync/runtime/pool.ts`, `packages/sync/service/event-log.ts` and
+- `packages/sync/runtime/pool.ts`, `packages/sync/runtime/confirmed.ts`,
+  `packages/sync/service/event-log.ts` and
   `packages/sync/service/feed.ts`
 - [Server](./server.md) and [client](./client.md)
 - [Normalized source of truth](../../principles/normalized-source-of-truth.md#client-copies)

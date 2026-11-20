@@ -2,6 +2,7 @@ import type { Change } from '@repo/sync/types/protocol';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
   index,
   integer,
   jsonb,
@@ -40,6 +41,30 @@ export const syncEvents = pgTable(
     primaryKey({ columns: [table.organizationId, table.syncId] }),
     uniqueIndex('sync_events_transaction').on(table.organizationId, table.transactionId),
     index('sync_events_groups').using('gin', table.groups),
+  ],
+);
+
+/**
+ * The last state of each record that the log holds: its groups, the sync ID
+ * of its last change, its last data, and whether that change deleted it. A
+ * commit updates the row in the transaction of its event, so the next change
+ * of the record knows the groups that it leaves. A group load can read the
+ * records of a group from here, with a GIN index on the groups.
+ */
+export const syncRecords = pgTable(
+  'sync_records',
+  {
+    organizationId: text('organization_id').notNull(),
+    model: text('model').notNull(),
+    recordId: text('record_id').notNull(),
+    groups: text('groups').array().notNull(),
+    syncId: bigint('sync_id', { mode: 'number' }).notNull(),
+    data: jsonb('data').$type<Readonly<Record<string, unknown>>>(),
+    deleted: boolean('deleted').notNull().default(false),
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.model, table.recordId] }),
+    index('sync_records_groups').using('gin', table.groups),
   ],
 );
 

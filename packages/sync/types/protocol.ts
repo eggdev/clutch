@@ -14,6 +14,10 @@ const RecordData = Schema.Record(Schema.String, Schema.Unknown);
  * One record that a server change wrote or deleted, with its sync groups. A
  * client gets the change only when it has loaded one of those groups. A
  * delete carries the last data of the record, so its groups are known.
+ * `left` names the groups that the record was in before the change and is
+ * not in now. The log stores it, and a client of only those groups gets a
+ * delete instead. It is an optional key, so each build reads a change with
+ * or without it.
  */
 export const Change = Schema.Struct({
   model: Schema.String,
@@ -21,6 +25,7 @@ export const Change = Schema.Struct({
   action: Schema.Literals(['upsert', 'delete']),
   data: Schema.NullOr(RecordData),
   groups: Schema.Array(Schema.String),
+  left: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type Change = typeof Change.Type;
 
@@ -49,7 +54,18 @@ const GroupsMessage = Schema.TaggedStruct('Groups', {
   backfill: Schema.Array(Delta),
 });
 
-export const SyncMessage = Schema.Union([DeltasMessage, GroupsMessage]);
+/**
+ * One page of the backfill of a group that loads. More pages can follow. The
+ * `Groups` message that names the group comes last, with the last page as
+ * its backfill. Only a client that asked for pages in `Load` gets this
+ * message, so an older build never reads it.
+ */
+const PageMessage = Schema.TaggedStruct('Page', {
+  group: Schema.String,
+  backfill: Schema.Array(Delta),
+});
+
+export const SyncMessage = Schema.Union([DeltasMessage, GroupsMessage, PageMessage]);
 export type SyncMessage = typeof SyncMessage.Type;
 
 /** One run of a command, as the client sends it. */
@@ -75,10 +91,14 @@ export const Outcome = Schema.Struct({
 });
 export type Outcome = typeof Outcome.Type;
 
+/** The most transactions that one `Push` holds. A longer queue goes in more pushes, in order. */
+export const transactionsPerPush = 100;
+
 /**
  * The calls of the sync engine, over one socket for each organization.
  * `Pull` names the groups that the client loaded before, and streams
  * messages. `Load` asks the open `Pull` stream to load one more group.
+ * `Push` holds at most `transactionsPerPush` transactions.
  */
 export class SyncRpcs extends RpcGroup.make(
   Rpc.make('Push', {
@@ -98,7 +118,12 @@ export class SyncRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make('Load', {
-    payload: { group: Schema.String },
+    payload: {
+      group: Schema.String,
+      // The client reads a backfill in `Page` messages. An optional key, so
+      // a build that does not send it gets the whole backfill in one message.
+      pages: Schema.optionalKey(Schema.Boolean),
+    },
     error: GroupNotAllowed,
   }),
 ) {}
