@@ -89,3 +89,48 @@ test('a client behind the trimmed log loads again, ends with each record and kee
   expect(notes()).toEqual(['n1', 'n2', 'n3', 'n4']);
   expect(pool.snapshot().pending).toEqual([]);
 }, 30_000);
+
+test('a write that the server accepted, sent again after the trim deleted its event, applies once', async () => {
+  const result = await Effect.runPromise(
+    Effect.gen(function* () {
+      const url = yield* syncUrl;
+      const push = (transactions: ReadonlyArray<ReturnType<typeof note>>) =>
+        Effect.flatMap(RpcClient.make(SyncRpcs), (rpc) => rpc.Push({ transactions })).pipe(
+          Effect.scoped,
+          Effect.provide(socketClient(url)),
+        );
+      // The device saw no delta of n1, so it keeps the write as waiting.
+      const [first] = yield* push([note('n1')]);
+      yield* push([note('n2'), note('n3')]);
+      yield* trimLogJob
+        .execute(
+          {},
+          {
+            jobId: 'sync/trim-log:test',
+            organizationId: null,
+            attempt: 1,
+            commit: () => Effect.die('The trim job commits nothing.'),
+          },
+        )
+        .pipe(
+          Effect.provide(
+            ConfigProvider.layer(ConfigProvider.fromEnv({ env: { SYNC_LOG_KEEP_DAYS: '0' } })),
+          ),
+        );
+      // After `ServerBehind`, the client sends each waiting write again.
+      const [again] = yield* push([note('n1')]);
+      const head = yield* Effect.flatMap(RpcClient.make(SyncRpcs), (rpc) =>
+        rpc.Pull({ lastSyncId: 0, groups: ['space:general'] }).pipe(
+          Stream.filter((message) => message._tag === 'Deltas'),
+          Stream.take(1),
+          Stream.runCollect,
+        ),
+      ).pipe(Effect.scoped, Effect.provide(socketClient(url)));
+      return { first, again, head: head[0]?._tag === 'Deltas' ? head[0].deltas[0]?.syncId : 0 };
+    }).pipe(Effect.provide(server)),
+  );
+  expect(result.first?.status).toBe('accepted');
+  expect(result.again).toEqual(result.first);
+  // No second event: the head is still the event of n2 and n3.
+  expect(result.head).toBe(3);
+}, 30_000);

@@ -11,7 +11,7 @@ import { Sessions } from '@repo/sync/service/sessions';
 import { settle } from '@repo/sync/service/settle';
 import { SyncGroups } from '@repo/sync/service/sync-groups';
 import { GroupNotAllowed } from '@repo/sync/types/group-not-allowed';
-import { SyncRpcs } from '@repo/sync/types/protocol';
+import { SyncRpcs, transactionsPerPush } from '@repo/sync/types/protocol';
 import type { Outcome, Transaction } from '@repo/sync/types/protocol';
 import { ServerBehind } from '@repo/sync/types/server-behind';
 import { SessionEnded } from '@repo/sync/types/session-ended';
@@ -171,8 +171,17 @@ export function SyncServer<R>(
         // The outcomes come in the order of the transactions. When the database
         // does not answer, the list ends there: that write and each write
         // behind it get no outcome, so the client keeps them in their order.
+        // A client sends at most `transactionsPerPush` in one push. A longer
+        // list is refused whole, before any of it runs.
         Push: ({ transactions }, { client, headers }) =>
           Effect.gen(function* () {
+            if (transactions.length > transactionsPerPush) {
+              return yield* Effect.die(
+                new Error(
+                  `A push holds ${transactions.length} transactions. The server takes at most ${transactionsPerPush}.`,
+                ),
+              );
+            }
             const outcomes: Array<Outcome> = [];
             for (const transaction of transactions) {
               const outcome = yield* push(transaction, client, headers).pipe(

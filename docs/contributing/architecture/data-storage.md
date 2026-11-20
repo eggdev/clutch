@@ -50,25 +50,33 @@ unless a migration rewrites every stored copy. See
 
 The template's sync engine holds these frozen contracts:
 
-| Contract                                                     | Defined in                              |
-| ------------------------------------------------------------ | --------------------------------------- |
-| The `sync_counters`, `sync_events` and `sync_records` tables | `packages/sync/repo/schema.ts`          |
-| The change shape in each event, with its `groups`            | `packages/sync/types/protocol.ts`       |
-| The `records`, `transactions` and `position` client stores   | `packages/sync/runtime/indexed-db.ts`   |
-| The saved pool state, with `groups`, `meta` and `actor`      | `packages/sync/types/local-database.ts` |
+| Contract                                                                          | Defined in                              |
+| --------------------------------------------------------------------------------- | --------------------------------------- |
+| The `sync_counters`, `sync_events`, `sync_records` and `sync_transactions` tables | `packages/sync/repo/schema.ts`          |
+| The change shape in each event, with its `groups`                                 | `packages/sync/types/protocol.ts`       |
+| The `records`, `transactions` and `position` client stores                        | `packages/sync/runtime/indexed-db.ts`   |
+| The saved pool state, with `groups`, `meta` and `actor`                           | `packages/sync/types/local-database.ts` |
 
 An event keeps its organization ID, so the log is scoped by tenant too. Its
 `groups` column holds the sync groups of all its changes, with a GIN index.
 An event written before the column existed has no groups, so no client gets
 it. A saved pool state without `groups` and `meta` loads as an empty pool.
 A saved position without `actor` keeps its copy, and takes the actor that the
-server names first.
+server names first. The `records` store holds no record that is in no loaded
+group of the position. A copy at sync ID 0 holds only part of a first load.
+The next pull from 0 drops each record that it does not send again.
 
 `sync_events` grows with each write. Its retention rule is
 `SYNC_LOG_KEEP_DAYS`, which has no value in the template, so the log keeps
 every event. With a value, the hourly `sync/trim-log` job deletes the older
 events and the deleted records of `sync_records` that they leave behind. See
 [the size of the log](./local-first-sync.md#the-size-of-the-log).
+
+`sync_transactions` grows only while the trim runs: one row for each client
+transaction whose event the trim deleted. It has a written exemption from
+retention. Its rows are never dropped. A client can send a waiting
+transaction again after any time, and the row makes the server apply it
+once. A row costs about 200 bytes with its index.
 
 <!-- kickoff: Each other frozen contract: each key format, object name and stored JSON shape, with the file that defines it. -->
 

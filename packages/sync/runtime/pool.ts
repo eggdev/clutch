@@ -63,7 +63,9 @@ export type Pool = ReadablePool & {
   readonly applyDeltas: (deltas: ReadonlyArray<Delta>) => void;
   /**
    * Sets the loaded groups. It applies the backfill of each new group, and
-   * deletes each confirmed record that is in no loaded group.
+   * deletes each confirmed record that is in no loaded group. The first one
+   * of a pull from sync ID 0 ends the snapshot of every loaded group, so it
+   * also deletes each confirmed record that the pull did not send.
    */
   readonly applyGroups: (loaded: ReadonlyArray<string>, backfill: ReadonlyArray<Delta>) => void;
   /**
@@ -82,7 +84,13 @@ export type Pool = ReadablePool & {
   readonly refuseGroup: (group: string) => void;
   /** The groups that a gate asked for and that are not loaded yet. */
   readonly requestedGroups: () => ReadonlyArray<string>;
-  /** Wakes when a gate asks for a group. Only the engine uses it. */
+  /**
+   * Wakes when a gate asks for a group. Only the engine uses it, and it
+   * listens for the length of one pull. When it stops, the pull has ended,
+   * and a load that did not finish leaves no record: each group whose pages
+   * came stops loading, and the pool drops each confirmed record that is in
+   * no loaded group.
+   */
   readonly onLoadRequest: (listener: (group: string) => void) => () => void;
   readonly resetConfirmed: () => void;
   /**
@@ -290,6 +298,7 @@ export function createPool(
     applyGroups(groups, backfill) {
       confirmed.setLoaded(groups);
       confirmed.applyBackfill(backfill);
+      confirmed.endLoad();
       confirmed.purge();
       recompute();
       wakeLoaded();
@@ -314,7 +323,14 @@ export function createPool(
       }
     },
     requestedGroups: waits.requested,
-    onLoadRequest: waits.onRequest,
+    onLoadRequest(listener) {
+      const leave = waits.onRequest(listener);
+      return () => {
+        if (leave() && confirmed.endPull(waits.cutOff())) {
+          recompute();
+        }
+      };
+    },
     resetConfirmed,
     nameBuild(digest) {
       if (confirmed.nameBuild(digest)) {

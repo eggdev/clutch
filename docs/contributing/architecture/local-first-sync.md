@@ -42,7 +42,8 @@ The protocol has three calls over one WebSocket for each organization, through
 `effect/rpc`:
 
 - `Push` sends a batch of at most 100 transactions and returns one outcome
-  for each write that the server tried. A longer queue goes in more pushes,
+  for each write that the server tried. The server refuses a longer batch
+  whole, and runs none of it. A client never sends one. A longer queue goes in more pushes,
   in order, one straight after the other. When the database does not answer, the list
   ends at that write. The client keeps each write with no outcome and sends
   it again. `packages/sync/runtime/transport.test.ts` holds this.
@@ -54,7 +55,7 @@ The protocol has three calls over one WebSocket for each organization, through
   A client past sync ID 0 that does not name an eager group lacks its
   records. The first `Groups` message then holds the snapshot of that group.
   With `pages`, `Page` messages come before it.
-- A client at sync ID 0 holds nothing. Its `Pull` sends the snapshot of each
+- A client at sync ID 0 holds at most part of a first load. Its `Pull` sends the snapshot of each
   loaded group in place of the deltas. Then it sends one delta with no changes
   at the head of the log. That delta moves the client's last sync ID to the head, so
   its next `Pull` asks only for the events after it.
@@ -107,7 +108,9 @@ the same, so loading the local database needs no decode.
    goes out only when the commit holds. After the commit, the server wakes its
    own process too. In each process, one reader for each organization reads the
    new events from the log, in sync ID order. It hands them to every open `Pull`
-   of the organization in that process. Each `Pull` sends only the changes of its loaded groups, and a
+   of the organization in that process. A `Pull` follows the reader only once
+   the reader knows where it starts. So the backlog of the `Pull` and the live
+   events leave no event out. Each `Pull` sends only the changes of its loaded groups, and a
    delete of each record that left them. The sender gets its delta too.
 7. The client applies the delta to its confirmed records, then applies each
    pending local change again on top. This is the rebase.
@@ -124,7 +127,8 @@ the same, so loading the local database needs no decode.
   rule `repo-determinism/no-ambient-time` rejects `Date.now()` and the other
   clock and random calls in client code outside `packages/sync`.
 - Each transaction has an ID. The server applies a transaction once, also when
-  the client sends it again.
+  the client sends it again. This holds after the trim deleted its event too.
+  The accepted outcome then names the sync ID of that first event.
 - The queue survives a reload. A transaction made offline goes to the server
   when the socket opens again.
 - After a socket drops, it opens again, and the engine pulls again. The new
@@ -168,9 +172,19 @@ job `sync/trim-log` trims the log of each organization:
 - It keeps the newest event of each organization, so the head stays right.
 - It deletes each record of `sync_records` that is marked deleted, and whose
   delete is older than the oldest event kept.
+- It moves the transaction ID of each event that it deletes to
+  `sync_transactions`, in the statement that deletes the event. A client can
+  hold an accepted transaction as waiting, such as when its tab closed before
+  the delta came. When it sends the transaction again, the server finds it
+  there, and does not apply it a second time.
 
 With `SYNC_LOG_KEEP_DAYS` set to D, an organization that writes W events a day
-keeps about D × W events, and at least one. A load reads `sync_records`, so a
+keeps about D × W events, and at least one. `sync_transactions` keeps one
+row for each client transaction that a trim deleted, for good. A saved copy
+has no age limit, so a client can send a waiting transaction again after any
+time. A row that went before then would let the change apply twice. A row
+costs about 200 bytes with its index, so a million trimmed transactions cost
+about 200 MB. A load reads `sync_records`, so a
 trim never changes what a new client gets. A client that was away for longer
 than D days loads again from 0. The `Pull` checks the oldest event again after
 the backlog. So a trim that runs during a `Pull` cannot drop an event that the
@@ -299,9 +313,24 @@ open.navigate(`/notes?space=${encodeURIComponent(spaceId)}`);
   each page with its own query, so it never holds every record of a group.
 - The pool applies the records of each page at once. The group is not loaded
   until its `Groups` message. No purge deletes the records of a group whose
-  pages have come, until it loads or the server refuses it. A client that
-  drops between two pages does not name the group in its next `Pull`, and
-  the gate asks for the whole group again.
+  pages have come, until it loads, the server refuses it, or the pull ends.
+- A record of a group that did not finish loading does not outlive that
+  load. When a pull ends, such as when the socket drops between two pages,
+  each group whose pages came stops loading. The pool drops each confirmed
+  record that is in no loaded group. The next `Pull` does not name the
+  group, and the gate asks for the whole group again. So a record that the
+  server deleted, or that moved to a group the person cannot see, between
+  the two loads does not stay. A record that is also in a loaded group stays,
+  and live deltas keep it right.
+- A save never writes a confirmed record that is in no loaded group. It
+  removes the row of such a record, and writes the record once its group
+  loads. So a tab that closes in the middle of a load saves none of its records.
+- A pull from sync ID 0 sends the snapshot of every loaded group. The first
+  `Groups` message of that pull ends it, and the pool then drops each
+  confirmed record that the pull did not send. A copy at sync ID 0 holds
+  only part of a first load, such as a page that an older build saved. So a
+  record that the server deleted since then goes.
+  `packages/sync/runtime/pool-cut-off.test.ts` holds these rules.
 - A record that already holds a later change keeps it. The snapshot never
   undoes a later change.
 - A deleted record stays deleted. The pool keeps the sync ID of the delete,

@@ -1,10 +1,15 @@
-import { syncCounters, syncEvents, syncRecords } from '@repo/sync/repo/schema';
+import { syncCounters, syncEvents, syncRecords, syncTransactions } from '@repo/sync/repo/schema';
 import type { DrizzleDatabase } from '@repo/sync/service/database';
 import type { Change, Delta } from '@repo/sync/types/protocol';
 import { and, arrayOverlaps, asc, eq, gt, max, or, sql } from 'drizzle-orm';
 import { Effect } from 'effect';
 
-/** The sync ID of a transaction that the log already holds, so a resent transaction applies once. */
+/**
+ * The sync ID of a transaction that the server applied, so a transaction that
+ * a client sends again applies once. Its event holds it, or, once the trim
+ * deleted that event, `sync_transactions` does. One statement reads both, so
+ * a trim that runs at the same time cannot hide it.
+ */
 export function findTransaction(
   db: DrizzleDatabase,
   organizationId: string,
@@ -18,6 +23,17 @@ export function findTransaction(
         eq(syncEvents.organizationId, organizationId),
         eq(syncEvents.transactionId, transactionId),
       ),
+    )
+    .unionAll(
+      db
+        .select({ syncId: syncTransactions.syncId })
+        .from(syncTransactions)
+        .where(
+          and(
+            eq(syncTransactions.organizationId, organizationId),
+            eq(syncTransactions.transactionId, transactionId),
+          ),
+        ),
     )
     .pipe(Effect.map((rows) => rows[0]?.syncId));
 }
