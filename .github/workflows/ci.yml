@@ -16,6 +16,24 @@ env:
 jobs:
   validate:
     runs-on: ubuntu-26.04
+    # A real Postgres server for the tests of the sync engine that need one
+    # (CL-920). Its password guards a server that lives as long as the job.
+    # See docs/contributing/testing.md#real-postgres.
+    services:
+      postgres:
+        image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+        env:
+          POSTGRES_PASSWORD: sync-test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-start-period 30s
+    env:
+      SYNC_TEST_DATABASE_URL: postgres://postgres:sync-test@localhost:5432/postgres
+      # A missing server fails these tests here, and does not skip them.
+      SYNC_TEST_POSTGRES_REQUIRED: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -41,6 +59,27 @@ jobs:
             bun run validate --changed
           else
             bun run validate
+          fi
+      # Validate runs only the tests that a change affects. This step runs
+      # each test on the real Postgres server on every run. It fails when no
+      # such test is found, when none passes, or when one skips, so the proof
+      # cannot go quiet.
+      - name: sync tests on a real Postgres server
+        run: |
+          files="$(git ls-files -- '*.postgres.test.ts' | sed 's#^#./#')"
+          if [ -z "$files" ]; then
+            echo "::error title=No Postgres tests::No *.postgres.test.ts file was found."
+            exit 1
+          fi
+          # shellcheck disable=SC2086 # one argument for each file
+          bun test $files 2>&1 | tee "$RUNNER_TEMP/postgres-tests.log"
+          if grep -Eq '^ *[1-9][0-9]* (skip|todo)$' "$RUNNER_TEMP/postgres-tests.log"; then
+            echo "::error title=Postgres tests skipped::A test on the real Postgres server skipped. Each one must run here."
+            exit 1
+          fi
+          if ! grep -Eq '^ *[1-9][0-9]* pass$' "$RUNNER_TEMP/postgres-tests.log"; then
+            echo "::error title=No Postgres test passed::No test on the real Postgres server passed."
+            exit 1
           fi
       # The quarantined tests in tools/flaky-tests.json run here on their own,
       # up to 3 times each. The step never fails the job, so a flaky test
