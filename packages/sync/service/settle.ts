@@ -70,7 +70,7 @@ const passingWait = (n: number) => `${20 * 2 ** n} millis` as const;
  * database transaction often ends it as a defect, since its rollback fails
  * too, so a defect that passes runs again as well. When the runs that pass
  * are spent, the last one fails as a failure, not a defect, so `settle`
- * asks the database whether it answers. Every other cause stays as it is.
+ * gives `ServerUnavailable`. Every other cause stays as it is.
  */
 function withRetries<R>(
   commit: Effect.Effect<number, unknown, R>,
@@ -113,11 +113,14 @@ const failed: BuiltInRefusal = 'failed';
  * A failure of the database that passes, such as a deadlock, a
  * serialization failure, a lock that is not free or a dropped connection,
  * runs the change again, up to 5 times, with a wait that grows from 20 ms.
- * Any other failure that is no refusal runs the change once more. When the
- * runs fail, the server asks its database for the head of the log. A
- * database that answers means the change itself fails, which is final. A
- * database that does not answer means the write was not tried: `settle`
- * fails with `ServerUnavailable`, and the client keeps the write. The sync socket and each agent tool both settle a transaction here,
+ * When those runs fail too, the write was not tried: the cause is the load
+ * of the database, not the change. `settle` fails with `ServerUnavailable`,
+ * the client keeps the write and sends it again, and the server applies a
+ * transaction once. Any other failure that is no refusal runs the change
+ * once more. When that run fails, the server asks its database for the head
+ * of the log. A database that answers means the change itself fails, which
+ * is final. A database that does not answer means the write was not tried,
+ * as above. The sync socket and each agent tool both settle a transaction here,
  * so the same command gives the same outcome however it arrives.
  */
 export function settle<R>(
@@ -146,14 +149,22 @@ export function settle<R>(
             reason: null,
             code: null,
           }),
-        onFailure: (failure) =>
-          failure instanceof CommandRejected
-            ? Effect.succeed(rejected(transaction, failure.code, failure.reason))
-            : log.head(actor.organizationId).pipe(
-                Effect.mapError(() => new ServerUnavailable()),
-                Effect.andThen(Effect.logError('A server change failed', failure)),
-                Effect.as(finalFailure),
-              ),
+        onFailure: (failure) => {
+          if (failure instanceof CommandRejected) {
+            return Effect.succeed(rejected(transaction, failure.code, failure.reason));
+          }
+          if (passingFailure(failure)) {
+            return Effect.logWarning(
+              'A server change met a failure that passes on each run',
+              failure,
+            ).pipe(Effect.andThen(Effect.fail(new ServerUnavailable())));
+          }
+          return log.head(actor.organizationId).pipe(
+            Effect.mapError(() => new ServerUnavailable()),
+            Effect.andThen(Effect.logError('A server change failed', failure)),
+            Effect.as(finalFailure),
+          );
+        },
       }),
       Effect.catchDefect((defect) =>
         Effect.logError('A server change broke a rule of the server', defect).pipe(

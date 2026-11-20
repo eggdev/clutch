@@ -109,13 +109,13 @@ test('a change that meets a deadlock four times, and then works, is accepted', a
   expect(log.commits()).toBe(5);
 });
 
-test('a change that meets a deadlock each time is final after five more runs', async () => {
+test('a change that meets a deadlock each time is not tried after five more runs, so the client keeps the write', async () => {
   const log = logThat({
     failures: 99,
     answers: true,
     error: deadlock,
   });
-  expect(await settled(log)).toBe('rejected failed');
+  expect(await settled(log)).toBe('not tried');
   expect(log.commits()).toBe(6);
 });
 
