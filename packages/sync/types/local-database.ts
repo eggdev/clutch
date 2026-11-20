@@ -41,7 +41,7 @@ export type SavedRecord = {
 export type SyncPosition = Pick<PoolState, 'lastSyncId' | 'groups' | 'leftOutBy'>;
 
 /** The confirmed part of one save: every record of the pool, which replace the saved ones, and the sync position. */
-export type ConfirmedSave = {
+type ConfirmedSave = {
   readonly put: ReadonlyArray<SavedRecord>;
   readonly position: SyncPosition;
 };
