@@ -1,7 +1,8 @@
 import type { Contract } from '@repo/sync/contract/define';
 import { manifestOf } from '@repo/sync/contract/manifest';
 import type { Pool } from '@repo/sync/runtime/pool';
-import { SyncRpcs } from '@repo/sync/types/protocol';
+import { SyncRpcs, transactionsPerPush } from '@repo/sync/types/protocol';
+import type { SyncMessage } from '@repo/sync/types/protocol';
 import { sessionEndedCode } from '@repo/sync/types/session-ended';
 import { Deferred, Effect, Layer, Queue, Schedule, Stream } from 'effect';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
@@ -72,6 +73,21 @@ function loadRequests(pool: Pool) {
   );
 }
 
+/** Applies one message of a pull to the pool. */
+function applyMessage(pool: Pool, message: SyncMessage) {
+  switch (message._tag) {
+    case 'Deltas': {
+      return pool.applyDeltas(message.deltas);
+    }
+    case 'Page': {
+      return pool.applyPage(message.group, message.backfill);
+    }
+    case 'Groups': {
+      return pool.applyGroups(message.loaded, message.backfill);
+    }
+  }
+}
+
 /** One signal each time the pool has new transactions to send. */
 function pendingSignals(pool: Pool) {
   return Stream.callback<true>((queue) =>
@@ -101,15 +117,7 @@ export function engine(
     const pull = Effect.suspend(() =>
       client
         .Pull({ lastSyncId: pool.lastSyncId(), groups: pool.loadedGroups(), contract })
-        .pipe(
-          Stream.runForEach((message) =>
-            Effect.sync(() =>
-              message._tag === 'Deltas'
-                ? pool.applyDeltas(message.deltas)
-                : pool.applyGroups(message.loaded, message.backfill),
-            ),
-          ),
-        ),
+        .pipe(Stream.runForEach((message) => Effect.sync(() => applyMessage(pool, message)))),
     );
     // A group that the actor may not load is refused: its gate stops waiting,
     // and the pool reports it. After any other end of a load, also when the
@@ -117,7 +125,7 @@ export function engine(
     // again. A load never ends the pull that it belongs to.
     const loads = loadRequests(pool).pipe(
       Stream.runForEach((group) =>
-        client.Load({ group }).pipe(
+        client.Load({ group, pages: true }).pipe(
           Effect.catchTag('GroupNotAllowed', () => Effect.sync(() => pool.refuseGroup(group))),
           Effect.ignoreCause,
         ),
@@ -153,10 +161,12 @@ export function engine(
       Effect.repeat({ while: (again) => again, schedule: retryWait }),
       Effect.forkScoped,
     );
-    const push = Effect.gen(function* () {
-      const batch = pool.unsent();
+    // One push holds at most `transactionsPerPush` transactions, in their
+    // order. The rest go in the next push, straight after this one.
+    const pushBatch = Effect.gen(function* () {
+      const batch = pool.unsent().slice(0, transactionsPerPush);
       if (batch.length === 0) {
-        return;
+        return false;
       }
       const ids = batch.map((transaction) => transaction.id);
       pool.markSent(ids, true);
@@ -173,7 +183,9 @@ export function engine(
         pool.markSent(unanswered, false);
         return yield* Effect.fail('The server did not try each write');
       }
+      return true;
     });
+    const push = pushBatch.pipe(Effect.repeat({ while: (sent) => sent }));
     yield* pendingSignals(pool).pipe(
       Stream.runForEach(() => push.pipe(Effect.retry(retryWait), Effect.ignore)),
     );

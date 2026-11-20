@@ -16,8 +16,11 @@ export type Connection = {
   /** The groups the actor may load now. It runs again after a change to the user's group. */
   readonly granted: Effect.Effect<Granted, unknown>;
   /** Groups that `Load` asked for. */
-  readonly requests: Queue.Queue<string>;
+  readonly requests: Queue.Queue<LoadRequest>;
 };
+
+/** One `Load`: the group, and whether the client reads its backfill in pages. */
+export type LoadRequest = { readonly group: string; readonly pages: boolean };
 
 const groupsMessage = (
   loaded: ReadonlySet<string>,
@@ -26,12 +29,15 @@ const groupsMessage = (
 
 type Input =
   | { readonly kind: 'delta'; readonly delta: Delta }
-  | { readonly kind: 'load'; readonly group: string };
+  | { readonly kind: 'load'; readonly request: LoadRequest };
 
 /**
  * The messages of one connection. It sends the loaded groups first, then the
  * backlog of those groups, then each live event in sync ID order. A `Load`
- * request adds a group and sends its backfill. A change in the user's own
+ * request adds a group and sends its backfill: in `Page` messages and a last
+ * `Groups` message when the client reads pages, else in one `Groups` message.
+ * The messages of one input go out before the next input runs, so no other
+ * message comes between two pages. A change in the user's own
  * group, such as a membership, makes it ask access again; each group the
  * actor lost leaves the loaded set, and the client deletes its records.
  */
@@ -82,18 +88,40 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
           return out;
         });
 
-      const onLoad = (group: string) =>
+      const onLoad = ({
+        group,
+        pages,
+      }: LoadRequest): Effect.Effect<Stream.Stream<SyncMessage, unknown>, unknown> =>
         Effect.gen(function* () {
           if (loaded.has(group)) {
-            return [groupsMessage(loaded, [])];
+            return Stream.make(groupsMessage(loaded, []));
           }
           const granted = yield* connection.granted;
           if (![...granted.eager, ...granted.lazy].includes(group)) {
-            return [];
+            return Stream.empty;
           }
           loaded.add(group);
-          const backfill = yield* log.backfill(organizationId, watermark, new Set([group]), loaded);
-          return [groupsMessage(loaded, backfill)];
+          const now = new Set(loaded);
+          const backfill = log.backfill(organizationId, watermark, new Set([group]), now);
+          if (!pages) {
+            // A build that does not read pages gets the whole backfill at once.
+            const all = yield* Stream.runCollect(backfill);
+            return Stream.make(
+              groupsMessage(
+                now,
+                all.flatMap((page) => page.deltas),
+              ),
+            );
+          }
+          return backfill.pipe(
+            Stream.flatMap(({ deltas, more }) => {
+              if (!more) {
+                return Stream.make(groupsMessage(now, deltas));
+              }
+              const page: SyncMessage = { _tag: 'Page', group, backfill: deltas };
+              return deltas.length ? Stream.make(page) : Stream.empty;
+            }),
+          );
         });
 
       const live = Stream.merge(
@@ -101,13 +129,14 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
           Stream.map((delta): Input => ({ kind: 'delta', delta })),
         ),
         Stream.fromQueue(connection.requests).pipe(
-          Stream.map((group): Input => ({ kind: 'load', group })),
+          Stream.map((request): Input => ({ kind: 'load', request })),
         ),
       ).pipe(
-        Stream.mapEffect((input) =>
-          input.kind === 'delta' ? onDelta(input.delta) : onLoad(input.group),
+        Stream.flatMap((input) =>
+          input.kind === 'delta'
+            ? Stream.unwrap(Effect.map(onDelta(input.delta), (out) => Stream.fromIterable(out)))
+            : Stream.unwrap(onLoad(input.request)),
         ),
-        Stream.flatMap((messages) => Stream.fromIterable(messages)),
       );
 
       return Stream.concat(Stream.concat(Stream.make(groupsMessage(loaded, [])), backlog), live);

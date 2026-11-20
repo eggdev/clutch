@@ -204,9 +204,10 @@ function deltasOf(
 }
 
 /**
- * Up to `limit` events after `lastSyncId` that touch `groups`, oldest first,
- * with every change they store. `last` is the sync ID of the last event read,
- * so the next page starts after it. The caller picks what a client sees.
+ * Up to `limit` events after `lastSyncId`, and up to `upTo` when it is given,
+ * that touch `groups`, oldest first, with every change they store. `last` is
+ * the sync ID of the last event read, so the next page starts after it. The
+ * caller picks what a client sees.
  */
 export function eventsAfter(
   db: DrizzleDatabase,
@@ -214,6 +215,7 @@ export function eventsAfter(
   lastSyncId: number,
   groups: ReadonlySet<string>,
   limit: number,
+  upTo?: number,
 ) {
   return db
     .select()
@@ -222,6 +224,7 @@ export function eventsAfter(
       and(
         eq(syncEvents.organizationId, organizationId),
         gt(syncEvents.syncId, lastSyncId),
+        upTo === undefined ? undefined : lte(syncEvents.syncId, upTo),
         arrayOverlaps(syncEvents.groups, [...groups]),
       ),
     )
@@ -234,29 +237,4 @@ export function eventsAfter(
         full: rows.length === limit,
       })),
     );
-}
-
-/**
- * Every event up to `upTo` that touches `groups`, oldest first, with every
- * change they store. A client that loads a group gets the part it sees as
- * its backfill.
- */
-export function eventsUpTo(
-  db: DrizzleDatabase,
-  organizationId: string,
-  upTo: number,
-  groups: ReadonlySet<string>,
-) {
-  return db
-    .select()
-    .from(syncEvents)
-    .where(
-      and(
-        eq(syncEvents.organizationId, organizationId),
-        lte(syncEvents.syncId, upTo),
-        arrayOverlaps(syncEvents.groups, [...groups]),
-      ),
-    )
-    .orderBy(asc(syncEvents.syncId))
-    .pipe(Effect.map(deltasOf));
 }
