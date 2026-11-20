@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.6 (2026-11-20)
+
+### Fixes and maintenance
+
+- fix(sync): prove the wake on real Postgres, lock migrations (CL-920)
+
 ## 1.26.5 (2026-11-20)
 
 ### Fixes and maintenance
