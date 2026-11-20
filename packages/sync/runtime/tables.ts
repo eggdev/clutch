@@ -207,7 +207,12 @@ export function visibleTables(): Reads & {
         } else {
           visible.get(model)?.delete(id);
         }
-        models.set(model, [...(models.get(model) ?? []), id]);
+        const ids = models.get(model);
+        if (ids) {
+          ids.push(id);
+        } else {
+          models.set(model, [id]);
+        }
         changed.push(key);
       }
       for (const [key, list] of lists) {
@@ -294,7 +299,12 @@ export function groupWaits(): GroupWaits {
   return {
     wait: (group) =>
       new Promise((resolve) => {
-        waiters.set(group, [...(waiters.get(group) ?? []), resolve]);
+        const resolves = waiters.get(group);
+        if (resolves) {
+          resolves.push(resolve);
+        } else {
+          waiters.set(group, [resolve]);
+        }
         for (const listener of listeners) {
           listener(group);
         }
