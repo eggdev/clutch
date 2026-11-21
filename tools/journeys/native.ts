@@ -249,9 +249,8 @@ async function readFlows(
 
 /**
  * Runs each native journey with Maestro on the booted device of the device
- * host: `mise exec -- bun run journey --native <ios|android>`. CI runs it on an
- * iPhone 16 simulator with `DEVICE_HOST=local`, and on a Pixel 7 emulator with
- * `DEVICE_HOST=ci` once a project has an Android app. A journey runs once,
+ * host: `mise exec -- bun run journey --native <ios|android>`. No CI job runs
+ * it for now: an agent runs it from its session. A journey runs once,
  * with no retry, so a failed run fails. Each journey writes
  * `<id>.<platform>.json` to the measures folder. See docs/contributing/end-to-end-testing.md#native-journeys.
  */
@@ -275,7 +274,7 @@ export async function nativeMain(
     return 1;
   }
   const flows = journeys(root).filter((journey) => journey.platform === 'native');
-  // CI starts a native lane only when a native app exists, so an app with no native journey has no proof.
+  // A native app with no native journey has no proof on a device.
   if (flows.length === 0) {
     log(
       `::error title=No journey ran::No native journey exists, so the ${platform} run proves nothing. Add one at features/<feature>/journeys/<id>.maestro.yaml. See docs/contributing/end-to-end-testing.md#native-journeys.`,

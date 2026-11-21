@@ -28,9 +28,8 @@ defines it. A host has four calls:
 A host has no call that creates, clones, boots or erases a device. When no
 device is booted, the host stops and tells the agent to ask the owner.
 
-The `DEVICE_HOST` environment variable names the host. A machine sets it, and
-the native jobs of `.github/workflows/ci.yml` set it. The template ships three
-hosts:
+The `DEVICE_HOST` environment variable names the host. A machine sets it. The
+template ships three hosts:
 
 - `none` refuses each call and points to this page. It is the host when
   `DEVICE_HOST` is not set.
@@ -105,12 +104,6 @@ needs no device, so it can finish before the owner boots one. When no device
 is booted, the command says so and exits 1. The owner boots the device, then
 runs the `--install` command.
 
-`--fresh` builds without the fingerprint comparison, and it writes no record.
-A CI runner has no earlier build to compare with. The command refuses unless
-the environment variable `GITHUB_ACTIONS` is `true`, which GitHub sets on its
-runners. `CI` does not name a runner, because an agent sets it on its own
-machine too.
-
 A review flags a change to `native-fingerprint.json` that has no native change
 with it.
 
@@ -154,12 +147,6 @@ owner.
 
 ## CI
 
-The `native-ios` and `native-android` jobs in `.github/workflows/ci.yml` run
-each native journey on a simulator and an emulator. `native-ios` runs when a
-native app declares an iOS app ID in its app.json, and the repository variable
-`CLUTCH_IOS_LANE` is `on`. `native-android` runs when a
-native app declares an Android package. The `native-ios` job starts the dev
-servers, then runs `native:build --fresh`. The `native-android` job still has a
-placeholder build line, which fails until a project fills it at kickoff. A CI
-job never calls `eas build` directly. See
+No CI job runs a native journey for now. An agent runs one from its session,
+on a device of the shared pool. CL-596 adds a native check to local CI. See
 [native journeys](../end-to-end-testing.md#native-journeys).
