@@ -6,6 +6,7 @@ import {
   advance,
   button,
   field,
+  fieldWith,
   fill,
   gone,
   heading,
@@ -187,11 +188,11 @@ test('an outcome with a path and no text has no native form', () => {
   );
 });
 
-test('the first launch clears the state of the app, and each launch passes the arguments of the run', () => {
+test('the first launch clears the state of the app, and each launch passes the arguments of the run with a leading dash', () => {
   const result = toMaestro(
     journey([open('/'), see(button('Open notes')), open('/'), see(button('Open notes'))]),
     'com.example',
-    { arguments: { devOrganization: 'run-1' } },
+    { arguments: { devOrganization: 'run-1', RCT_jsLocation: 'app.localhost:1355' } },
   );
   expect(result.flow).toStartWith(
     [
@@ -200,11 +201,19 @@ test('the first launch clears the state of the app, and each launch passes the a
       '- launchApp:',
       '    clearState: true',
       '    arguments:',
-      '      devOrganization: run-1',
+      '      -devOrganization: run-1',
+      '      -RCT_jsLocation: app.localhost:1355',
     ].join('\n'),
   );
   expect(result.flow.match(/clearState/gu)).toHaveLength(1);
-  expect(result.flow.match(/devOrganization: run-1/gu)).toHaveLength(2);
+  expect(result.flow.match(/-devOrganization: run-1/gu)).toHaveLength(2);
+  const commands: Array<{ launchApp?: { arguments?: unknown } }> = parse(
+    result.flow.split('---\n')[1] ?? '',
+  );
+  expect(commands[0]?.launchApp?.arguments).toEqual({
+    '-devOrganization': 'run-1',
+    '-RCT_jsLocation': 'app.localhost:1355',
+  });
 });
 
 test('an offline step is left out of an iOS flow, and one sentence names it', () => {
@@ -225,6 +234,33 @@ test('a value with quotes and pattern characters is quoted and escaped', () => {
     'com.example',
   );
   expect(result.flow).toContain('text: Save \\(draft\\) "now"');
+});
+
+test('a step on a field with a value calls a native command of agent-device from a script', () => {
+  const target = fieldWith('Note title', 'Say "hi" \\ bye');
+  const { flow } = toMaestro(
+    journey([
+      open('/'),
+      see(target),
+      see(target, { within: 3000 }),
+      fill(target, 'New "title"'),
+      tap(target),
+      submit(target),
+      gone(target),
+    ]),
+    'com.example',
+  );
+  const commands: Array<Record<string, unknown>> = parse(flow.split('---\n')[1] ?? '');
+  // The selector escapes each quote and backslash, and the script holds it as a JSON string.
+  const selector = JSON.stringify('label="Note title" value="Say \\"hi\\" \\\\ bye"');
+  expect(commands.slice(1)).toEqual([
+    { evalScript: `\${device.wait(${selector}, 10000)}` },
+    { evalScript: `\${device.wait(${selector}, 3000)}` },
+    { evalScript: `\${device.fill(${selector}, "New \\"title\\"")}` },
+    { evalScript: `\${device.press(${selector})}` },
+    { pressKey: 'Enter' },
+    { evalScript: `\${device.gone(${selector}, 10000)}` },
+  ]);
 });
 
 const createTool = { do: 'tool', name: 'notes_create', input: { title: "Agent's note" } } as const;
