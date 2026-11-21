@@ -55,19 +55,64 @@ function textOf(target: Target): string {
   return target.name;
 }
 
-/** The value text that a `fieldWith` target matches on the device, or the label of a field. */
+/** The text that a target matches on the device: the label of a field, or the text of another target. */
 function selectorOf(target: Target): { text: string } {
-  if (target.kind === 'field' && target.value !== undefined) {
-    return { text: escapePattern(target.value) };
-  }
   return { text: escapePattern(textOf(target)) };
 }
 
-/** The launch of the app. The first launch of a flow clears the state of the app. */
+/** A `fieldWith` target: a field that holds a value. */
+type ValueField = { readonly kind: 'field'; readonly label: string; readonly value: string };
+
+const holdsValue = (target: Target): target is ValueField =>
+  target.kind === 'field' && target.value !== undefined;
+
+/** Text in a native selector of `agent-device`, in double quotes. */
+const quoted = (text: string) => `"${text.replaceAll(/["\\]/gu, '\\$&')}"`;
+
+/**
+ * The script step that runs one native command of `agent-device` on a field
+ * with a value. A `text` selector of a flow matches the label of a field, never
+ * its value, so no flow step finds the field. The native commands read
+ * `label="…" value="…"`, and the runner gives the script a `device` object
+ * that calls them. See docs/contributing/end-to-end-testing.md#native-journeys.
+ */
+function deviceStep(command: string, target: ValueField, ...rest: Array<string | number>) {
+  const selector = `label=${quoted(target.label)} value=${quoted(target.value)}`;
+  const args = [selector, ...rest].map((item) => JSON.stringify(item)).join(', ');
+  return { evalScript: `\${device.${command}(${args})}` };
+}
+
+/** The script step of a tap, fill, see or gone on a field with a value, or null for another step. */
+function valueFieldStep(step: Step): unknown {
+  if (!('target' in step) || !holdsValue(step.target)) {
+    return null;
+  }
+  if (step.do === 'tap') {
+    return deviceStep('press', step.target);
+  }
+  if (step.do === 'fill') {
+    return deviceStep('fill', step.target, step.text);
+  }
+  if (step.do === 'see') {
+    return deviceStep('wait', step.target, step.within ?? defaultWait);
+  }
+  // A submit presses the key of the keyboard, which needs no selector.
+  return step.do === 'gone' ? deviceStep('gone', step.target, defaultWait) : null;
+}
+
+/**
+ * The launch of the app. The first launch of a flow clears the state of the
+ * app. `agent-device` passes each argument name to the app as it is, and iOS
+ * reads an argument as `-name value`, so each name gets a leading `-`.
+ */
 function launchOf(first: boolean, options: FlowOptions): unknown {
+  const named = Object.entries(options.arguments ?? {}).map(([name, value]) => [
+    name.startsWith('-') ? name : `-${name}`,
+    value,
+  ]);
   const launch = {
     ...(first ? { clearState: true } : {}),
-    ...(options.arguments ? { arguments: options.arguments } : {}),
+    ...(named.length ? { arguments: Object.fromEntries(named) } : {}),
   };
   return Object.keys(launch).length ? { launchApp: launch } : 'launchApp';
 }
@@ -158,6 +203,10 @@ function commandsOf(step: Step, number: number, options: FlowOptions): Array<unk
       );
     }
     return [{ openLink: `${options.scheme}://${step.path.replace(/^\//u, '')}` }];
+  }
+  const native = valueFieldStep(step);
+  if (native !== null) {
+    return [native];
   }
   if (step.do === 'tap') {
     return [{ tapOn: selectorOf(step.target) }];
