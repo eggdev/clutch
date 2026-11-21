@@ -84,6 +84,15 @@
         "yaml": "2.9.1",
       },
     },
+    "apps/local-ci": {
+      "name": "@repo/local-ci",
+      "bin": {
+        "local-ci": "src/main.ts",
+      },
+      "dependencies": {
+        "yaml": "2.9.1",
+      },
+    },
     "features/notes": {
       "name": "@features/notes",
       "dependencies": {
@@ -1088,6 +1097,8 @@
     "@repo/identity": ["@repo/identity@workspace:packages/identity"],
 
     "@repo/journeys": ["@repo/journeys@workspace:packages/journeys"],
+
+    "@repo/local-ci": ["@repo/local-ci@workspace:apps/local-ci"],
 
     "@repo/notes": ["@repo/notes@workspace:packages/notes"],
 

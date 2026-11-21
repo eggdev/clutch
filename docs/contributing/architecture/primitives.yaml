@@ -80,6 +80,16 @@ primitives:
     docs:
       - apps/cli/README.md
 
+  - id: local-ci
+    group: repository
+    name: Local CI
+    kind: app
+    summary: One service for a machine. It runs the CI jobs of watched repositories in containers and posts statuses.
+    code:
+      - apps/local-ci/
+    docs:
+      - apps/local-ci/README.md
+
   - id: sync
     group: product
     name: Sync engine

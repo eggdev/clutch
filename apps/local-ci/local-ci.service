@@ -1,0 +1,14 @@
+[Unit]
+Description=Local CI: runs the CI jobs of the watched repositories in containers
+After=docker.service network-online.target
+
+[Service]
+Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/share/local-ci/local-ci serve
+Restart=always
+RestartSec=10
+ExecStopPost=-/bin/sh -c 'docker ps -aq --filter label=local-ci=1 | xargs -r docker rm -f -v'
+Nice=10
+
+[Install]
+WantedBy=default.target
