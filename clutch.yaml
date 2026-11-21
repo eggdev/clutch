@@ -77,11 +77,9 @@ sast: auto
 verification:
   gate: observe
 # When clutch labels warns about a large PR, and when a PR must split (tools/check-scope.ts).
-# Brendan, 2026-11-20: max is 6000 for one pull request, which brings the sync
-# engine to 9/10 in one piece. CL-593 sets it back to 1000.
 pr_size:
   warn: 300
-  max: 6000
+  max: 1000
   exclude: []
 # clutch worktree new --check runs check in the new checkout after the setup.
 worktree:
