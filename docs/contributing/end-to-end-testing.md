@@ -243,9 +243,11 @@ into `webOnly`, waits for the owner. See [proof gates code](../principles/proof-
 
 Each native journey runs on the device that the caller opened from the
 [device pool](./setup/native.md#the-device-pool). `agent-device` runs each
-flow with `replay --maestro`, and the Maestro command line tool is not needed:
+flow with `replay --maestro`, and the Maestro command line tool is not needed.
+A leased device has no app, so install the build first:
 
 ```sh
+AGENT_DEVICE=<path> mise exec -- bun run native:build --platform ios --install
 AGENT_DEVICE=<path> mise exec -- bun run journey --native ios
 ```
 

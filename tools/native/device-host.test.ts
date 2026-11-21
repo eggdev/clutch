@@ -1,4 +1,7 @@
 import { expect, test } from 'bun:test';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import {
   DeviceHostError,
@@ -6,7 +9,9 @@ import {
   deviceHost,
   deviceName,
   install,
+  installedOn,
   poolHost,
+  recordInstalled,
   runFlow,
 } from '@tools/native/device-host';
 
@@ -61,11 +66,18 @@ test('deviceName reads the model of the opened device, and falls back when it ca
   expect(deviceName(fakePool(listed, 1).host)).toBe('the opened device');
 });
 
-test('the pool host is the device host of the template, and makes no build yet', async () => {
+test('the pool host is the device host of the template, and its id is the bound command', () => {
   expect(deviceHost({}).name).toBe('pool');
-  const refusal = await fakePool()
-    .host.build('/apps/app', 'ios')
-    .catch((error: unknown) => error);
-  expect(refusal).toBeInstanceOf(DeviceHostError);
-  expect(String(refusal)).toContain('CL-499 adds the build on the build machine');
+  expect(fakePool().host.id()).toBe(bound);
+  expect(() => poolHost({ env: {} }).id()).toThrow('`AGENT_DEVICE` is not set');
+});
+
+test('installedOn reads what recordInstalled wrote, and nothing for another device', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'device-record-'));
+  const { host } = fakePool();
+  const other = poolHost({ env: { AGENT_DEVICE: '/lease-2/agent-device' }, exists: () => true });
+  expect(installedOn(root, host)).toBeNull();
+  recordInstalled(root, host, 'a1b2');
+  expect(installedOn(root, host)).toEqual({ fingerprint: 'a1b2' });
+  expect(installedOn(root, other)).toBeNull();
 });
