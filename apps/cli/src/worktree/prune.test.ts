@@ -171,3 +171,19 @@ test('prune reports a removal that fails and goes on to the next checkout', asyn
   expect(f.log[0]).toStartWith(`Failed to remove ${f.at('locked')}: git worktree remove`);
   expect(await f.branches()).toEqual(['locked', 'main']);
 });
+
+test('prune finds a worktree that T3 Code made under ~/.t3/worktrees', async () => {
+  const f = await fixture();
+  await using _repo = f.repo;
+  const t3 = path.join(f.repo.parent, 'home', '.t3', 'worktrees', 'shop', 'sh-1000');
+  const branch = 'clutch/sh-1000-fix';
+  await gitOrThrow(f.repo.root, 'worktree', 'add', '--quiet', '-b', branch, t3, 'main');
+  await writeFile(path.join(t3, 'fix.txt'), 'fix\n');
+  await gitOrThrow(t3, 'add', '--all');
+  await gitOrThrow(t3, 'commit', '--quiet', '--message', 'Fix');
+  await gitOrThrow(f.repo.root, 'merge', '--quiet', '--no-ff', '--no-edit', branch);
+  f.pr(branch, 'MERGED', await gitOrThrow(t3, 'rev-parse', 'HEAD'));
+  const results = await f.prune();
+  expect(results.map(({ path: where, action }) => [where, action])).toEqual([[t3, 'removed']]);
+  expect(await f.branches()).toEqual(['main']);
+});

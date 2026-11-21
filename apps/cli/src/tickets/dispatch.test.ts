@@ -1,107 +1,11 @@
 import { expect, test } from 'bun:test';
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { gitRepo } from '@/testing/git-repo';
-
-const main = path.join(import.meta.dir, '..', 'main.ts');
-
-const config =
-  'schemaVersion: 1\nproject: shop\ntemplate:\n  repo: eggdev/clutch\n  mode: sync\ncapabilities: {}\ntickets:\n  prefix: SH\n';
-
-/** A phase file with the limits and the phase entries of one test. */
-const phaseFile = (limits: string, phases: string) =>
-  `schemaVersion: 1\nlimits: ${limits}\nwork_thread: { provider: claudeAgent, model: opus }\nphases:\n${phases}`;
+import { phaseFile, project, requirements, routed, status } from '@/testing/ticket-project';
 
 const triageOwn =
   '  - { id: triage, thread: own, provider: claudeAgent, model: haiku, prompt: Triage. }\n';
-
-const fakeT3 = (log: string) => `#!${process.execPath}
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + '\\n');
-if (process.env.FAKE_T3_FAIL) { console.error('The T3 Code server is not running.'); process.exit(1); }
-const count = fs.readFileSync(${JSON.stringify(log)}, 'utf-8').trim().split('\\n').length;
-if (args[1] === 'start') console.log(JSON.stringify({ threadId: 'thread-' + count, projectId: 'p', runId: 'r' }));
-if (args[1] === 'show') console.log(JSON.stringify({ thread: { threadId: args[3], worktreePath: process.env.FAKE_WORKTREE ?? null }, messages: [] }));
-if (args[1] === 'send') console.log(JSON.stringify({ delivery: 'queued' }));
-`;
-
-type Row = { phase: string; status: string; thread: string | null; blockedReason: string | null };
-type Output = {
-  status?: string;
-  message?: string;
-  ticket: { id: string; phases: Array<Row>; links: Array<{ kind: string; value: string }> };
-  event: { data: Row } | null;
-  dispatch: Array<{ kind: string; reason?: string }>;
-};
-
-/** The JSON lines of a file. Empty when it does not exist. */
-async function jsonLines<T>(file: string) {
-  const text = await readFile(file, 'utf-8').catch(() => '');
-  return text
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
-}
-
-/** A project with a phase file, a fake `t3` on the PATH and its own state and home folders. */
-async function project(phases: string, files: Record<string, string> = {}) {
-  const repo = await gitRepo({ 'clutch.yaml': config, '.clutch/phases.yaml': phases, ...files });
-  const folder = await mkdtemp(path.join(tmpdir(), 'dispatch-'));
-  const log = path.join(folder, 't3-calls.jsonl');
-  await mkdir(path.join(folder, 'bin'));
-  await mkdir(path.join(folder, 'home'));
-  await writeFile(path.join(folder, 'bin', 't3'), fakeT3(log));
-  await chmod(path.join(folder, 'bin', 't3'), 0o755);
-  const env = {
-    ...process.env,
-    PATH: `${path.join(folder, 'bin')}:${process.env.PATH}`,
-    XDG_STATE_HOME: path.join(folder, 'state'),
-    HOME: path.join(folder, 'home'),
-    FAKE_WORKTREE: repo.root,
-  };
-  return {
-    root: repo.root,
-    async tickets(args: Array<string>, extra: Record<string, string> = {}) {
-      const proc = Bun.spawn([process.execPath, main, 'tickets', ...args], {
-        cwd: repo.root,
-        env: { ...env, ...extra },
-        stdout: 'pipe',
-        stderr: 'pipe',
-      });
-      const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
-      return { code, json: JSON.parse(stdout) as Output };
-    },
-    calls: () => jsonLines<Array<string>>(log),
-    log: () =>
-      jsonLines<Record<string, string>>(
-        path.join(folder, 'state', 'clutch', 'shop', 'dispatch.jsonl'),
-      ),
-    [Symbol.asyncDispose]: async () => {
-      await repo[Symbol.asyncDispose]();
-      await rm(folder, { recursive: true, force: true });
-    },
-  };
-}
-
-type Project = Awaited<ReturnType<typeof project>>;
-
-const requirements = '--now a --expected b --location c --acceptance d --major no'.split(' ');
-
-/** Adds a held ticket with a route of `phases`, then releases it and finishes triage. */
-async function routed(shop: Project, title: string, phases: string) {
-  const { json } = await shop.tickets(['add', title, '--description', 'x', '--hold']);
-  const { id } = json.ticket;
-  await shop.tickets(['edit', id, ...requirements]);
-  await shop.tickets(['route', id, '--phases', phases, '--reason', 'Clear.']);
-  await shop.tickets(['release', id]);
-  return { id, done: await shop.tickets(['phase', id, 'triage', 'done']) };
-}
-
-const status = (output: { json: Output }, phase: string) =>
-  output.json.ticket.phases.find((row) => row.phase === phase);
 
 test('tickets add starts one thread, and a second dispatch starts none', async () => {
   await using shop = await project(phaseFile('{ threads: 6, device: 2 }', triageOwn));
@@ -269,4 +173,68 @@ test('phases --check exits 1 on an unknown key or phase, and 0 on a valid file',
     phaseFile('{ threads: 6, device: 2 }', triageOwn),
   );
   expect(await shop.tickets(['phases', '--check'])).toMatchObject({ code: 0 });
+});
+
+/** The default phase file of Clutch, which a project gets on its first sync. */
+const defaultPhases = await readFile(
+  path.join(import.meta.dir, '..', '..', '..', '..', '.clutch', 'phases.yaml'),
+  'utf-8',
+);
+
+test('the default phase file passes the check, and triage of a full bug report starts Build in a new worktree', async () => {
+  await using shop = await project(defaultPhases, {
+    '.agents/skills/deliver/SKILL.md': '# Deliver\n',
+    '.agents/skills/babysit-pr/SKILL.md': '# Babysit\n',
+  });
+  expect(await shop.tickets(['phases', '--check'])).toMatchObject({ code: 0 });
+  const added = await shop.tickets(['add', 'Fix the total', '--description', 'The total is 0.']);
+  const [triage] = await shop.calls();
+  expect(triage.slice(5, 9)).toEqual(['--provider', 'claudeAgent', '--model', 'claude-sonnet-5-5']);
+  expect(triage.at(-1)).toContain('`mise exec -- bun run clutch tickets show SH-1000`');
+  expect(triage.at(-1)).toContain('hold the ticket');
+
+  // The triage agent fills the requirements and writes a route with no planning and no design.
+  const { id } = added.json.ticket;
+  await shop.tickets(['edit', id, ...requirements]);
+  await shop.tickets(['route', id, '--phases', 'build,deploy', '--reason', 'A clear bug.']);
+  const done = await shop.tickets(['phase', id, 'triage', 'done']);
+  expect(done.json.ticket.route).toEqual(['triage', 'build', 'deploy']);
+  expect(status(done, 'build')).toMatchObject({ status: 'in_progress', thread: 'thread-2' });
+  const [, build] = await shop.calls();
+  expect(build.slice(9, 13)).toEqual([
+    '--worktree',
+    'origin/main',
+    '--branch',
+    'clutch/sh-1000-fix-the-total',
+  ]);
+  expect(build.slice(6, 9)).toEqual(['claudeAgent', '--model', 'claude-opus-5-5']);
+});
+
+test('a ticket that triage holds keeps its reason, and no Build thread starts', async () => {
+  await using shop = await project(defaultPhases);
+  const added = await shop.tickets(['add', 'Make it better', '--description', 'It is slow.']);
+  const { id } = added.json.ticket;
+  await shop.tickets(['route', id, '--phases', 'planning,build,deploy', '--reason', 'Vague.']);
+  const reason = 'The route needs planning: the description names no place and no check.';
+  await shop.tickets(['hold', id, '--reason', reason]);
+  const done = await shop.tickets(['phase', id, 'triage', 'done']);
+  expect(done.json.ticket.holdReason).toBe(reason);
+  expect(status(done, 'planning')?.status).toBe('not_ready');
+  const calls = await shop.calls();
+  expect(calls.filter((call) => call[1] === 'start')).toHaveLength(1);
+});
+
+test('done looks the worktree up again from the work thread, and the check gets CLUTCH_TICKET', async () => {
+  const build =
+    '  - { id: build, thread: work, prompt: Build., check: \'test "$CLUTCH_TICKET" = SH-1000 && test -f here\' }\n';
+  await using shop = await project(phaseFile('{ threads: 6, device: 2 }', build));
+  const later = path.join(shop.home, 'worktree');
+  await mkdir(later);
+  await writeFile(path.join(later, 'here'), '');
+  // T3 Code has no worktree path yet when the thread starts.
+  const { id, done } = await routed(shop, 'Fix', 'build', { FAKE_WORKTREE: '' });
+  expect(done.json.ticket.links).toEqual([{ kind: 'branch', value: 'clutch/sh-1000-fix' }]);
+  const built = await shop.tickets(['phase', id, 'build', 'done'], { FAKE_WORKTREE: later });
+  expect(built.code).toBe(0);
+  expect(built.json.ticket.links.at(-1)).toEqual({ kind: 'worktree', value: later });
 });

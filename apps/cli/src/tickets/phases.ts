@@ -26,6 +26,8 @@ export type PhaseEntry = {
 
 export type PhaseFile = {
   schemaVersion: 1;
+  /** How an agent runs Clutch in this project, such as `mise exec -- bun run clutch`. By default `clutch`. */
+  command?: string;
   limits: { threads: number; device: number };
   work_thread: { provider: string; model: string };
   phases: Array<PhaseEntry>;
@@ -82,6 +84,7 @@ function phaseFileErrors(data: unknown) {
     data,
     {
       schemaVersion: (value) => value === 1,
+      command: isText,
       limits: () => true,
       work_thread: () => true,
       phases: Array.isArray,

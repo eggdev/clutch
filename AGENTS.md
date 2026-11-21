@@ -10,11 +10,11 @@ This file is a map, not the docs. Open the page that owns the task:
 
 - Not defined yet: read [KICKOFF.md](./KICKOFF.md) first. In the template repository, work on the starter and tooling is allowed. In a project, run kickoff first, and ask the owner before product work while `KICKOFF.md` exists.
 - Project intent: [docs/contributing/project-intent.md](./docs/contributing/project-intent.md)
-- Contributor documentation map:
-  [docs/contributing/index.md](./docs/contributing/index.md)
+- Contributor documentation map: [docs/contributing/index.md](./docs/contributing/index.md)
 - Engineering principles: [docs/principles/](./docs/principles/index.md)
 - Terms: [docs/contributing/glossary.md](./docs/contributing/glossary.md)
 - Task skills: [`.agents/skills/`](./.agents/skills/). Repeatable commands by stage: [commands](./.agents/skills/deliver/references/commands.md)
 - Tasks in this repository: [`.clutch/issues/`](./.clutch/README.md). `mise exec -- bun run clutch issues next` names the next one.
+- The owner says "log this": run `mise exec -- bun run clutch tickets add "<title>" --description "<the owner's words>"`, with `--hold` for "just log it", and start no work. See [tickets](./.clutch/README.md#capture).
 - Architecture: [docs/contributing/architecture/](./docs/contributing/architecture/index.md)
 - Setup and checks: [docs/contributing/setup/](./docs/contributing/setup/index.md)

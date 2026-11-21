@@ -20,7 +20,7 @@ export type PruneResult = {
 };
 
 /** True when `inner` is `outer` or a folder inside it. */
-function holds(outer: string, inner: string) {
+export function holds(outer: string, inner: string) {
   const relative = path.relative(outer, inner);
   return !relative.startsWith('..') && !path.isAbsolute(relative);
 }

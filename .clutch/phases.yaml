@@ -1,6 +1,7 @@
 # How `clutch tickets dispatch` starts each phase of a ticket. See .clutch/README.md#phases.
 # A project owns this file after the first sync. A ready phase with no entry stays ready.
 schemaVersion: 1
+command: 'mise exec -- bun run clutch' # how an agent runs Clutch in this project
 limits:
   threads: 6 # work threads that run at once on this machine
   device: 2 # phases that need a device, at once
@@ -8,13 +9,50 @@ work_thread:
   provider: claudeAgent
   model: claude-opus-5-5
 phases:
+  - id: triage
+    thread: own # work: the one work thread of the ticket. own: a thread of its own.
+    provider: claudeAgent
+    model: claude-sonnet-5-5
+    prompt: |
+      Triage the ticket. Change no code, and start no other work.
+      Run each `tickets` command below with the Clutch command of the last line of this prompt.
+
+      1. Read the ticket and the code that it names.
+      2. Fill the requirements with `tickets edit <id>`: `--kind`, `--now`, `--expected`, `--location`, one `--acceptance` for each check, and `--major yes|no`. Take each one from the description and the code. Never guess a part that needs the owner's judgment. Leave that part empty.
+      3. Choose the route. It always has `build` and `deploy`.
+         - When `now`, `expected`, `location`, one acceptance check and `major: no` are all set, the route has no `planning`.
+         - When the ticket changes nothing that a user sees, or it restores behavior that the owner approved before, the route has no `design`.
+         - In each other case, the route keeps the phase.
+      4. Write the route and the reason with `tickets route <id> --phases <phase,...> --reason "<why>"`. When it exits 1, a requirement is missing, so the route needs `planning`.
+      5. Clutch cannot run `planning` or `design` yet. When the route has one of them, hold the ticket with `tickets hold <id> --reason "<the phase and why the ticket needs it>"`. Do this before you end the phase.
+    advance: agent # agent | owner
   - id: build
-    thread: work # work: the one work thread of the ticket. own: a thread of its own.
+    thread: work
     skills: [deliver]
-    prompt: 'Build the ticket in this worktree.'
+    prompt: |
+      Build the ticket in this worktree. Follow the deliver skill through its "Verify and finalize" section, and stop before "Complete the destination". The Deploy phase opens the pull requests.
+
+      Commit the work on the branch of this worktree. When the change passes the pull request size limit, split it into more than one branch, each on top of the one before. Give each branch a name that starts like the branch of this worktree. Link each branch above the first, in order, with `tickets link <id> --kind branch <branch>`.
     check: 'mise exec -- bun run validate'
     needs: []
-    advance: agent # agent | owner
+    advance: agent
+    statuses:
+      blocked:
+        prompt: 'Write the question for the owner in the ask-the-owner form, then stop.'
+  - id: deploy
+    thread: work
+    skills: [babysit-pr]
+    prompt: |
+      Open, watch and merge the pull requests of the ticket. The hosting platform deploys on the merge to `main`. Clutch runs no deploy script.
+
+      1. Open one pull request for each branch of the ticket, from the bottom up, with `mise exec -- bun run pr open --title "<conventional title>" --body-file <file>`. Add `--base <the branch below>` for each branch above the first. `pr open` links each pull request to the ticket.
+      2. Follow the babysit-pr skill until each pull request of the stack is green and has no open thread. `pr babysit <top>` plans a round for each pull request of the stack.
+      3. Merge the pull requests one at a time, from the bottom up, each with `mise exec -- bun run pr merge <number>`. Never pass `--owner`.
+      4. When `pr merge` cannot merge, such as when the merge judge holds the pull request for the owner or does not start, set the phase to blocked with `tickets phase <id> deploy blocked --reason "<the output of pr merge>"`, and stop.
+    # Passes when each pull_request link of the ticket is merged.
+    check: 'mise exec -- bun run clutch tickets merged "$CLUTCH_TICKET"'
+    needs: []
+    advance: agent
     statuses:
       blocked:
         prompt: 'Write the question for the owner in the ask-the-owner form, then stop.'

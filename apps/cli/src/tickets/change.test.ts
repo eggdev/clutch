@@ -56,8 +56,11 @@ test('ids start at 1000, and a new ticket has one triage phase that a hold keeps
   expect(statuses(store, 'T-1001')).toEqual({ triage: 'not_ready' });
   releaseTicket(store, 'owner', 'T-1001');
   expect(statuses(store, 'T-1001')).toEqual({ triage: 'ready' });
-  holdTicket(store, 'owner', 'T-1001');
+  holdTicket(store, 'owner', 'T-1001', 'The route needs design.');
   expect(statuses(store, 'T-1001')).toEqual({ triage: 'not_ready' });
+  expect(store.ticket('T-1001').holdReason).toBe('The route needs design.');
+  releaseTicket(store, 'owner', 'T-1001');
+  expect(store.ticket('T-1001').holdReason).toBeNull();
 });
 
 test('a route with no planning names each missing requirement, and passes once they are set', async () => {
@@ -217,7 +220,7 @@ test('done writes one event for the phase and one for the next phase that become
     [{ phase: 'build', status: 'ready' }, { status: 'not_ready' }],
   ]);
   const held = store.events().length;
-  holdTicket(store, 'owner', id);
+  holdTicket(store, 'owner', id, null);
   expect(store.events({ since: held }).map((event) => event.type)).toEqual(['Ticket', 'Phase']);
 });
 

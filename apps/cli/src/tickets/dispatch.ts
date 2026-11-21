@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 
 import { claimPhase, linkTicket, readyPhases, setPhase, setThread } from '@/tickets/change';
+import { removeFinished } from '@/tickets/finish';
 import type { PhaseEntry, PhaseFile } from '@/tickets/phases';
 import type { TicketStore } from '@/tickets/store';
 
@@ -15,10 +16,12 @@ export type Driver = {
   project: string;
   /** The main checkout of the project, which T3 Code knows as the project. */
   projectDir: string;
+  /** The folder that the command runs in. Dispatch never removes the worktree that holds it. */
+  cwd: string;
 };
 
 type LogLine = {
-  kind: 'start' | 'skip' | 'fail';
+  kind: 'start' | 'skip' | 'fail' | 'remove' | 'keep';
   ticket: string;
   phase: string;
   thread?: string;
@@ -60,12 +63,21 @@ const slug = (title: string) =>
     .slice(0, 40)
     .replaceAll(/^-+|-+$/gu, '');
 
-/** The prompt, the skills to use, and how to read the ticket and end the phase. */
-function promptOf(id: string, phase: string, text: string, skills: Array<string> = []) {
+/**
+ * The prompt, the skills to use, and how to read the ticket and end the phase.
+ * `command` is how an agent runs Clutch in the project.
+ */
+function promptOf(
+  file: PhaseFile,
+  id: string,
+  phase: string,
+  { prompt, skills = [] }: { prompt?: string; skills?: Array<string> },
+) {
+  const clutch = file.command ?? 'clutch';
   return [
-    text,
+    prompt,
     skills.length > 0 ? `Use these skills: ${skills.join(', ')}.` : '',
-    `Read the ticket with \`clutch tickets show ${id}\`. When the phase is done, run \`clutch tickets phase ${id} ${phase} done\`.`,
+    `Read the ticket with \`${clutch} tickets show ${id}\`. When the phase is done, run \`${clutch} tickets phase ${id} ${phase} done\`.`,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -104,10 +116,26 @@ function workThread(driver: Driver, id: string) {
     .find((row) => row.thread && entryOf(driver.file, row.phase)?.thread === 'work')?.thread;
 }
 
+/**
+ * Asks T3 Code for the worktree of `thread` and links it to the ticket. Right
+ * after a start the path can still be empty, so `done` asks again. Returns the
+ * path, or null when the thread has none yet.
+ */
+async function linkWorktree(driver: Driver, id: string, thread: string) {
+  const shown = JSON.parse(await t3('thread', 'show', '--json', thread)) as {
+    thread: { worktreePath: string | null };
+  };
+  const value = shown.thread.worktreePath || null;
+  if (value) {
+    linkTicket(driver.store, driver.actor, id, { kind: 'worktree', value });
+  }
+  return value;
+}
+
 /** Starts the thread of a claimed phase, or sends the prompt to the work thread. Returns the thread id. */
 async function startThread(driver: Driver, row: { id: string; phase: string; title: string }) {
   const entry = entryOf(driver.file, row.phase) as PhaseEntry;
-  const prompt = promptOf(row.id, row.phase, entry.prompt, entry.skills);
+  const prompt = promptOf(driver.file, row.id, row.phase, entry);
   const existing = entry.thread === 'work' ? workThread(driver, row.id) : null;
   if (existing) {
     await t3('thread', 'send', existing, prompt);
@@ -132,19 +160,25 @@ async function startThread(driver: Driver, row: { id: string; phase: string; tit
   if (entry.thread === 'work') {
     linkTicket(driver.store, driver.actor, row.id, { kind: 'branch', value: branch });
     // `start` prints no worktree, so ask the thread for it. A check runs there.
-    const shown = JSON.parse(await t3('thread', 'show', '--json', threadId)) as {
-      thread: { worktreePath: string | null };
-    };
-    if (shown.thread.worktreePath) {
-      const value = shown.thread.worktreePath;
-      linkTicket(driver.store, driver.actor, row.id, { kind: 'worktree', value });
-    }
+    await linkWorktree(driver, row.id, threadId);
   }
   return threadId;
 }
 
+/** The worktree of a ticket: its link, or else the worktree that its work thread reports now. */
+async function worktreeOf(driver: Driver, id: string) {
+  const linked = driver.store.ticket(id).links.findLast((link) => link.kind === 'worktree');
+  if (linked) {
+    return linked.value;
+  }
+  const thread = workThread(driver, id);
+  // With no T3 Code to ask, the check runs in the current folder.
+  return thread ? await linkWorktree(driver, id, thread).catch(() => null) : null;
+}
+
 /**
- * Starts the thread of each ready phase that fits the limits. The claim makes
+ * Removes the worktree of each finished ticket (see `removeFinished`). Then
+ * starts the thread of each ready phase that fits the limits. The claim makes
  * the start safe from several processes at once: a phase that another process
  * claimed first is left to it. A ready phase with no entry in the phase file
  * stays ready. A start that fails sets the phase back to `ready` with the
@@ -152,6 +186,9 @@ async function startThread(driver: Driver, row: { id: string; phase: string; tit
  */
 export async function dispatch(driver: Driver) {
   const lines: Array<LogLine> = [];
+  for (const line of await removeFinished(driver)) {
+    lines.push(await log(driver, line));
+  }
   for (const row of readyPhases(driver.store)) {
     const at = { ticket: row.id, phase: row.phase };
     const entry = entryOf(driver.file, row.phase);
@@ -206,7 +243,7 @@ export async function sendStatusPrompt(driver: Driver, id: string, phase: string
     return null;
   }
   try {
-    await t3('thread', 'send', thread, promptOf(id, phase, prompt.prompt, prompt.skills));
+    await t3('thread', 'send', thread, promptOf(driver.file, id, phase, prompt));
     return await log(driver, { kind: 'start', ticket: id, phase, thread, reason: status });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -230,11 +267,11 @@ export async function checkDone(
     );
   }
   if (entry?.check) {
-    const worktree = driver.store
-      .ticket(done.id)
-      .links.findLast((link) => link.kind === 'worktree')?.value;
+    const worktree = await worktreeOf(driver, done.id);
+    // The check reads the ticket id from CLUTCH_TICKET, such as `clutch tickets merged "$CLUTCH_TICKET"`.
     const proc = Bun.spawn(['sh', '-c', entry.check], {
       cwd: worktree ?? done.cwd,
+      env: { ...process.env, CLUTCH_TICKET: done.id },
       stdout: 'pipe',
       stderr: 'pipe',
     });

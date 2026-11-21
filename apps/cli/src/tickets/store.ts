@@ -45,6 +45,8 @@ export type Ticket = {
   route: Array<PhaseName>;
   routeReason: string | null;
   hold: boolean;
+  /** Why the ticket is held, such as the phase that the route needs and Clutch cannot run yet. */
+  holdReason: string | null;
   body: string;
   dependsOn: Array<string>;
   links: Array<{ kind: (typeof linkKinds)[number]; value: string }>;
@@ -67,13 +69,22 @@ export type Change = Pick<Event, 'type' | 'action' | 'data' | 'updatedFrom'>;
 
 type TicketRow = Omit<
   Ticket,
-  'acceptance' | 'major' | 'route' | 'routeReason' | 'hold' | 'dependsOn' | 'links' | 'createdAt'
+  | 'acceptance'
+  | 'major'
+  | 'route'
+  | 'routeReason'
+  | 'hold'
+  | 'holdReason'
+  | 'dependsOn'
+  | 'links'
+  | 'createdAt'
 > & {
   acceptance: string;
   major: number | null;
   route: string;
   route_reason: string | null;
   hold: number;
+  hold_reason: string | null;
   created_at: string;
 };
 
@@ -117,6 +128,7 @@ const schema = `
     route TEXT NOT NULL DEFAULT '[]',
     route_reason TEXT,
     hold INTEGER NOT NULL DEFAULT 0 CHECK(hold IN (0, 1)),
+    hold_reason TEXT,
     body TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
   );
@@ -154,8 +166,11 @@ const schema = `
     updated_from TEXT NOT NULL
   );
   CREATE INDEX events_ticket ON events (ticket, number);
-  PRAGMA user_version=1;
+  PRAGMA user_version=2;
 `;
+
+/** Version 2 adds the reason of a hold. */
+const fromVersion1 = 'ALTER TABLE tickets ADD COLUMN hold_reason TEXT; PRAGMA user_version=2;';
 
 /** The old value of each field that differs between `before` and `after`. */
 export function changedFrom<T extends object>(before: T, after: T) {
@@ -214,7 +229,9 @@ export class TicketStore implements Disposable {
             .get() ?? { user_version: 0 };
           if (version === 0) {
             this.db.exec(schema);
-          } else if (version !== 1) {
+          } else if (version === 1) {
+            this.db.exec(fromVersion1);
+          } else if (version !== 2) {
             throw new Error(`${file} has schema ${version}. Update Clutch to read it.`);
           }
         })
@@ -303,6 +320,7 @@ export class TicketStore implements Disposable {
       route,
       route_reason,
       hold,
+      hold_reason,
       created_at,
       ...rest
     } = row as TicketRow & { number: number };
@@ -313,6 +331,7 @@ export class TicketStore implements Disposable {
       route: JSON.parse(route) as Array<PhaseName>,
       routeReason: route_reason,
       hold: hold === 1,
+      holdReason: hold_reason,
       dependsOn: this.db
         .query<{ depends_on: string }, [string]>(
           'SELECT depends_on FROM depends_on WHERE ticket = ? ORDER BY depends_on',

@@ -20,6 +20,7 @@ import {
 import type { Edit } from '@/tickets/change';
 import { checkDone, dispatch, sendStatusPrompt } from '@/tickets/dispatch';
 import type { Driver } from '@/tickets/dispatch';
+import { checkMerged } from '@/tickets/finish';
 import { missingSkills, phaseFilePath, readPhaseFile } from '@/tickets/phases';
 import { openStore, phaseNames, phaseStatuses } from '@/tickets/store';
 import type { Event, TicketStore } from '@/tickets/store';
@@ -31,12 +32,13 @@ export const ticketsUsage = [
   'clutch tickets ready',
   'clutch tickets edit <id> [--now TEXT] [--expected TEXT] [--location TEXT] [--acceptance TEXT]... [--major yes|no] [--kind KIND] [--depends ID,...] [--body-file PATH]',
   'clutch tickets route <id> --phases PHASE,... --reason TEXT',
-  'clutch tickets hold <id>',
+  'clutch tickets hold <id> [--reason TEXT]',
   'clutch tickets release <id>',
   'clutch tickets claim <id> <phase> --as NAME [--thread THREAD]',
   'clutch tickets phase <id> <phase> <status> [--reason TEXT] [--approved-by owner --quote TEXT]',
   'clutch tickets link <id> --kind KIND <value>',
   'clutch tickets events [--ticket ID] [--since NUMBER]',
+  'clutch tickets merged <id>',
   'clutch tickets dispatch',
   'clutch tickets phases [--check]',
 ].join('\n');
@@ -124,6 +126,7 @@ async function driverOf(store: TicketStore, cwd: string, values: Values): Promis
     project: loaded.kind === 'loaded' ? loaded.config.project : path.basename(root),
     // The store is `<git-common-dir>/clutch/tickets.sqlite`, in the main checkout.
     projectDir: path.dirname(path.dirname(path.dirname(store.file))),
+    cwd: path.resolve(cwd),
   };
 }
 
@@ -163,6 +166,7 @@ const reads: Record<string, [number, Handler]> = {
     },
   ],
   show: [1, (store, [id]) => ({ ticket: shown(store, id) })],
+  merged: [1, (store, [id], _values, cwd) => checkMerged(store, id, cwd)],
   ready: [0, (store) => ({ phases: readyPhases(store) })],
   events: [
     0,
@@ -248,7 +252,11 @@ const writes: Record<string, [number, Handler]> = {
       return written(store, id, routeTicket(store, actorOf(values), id, { phases, reason }));
     },
   ],
-  hold: [1, (store, [id], values) => written(store, id, holdTicket(store, actorOf(values), id))],
+  hold: [
+    1,
+    (store, [id], values) =>
+      written(store, id, holdTicket(store, actorOf(values), id, values.reason ?? null)),
+  ],
   release: [
     1,
     (store, [id], values) => written(store, id, releaseTicket(store, actorOf(values), id)),

@@ -84,7 +84,7 @@ A ticket has an id such as `CL-1000`. The prefix is `tickets.prefix` in `clutch.
 
 A ticket has one phase row for each phase on its route: `triage`, `planning`, `design`, `build`, `review` and `deploy`, in that order. Each row has a status: `not_ready`, `ready`, `in_progress`, `blocked`, `in_review` or `done`.
 
-- A new ticket has one `triage` row. It is `ready`, or `not_ready` when the ticket is held. `release` makes it `ready`.
+- A new ticket has one `triage` row. It is `ready`, or `not_ready` when the ticket is held. `hold --reason` keeps the reason, and `show` prints it as `holdReason`. `release` makes the row `ready` and clears the reason.
 - `route` adds `triage` at the start when the list leaves it out. A route with no `planning` needs `now`, `expected`, `location`, one acceptance check and `major: no`. Otherwise `route` exits 1 and names each missing part.
 - `done` makes the next phase `ready`. A phase that goes back to `ready` sets each later phase to `not_ready`.
 - `claim` sets `in_progress` and the claim in one transaction. Only a `ready` phase can be claimed, so a second claim exits 1.
@@ -97,27 +97,42 @@ Every command prints JSON with `schemaVersion: 1`. An error prints `status: erro
 - `clutch tickets list [--inbox] [--phase <phase>] [--status <status>]`, `show <id>`, `ready`
 - `clutch tickets edit <id> [--now] [--expected] [--location] [--acceptance]... [--major yes|no] [--kind] [--depends <id,...>] [--body-file <path>]`
 - `clutch tickets route <id> --phases <phase,...> --reason <text>`
-- `clutch tickets hold <id>`, `release <id>`
+- `clutch tickets hold <id> [--reason <text>]`, `release <id>`
 - `clutch tickets claim <id> <phase> --as <name> [--thread <thread>]`
 - `clutch tickets phase <id> <phase> <status> [--reason <text>] [--approved-by owner --quote <text>]`
 - `clutch tickets link <id> --kind prototype|pull_request|branch|worktree|evidence <value>`
 - `clutch tickets events [--ticket <id>] [--since <event number>]`
+- `clutch tickets merged <id>` exits 0 when each `pull_request` link of the ticket is merged, and 1 when one is not, or when the ticket has none.
 - `clutch tickets dispatch`, `phases [--check]`
 
 `ready` lists each `ready` phase of a ticket that is not held and whose dependencies are done. A ticket is done when each of its phases is `done`.
 
+### Capture
+
+When the owner says "log this" in any thread, the agent runs `clutch tickets add "<title>" --description "<the owner's words>"`. When the owner says "just log it", it adds `--hold`. For a ticket of another project, it runs the command in a checkout of that project. Capture starts no work in the thread that captured.
+
+### The first phases
+
+The default phase file has entries for Triage, Build and Deploy. Planning, Design and Review have none yet, so a ticket that needs one waits.
+
+- Triage runs in a short thread of its own and changes no code. It fills the requirements from the description and the code, and never guesses a part that needs the owner's judgment. It writes the route with `route`. A route with `planning` or `design` holds the ticket with a reason.
+- Build is the first phase of the work thread, in a new worktree. It follows the `deliver` skill through "Verify and finalize". Its check is `validate`. A change that passes the pull request size limit becomes more than one branch, in order.
+- Deploy opens a pull request for each branch, as one stack, and links each one to the ticket. It babysits the stack and merges it from the bottom up with `pr merge`, with no `--owner`. When `pr merge` cannot merge, it sets the phase to `blocked`. Its check is `tickets merged`, so the ticket is done when its whole stack is on `main`.
+
 ### Phases
 
-`.clutch/phases.yaml` tells the driver how to start each phase. Clutch ships a default, and the project owns its copy after the first sync. The file has `limits`, `work_thread` and one entry for each phase in `phases`. `tickets phases --check` exits 1 on an unknown key, an unknown phase, or a skill with no `SKILL.md` in `.agents/skills/`, `~/.claude/skills/` or `~/.agents/skills/`.
+`.clutch/phases.yaml` tells the driver how to start each phase. Clutch ships a default, and the project owns its copy after the first sync. The file has `command`, `limits`, `work_thread` and one entry for each phase in `phases`. `command` is how an agent runs Clutch in the project, such as `mise exec -- bun run clutch`. The default is `clutch`. `tickets phases --check` exits 1 on an unknown key, an unknown phase, or a skill with no `SKILL.md` in `.agents/skills/`, `~/.claude/skills/` or `~/.agents/skills/`.
 
 - `thread: own` starts a new thread with the `provider` and `model` of the entry.
 - `thread: work` uses the one work thread of the ticket. The first work phase starts it in a new worktree from `origin/main`, on the branch `clutch/<id>-<title>`, with the model of `work_thread`. Each later work phase sends its prompt to that thread.
-- `prompt` and `skills` make the prompt. The prompt also tells the agent to read the ticket and to end with `clutch tickets phase <id> <phase> done`.
+- `prompt` and `skills` make the prompt. The prompt also tells the agent to read the ticket and to end with `<command> tickets phase <id> <phase> done`.
 - `statuses` holds a prompt for a status. When `tickets phase` sets that status, the driver sends the prompt to the thread of the phase.
-- `check` is a command. `done` runs it in the worktree of the ticket, and exits 1 with no change when it fails.
+- `check` is a command. `done` runs it in the worktree of the ticket, with the ticket id in `CLUTCH_TICKET`, and exits 1 with no change when it fails. When the ticket has no `worktree` link yet, `done` asks the work thread for its worktree first, since T3 Code can report it after the start.
 - `advance: owner` means that `done` needs `--approved-by owner --quote <the owner's words>`. The quote goes in the reason of the phase, so it is in the event.
 - `needs: [device]` counts the phase against `limits.device`. A running work phase counts against `limits.threads`.
 
 `tickets dispatch` runs after each command that writes, and by hand. It finds each `ready` phase that `tickets ready` lists, and claims it, then starts its thread with `t3` and saves the thread id on the phase. The claim stops a second start, so several dispatches can run at once. A phase that would pass a limit stays `ready`. A phase with no entry in the phase file stays `ready`. When `t3` fails, the phase goes back to `ready` with the error as its reason, and the next dispatch tries again. A checkout with no phase file starts nothing.
 
-Each start, skip and failure writes one JSON line to `~/.local/state/clutch/<project>/dispatch.jsonl`, or under `$XDG_STATE_HOME` when it is set.
+Before it starts any phase, `dispatch` removes the worktree of each ticket whose phases are all `done`. It also deletes each local branch of the ticket that is merged into the base. It keeps a worktree with uncommitted changes, and the one that the command runs in. The agent ends the last phase from inside the worktree, so the next dispatch from another folder removes it. A worktree that T3 Code made under `~/.t3/worktrees/` is a worktree of the project too, so `dispatch` and `clutch worktree prune` both find it.
+
+Each start, skip, failure, removal and kept worktree writes one JSON line to `~/.local/state/clutch/<project>/dispatch.jsonl`, or under `$XDG_STATE_HOME` when it is set.

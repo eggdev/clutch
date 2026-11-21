@@ -178,11 +178,11 @@ export function routeTicket(
   });
 }
 
-/** Holds a ticket: each `ready` phase goes back to `not_ready`. */
-export function holdTicket(store: TicketStore, actor: string, id: string) {
+/** Holds a ticket, with the reason when one is given: each `ready` phase goes back to `not_ready`. */
+export function holdTicket(store: TicketStore, actor: string, id: string, reason: string | null) {
   return store.write(actor, () => {
     const before = store.ticket(id);
-    store.db.query('UPDATE tickets SET hold = 1 WHERE id = ?').run(id);
+    store.db.query('UPDATE tickets SET hold = 1, hold_reason = ? WHERE id = ?').run(reason, id);
     store.db
       .query("UPDATE phases SET status = 'not_ready' WHERE ticket = ? AND status = 'ready'")
       .run(id);
@@ -194,7 +194,7 @@ export function holdTicket(store: TicketStore, actor: string, id: string) {
 export function releaseTicket(store: TicketStore, actor: string, id: string) {
   return store.write(actor, () => {
     const before = store.ticket(id);
-    store.db.query('UPDATE tickets SET hold = 0 WHERE id = ?').run(id);
+    store.db.query('UPDATE tickets SET hold = 0, hold_reason = NULL WHERE id = ?').run(id);
     advance(store, id);
     return ticketChange(store, before);
   });
@@ -305,7 +305,7 @@ export function linkTicket(
 }
 
 /** A ticket is done when it has phases and each one is `done`. */
-function isDone(store: TicketStore, id: string) {
+export function isDone(store: TicketStore, id: string) {
   const rows = store.phases(id);
   return rows.length > 0 && rows.every((row) => row.status === 'done');
 }
