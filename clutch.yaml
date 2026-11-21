@@ -68,9 +68,10 @@ automerge:
   # .agents/skills/deliver/references/pull-requests.md#approval.
   owner: eggdev
 # The static analysis engine that .github/workflows/sast.yml runs. auto runs CodeQL where
-# code scanning takes results and Semgrep elsewhere. This repository is public, so auto runs
-# CodeQL. Kickoff asks each project. See docs/contributing/capabilities/codeql-sast.md.
-sast: auto
+# code scanning takes results and Semgrep elsewhere. This repository runs Semgrep: its checks
+# run on local CI, and CodeQL's upload needs a GitHub Actions run. Kickoff asks each project.
+# See docs/contributing/capabilities/codeql-sast.md.
+sast: semgrep
 # What bun run pr open does with a change that has no passing verify receipt for a flow
 # that the feature map asks for: off, observe or enforce. observe prints that the gate
 # would block it, and the record on the PR is the log. See docs/contributing/delivery.md.
