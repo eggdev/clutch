@@ -7,7 +7,8 @@ rules that keep them from building or starting devices they do not need.
 - An agent opens a device of the shared pool with T3 Code's device tools, and
   closes it when the work ends. It never creates, clones, boots or erases a
   device with `simctl`, `adb` or Xcode.
-- An agent makes a native build only when the native fingerprint changed.
+- An agent gets a native build only through `native:build`. It makes the build
+  only when no build of the native fingerprint exists.
 - A script in this repository drives the device that its caller opened. It
   never opens or closes one.
 
@@ -48,8 +49,8 @@ flow as not verified.
 
 ## Device host
 
-The device host is the one adapter that drives a device or makes a native
-build. [`tools/native/device-host.ts`](../../../tools/native/device-host.ts)
+The device host is the one adapter that drives a device.
+[`tools/native/device-host.ts`](../../../tools/native/device-host.ts)
 defines it. The template has one host, `pool`. It drives the device that the
 caller opened, through the command that `AGENT_DEVICE` names. A host has two
 calls:
@@ -57,15 +58,15 @@ calls:
 | Call     | Does                                                 |
 | -------- | ---------------------------------------------------- |
 | `device` | Runs one command of the bound `agent-device` command |
-| `build`  | Builds the native app for one platform               |
+| `id`     | Names the opened device: the path of its command     |
 
 `install`, `runFlow` and `deviceName` use the `device` call. `install` puts a
 built app on the device. `runFlow` runs a flow in the Maestro format with
 `agent-device replay --maestro`. `deviceName` reads the model of the device,
 such as `iPhone 17`.
 
-The `pool` host makes no build yet. CL-499 adds the build on the build
-machine.
+A build needs no device, so the device host makes no build. The
+[build machine](#the-build-machine) makes it.
 
 To run a Maestro flow on the opened device:
 
@@ -128,26 +129,37 @@ Node version of `mise.toml`, the script stops. Ask the owner to install it.
 The native fingerprint is a hash of each input that goes into the native
 binary: the native folders, the config plugins and the native dependencies.
 A JavaScript-only change keeps the same fingerprint. The dev build on the
-device loads the JavaScript of the dev server, so it needs no native
+device loads the JavaScript of the dev server, so it needs no new native
 build.
 
-`mise exec -- bun run native:build` is the one way to make a native build:
+`mise exec -- bun run native:build` is the one way to get a native build. It
+has two forms:
 
 ```sh
 mise exec -- bun run native:build --platform ios
+AGENT_DEVICE=<path> mise exec -- bun run native:build --platform ios --install
 ```
 
 1. It finds the native app: an app in `apps/` that depends on `expo` or
    `react-native`. With more than one, name the app before the flags.
-2. It makes the fingerprint of the app with `@expo/fingerprint`.
-3. It compares the fingerprint with the one in
-   `apps/<app>/native-fingerprint.json`, the fingerprint of the last build.
-4. When the two are the same, it refuses. The change is JavaScript only, so
-   ship it with an update.
-5. When they differ, it lists the changed sources. Then it builds through the
-   device host. The `pool` host refuses until CL-499.
-6. After a build passes, it writes the fingerprint of the build. Commit
-   `native-fingerprint.json` with the native change that caused the build.
+2. With `--install`, it reads `AGENT_DEVICE` first. With no device, it stops
+   before any build.
+3. It makes the fingerprint of the app with `@expo/fingerprint`.
+4. It looks for the build in `tmp/native/<fingerprint>/` of this checkout.
+5. With none there, it looks on the build machine.
+6. With none there, it makes the build on the build machine.
+7. It copies the build to `tmp/native/<fingerprint>/`.
+8. When the fingerprint differs from the one in
+   `apps/<app>/native-fingerprint.json`, it lists the changed sources and
+   writes the new fingerprint. Commit that file with the native change that
+   caused the build.
+9. With `--install`, it installs the app on the opened device. Then it records
+   the fingerprint of the device in `tmp/native/devices/`.
+
+A lease gives a device with no app, so each lease needs `--install`. When a
+build of the fingerprint exists, the command makes no new build.
+
+Android builds are not made yet. `--platform android` stops with one sentence.
 
 A repository with no native app has nothing to build. The command prints
 `No native app in this repository.` and exits 0.

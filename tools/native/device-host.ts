@@ -1,10 +1,11 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 
 /**
- * The device host is the one place that drives a simulator, an emulator or a
- * native build. The template has one host, `pool`. It drives the device that
- * the caller opened from the shared device pool, through the `agent-device`
- * command that `AGENT_DEVICE` names. A script never opens or closes a device.
+ * The device host is the one place that drives a simulator or an emulator.
+ * The template has one host, `pool`. It drives the device that the caller
+ * opened from the shared device pool, through the `agent-device` command that
+ * `AGENT_DEVICE` names. A script never opens or closes a device.
  * See docs/contributing/setup/native.md#the-device-pool.
  */
 export type Platform = 'ios' | 'android';
@@ -15,8 +16,8 @@ export type DeviceHost = {
   readonly name: string;
   /** One call of the `agent-device` command that is bound to the device the caller opened. */
   readonly device: (args: ReadonlyArray<string>) => Result;
-  /** Builds the native app in `appRoot` for the platform. */
-  readonly build: (appRoot: string, platform: Platform) => Promise<Result>;
+  /** What names the opened device: the path of its bound command. */
+  readonly id: () => string;
 };
 
 /** A refusal from the device host. Its message names the fix. */
@@ -62,12 +63,7 @@ export function poolHost(
     name: 'pool',
     // The variable is read on each call, so the refusal comes at the first device call.
     device: (args) => run(agentDeviceOf(options.env, options.exists), args),
-    build: () =>
-      Promise.reject(
-        new DeviceHostError(
-          'The `pool` device host makes no build yet. CL-499 adds the build on the build machine.',
-        ),
-      ),
+    id: () => agentDeviceOf(options.env, options.exists),
   };
 }
 
@@ -82,6 +78,28 @@ export function install(host: DeviceHost, app: string): void {
   if (result.exitCode !== 0) {
     throw new DeviceHostError(`agent-device install ${app} failed: ${result.output}`);
   }
+}
+
+/**
+ * The file that records the build on the opened device. A lease gives a new
+ * device with a new command path, so the record of an old device never matches.
+ */
+function recordOf(root: string, host: DeviceHost): string {
+  return path.join(root, 'tmp/native/devices', `${Bun.hash(host.id()).toString(36)}.json`);
+}
+
+/** The fingerprint of the build that `recordInstalled` wrote for the opened device, or null. */
+export function installedOn(root: string, host: DeviceHost): { fingerprint: string } | null {
+  const file = recordOf(root, host);
+  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf-8')) : null;
+}
+
+/** Records the fingerprint of the build on the opened device. A reader never gets half of the file. */
+export function recordInstalled(root: string, host: DeviceHost, fingerprint: string): void {
+  const file = recordOf(root, host);
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(`${file}.new`, `${JSON.stringify({ fingerprint })}\n`);
+  renameSync(`${file}.new`, file);
 }
 
 /** Runs a Maestro flow on the opened device, with a limit of 15 minutes. */

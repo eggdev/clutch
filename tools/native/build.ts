@@ -3,16 +3,24 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { nativeApps } from '@tools/apps';
-import { DeviceHostError, deviceHost } from '@tools/native/device-host';
+import { findOrMakeBuild } from '@tools/native/build-machine';
+import type { BuildRequest } from '@tools/native/build-machine';
+import {
+  DeviceHostError,
+  deviceHost,
+  deviceName,
+  install,
+  recordInstalled,
+} from '@tools/native/device-host';
 import type { DeviceHost, Platform } from '@tools/native/device-host';
 
 /**
- * `mise exec -- bun run native:build` builds a native app only when its native
- * fingerprint changed. The fingerprint is a hash of each input that goes into
- * the native binary: native folders, config plugins and native dependencies.
- * A JavaScript-only change keeps it, so it needs no native build. Each app
- * commits its last built fingerprint in `native-fingerprint.json`.
- * See docs/contributing/setup/native.md#native-builds.
+ * `mise exec -- bun run native:build` finds or makes the native build of a
+ * native fingerprint, and with `--install` puts it on the opened device. The
+ * fingerprint is a hash of each input that goes into the native binary: native
+ * folders, config plugins and native dependencies. Each app commits the
+ * fingerprint of its last build in `native-fingerprint.json`, so a review sees
+ * a native change. See docs/contributing/setup/native.md#native-builds.
  */
 export const recordName = 'native-fingerprint.json';
 
@@ -92,16 +100,19 @@ export type BuildOptions = {
   readonly args: Array<string>;
   readonly host?: DeviceHost;
   readonly tool?: (appRoot: string) => Promise<FingerprintTool>;
+  /** Finds or makes the build, and returns the path of the app on this machine. */
+  readonly build?: (request: BuildRequest) => Promise<string>;
   readonly log?: (line: string) => void;
-  readonly env?: NodeJS.ProcessEnv;
 };
 
-const usage = 'Usage: mise exec -- bun run native:build [app] --platform <ios|android> [--record]';
+const usage =
+  'Usage: mise exec -- bun run native:build [app] --platform <ios|android> [--install | --record]';
 
 type Target = {
   app: string;
   platforms: Array<Platform>;
   record: boolean;
+  install: boolean;
 };
 
 /** The app and platforms that the arguments name, or a refusal to log. */
@@ -114,6 +125,7 @@ function targetOf(root: string, args: Array<string>): Target | string {
       options: {
         platform: { type: 'string' },
         record: { type: 'boolean', default: false },
+        install: { type: 'boolean', default: false },
       },
     });
   } catch (error) {
@@ -133,6 +145,7 @@ function targetOf(root: string, args: Array<string>): Target | string {
     app,
     platforms: chosen,
     record: values.record,
+    install: values.install,
   };
 }
 
@@ -158,35 +171,42 @@ async function record(run: Run): Promise<number> {
   return 0;
 }
 
-async function buildChanged(run: Run, host: () => DeviceHost): Promise<number> {
+async function buildAndInstall(
+  run: Run,
+  options: BuildOptions,
+  host: () => DeviceHost,
+): Promise<number> {
   const { log, relative } = run;
   const [platform] = run.target.platforms;
-  const before = run.recorded[platform];
-  if (!before) {
-    log(
-      `${relative} has no ${platform} fingerprint. Kickoff records the first one: \`mise exec -- bun run native:build ${run.target.app} --record\`.`,
-    );
-    return 1;
-  }
+  // A missing device refuses before the build, which can take minutes.
+  const device = run.target.install ? host() : undefined;
+  device?.id();
   const after = await run.tool.create(run.appRoot, platform);
-  if (after.hash === before.hash) {
-    log(
-      `JS-only change: the ${platform} native fingerprint matches ${relative}. Ship it with an update, not a native build. A dev build on the device loads the new JavaScript from the dev server.`,
-    );
-    return 1;
+  const app = await (options.build ?? findOrMakeBuild)({
+    root: options.root,
+    app: run.target.app,
+    platform,
+    fingerprint: after.hash,
+    log,
+  });
+  const before = run.recorded[platform];
+  if (before?.hash !== after.hash) {
+    if (before) {
+      log(`The ${platform} native fingerprint changed. Changed sources:`);
+      for (const source of changedSources(before, after).slice(0, 20)) {
+        log(`  ${source}`);
+      }
+    }
+    run.save({ ...run.recorded, [platform]: after });
+    log(`Commit ${relative} with the native change that caused the build.`);
   }
-  log(`The ${platform} native fingerprint changed. Changed sources:`);
-  for (const source of changedSources(before, after).slice(0, 20)) {
-    log(`  ${source}`);
+  const short = after.hash.slice(0, 8);
+  log(`The ${platform} build of fingerprint ${short} is at ${path.relative(options.root, app)}.`);
+  if (device) {
+    install(device, app);
+    recordInstalled(options.root, device, after.hash);
+    log(`Installed the build of fingerprint ${short} on ${deviceName(device)}.`);
   }
-  const result = await host().build(run.appRoot, platform);
-  log(result.output);
-  if (result.exitCode !== 0) {
-    log(`The ${platform} build failed, so ${relative} keeps the last built fingerprint.`);
-    return result.exitCode;
-  }
-  run.save({ ...run.recorded, [platform]: after });
-  log(`Built. Commit ${relative} with the native change that caused the build.`);
   return 0;
 }
 
@@ -205,7 +225,6 @@ export async function nativeBuild(options: BuildOptions): Promise<number> {
     log(target);
     return 1;
   }
-  const env = options.env ?? process.env;
   const appRoot = path.join(options.root, 'apps', target.app);
   const recordFile = path.join(appRoot, recordName);
   try {
@@ -218,11 +237,10 @@ export async function nativeBuild(options: BuildOptions): Promise<number> {
       save: (next) => writeFileSync(recordFile, `${JSON.stringify(next, null, 2)}\n`),
       log,
     };
-    const host = () => options.host ?? deviceHost(env);
     if (target.record) {
       return await record(run);
     }
-    return await buildChanged(run, host);
+    return await buildAndInstall(run, options, () => options.host ?? deviceHost());
   } catch (error) {
     if (!(error instanceof DeviceHostError)) {
       throw error;

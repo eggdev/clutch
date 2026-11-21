@@ -26,7 +26,7 @@ function host(codes: Array<number>, opened = true) {
       ran.push(file);
       return { exitCode: codes.shift() ?? 0, output: `ran ${file}` };
     },
-    build: () => Promise.resolve({ exitCode: 1, output: '' }),
+    id: () => 'fake',
   };
   return { fake, ran };
 }
