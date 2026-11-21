@@ -281,16 +281,17 @@ A native profile also sets up [native builds and devices](../../../docs/contribu
 4. Run `mise exec -- bun run clutch doctor`, and read its two native lines:
    the build machine and the device pool. Do not ask the owner which machine
    has the simulators.
-5. When both are present, do a first run. Open a pool device with
-   `device_open`. Run
+5. When both are present, do a first run. Start the dev servers with
+   `mise exec -- bun run dev`. Open a pool device with `device_open`. Run
    `AGENT_DEVICE=<path> mise exec -- bun run native:build --platform ios --install`
    and `AGENT_DEVICE=<path> mise exec -- bun run journey --native ios`. Close
    the device with `device_close` and `shutdown: true`, also after a failure.
 6. When one is missing, tell the owner in one message which machine setting is
    missing and where it goes. Then go on with kickoff. The first run waits for
    the setting.
-   Remove the notes example (`packages/notes`, `features/notes`, its route and its
-   registrations) once the first product package exists.
+
+Remove the notes example (`packages/notes`, `features/notes`, its route and its
+registrations) once the first product package exists.
 
 ### 5. Close
 
