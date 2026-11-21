@@ -11,7 +11,7 @@ import { DeviceHostError } from '@tools/native/device-host';
 export type BuildMachine = { readonly ssh: string; readonly root: string };
 
 /** Where the setting is: `$XDG_CONFIG_HOME/clutch/build-machine.json`, or `~/.config/clutch/build-machine.json`. */
-export function settingFile(env: NodeJS.ProcessEnv = process.env): string {
+function settingFile(env: NodeJS.ProcessEnv = process.env): string {
   const config = env['XDG_CONFIG_HOME'] || path.join(homedir(), '.config');
   return path.join(config, 'clutch', 'build-machine.json');
 }
@@ -116,7 +116,7 @@ export type BuildRequest = {
 };
 
 /** The built app of a fingerprint in `tmp/native/<fingerprint>/` of the repository, or null. */
-export function cachedApp(root: string, fingerprint: string): string | null {
+function cachedApp(root: string, fingerprint: string): string | null {
   const folder = path.join(root, 'tmp/native', fingerprint);
   const app = existsSync(folder)
     ? readdirSync(folder).find((name) => name.endsWith('.app'))

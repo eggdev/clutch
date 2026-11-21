@@ -73,6 +73,56 @@ To run a Maestro flow on the opened device:
 AGENT_DEVICE=<path> mise exec -- bun tools/native/device-host.ts flow features/<feature>/journeys/<id>.maestro.yaml
 ```
 
+## The build machine
+
+An iOS build needs Xcode, so a Mac makes it. This machine reaches that Mac
+over ssh. The Mac is the build machine.
+
+The setting is the file `~/.config/clutch/build-machine.json`:
+
+```json
+{ "ssh": "<host>", "root": "<absolute folder>" }
+```
+
+`ssh` is the name that `ssh` uses for the Mac. `root` is the folder on the Mac
+that holds the builds. The setting belongs to the machine, so one file serves
+all projects on it. The repository holds no machine name. With no file, the
+build stops before any ssh call and names the file and its two fields.
+
+The build is of the head commit, never of a working tree. `git archive` sends
+the commit to the build machine. A native change that no commit holds stops
+the command, and the message gives both fingerprints. Commit the change, then
+run the command again.
+
+[`tools/native/ios-simulator-build.sh`](../../../tools/native/ios-simulator-build.sh)
+makes the build on the build machine. It does these steps:
+
+1. It takes the build lock. When another build of the project runs, it stops.
+2. It unpacks the commit into `work/<revision>/`.
+3. It runs `bun install --frozen-lockfile`.
+4. It makes the native fingerprint, before the prebuild writes `ios/`.
+5. When `artifacts/<fingerprint>/` exists, it has nothing to build.
+6. Otherwise it runs `prebuild:native`. Then `xcodebuild` builds the app for
+   the simulator, signed to run locally, with no team and no profile.
+7. It moves the app to `artifacts/<fingerprint>/`. The folder appears only
+   when the app in it is whole.
+8. It removes `work/<revision>/` and the lock.
+
+The last line of its output is the fingerprint. The script writes only under
+`<root>/<project>/`. `<project>` is the `name` in the root `package.json`,
+without its scope.
+
+| Folder                     | Holds                                         |
+| -------------------------- | --------------------------------------------- |
+| `bin/`                     | The script, as the last command sent it       |
+| `work/<revision>/`         | The commit and the build products of one run  |
+| `cache/`                   | The package caches of Bun, npm and CocoaPods  |
+| `artifacts/<fingerprint>/` | The finished app, and the commit that made it |
+| `build.lock/`              | The lock, while a build runs                  |
+
+The script installs no tool. When mise on the build machine lacks the Bun or
+Node version of `mise.toml`, the script stops. Ask the owner to install it.
+
 ## Native builds
 
 The native fingerprint is a hash of each input that goes into the native
