@@ -13,7 +13,7 @@ import type { FlowOptions, MaestroFlow } from '@tools/journeys/maestro';
 import { budgetsOf, deviceRuns, failedRuns, writeMeasures } from '@tools/journeys/measures';
 import { appIdOfApp, expoFingerprint, recordName } from '@tools/native/build';
 import type { Fingerprint, FingerprintTool } from '@tools/native/build';
-import { DeviceHostError, deviceHost, lockFile, withDevice } from '@tools/native/device-host';
+import { DeviceHostError, deviceHost, deviceName, runFlow } from '@tools/native/device-host';
 import type { DeviceHost, Platform } from '@tools/native/device-host';
 
 /** The outcome of a compiled journey, with the activations before it from the start of the flow. */
@@ -220,37 +220,30 @@ async function prepare(
 }
 
 /**
- * Compiles each journey and has Maestro read each flow, before a device is
- * needed. A journey that does not compile, or a flow that Maestro cannot read,
- * is logged and left out, and the run fails for it.
+ * Compiles each journey before a device runs it. A journey that does not
+ * compile is logged and left out, and the run fails for it.
  */
 async function readFlows(
   root: string,
   flows: ReadonlyArray<Journey>,
   platform: Platform,
-  host: DeviceHost,
   log: (line: string) => void,
 ): Promise<Array<{ journey: Journey; prepared: Prepared }>> {
   const ready: Array<{ journey: Journey; prepared: Prepared }> = [];
   for (const journey of flows) {
     const prepared = await prepare(root, journey, platform, log);
-    if (prepared === null) {
-      continue;
-    }
-    const read = await host.checkFlow(prepared.file);
-    if (read.exitCode === 0) {
+    if (prepared !== null) {
       ready.push({ journey, prepared });
-    } else {
-      log(`::error title=Maestro cannot read the flow::${journey.file}: ${read.output.trim()}`);
     }
   }
   return ready;
 }
 
 /**
- * Runs each native journey with Maestro on the booted device of the device
- * host: `mise exec -- bun run journey --native <ios|android>`. No CI job runs
- * it for now: an agent runs it from its session. A journey runs once,
+ * Runs each native journey on the device that the caller opened, through the
+ * device host: `AGENT_DEVICE=<path> mise exec -- bun run journey --native
+ * <ios|android>`. `agent-device` runs each flow in the Maestro format. An
+ * agent runs it from its session. A journey runs once,
  * with no retry, so a failed run fails. Each journey writes
  * `<id>.<platform>.json` to the measures folder. See docs/contributing/end-to-end-testing.md#native-journeys.
  */
@@ -259,7 +252,6 @@ export type NativeOptions = {
   host?: DeviceHost;
   /** The fingerprint tool of a native app. A test gives a fake. */
   tool?: (appRoot: string) => Promise<FingerprintTool>;
-  lock?: string;
   log?: (line: string) => void;
 };
 
@@ -288,39 +280,33 @@ export async function nativeMain(
       log(`::error title=Stale build::${stale}`);
       return 1;
     }
-    const ready = await readFlows(root, flows, platform, host, log);
-    return await withDevice(
-      host,
-      platform,
-      async (device) => {
-        let failed = flows.length - ready.length;
-        for (const { journey, prepared } of ready) {
-          const start = Date.now();
-          const result = await host.runFlow(device, prepared.file);
-          log(result.output);
-          // The flow is linear, so a click budget that its outcomes go over fails a run that passes the flow.
-          const failure = result.exitCode === 0 ? prepared.failure : undefined;
-          const runs = deviceRuns(platform, [
-            {
-              device: device.name,
-              retry: 0,
-              status: result.exitCode === 0 && failure === undefined ? 'passed' : 'failed',
-              durationMs: Date.now() - start,
-              outcomes: prepared.outcomes.map(({ name, clicks }) => ({ name, clicks })),
-              failure: failure ?? null,
-            },
-          ]);
-          const where = writeMeasures(root, journey, runs);
-          const lines = failedRuns(journey, runs, where);
-          for (const line of lines) {
-            log(line);
-          }
-          failed += lines.length > 0 ? 1 : 0;
-        }
-        return failed > 0 ? 1 : 0;
-      },
-      options.lock ?? lockFile(),
-    );
+    const ready = await readFlows(root, flows, platform, log);
+    const device = deviceName(host);
+    let failed = flows.length - ready.length;
+    for (const { journey, prepared } of ready) {
+      const start = Date.now();
+      const result = runFlow(host, prepared.file);
+      log(result.output);
+      // The flow is linear, so a click budget that its outcomes go over fails a run that passes the flow.
+      const failure = result.exitCode === 0 ? prepared.failure : undefined;
+      const runs = deviceRuns(platform, [
+        {
+          device,
+          retry: 0,
+          status: result.exitCode === 0 && failure === undefined ? 'passed' : 'failed',
+          durationMs: Date.now() - start,
+          outcomes: prepared.outcomes.map(({ name, clicks }) => ({ name, clicks })),
+          failure: failure ?? null,
+        },
+      ]);
+      const where = writeMeasures(root, journey, runs);
+      const lines = failedRuns(journey, runs, where);
+      for (const line of lines) {
+        log(line);
+      }
+      failed += lines.length > 0 ? 1 : 0;
+    }
+    return failed > 0 ? 1 : 0;
   } catch (error) {
     if (!(error instanceof DeviceHostError)) {
       throw error;

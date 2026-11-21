@@ -4,7 +4,7 @@ End-to-end tests drive the real app through its user-facing entry point:
 browser, native app or CLI. A journey is one end-to-end test. See
 [journeys](./setup/verification.md#journeys) for the files, the runner and the
 check. The locator guidance below applies to browser journeys. Native journeys
-use Maestro.
+use the Maestro flow format.
 
 ## What to test
 
@@ -225,7 +225,7 @@ the answer can come.
 Chromium: it moves the clock past a timer of one minute.
 
 The native run writes the flow to `test-results/journeys/native/<id>.maestro.yaml`
-and runs it on the booted device. It records each outcome with the taps and
+and runs it on the opened device. It records each outcome with the taps and
 submits before it. A core journey whose outcome goes over the click budget fails,
 with the rule of the web run in `@repo/journeys/types/budget`. The app ID comes
 from `expo.ios.bundleIdentifier` or `expo.android.package` in the app's `app.json`.
@@ -241,10 +241,12 @@ into `webOnly`, waits for the owner. See [proof gates code](../principles/proof-
 
 ## Native journeys
 
-Each native journey runs with Maestro on the booted device of the device host:
+Each native journey runs on the device that the caller opened from the
+[device pool](./setup/native.md#the-device-pool). `agent-device` runs each
+flow with `replay --maestro`, and the Maestro command line tool is not needed:
 
 ```sh
-mise exec -- bun run journey --native ios
+AGENT_DEVICE=<path> mise exec -- bun run journey --native ios
 ```
 
 No CI job runs a native journey for now. An agent runs one from its session,
@@ -275,18 +277,9 @@ text that the flow typed. So `serverHolds` is the proof that the write left the
 device.
 
 A `tool` step calls `/mcp` on the API from the machine that drives the device, as
-the organization of the run. Maestro runs that call, so the write comes from
+the organization of the run. The flow runs that call, so the write comes from
 outside the app. The `see` after it proves that the write reached the device
 through the server. A refusal of the tool fails the flow.
-
-The runner compiles each journey first. Maestro then reads each flow with
-`maestro check-syntax`, before a device is needed. A flow that Maestro cannot
-read fails the run, also when no device is booted.
-`tools/journeys/native.test.ts` holds that rule.
-
-Maestro runs on Java. On a Mac whose only JDK is the one of Homebrew, the device
-host names that JDK as `JAVA_HOME`. With no Java, the run stops with one
-sentence that names the fix. `tools/native/maestro.test.ts` holds both cases.
 
 An `offline` step is left out of an iOS flow. The run prints one sentence that
 says so, because a simulator shares the network of its host. The app loads

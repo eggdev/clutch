@@ -3,29 +3,28 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { nativeMain } from '@tools/journeys/native';
+import { DeviceHostError } from '@tools/native/device-host';
 import type { DeviceHost } from '@tools/native/device-host';
 import { inRepo } from '@tools/testing/in-repo';
 
 const flow = '# sign-up: A visitor signs up.\nappId: com.example\n';
 
-/** A host whose flows answer the exit codes in order. */
-function host(codes: Array<number>, booted = true, readable = true) {
+/** A host whose flows answer the exit codes in order. With no device opened, each device call refuses. */
+function host(codes: Array<number>, opened = true) {
   const ran: Array<string> = [];
   const fake: DeviceHost = {
     name: 'fake',
-    bootedDevice: (platform) =>
-      Promise.resolve(booted ? { platform, id: 'emulator-5554', name: 'pixel-7-api-35' } : null),
-    install: () => Promise.resolve(),
-    checkFlow: () =>
-      Promise.resolve(
-        readable ? { exitCode: 0, output: 'OK' } : { exitCode: 1, output: 'Invalid Command: tapp' },
-      ),
-    runFlow: (_device, file) => {
+    device: (args) => {
+      if (!opened) {
+        throw new DeviceHostError('`AGENT_DEVICE` is not set, so no device is named.');
+      }
+      if (args[0] === 'devices') {
+        const devices = [{ model: 'pixel-7-api-35', osVersion: '15' }];
+        return { exitCode: 0, output: JSON.stringify({ success: true, data: { devices } }) };
+      }
+      const [, file = ''] = args;
       ran.push(file);
-      return Promise.resolve({
-        exitCode: codes.shift() ?? 0,
-        output: `ran ${file}`,
-      });
+      return { exitCode: codes.shift() ?? 0, output: `ran ${file}` };
     },
     build: () => Promise.resolve({ exitCode: 1, output: '' }),
   };
@@ -40,22 +39,20 @@ const fingerprintOf = (hash: string) => () =>
 
 function run(
   codes: Array<number>,
-  booted = true,
+  opened = true,
   files: Record<string, string> = signUp,
   sources = 'built',
-  readable = true,
 ) {
   return inRepo(files, async (root) => {
-    const { fake, ran } = host(codes, booted, readable);
+    const { fake, ran } = host(codes, opened);
     const lines: Array<string> = [];
     const exitCode = await nativeMain(root, 'android', {
       host: fake,
       tool: fingerprintOf(sources),
-      lock: path.join(root, '.lock'),
       log: (line) => lines.push(line),
     });
     const file = path.join(root, 'test-results/journeys/measures/sign-up.android.json');
-    const measures = booted && ran.length > 0 ? JSON.parse(readFileSync(file, 'utf-8')) : null;
+    const measures = opened && ran.length > 0 ? JSON.parse(readFileSync(file, 'utf-8')) : null;
     return { exitCode, ran, lines, measures };
   });
 }
@@ -80,28 +77,13 @@ test('a native journey that passes runs once, and passes', async () => {
   expect(passed.measures.runs[0].result).toBe('passed');
 });
 
-test('with no booted device, the run fails and asks for one', async () => {
+test('with no opened device, the run fails and names the fix', async () => {
   const result = await run([], false);
-  expect(result.exitCode).toBe(1);
-  expect(result.lines.at(-1)).toContain('No android device is booted');
-});
-
-test('a flow that Maestro cannot read fails the run, and no device runs it', async () => {
-  const result = await run([0], true, signUp, 'built', false);
   expect([result.exitCode, result.ran]).toEqual([1, []]);
-  expect(result.lines).toEqual([
-    '::error title=Maestro cannot read the flow::features/account/journeys/sign-up.maestro.yaml: Invalid Command: tapp',
-  ]);
+  expect(result.lines.at(-1)).toContain('`AGENT_DEVICE` is not set');
 });
 
-test('with no booted device, a flow that Maestro cannot read is still reported', async () => {
-  const result = await run([], false, signUp, 'built', false);
-  expect(result.exitCode).toBe(1);
-  expect(result.lines[0]).toContain('Maestro cannot read the flow');
-  expect(result.lines.at(-1)).toContain('No android device is booted');
-});
-
-test('with no native journey, the run fails, since the lane runs only when a native app exists', async () => {
+test('with no native journey, the run fails, since it proves nothing', async () => {
   const result = await run([], true, {});
   expect([result.exitCode, result.ran]).toEqual([1, []]);
   expect(result.lines).toEqual([

@@ -1,69 +1,77 @@
 # Native builds and devices
 
 A native app runs on a simulator, an emulator or a phone. Agents work on many
-tasks at once, so they share the devices of one machine. This page describes
-the rules that keep them from building or starting devices they do not need.
+tasks at once, so they share one pool of devices. This page describes the
+rules that keep them from building or starting devices they do not need.
 
-- An agent reuses the booted device. It never creates, clones, boots or
-  erases one.
+- An agent opens a device of the shared pool with T3 Code's device tools, and
+  closes it when the work ends. It never creates, clones, boots or erases a
+  device with `simctl`, `adb` or Xcode.
 - An agent makes a native build only when the native fingerprint changed.
-- One session at a time drives a device or makes a native build.
+- A script in this repository drives the device that its caller opened. It
+  never opens or closes one.
 
 The template has one native app, `apps/app`. It runs on the web and on iOS.
 Android is a kickoff choice. See [client](../architecture/client.md#profiles).
+
+## The device pool
+
+The owner's machines share one pool of iOS simulators and Android emulators.
+A lease gives one session a clean device with no app installed. T3 Code's
+device tools take and end the lease:
+
+1. `device_list` lists the device hosts and their devices. The pool is the
+   host of kind `simlock`.
+2. `device_open` with that host and a device leases the device. It returns the
+   path of an `agent-device` command that is bound to that device and session.
+3. `device_screenshot` shows the screen.
+4. `device_close` with `shutdown: true` ends the lease. Always call it, also
+   after a failure.
+
+Each install, launch, tap and screenshot on the device goes through the bound
+`agent-device` command. The scripts of this repository take its path in one
+environment variable, `AGENT_DEVICE`:
+
+```sh
+AGENT_DEVICE=<path from device_open> mise exec -- bun run journey --native ios
+```
+
+With no variable, or with the command of a closed device, a script stops at
+its first device call and names these steps. A new `device_open` gives a new
+path, so pass the path of the device that is open.
+
+The pool gives each lease its own device, so two sessions never drive one
+device. No device lock exists.
+
+A session with no T3 Code device tools cannot run a native journey. Mark the
+flow as not verified.
 
 ## Device host
 
 The device host is the one adapter that drives a device or makes a native
 build. [`tools/native/device-host.ts`](../../../tools/native/device-host.ts)
-defines it. A host has four calls:
+defines it. The template has one host, `pool`. It drives the device that the
+caller opened, through the command that `AGENT_DEVICE` names. A host has two
+calls:
 
-| Call           | Does                                              |
-| -------------- | ------------------------------------------------- |
-| `bootedDevice` | Finds the booted device of a platform, or nothing |
-| `install`      | Installs a built app on the booted device         |
-| `runFlow`      | Runs a Maestro flow on the booted device          |
-| `build`        | Builds the native app for one platform            |
+| Call     | Does                                                 |
+| -------- | ---------------------------------------------------- |
+| `device` | Runs one command of the bound `agent-device` command |
+| `build`  | Builds the native app for one platform               |
 
-A host has no call that creates, clones, boots or erases a device. When no
-device is booted, the host stops and tells the agent to ask the owner.
+`install`, `runFlow` and `deviceName` use the `device` call. `install` puts a
+built app on the device. `runFlow` runs a flow in the Maestro format with
+`agent-device replay --maestro`. `deviceName` reads the model of the device,
+such as `iPhone 17`.
 
-The `DEVICE_HOST` environment variable names the host. A machine sets it. The
-template ships three hosts:
+The `pool` host makes no build yet. CL-499 adds the build on the build
+machine.
 
-- `none` refuses each call and points to this page. It is the host when
-  `DEVICE_HOST` is not set.
-- `ci` drives the one device that a CI job booted on its own runner. It runs
-  Maestro on it, and it builds nothing. See
-  [native journeys](../end-to-end-testing.md#native-journeys).
-- `local` drives the booted device of the machine that runs the command. It
-  also builds. It runs the `prebuild:native` script of the app, then compiles a
-  debug build for any simulator. A build needs no booted device.
-
-<!-- kickoff: The device host of this project: the machine that runs the simulators, how an agent session reaches it, and the DEVICE_HOST name. Add the adapter to `hosts` in tools/native/device-host.ts, with tests that use a fake. -->
-
-To run a Maestro flow on the booted device:
+To run a Maestro flow on the opened device:
 
 ```sh
-mise exec -- bun tools/native/device-host.ts flow ios features/<feature>/journeys/<id>.maestro.yaml
+AGENT_DEVICE=<path> mise exec -- bun tools/native/device-host.ts flow features/<feature>/journeys/<id>.maestro.yaml
 ```
-
-## The device lock
-
-One lock file lets one session at a time drive a device or make a native
-build. It is `~/.cache/agent-devices/device.lock`. `DEVICE_LOCK` moves it,
-for tests.
-
-The lock is in the home folder, not in the repository. Each clone, worktree
-and project on a machine shares the same simulators. A lock in the
-repository would give each worktree its own lock.
-
-When a live process holds the lock, the next session stops at once. The
-message names the process and its folder. Wait for that session to finish. Do
-not delete the lock file. A lock from a process that has ended is taken over.
-
-A host that drives a device on another machine holds its lock on that
-machine.
 
 ## Native builds
 
@@ -77,7 +85,6 @@ build.
 
 ```sh
 mise exec -- bun run native:build --platform ios
-mise exec -- bun run native:build --platform ios --install
 ```
 
 1. It finds the native app: an app in `apps/` that depends on `expo` or
@@ -88,7 +95,7 @@ mise exec -- bun run native:build --platform ios --install
 4. When the two are the same, it refuses. The change is JavaScript only, so
    ship it with an update.
 5. When they differ, it lists the changed sources. Then it builds through the
-   device host, while it holds the device lock.
+   device host. The `pool` host refuses until CL-499.
 6. After a build passes, it writes the fingerprint of the build. Commit
    `native-fingerprint.json` with the native change that caused the build.
 
@@ -98,11 +105,6 @@ A repository with no native app has nothing to build. The command prints
 The app lists `@expo/fingerprint` in its devDependencies, at an exact version.
 The command `mise exec -- bun run native:build <app> --record` records the
 first fingerprint, with no build.
-
-`--install` puts the last build on the booted device, with no build. A build
-needs no device, so it can finish before the owner boots one. When no device
-is booted, the command says so and exits 1. The owner boots the device, then
-runs the `--install` command.
 
 A review flags a change to `native-fingerprint.json` that has no native change
 with it.
