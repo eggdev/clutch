@@ -24,8 +24,13 @@ type ConfirmedState = Omit<PoolState, 'pending'>;
  * nothing that waits. The pool puts each waiting change on top of them.
  */
 export type Confirmed = {
-  /** The confirmed tables. The pool copies them before it applies a waiting change. */
+  /** The confirmed tables. The pool reads them under each waiting change, and never writes them. */
   readonly tables: () => Tables;
+  /**
+   * The keys of the records that changed since the last call, or `all` after
+   * a load or a reset. The pool puts only these records in step.
+   */
+  readonly takeTouched: () => ReadonlySet<string> | 'all';
   readonly lastSyncId: () => number;
   readonly loaded: () => ReadonlySet<string>;
   /**
@@ -46,6 +51,11 @@ export type Confirmed = {
   readonly actor: () => SyncActor | undefined;
   /** Names the actor of these records. The next save writes it with the position. */
   readonly setActor: (actor: SyncActor) => void;
+  /**
+   * A `Groups` message of this session came. Each save after it removes the
+   * mark of a session end, also when the server named no actor.
+   */
+  readonly hearServer: () => void;
   /** Applies a delta and returns `true`, or returns `false` when the pool already has it. */
   readonly applyDelta: (delta: Delta) => boolean;
   /** Applies each change of a backfill. A backfill does not move the sync position. */
@@ -127,10 +137,14 @@ export function createConfirmed(
   // record after the confirmed records were dropped.
   let unsaved = new Set<string>();
   let unsavedAll = false;
+  // The same for the visible tables of the pool, since its last change.
+  let touched = new Set<string>();
+  let touchedAll = true;
   // The build that left a record of a delta out of the confirmed records, if one did.
   let leftOutBy: string | undefined;
   let build = 'unnamed';
   let actor: SyncActor | undefined;
+  let heard = false;
   // The keys of the records that a backfill of this pull sent since its last
   // `Groups` message, and whether a `Groups` message of this pull came.
   let sent = new Set<string>();
@@ -158,6 +172,7 @@ export function createConfirmed(
       meta.set(key, { groups: change.groups, syncId, deleted: true });
     }
     unsaved.add(key);
+    touched.add(key);
   }
 
   function drop(key: string) {
@@ -165,6 +180,7 @@ export function createConfirmed(
     tables.get(model)?.delete(id);
     meta.delete(key);
     unsaved.add(key);
+    touched.add(key);
   }
 
   function purge() {
@@ -182,12 +198,19 @@ export function createConfirmed(
     meta = new Map();
     unsaved = new Set();
     unsavedAll = true;
+    touchedAll = true;
     lastSyncId = 0;
     leftOutBy = undefined;
   }
 
   return {
     tables: () => tables,
+    takeTouched() {
+      const taken = touchedAll ? 'all' : touched;
+      touched = new Set();
+      touchedAll = false;
+      return taken;
+    },
     lastSyncId: () => lastSyncId,
     loaded: () => loaded,
     load(state) {
@@ -212,6 +235,7 @@ export function createConfirmed(
       ({ lastSyncId, leftOutBy } = state);
       unsaved = new Set();
       unsavedAll = false;
+      touchedAll = true;
       return true;
     },
     snapshot: () => ({
@@ -238,12 +262,16 @@ export function createConfirmed(
           ...(leftOutBy === undefined ? {} : { leftOutBy }),
           ...(actor === undefined ? {} : { actor }),
         },
+        ...(heard ? { heardServer: true } : {}),
       };
     },
     reset,
     actor: () => actor,
     setActor(next) {
       actor = next;
+    },
+    hearServer() {
+      heard = true;
     },
     applyDelta(delta) {
       if (delta.syncId <= lastSyncId) {

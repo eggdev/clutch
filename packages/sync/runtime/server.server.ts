@@ -142,8 +142,12 @@ export function SyncServer<R>(
                 : Effect.die(defect),
             ),
           );
-      // The `Load` queue of each open `Pull` stream, by RPC client. A `Load`
-      // that comes before its `Pull` stream opens waits for the queue.
+      // The `Load` queue of the newest `Pull` stream of each RPC client. A
+      // `Load` that comes before its `Pull` stream opens waits for the queue.
+      // A second pull on one socket can start before the cleanup of the first
+      // one runs: the server does not wait for the cleanup of a pull that the
+      // client interrupts. So each pull owns its entry, and its cleanup
+      // removes only that entry.
       const requests = new Map<number, Deferred.Deferred<Queue.Queue<LoadRequest>>>();
       const requestsOf = (id: number) =>
         Effect.gen(function* () {
@@ -229,7 +233,14 @@ export function SyncServer<R>(
               const granted = syncGroups.groupsFor(actor);
               const allowed = yield* granted.pipe(Effect.orDie);
               const queue = yield* Queue.unbounded<LoadRequest>();
-              yield* Deferred.succeed(yield* requestsOf(client.id), queue);
+              // An entry that no pull filled yet holds each `Load` that came first.
+              const waiting = requests.get(client.id);
+              const entry =
+                waiting && !Deferred.isDoneUnsafe(waiting)
+                  ? waiting
+                  : yield* Deferred.make<Queue.Queue<LoadRequest>>();
+              requests.set(client.id, entry);
+              yield* Deferred.succeed(entry, queue);
               const accepted = yield* Queue.unbounded<number>();
               positions.set(client.id, accepted);
               return feed(log, {
@@ -257,7 +268,9 @@ export function SyncServer<R>(
                 ),
                 Stream.ensuring(
                   Effect.sync(() => {
-                    requests.delete(client.id);
+                    if (requests.get(client.id) === entry) {
+                      requests.delete(client.id);
+                    }
                     if (positions.get(client.id) === accepted) {
                       positions.delete(client.id);
                     }

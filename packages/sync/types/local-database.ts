@@ -13,6 +13,14 @@ export type RecordMeta = {
 };
 
 /**
+ * One saved waiting transaction, with the actor that ran it. The pool drops
+ * a row of another actor than the one the server confirms, and never sends
+ * it. A row from before the actor was saved, or that the pool made before it
+ * knew its actor, has none. It takes the actor that the server confirms next.
+ */
+export type WaitingRow = Transaction & { readonly actor?: SyncActor };
+
+/**
  * What the pool loads and what a read of the local database gives: the
  * confirmed records, the groups the client loaded, each record's groups, and
  * the transactions that wait. `meta` is keyed by `<model> <id>`.
@@ -22,7 +30,7 @@ export type PoolState = {
   readonly tables: Readonly<Record<string, ReadonlyArray<RecordRow>>>;
   readonly groups: ReadonlyArray<string>;
   readonly meta: Readonly<Record<string, RecordMeta>>;
-  readonly pending: ReadonlyArray<Transaction>;
+  readonly pending: ReadonlyArray<WaitingRow>;
   /**
    * The contract digest of the build that left a record of a delta out of
    * this copy, because it could not read the record. Another build drops the
@@ -34,6 +42,13 @@ export type PoolState = {
    * saved has none, and takes the actor that the server names first.
    */
   readonly actor?: SyncActor;
+  /**
+   * A session ended on this device, and no start has loaded since. The pool
+   * drops each waiting row with no actor, because it may be the work of the
+   * person who left. The first save of the start spends the mark, so it does
+   * this once.
+   */
+  readonly ended?: true;
   /**
    * The read found a record row or a position row with another shape, so it
    * kept no record and no position. The pool reports it and loads again.
@@ -70,25 +85,47 @@ export type ConfirmedSave = {
   readonly put: ReadonlyArray<SavedRecord>;
   readonly remove: ReadonlyArray<RecordKey>;
   readonly position: SyncPosition;
+  /**
+   * A `Groups` message of this session came, also one that named no actor,
+   * as a server of an older build sends. The save removes the mark of a
+   * session end.
+   */
+  readonly heardServer?: true;
 };
 
 /**
  * One save, which the adapter writes in one database transaction. `add`
  * holds the waiting transactions that this tab ran since its last save, and
- * `done` the IDs of the ones that left its queue. Only the tab that writes
+ * the ones whose actor changed. A row that is saved already keeps its place
+ * and takes the new value. `done` holds the IDs of the ones that left its queue. Only the tab that writes
  * the confirmed records sends `confirmed`.
  */
 export type LocalSave = {
   readonly confirmed?: ConfirmedSave;
-  readonly add: ReadonlyArray<Transaction>;
+  readonly add: ReadonlyArray<WaitingRow>;
   readonly done: ReadonlyArray<string>;
+  /**
+   * The first save of a start. The load before it dropped each waiting row
+   * with no actor that a fresh mark of a session end asked for, so the save
+   * spends the mark: a read gives no `ended` after it. A spent mark stays
+   * until the first `Groups` message.
+   */
+  readonly afterLoad?: true;
 };
+
+/**
+ * What a save did: `saved`, or `cleared` when another handle cleared the
+ * database after this handle opened, so the save wrote nothing.
+ */
+export type SaveResult = 'saved' | 'cleared';
 
 /**
  * The seam of the local database. Only the sync engine reads or writes it. It
  * keeps one row for each confirmed record, one row for each waiting
  * transaction and one row for the sync position, so two tabs that share it
- * never erase each other's waiting transactions.
+ * never erase each other's waiting transactions. It also keeps its
+ * generation: a random value that each clear writes anew. Each handle reads
+ * it when it opens, and a database from before it gets one at its first open.
  *
  * Each platform has one adapter: IndexedDB on the web, in
  * `packages/sync/runtime/indexed-db.ts`, and SQLite on native, in
@@ -101,9 +138,65 @@ export type LocalSave = {
 export type LocalDatabase = {
   /** Every row as one state, the waiting transactions in the order they were added. */
   readonly read: () => Promise<PoolState | undefined>;
-  readonly save: (save: LocalSave) => Promise<void>;
-  /** Removes every row. */
+  /**
+   * Writes one save in one database transaction, and gives `saved`. It
+   * gives `cleared` and writes nothing when another handle cleared the
+   * database after this handle opened: the generation of the database is
+   * not the one that this handle read at its open. It then wakes `onLost`.
+   * So a save of an older session never lands after a session end.
+   */
+  readonly save: (save: LocalSave) => Promise<SaveResult>;
+  /**
+   * Removes every row, and leaves the mark of a session end in the same
+   * database transaction. A read reads the mark as `ended` while any other
+   * row is there, until a save with `afterLoad` spends it. The first save
+   * whose position names an actor removes the mark, fresh or spent, and each
+   * waiting row with no actor that it does not write. A save with
+   * `heardServer` removes the mark too. The same database transaction writes
+   * a new random generation, which this handle takes. A session end calls
+   * it. It first tells each other tab of this database on the device, which
+   * then stops its engine and its saves.
+   */
   readonly clear: () => Promise<void>;
+  /**
+   * Makes room on a device that cannot save. In one database transaction it
+   * drops every confirmed record, sets the saved position to sync ID 0,
+   * with its groups and actor, and raises the count of the room made. It
+   * keeps each waiting transaction, the generation and the mark of a session
+   * end. Each handle reads the count when it opens, and a save after the
+   * count changed writes only its waiting rows, so no record and no position
+   * lands over the emptied records before the next start. A clear sets the
+   * count back. When that cannot be written either, the SQLite adapter
+   * first commits the emptied position and the count, then deletes the
+   * records in small steps. A delete that stops part way then leaves sync ID
+   * 0 with some records, and the next start loads again from 0. When the
+   * drop cannot be written, the web adapter deletes the database, creates it
+   * again, and writes the waiting transactions into it. It keeps a copy of them in
+   * `localStorage` for the time between, and writes that copy back at the
+   * next open when the write did not happen. It gives `cleared` and writes
+   * nothing when another handle cleared the database, as `save` does.
+   */
+  readonly makeRoom: () => Promise<SaveResult>;
+  /**
+   * Wakes once when this handle can no longer save. Another tab cleared the
+   * database, which the tab hears as a message or as a save that gives
+   * `cleared`. Or a tab of a newer build asked for a new version of the
+   * database, and this handle let it go. It returns the stop of the
+   * listener. A platform with one process has no other tab, so only a second
+   * handle of a test clears it.
+   */
+  readonly onLost: (listener: () => void) => () => void;
+  /**
+   * Keeps the waiting rows of this tab outside the database, so that the next
+   * open writes them back. A tab that lost its database calls it with its
+   * whole queue before it starts again, so a row whose save had not started,
+   * or waited after a failure, is not lost. A row that the database holds
+   * already is not added again. A row of a session that ended since is not
+   * written back. The web adapter keeps a copy in `localStorage` for each
+   * handle. A platform with one process has no other tab that takes its
+   * database, so it keeps nothing.
+   */
+  readonly keep: (rows: ReadonlyArray<WaitingRow>) => void;
   /**
    * Whether this tab writes the confirmed records now. Two tabs hold
    * different groups and positions, so only one tab writes them. A platform

@@ -104,9 +104,13 @@ test('a client gets only the changes of its loaded groups, from the backlog and 
         { loaded: ['org:a', 'space:x'], lastSyncId: 1 },
         requests,
         seen,
-        3,
+        4,
       );
-      yield* Queue.take(seen);
+      // The catch-up ends with an empty delta at the head, sync ID 3, whose
+      // event is in no loaded group. The live events come after it.
+      for (const _ of [1, 2, 3]) {
+        yield* Queue.take(seen);
+      }
       yield* log.commit('org-a', 't3', () =>
         Effect.succeed([change('c', ['space:y']), change('d', ['space:x'])]),
       );
@@ -114,7 +118,12 @@ test('a client gets only the changes of its loaded groups, from the backlog and 
       return yield* Fiber.join(reading).pipe(Effect.timeout('2 seconds'));
     }),
   );
-  expect(summary(messages)).toEqual(['groups org:a+space:x backfill ', 'deltas a', 'deltas d']);
+  expect(summary(messages)).toEqual([
+    'groups org:a+space:x backfill ',
+    'deltas a',
+    'deltas ',
+    'deltas d',
+  ]);
 });
 
 test('loading a group sends its past changes once, then its live changes', async () => {

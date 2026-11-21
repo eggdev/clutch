@@ -52,9 +52,10 @@ const emptyDelta = (syncId: number): SyncMessage => ({
  * snapshot of each group in `fill`, then the backlog of those groups, then
  * each live event in sync ID order. A client at sync ID 0 gets the snapshot of
  * each loaded group instead of the backlog, and then an empty delta at the
- * head, so it saves that sync ID. A `Load` request adds a group and sends its
- * snapshot: in `Page` messages and a last `Groups` message when the client
- * reads pages, else in one `Groups` message. A snapshot holds the last change
+ * head, so it saves that sync ID. A client past sync ID 0 gets the backlog,
+ * then an empty delta at the head unless the backlog took it there. A `Load`
+ * request adds a group and sends its snapshot: in `Page` messages and a last
+ * `Groups` message when the client reads pages, else in one `Groups` message. A snapshot holds the last change
  * of each live record, so its cost follows the records, not their history.
  * The messages of one input go out before the next input runs, so no other
  * message comes between two pages. A client whose last sync ID is older than
@@ -292,13 +293,24 @@ export function feed(log: Context.Service.Shape<typeof EventLog>, connection: Co
       // while the backlog was read can have dropped some of them, so the log
       // is checked again after it. A trim drops a run of sync IDs from the
       // first, so when the oldest is still in reach, no event was missed.
+      // Then an empty delta moves the client to the head, unless the last
+      // delta took it there. The events after its position are in no loaded
+      // group, so the client stops waiting for its accepted transactions
+      // among them, also when the delta at their sync ID never reached it.
       const opening = snapshotMessages(
         (connection.fill ?? []).filter((group) => loaded.has(group)),
         readsPages,
       );
+      const toHead = Stream.suspend(() => {
+        if (position >= watermark) {
+          return Stream.empty;
+        }
+        position = watermark;
+        return Stream.make(emptyDelta(watermark));
+      });
       return Stream.concat(
         Stream.concat(opening, backlog),
-        Stream.concat(Stream.fromEffect(keptSince).pipe(Stream.drain), live),
+        Stream.concat(Stream.fromEffect(keptSince).pipe(Stream.drain), Stream.concat(toHead, live)),
       );
     }),
   );

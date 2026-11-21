@@ -1,5 +1,14 @@
-import { oldLayoutSave, stateOf } from '@repo/sync/runtime/pool-doors';
-import type { LocalDatabase, LocalSave } from '@repo/sync/types/local-database';
+import {
+  emptiedPosition,
+  leftBehind,
+  markAfter,
+  oldLayoutSave,
+  roomCount,
+  roomSave,
+  stateOf,
+} from '@repo/sync/runtime/pool-doors';
+import type { MarkState } from '@repo/sync/runtime/pool-doors';
+import type { LocalDatabase, LocalSave, SaveResult } from '@repo/sync/types/local-database';
 import type { SqliteDriver } from '@repo/sync/types/sqlite-driver';
 
 /**
@@ -12,6 +21,14 @@ import type { SqliteDriver } from '@repo/sync/types/sqlite-driver';
  *
  * The old layout kept the whole state of a name as one JSON row in the table
  * `pool`. The open moves that row into the new tables and deletes it.
+ *
+ * `pool_generation` holds the generation of each name, which each clear
+ * writes anew. One process uses the file, so no other tab clears it. Only a
+ * second handle, such as in a test, can find another generation.
+ *
+ * `pool_room` counts the times that room was made for each name. Each handle
+ * reads it when it opens, and a save after it changed writes only the waiting
+ * rows, until the next start.
  */
 
 /** The saved text as a value. Text that is no JSON gives `undefined`, which the read counts as a row with another shape. */
@@ -30,6 +47,9 @@ const schema = [
   'create table if not exists pool_records (name text not null, model text not null, id text not null, value text not null, primary key (name, model, id))',
   'create table if not exists pool_transactions (seq integer primary key autoincrement, name text not null, id text not null, value text not null, unique (name, id))',
   'create table if not exists pool_position (name text primary key, value text not null)',
+  'create table if not exists pool_ended (name text primary key, spent integer not null default 0)',
+  'create table if not exists pool_generation (name text primary key, value text not null)',
+  'create table if not exists pool_room (name text primary key, value integer not null)',
 ];
 
 export async function openSqlite(driver: SqliteDriver, name: string): Promise<LocalDatabase> {
@@ -61,6 +81,27 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
     }
   }
 
+  /** The state of the mark of a session end, if there is one. */
+  async function markOf(): Promise<MarkState | undefined> {
+    const [mark] = await driver.all('select spent from pool_ended where name = ?', [name]);
+    if (!mark) {
+      return undefined;
+    }
+    return mark['spent'] === 1 ? 'spent' : 'fresh';
+  }
+
+  /** The generation of the name now. */
+  async function generationOf(): Promise<unknown> {
+    const [row] = await driver.all('select value from pool_generation where name = ?', [name]);
+    return row?.['value'];
+  }
+
+  /** The times that room was made for the name. */
+  async function roomOf(): Promise<number> {
+    const [row] = await driver.all('select value from pool_room where name = ?', [name]);
+    return roomCount(row?.['value']);
+  }
+
   async function write(save: LocalSave): Promise<void> {
     const { confirmed } = save;
     if (confirmed) {
@@ -89,16 +130,66 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
       await driver.run('delete from pool_transactions where name = ? and id = ?', [name, id]);
     }
     for (const transaction of save.add) {
-      // A transaction that is saved already keeps its place in the order.
+      // A transaction that is saved already keeps its place in the order, and takes the new row.
       await driver.run(
-        'insert into pool_transactions (name, id, value) values (?, ?, ?) on conflict (name, id) do nothing',
+        'insert into pool_transactions (name, id, value) values (?, ?, ?) on conflict (name, id) do update set value = excluded.value',
         [name, transaction.id, JSON.stringify(transaction)],
       );
+    }
+    const { mark, sweep } = markAfter(await markOf(), save);
+    if (mark === undefined) {
+      await driver.run('delete from pool_ended where name = ?', [name]);
+    } else if (mark === 'spent') {
+      await driver.run('update pool_ended set spent = 1 where name = ?', [name]);
+    }
+    if (sweep) {
+      const rows = await driver.all('select seq, value from pool_transactions where name = ?', [
+        name,
+      ]);
+      for (const row of rows) {
+        const { seq } = row;
+        if (typeof seq === 'number' && leftBehind(parsed(row['value']), save)) {
+          await driver.run('delete from pool_transactions where seq = ?', [seq]);
+        }
+      }
     }
   }
 
   for (const statement of schema) {
     await driver.run(statement);
+  }
+  // A database from before the generation gets one at its first open.
+  await driver.run(
+    'insert into pool_generation (name, value) values (?, ?) on conflict (name) do nothing',
+    [name, crypto.randomUUID()],
+  );
+  let generation = await generationOf();
+  let openedRoom = await roomOf();
+  let lost = false;
+  const heard = new Set<() => void>();
+  function wake() {
+    if (!lost) {
+      lost = true;
+      for (const listener of heard) {
+        listener();
+      }
+    }
+  }
+
+  /** Sets the saved position to sync ID 0, with its groups and actor, and counts the room made. */
+  async function writeEmptiedPosition(): Promise<void> {
+    await driver.run(
+      'insert into pool_room (name, value) values (?, 1) on conflict (name) do update set value = value + 1',
+      [name],
+    );
+    const [row] = await driver.all('select value from pool_position where name = ?', [name]);
+    const emptied = emptiedPosition(row ? parsed(row['value']) : undefined);
+    await (emptied
+      ? driver.run('update pool_position set value = ? where name = ?', [
+          JSON.stringify(emptied),
+          name,
+        ])
+      : driver.run('delete from pool_position where name = ?', [name]));
   }
   const [old] = await driver.all(
     "select name from sqlite_master where type = 'table' and name = 'pool'",
@@ -131,17 +222,85 @@ export async function openSqlite(driver: SqliteDriver, name: string): Promise<Lo
           records.map((row) => parsed(row['value'])),
           position ? parsed(position['value']) : undefined,
           waiting.map((row) => parsed(row['value'])),
+          (await markOf()) === 'fresh',
         );
       }),
-    save: (save) => serial(() => atomically(() => write(save))),
+    save: async (save) => {
+      const result = await serial(async (): Promise<SaveResult> => {
+        let found: SaveResult = 'saved';
+        await atomically(async () => {
+          if ((await generationOf()) === generation) {
+            await write(roomSave(save, openedRoom, await roomOf()));
+          } else {
+            found = 'cleared';
+          }
+        });
+        return found;
+      });
+      if (result === 'cleared') {
+        wake();
+      }
+      return result;
+    },
+    makeRoom: async () => {
+      const result = await serial(async (): Promise<SaveResult> => {
+        if ((await generationOf()) !== generation) {
+          return 'cleared';
+        }
+        // The emptied position and the count commit first, so a delete that
+        // stops part way leaves sync ID 0, and the next start loads from 0.
+        await atomically(writeEmptiedPosition);
+        try {
+          await driver.run('delete from pool_records where name = ?', [name]);
+        } catch {
+          // A full device may not hold the journal of one large delete, and a
+          // small delete needs less of it. The waiting rows are never touched.
+          for (;;) {
+            await driver.run(
+              'delete from pool_records where rowid in (select rowid from pool_records where name = ? limit 500)',
+              [name],
+            );
+            const [left] = await driver.all('select 1 from pool_records where name = ? limit 1', [
+              name,
+            ]);
+            if (!left) {
+              break;
+            }
+          }
+        }
+        return 'saved';
+      });
+      if (result === 'cleared') {
+        wake();
+      }
+      return result;
+    },
     clear: () =>
       serial(() =>
         atomically(async () => {
-          for (const table of ['pool_records', 'pool_transactions', 'pool_position']) {
+          for (const table of ['pool_records', 'pool_transactions', 'pool_position', 'pool_room']) {
             await driver.run(`delete from ${table} where name = ?`, [name]);
           }
+          await driver.run(
+            'insert into pool_ended (name, spent) values (?, 0) on conflict (name) do update set spent = 0',
+            [name],
+          );
+          const next = crypto.randomUUID();
+          await driver.run(
+            'insert into pool_generation (name, value) values (?, ?) on conflict (name) do update set value = excluded.value',
+            [name, next],
+          );
+          generation = next;
+          openedRoom = 0;
         }),
       ),
+    onLost(listener) {
+      heard.add(listener);
+      return () => heard.delete(listener);
+    },
+    keep() {
+      // One process uses the file, so no other tab takes it, and the rows stay in it.
+    },
     // One process uses the file, so it writes from the start.
     isWriter: () => true,
     writer: Promise.resolve(),

@@ -1,4 +1,12 @@
-import { fullSave, stateOf } from '@repo/sync/runtime/pool-doors';
+import {
+  emptiedPosition,
+  fullSave,
+  leftBehind,
+  markAfter,
+  roomSave,
+  stateOf,
+} from '@repo/sync/runtime/pool-doors';
+import type { MarkState } from '@repo/sync/runtime/pool-doors';
 import { recordKey } from '@repo/sync/runtime/tables';
 import type {
   LocalDatabase,
@@ -6,12 +14,12 @@ import type {
   PoolState,
   SavedRecord,
   SyncPosition,
+  WaitingRow,
 } from '@repo/sync/types/local-database';
-import type { Transaction } from '@repo/sync/types/protocol';
 
 /** A local database in memory, with what a test reads about its saves. */
 export type MemoryLocalDatabase = LocalDatabase & {
-  /** The number of saves that this handle wrote. */
+  /** The number of saves that this handle wrote, not counting a save that wrote nothing. */
   readonly writes: () => number;
   /** Each save that a handle of these rows wrote, in order. */
   readonly saves: () => ReadonlyArray<LocalSave>;
@@ -31,9 +39,17 @@ export type MemoryLocalDatabase = LocalDatabase & {
  */
 export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
   const records = new Map<string, SavedRecord>();
-  let transactions: Array<Transaction> = [];
+  let transactions: Array<WaitingRow> = [];
   let position: SyncPosition | undefined;
+  // The mark of a session end, which a clear leaves.
+  let ended: MarkState | undefined;
+  // The generation of the rows, which each clear writes anew.
+  let generation = 0;
+  // The times that room was made, which each handle reads when it opens.
+  let room = 0;
   const log: Array<LocalSave> = [];
+  // The lost listeners of each handle, as a `BroadcastChannel` of each tab.
+  const handles = new Set<() => void>();
 
   function apply(save: LocalSave) {
     const { confirmed } = save;
@@ -51,9 +67,17 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
     }
     transactions = transactions.filter(({ id }) => !save.done.includes(id));
     for (const transaction of save.add) {
-      if (!transactions.some(({ id }) => id === transaction.id)) {
-        transactions.push(structuredClone(transaction));
-      }
+      const at = transactions.findIndex(({ id }) => id === transaction.id);
+      transactions.splice(
+        at === -1 ? transactions.length : at,
+        at === -1 ? 0 : 1,
+        structuredClone(transaction),
+      );
+    }
+    const { mark, sweep } = markAfter(ended, save);
+    ended = mark;
+    if (sweep) {
+      transactions = transactions.filter((row) => !leftBehind(row, save));
     }
   }
 
@@ -64,24 +88,76 @@ export function memoryLocalDatabase(initial?: PoolState): MemoryLocalDatabase {
 
   if (initial) {
     apply(fullSave(initial));
+    ended = initial.ended ? 'fresh' : undefined;
   }
 
   function handle(writer: Promise<unknown>, held: boolean): MemoryLocalDatabase {
     let isWriter = held;
     let writes = 0;
+    // The generation that this handle read when it opened.
+    let mine = generation;
+    let openedRoom = room;
+    let lost = false;
+    const heard = new Set<() => void>();
+    function wake() {
+      if (!lost) {
+        lost = true;
+        for (const listener of heard) {
+          listener();
+        }
+      }
+    }
+    handles.add(wake);
     return {
-      read: () => Promise.resolve(structuredClone(stateOf(inKeyOrder(), position, transactions))),
+      read: () =>
+        Promise.resolve(
+          structuredClone(stateOf(inKeyOrder(), position, transactions, ended === 'fresh')),
+        ),
       save: (save) => {
-        apply(save);
-        log.push(structuredClone(save));
+        if (mine !== generation) {
+          wake();
+          return Promise.resolve('cleared');
+        }
+        const written = roomSave(save, openedRoom, room);
+        apply(written);
+        log.push(structuredClone(written));
         writes += 1;
-        return Promise.resolve();
+        return Promise.resolve('saved');
+      },
+      makeRoom: () => {
+        if (mine !== generation) {
+          wake();
+          return Promise.resolve('cleared');
+        }
+        records.clear();
+        position = emptiedPosition(position);
+        room += 1;
+        return Promise.resolve('saved');
       },
       clear: () => {
+        for (const other of handles) {
+          // A message reaches each other handle in a later task, as a
+          // `BroadcastChannel` message does on the web.
+          if (other !== wake) {
+            setTimeout(other, 0);
+          }
+        }
         records.clear();
         transactions = [];
         position = undefined;
+        ended = 'fresh';
+        generation += 1;
+        mine = generation;
+        room = 0;
+        openedRoom = 0;
         return Promise.resolve();
+      },
+      onLost(listener) {
+        heard.add(listener);
+        return () => heard.delete(listener);
+      },
+      keep() {
+        // Only a clear takes these rows from a handle, and a clear ends the session of the rows.
       },
       isWriter: () => isWriter,
       writer: (async () => {

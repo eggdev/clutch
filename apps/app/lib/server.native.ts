@@ -26,7 +26,7 @@ export function socketHeaders(): Readonly<Record<string, string>> | undefined {
     : undefined;
 }
 
-/** After a session ends, the app stays open and reads its empty local database again. */
-export function afterSessionEnded(): void {
-  // Nothing to load again: the boot module starts over.
+/** After a session ends, or the local database is lost, the app stays open and `restart` starts it again on the local database. */
+export function afterSessionEnded(restart: () => void): void {
+  restart();
 }

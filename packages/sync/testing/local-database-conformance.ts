@@ -1,79 +1,14 @@
 import { fullSave } from '@repo/sync/runtime/pool-doors';
+import { roomCases } from '@repo/sync/testing/local-database-room-cases';
+import {
+  expectSame,
+  readState,
+  rename,
+  sampleState,
+} from '@repo/sync/testing/local-database-samples';
+import type { LocalDatabaseCase } from '@repo/sync/testing/local-database-samples';
+import { sessionCases } from '@repo/sync/testing/local-database-session-cases';
 import type { LocalDatabase, PoolState } from '@repo/sync/types/local-database';
-import type { Transaction } from '@repo/sync/types/protocol';
-
-/**
- * One case that every local database adapter must pass. `run` gets `open`,
- * which gives a handle to one database. A second call in the same case gives
- * a second handle to the same stored data. `run` throws an error that says
- * what was expected and what was found.
- */
-export type LocalDatabaseCase = {
-  readonly name: string;
-  readonly run: (open: () => Promise<LocalDatabase>) => Promise<void>;
-};
-
-/** A waiting transaction that renames the card `a`. */
-function rename(id: string, title = 'New'): Transaction {
-  return { id, command: 'cards/rename', input: { id: 'a', title } };
-}
-
-/** A state of one actor, with two confirmed records, a loaded group and one pending transaction. */
-function sampleState(title = 'Old'): PoolState {
-  return {
-    lastSyncId: 7,
-    tables: {
-      Card: [
-        { id: 'a', title },
-        { id: 'b', title: 'Kept' },
-      ],
-    },
-    groups: ['test'],
-    meta: {
-      'Card\u0000a': { groups: ['test'], syncId: 7 },
-      'Card\u0000b': { groups: ['test'], syncId: 5 },
-    },
-    pending: [rename('t1')],
-    leftOutBy: 'old-build',
-    actor: { userId: 'ana', organizationId: 'acme' },
-  };
-}
-
-/** Whether two JSON values hold the same data, with the keys in any order. */
-function sameJson(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) {
-    return true;
-  }
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((item, index) => sameJson(item, b[index]));
-  }
-  if (a && b && typeof a === 'object' && typeof b === 'object') {
-    const aKeys = Object.keys(a);
-    return (
-      aKeys.length === Object.keys(b).length &&
-      aKeys.every((key) => sameJson(Reflect.get(a, key), Reflect.get(b, key)))
-    );
-  }
-  return false;
-}
-
-/** Throws when a value is not the expected one, and says both. */
-function expectSame(actual: unknown, expected: unknown, what: string): void {
-  if (!sameJson(actual, expected)) {
-    throw new Error(
-      `${what}: expected ${JSON.stringify(expected)}, found ${JSON.stringify(actual)}.`,
-    );
-  }
-}
-
-/** Reads the state, and throws when the database has none. */
-async function readState(db: LocalDatabase, what: string): Promise<PoolState> {
-  const state = await db.read();
-  if (state === undefined) {
-    throw new Error(`${what}: expected a saved state, found undefined.`);
-  }
-  return state;
-}
 
 const { actor: _noActor, ...oldLayout } = sampleState('Old layout');
 
@@ -89,8 +24,7 @@ export async function expectOldLayoutMoved(db: LocalDatabase): Promise<void> {
   expectSame(await db.read(), oldLayoutCopy, 'The read of a copy in the old layout');
 }
 
-/** The cases that every local database adapter must pass, in the order they run. */
-export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
+const rowCases: ReadonlyArray<LocalDatabaseCase> = [
   {
     name: 'a database that was never written reads as undefined',
     async run(open) {
@@ -230,6 +164,27 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
     },
   },
   {
+    name: 'a waiting row keeps its actor, and a row with no actor reads with none',
+    async run(open) {
+      const db = await open();
+      const actor = { userId: 'ana', organizationId: 'acme' };
+      await db.save({ add: [{ ...rename('t1'), actor }, rename('t2')], done: [] });
+      const read = await readState(db, 'The read of the waiting rows');
+      expectSame(read.pending, [{ ...rename('t1'), actor }, rename('t2')], 'The waiting rows');
+    },
+  },
+  {
+    name: 'a second add of a waiting row takes the new row and keeps its place',
+    async run(open) {
+      const db = await open();
+      const actor = { userId: 'ana', organizationId: 'acme' };
+      await db.save({ add: [rename('t1'), rename('t2')], done: [] });
+      await db.save({ add: [{ ...rename('t1'), actor }], done: [] });
+      const read = await readState(db, 'The read after the second add');
+      expectSame(read.pending, [{ ...rename('t1'), actor }, rename('t2')], 'The waiting rows');
+    },
+  },
+  {
     name: 'clear makes the next read undefined, and a save after a clear reads back',
     async run(open) {
       const db = await open();
@@ -268,4 +223,11 @@ export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
       expectSame(await second.read(), state, 'The read through the second handle');
     },
   },
+];
+
+/** The cases that every local database adapter must pass, in the order they run. */
+export const localDatabaseCases: ReadonlyArray<LocalDatabaseCase> = [
+  ...rowCases,
+  ...sessionCases,
+  ...roomCases,
 ];

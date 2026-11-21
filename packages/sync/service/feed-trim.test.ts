@@ -9,7 +9,7 @@ import { EventLog, eventLog } from '@repo/sync/service/event-log';
 import { feed } from '@repo/sync/service/feed';
 import type { LoadRequest } from '@repo/sync/service/feed';
 import { DatabaseTest } from '@repo/sync/testing/database';
-import type { Change } from '@repo/sync/types/protocol';
+import type { Change, SyncMessage } from '@repo/sync/types/protocol';
 import { Effect, Layer, Queue, Stream } from 'effect';
 import type { Context } from 'effect';
 
@@ -121,4 +121,59 @@ test('a trim that runs while the backlog is read ends the pull with ServerBehind
     }),
   );
   expect(failure).toMatchObject({ _tag: 'ServerBehind', oldest: 5 });
+});
+
+test('a trim that runs while the backlog is read sends no delta at the head before ServerBehind', async () => {
+  const result = await run(
+    Effect.gen(function* () {
+      const log = yield* EventLog;
+      for (const id of ['a', 'b', 'c', 'd']) {
+        yield* log.commit('org-a', `t-${id}`, () => Effect.succeed([upsert(id)]));
+      }
+      // The newest event is in a group that the client did not load.
+      yield* log.commit('org-a', 't-e', () =>
+        Effect.succeed([{ ...upsert('e'), groups: ['org:a', 'space:y'] }]),
+      );
+      yield* log.commit('org-a', 't-f', () =>
+        Effect.succeed([{ ...upsert('f'), groups: ['space:y'] }]),
+      );
+      const db = yield* Database;
+      let trimmed = false;
+      const trimmedDuringBacklog: Log = {
+        ...log,
+        backlog: (organizationId, after, groups) =>
+          log.backlog(organizationId, after, groups).pipe(
+            Stream.tap(() =>
+              trimmed
+                ? Effect.void
+                : Effect.gen(function* () {
+                    trimmed = true;
+                    yield* trimLog(db, new Date(Date.now() + 60_000));
+                  }),
+            ),
+          ),
+      };
+      const requests = yield* Queue.unbounded<LoadRequest>();
+      const sent: Array<SyncMessage> = [];
+      const ended = yield* feed(trimmedDuringBacklog, {
+        organizationId: 'org-a',
+        userId: 'u',
+        lastSyncId: 1,
+        loaded: ['org:a'],
+        granted: Effect.succeed({ eager: ['org:a'], lazy: [] }),
+        requests,
+      }).pipe(
+        Stream.tap((message) => Effect.sync(() => sent.push(message))),
+        Stream.runDrain,
+        Effect.timeout('2 seconds'),
+        Effect.flip,
+      );
+      return { ended, sent };
+    }),
+  );
+  expect(result.ended).toMatchObject({ _tag: 'ServerBehind', oldest: 6 });
+  const deltas = result.sent.flatMap((message) =>
+    message._tag === 'Deltas' ? message.deltas : [],
+  );
+  expect(deltas.filter((delta) => delta.changes.length === 0)).toEqual([]);
 });

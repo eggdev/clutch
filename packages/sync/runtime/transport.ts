@@ -188,6 +188,8 @@ export function engine(
     const again = (): PullEnd => (heard ? 'heard' : 'silent');
     const pullOnce = pull.pipe(
       Effect.raceFirst(loads),
+      // However the pull ended, the pool hears it, so a load that it cut off leaves no record.
+      Effect.ensuring(Effect.sync(() => pool.endPull())),
       Effect.map(again),
       Effect.catchTag('ActorChanged', () => Effect.sync(again)),
       Effect.catchTag('ServerBehind', () =>

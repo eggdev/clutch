@@ -14,7 +14,11 @@ export function socketHeaders(): Readonly<Record<string, string>> | undefined {
   return undefined;
 }
 
-/** After a session ends, the page loads again from its start, with an empty local database. */
-export function afterSessionEnded(): void {
+/**
+ * After a session ends, or a newer build takes the local database, the page
+ * loads again from its start. It does not call `restart` first: a start in
+ * the old page would open the old build on a database that may be newer.
+ */
+export function afterSessionEnded(_restart: () => void): void {
   location.assign('/');
 }
