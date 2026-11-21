@@ -271,19 +271,26 @@ SQLite.
 A native profile also sets up [native builds and devices](../../../docs/contributing/setup/native.md):
 
 1. Add `@expo/fingerprint` to the native app's devDependencies at an exact
-   version. Install Maestro on the machine that runs the simulators.
-2. Ask the owner which machine runs the simulators and how a session reaches
-   it. Add that device host to `hosts` in `tools/native/device-host.ts`, with
-   tests that use a fake, and fill the device host slot in
-   `docs/contributing/setup/native.md`.
-3. Record the first fingerprint with
+   version.
+2. Record the first fingerprint with
    `mise exec -- bun run native:build <app> --record`, and commit
    `apps/<app>/native-fingerprint.json`.
-4. Add a native journey for each feature:
-   `features/<feature>/journeys/<id>.maestro.yaml`. It runs on the booted
-   device through the device host.
-Remove the notes example (`packages/notes`, `features/notes`, its route and its
-registrations) once the first product package exists.
+3. Add a native journey for each feature:
+   `features/<feature>/journeys/<id>.maestro.yaml`. It runs on a
+   [pool device](../../../docs/contributing/setup/native.md#the-device-pool).
+4. Run `mise exec -- bun run clutch doctor`, and read its two native lines:
+   the build machine and the device pool. Do not ask the owner which machine
+   has the simulators.
+5. When both are present, do a first run. Open a pool device with
+   `device_open`. Run
+   `AGENT_DEVICE=<path> mise exec -- bun run native:build --platform ios --install`
+   and `AGENT_DEVICE=<path> mise exec -- bun run journey --native ios`. Close
+   the device with `device_close` and `shutdown: true`, also after a failure.
+6. When one is missing, tell the owner in one message which machine setting is
+   missing and where it goes. Then go on with kickoff. The first run waits for
+   the setting.
+   Remove the notes example (`packages/notes`, `features/notes`, its route and its
+   registrations) once the first product package exists.
 
 ### 5. Close
 
