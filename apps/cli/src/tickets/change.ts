@@ -12,7 +12,7 @@ import type {
 const now = () => new Date().toISOString();
 
 /** `value` when it is one of `allowed`. Otherwise an error that names each choice. */
-function oneOf<T extends string>(name: string, allowed: ReadonlyArray<T>, value: string) {
+export function oneOf<T extends string>(name: string, allowed: ReadonlyArray<T>, value: string) {
   if (!(allowed as ReadonlyArray<string>).includes(value)) {
     throw new Error(`${name} must be one of ${allowed.join(', ')}. Got ${value}.`);
   }

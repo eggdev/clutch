@@ -529,6 +529,8 @@ autoRevert: # optional
   watch: [production] # checks or jobs that also count as required for auto-revert only
 pr: # optional
   branchPrefix: clutch/cl- # the default: how bun run pr finds an agent's branch
+tickets: # optional: clutch tickets add needs it
+  prefix: CL # ticket ids are CL-1000, CL-1001 and so on
 sast: auto # optional: auto (the default), codeql or semgrep
 verification: # optional
   gate: observe # off, observe (the default) or enforce: what bun run pr open does with a missing flow

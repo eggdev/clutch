@@ -73,3 +73,34 @@ New issues take the next free id in their range. Make them with `clutch issues n
 - `clutch issues new --phase <P> --title <title> [--depends CL-NNN,...] [--owner <name>] [--range CL-NNN..CL-NNN]`: fetch origin, then write `issues/CL-NNN.md` with `status: todo` and the next free id. The id is one above the highest id in the phase's range, or in `--range`. It counts each issue file in the working tree, in each local branch and in each `origin/*` branch. A renumbered id never comes back. It fails when the range is full. Fill in the body sections, then commit and push the file soon, so other lanes see the id.
 
 Mirroring issues to GitHub Issues needs Brendan's approval first.
+
+## Tickets
+
+`clutch tickets` keeps tickets in a store that every worktree of a project shares. It is separate from the issue files. `clutch issues` and `.clutch/issues` do not change, and no command copies one into the other.
+
+The store is one SQLite file at `<git-common-dir>/clutch/tickets.sqlite`. Git does not track it, so a ticket shows in each worktree at once, with no commit. Each project has its own file. No server runs. The CLI opens the file for each command, and it is the only reader and writer. Agents use the commands, never the file.
+
+A ticket has an id such as `CL-1000`. The prefix is `tickets.prefix` in `clutch.yaml`, and numbers start at 1000. A ticket with no route is in the inbox. The ticket holds the owner's words in `description`, and no command changes them. `edit` sets the requirements (`now`, `expected`, `location`, `acceptance`, `major`), the kind, the dependencies and the plan body.
+
+A ticket has one phase row for each phase on its route: `triage`, `planning`, `design`, `build`, `review` and `deploy`, in that order. Each row has a status: `not_ready`, `ready`, `in_progress`, `blocked`, `in_review` or `done`.
+
+- A new ticket has one `triage` row. It is `ready`, or `not_ready` when the ticket is held. `release` makes it `ready`.
+- `route` adds `triage` at the start when the list leaves it out. A route with no `planning` needs `now`, `expected`, `location`, one acceptance check and `major: no`. Otherwise `route` exits 1 and names each missing part.
+- `done` makes the next phase `ready`. A phase that goes back to `ready` sets each later phase to `not_ready`.
+- `claim` sets `in_progress` and the claim in one transaction. Only a `ready` phase can be claimed, so a second claim exits 1.
+
+Each change writes one event in the same transaction, in the shape of a Linear webhook: `deliveryId`, `createdAt`, `actor`, `type` (`Ticket` or `Phase`), `action` (`create` or `update`), `data` (the record after the change) and `updatedFrom` (the old value of each changed field). A command that changes nothing writes no event. The actor is `--as`, or the user of the machine.
+
+Every command prints JSON with `schemaVersion: 1`. An error prints `status: error` and a `message`, and exits 1.
+
+- `clutch tickets add <title> --description <text> [--kind bug|feature|chore] [--hold]`
+- `clutch tickets list [--inbox] [--phase <phase>] [--status <status>]`, `show <id>`, `ready`
+- `clutch tickets edit <id> [--now] [--expected] [--location] [--acceptance]... [--major yes|no] [--kind] [--depends <id,...>] [--body-file <path>]`
+- `clutch tickets route <id> --phases <phase,...> --reason <text>`
+- `clutch tickets hold <id>`, `release <id>`
+- `clutch tickets claim <id> <phase> --as <name> [--thread <thread>]`
+- `clutch tickets phase <id> <phase> <status> [--reason <text>]`
+- `clutch tickets link <id> --kind prototype|pull_request|branch|worktree|evidence <value>`
+- `clutch tickets events [--ticket <id>] [--since <event number>]`
+
+`ready` lists each `ready` phase of a ticket that is not held and whose dependencies are done. A ticket is done when each of its phases is `done`.
