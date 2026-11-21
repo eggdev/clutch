@@ -18,9 +18,13 @@ function settingFile(env: NodeJS.ProcessEnv = process.env): string {
 
 const readText = (file: string) => (existsSync(file) ? readFileSync(file, 'utf-8') : null);
 
-/** Whether a value is text that is safe in a shell command with no quotes. */
+/**
+ * Whether a value is text that is safe in a shell command with no quotes. A
+ * value that starts with `-` would be read as an option of ssh. Doctor repeats
+ * this rule.
+ */
 const safe = (part: unknown): part is string =>
-  typeof part === 'string' && /^[A-Za-z0-9._/@-]+$/u.test(part);
+  typeof part === 'string' && /^[A-Za-z0-9._/@][A-Za-z0-9._/@-]*$/u.test(part);
 
 function parsed(text: string | null): { readonly ssh?: unknown; readonly root?: unknown } {
   try {
@@ -125,14 +129,20 @@ function cachedApp(root: string, fingerprint: string): string | null {
   return app ? path.join(folder, app) : null;
 }
 
-/** A command on the build machine. A login shell has Homebrew and mise, as a terminal there has them. */
-export const remote = (to: string, cmd: string) => [
-  'ssh',
+/** The ssh options of each call: no prompt, a time limit to connect, and a keep-alive that ends a dead link. */
+export const sshOptions = [
   '-o',
   'BatchMode=yes',
-  to,
-  `zsh -lc '${cmd}'`,
-];
+  '-o',
+  'ConnectTimeout=15',
+  '-o',
+  'ServerAliveInterval=30',
+  '-o',
+  'ServerAliveCountMax=3',
+] as const;
+
+/** A command on the build machine. A login shell has Homebrew and mise, as a terminal there has them. */
+export const remote = (to: string, cmd: string) => ['ssh', ...sshOptions, to, `zsh -lc '${cmd}'`];
 
 /** Builds the head commit on the build machine. The build machine gets a snapshot from Git, so the build has only committed changes. */
 async function makeBuild(request: BuildRequest, runner: Runner, ssh: string, folder: string) {
@@ -155,17 +165,21 @@ async function makeBuild(request: BuildRequest, runner: Runner, ssh: string, fol
   );
   const build = await runner.pipe(
     ['git', 'archive', '--format=tar', revision],
-    remote(ssh, `exec bash ${folder}/bin/ios-simulator-build.sh ${folder} ${app} ${revision}`),
+    remote(
+      ssh,
+      `exec bash ${folder}/bin/ios-simulator-build.sh ${folder} ${app} ${revision} ${fingerprint}`,
+    ),
     { cwd: root, log },
   );
-  if (build.code !== 0) {
+  // The script exits 76 before the prebuild when the head commit has another fingerprint.
+  if (build.code !== 0 && build.code !== 76) {
     throw new DeviceHostError(
       build.code === 75
         ? 'Another build of this project runs on the build machine. Wait for it, then run the command again.'
         : `The build on the build machine failed (exit ${build.code}). Read its output above.`,
     );
   }
-  if (build.lastLine !== fingerprint) {
+  if (build.code === 76 || build.lastLine !== fingerprint) {
     throw new DeviceHostError(
       `The head commit has the native fingerprint ${build.lastLine.slice(0, 8)}, and this checkout has ${fingerprint.slice(0, 8)}. The build is of the commit, so a native change that no commit holds is not in it. Commit each native change, then run the command again.`,
     );

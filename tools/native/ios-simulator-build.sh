@@ -3,8 +3,9 @@
 # keeps it by its native fingerprint. `native:build` copies this script to the
 # build machine and runs it over ssh.
 #
-#   git archive REVISION | bash ios-simulator-build.sh ROOT APP REVISION
+#   git archive REVISION | bash ios-simulator-build.sh ROOT APP REVISION FINGERPRINT
 #
+# FINGERPRINT is the native fingerprint of the checkout that asks for the build.
 # ROOT is the folder of this project on the build machine. The script writes
 # only under it:
 #
@@ -14,8 +15,10 @@
 #   build.lock/              held while a build runs
 #
 # It reads a clean snapshot of REVISION as a tar archive on stdin, so it never
-# builds from a working tree. A fingerprint that has an artifact builds
-# nothing. The last line of the output is the fingerprint. See
+# builds from a working tree. When the snapshot has another fingerprint, it
+# stops before the prebuild and exits 76. A fingerprint that has an artifact
+# builds nothing. When another build holds the lock, it exits 75. The last line
+# of the output is the fingerprint. See
 # docs/contributing/setup/native.md#the-build-machine.
 set -euo pipefail
 
@@ -25,9 +28,10 @@ export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 root="${1:-}"
 app="${2:-}"
 revision="${3:-}"
+expected="${4:-}"
 if [ -z "$root" ] || [ "${root#/}" = "$root" ] || ! printf '%s' "$app" | grep -Eq '^[a-z0-9][a-z0-9-]*$' ||
-  ! printf '%s' "$revision" | grep -Eq '^[0-9a-f]{40}$'; then
-  echo "Usage: git archive REVISION | bash ios-simulator-build.sh ROOT APP REVISION, with an absolute ROOT and the full commit hash." >&2
+  ! printf '%s' "$revision" | grep -Eq '^[0-9a-f]{40}$' || ! printf '%s' "$expected" | grep -Eq '^[0-9a-f]{40}$'; then
+  echo "Usage: git archive REVISION | bash ios-simulator-build.sh ROOT APP REVISION FINGERPRINT, with an absolute ROOT, the full commit hash and the full fingerprint." >&2
   exit 2
 fi
 
@@ -46,7 +50,10 @@ if ! mkdir "$lock" 2>/dev/null; then
   fi
   # The build that held the lock has ended without removing it.
   rm -rf "$lock"
-  mkdir "$lock"
+  if ! mkdir "$lock" 2>/dev/null; then
+    echo "Another build of this project runs on the build machine. Wait for it, then run the command again." >&2
+    exit 75
+  fi
 fi
 echo "$$" > "$lock/pid"
 # The snapshot and the build products take several GB.
@@ -79,6 +86,11 @@ fingerprint="$(mise exec -- bun -e 'const tool = await import(Bun.resolveSync("@
 if ! printf '%s' "$fingerprint" | grep -Eq '^[0-9a-f]{40}$'; then
   echo "The fingerprint tool gave \"$fingerprint\", not a fingerprint." >&2
   exit 1
+fi
+if [ "$fingerprint" != "$expected" ]; then
+  echo "The head commit has the native fingerprint $fingerprint, not $expected." >&2
+  echo "$fingerprint"
+  exit 76
 fi
 target="$artifacts/$fingerprint"
 

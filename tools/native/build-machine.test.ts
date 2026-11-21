@@ -27,7 +27,8 @@ test('the setting is read from the config folder', () => {
 });
 
 test('a missing or bad setting is refused with the name of the file', () => {
-  for (const text of [null, '{', '{"ssh":"mac","root":"builds"}', '{"ssh":"a b","root":"/b"}']) {
+  const bad = [null, '{', '{"ssh":"mac","root":"builds"}', '{"ssh":"a b","root":"/b"}'];
+  for (const text of [...bad, '{"ssh":"-oProxyCommand=x","root":"/b"}']) {
     expect(() => buildMachineOf(env, () => text)).toThrow(`Write \`${file}\``);
   }
   expect(() => buildMachineOf(env, () => `{"ssh":"m'ac","root":"/b"}`)).toThrow(
@@ -104,6 +105,12 @@ test('a build on the build machine is copied, not made', async () => {
     'ssh',
     '-o',
     'BatchMode=yes',
+    '-o',
+    'ConnectTimeout=15',
+    '-o',
+    'ServerAliveInterval=30',
+    '-o',
+    'ServerAliveCountMax=3',
     'mac',
     `zsh -lc 'test -d ${folder}/artifacts/${fingerprint}'`,
   ]);
@@ -121,7 +128,7 @@ test('with no build, the script goes over, the head commit builds, and the app i
   expect(calls.map((call) => call.argv[0])).toEqual(['ssh', 'git', 'ssh', 'git', 'ssh']);
   expect(calls[2]?.argv.at(-1)).toContain(`cat > ${folder}/bin/ios-simulator-build.sh`);
   expect(calls[3]?.argv.at(-1)).toBe(
-    `zsh -lc 'exec bash ${folder}/bin/ios-simulator-build.sh ${folder} mobile ${revision}'`,
+    `zsh -lc 'exec bash ${folder}/bin/ios-simulator-build.sh ${folder} mobile ${revision} ${fingerprint}'`,
   );
   expect(lines[0]).toStartWith(`Building ${revision.slice(0, 8)} on the build machine.`);
 });
@@ -132,6 +139,11 @@ const refusals: Array<[string, Answers | 'android', string]> = [
   [
     'the commit has another fingerprint',
     { found: 1, last: 'b2'.repeat(20) },
+    'The head commit has the native fingerprint b2b2b2b2, and this checkout has a1a1a1a1.',
+  ],
+  [
+    'the script stops for another fingerprint',
+    { found: 1, built: 76, last: 'b2'.repeat(20) },
     'The head commit has the native fingerprint b2b2b2b2, and this checkout has a1a1a1a1.',
   ],
   ['ssh fails', { found: 255 }, 'ssh mac failed: refused'],

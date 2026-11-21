@@ -46,15 +46,19 @@ async function hasNativeApp(root: string): Promise<boolean> {
 const buildMachineFile = (place: MachinePlace) =>
   path.join(configBase(place.env, place.home), 'clutch', 'build-machine.json');
 
-/** The setting is present when it parses, with a non-empty `ssh` and an absolute `root`. */
+/**
+ * Text that a shell command holds with no quotes, and that ssh does not read as
+ * an option. The same rule as `safe` in `tools/native/build-machine.ts`, which
+ * the CLI cannot import.
+ */
+const plain = (value: unknown): value is string =>
+  typeof value === 'string' && /^[A-Za-z0-9._/@][A-Za-z0-9._/@-]*$/u.test(value);
+
+/** The setting is present when it parses, and `native:build` would read it. */
 async function buildMachine(place: MachinePlace): Promise<NativeMachine['buildMachine']> {
   const setting = await readJson(buildMachineFile(place)).catch(() => null);
   const valid =
-    isRecord(setting) &&
-    typeof setting.ssh === 'string' &&
-    setting.ssh.trim() !== '' &&
-    typeof setting.root === 'string' &&
-    path.isAbsolute(setting.root);
+    isRecord(setting) && plain(setting.ssh) && plain(setting.root) && path.isAbsolute(setting.root);
   return valid ? 'present' : 'missing';
 }
 

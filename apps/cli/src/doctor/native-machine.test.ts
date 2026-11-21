@@ -61,11 +61,15 @@ test('a native app on a machine with neither setting names the file and says doc
   expect(text).toContain('so doctor cannot tell');
 });
 
-test('a build machine file that does not parse or has a relative root is missing', async () => {
+test('a build machine file that native:build would refuse is missing', async () => {
   for (const build of [
     '{ not json',
     { ssh: 'host', root: 'relative/folder' },
     { ssh: '', root: '/a' },
+    { ssh: 'a b', root: '/a' },
+    { ssh: "m'ac", root: '/a' },
+    { ssh: '-oProxyCommand=x', root: '/a' },
+    { ssh: 'host', root: '/my builds' },
   ]) {
     const { result } = await machine({ native: true, build });
     expect(result?.buildMachine).toBe('missing');
