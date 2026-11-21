@@ -8,6 +8,8 @@ import {
   readDeploy,
   readFactory,
   readJourneys,
+  readPr,
+  readTickets,
   readVerification,
 } from '@/clutch-config/optional-keys';
 import type { verificationGates } from '@/clutch-config/optional-keys';
@@ -51,6 +53,8 @@ export type ClutchConfig = {
   };
   /** How `bun run pr` finds an agent's branch: its prefix, `clutch/cl-` by default. */
   pr?: { branchPrefix: string };
+  /** The part of a ticket id before the number, such as `CL` in `CL-1000`. */
+  tickets?: { prefix: string };
   /** What auto-revert judges main by, besides the required checks. `watch` names checks or jobs. */
   autoRevert?: { watch: Array<string> };
   /** The command that deploys, and the production URL that the core journeys prove. */
@@ -96,6 +100,7 @@ const topKeys = [
   'autoRevert',
   'deploy',
   'pr',
+  'tickets',
   'fleet',
   'sast',
   'pr_size',
@@ -300,22 +305,6 @@ function readFleet(value: unknown, errors: Errors) {
   return errors.length === before ? fleet : undefined;
 }
 
-function readPr(value: unknown, errors: Errors) {
-  if (!isObject(value)) {
-    errors.push({ path: 'pr', message: 'Expected a map with branchPrefix.' });
-    return;
-  }
-  unknownKeys(value, ['branchPrefix'], 'pr', errors);
-  if (typeof value.branchPrefix !== 'string' || !/^[\w./-]+$/u.test(value.branchPrefix)) {
-    errors.push({
-      path: 'pr.branchPrefix',
-      message: 'Expected a branch prefix, such as clutch/cl-.',
-    });
-    return;
-  }
-  return { branchPrefix: value.branchPrefix };
-}
-
 function readPrSize(value: unknown, errors: Errors) {
   if (!isObject(value)) {
     errors.push({ path: 'pr_size', message: 'Expected a map with warn and exclude.' });
@@ -347,6 +336,7 @@ const optionalSections: Record<string, (value: unknown, errors: Errors) => unkno
   autoRevert: readAutoRevert,
   deploy: readDeploy,
   pr: readPr,
+  tickets: readTickets,
   fleet: readFleet,
   pr_size: readPrSize,
   verification: readVerification,

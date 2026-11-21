@@ -130,3 +130,33 @@ export function readVerification(value: unknown, errors: Errors) {
   }
   return { gate: gate as (typeof verificationGates)[number] };
 }
+
+/** `tickets.prefix`: the part of a ticket id before the number, such as `CL`. */
+export function readTickets(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'tickets', message: 'Expected a map with prefix.' });
+    return;
+  }
+  unknownKeys(value, ['prefix'], 'tickets', errors);
+  if (typeof value.prefix !== 'string' || !/^[A-Z][A-Z0-9]*$/u.test(value.prefix)) {
+    errors.push({ path: 'tickets.prefix', message: 'Expected capital letters, such as CL.' });
+    return;
+  }
+  return { prefix: value.prefix };
+}
+
+export function readPr(value: unknown, errors: Errors) {
+  if (!isObject(value)) {
+    errors.push({ path: 'pr', message: 'Expected a map with branchPrefix.' });
+    return;
+  }
+  unknownKeys(value, ['branchPrefix'], 'pr', errors);
+  if (typeof value.branchPrefix !== 'string' || !/^[\w./-]+$/u.test(value.branchPrefix)) {
+    errors.push({
+      path: 'pr.branchPrefix',
+      message: 'Expected a branch prefix, such as clutch/cl-.',
+    });
+    return;
+  }
+  return { branchPrefix: value.branchPrefix };
+}

@@ -14,6 +14,7 @@ import { riskCommand } from '@/risk-command';
 import { rulesetCommand } from '@/ruleset-command';
 import { scoreCommand } from '@/score-command';
 import { syncCommand } from '@/sync-command';
+import { ticketsCommand, ticketsUsage } from '@/tickets-command';
 import { verifyCommand } from '@/verify-command';
 import { worktreeCommand } from '@/worktree-command';
 
@@ -96,6 +97,12 @@ export const commands: Record<string, Command> = {
       'clutch issues [--write | --check] [--json]\nclutch issues next [--stack] [--json]\nclutch issues set <id> <status> [--pr URL] [--owner NAME]\nclutch issues new --phase P --title TEXT [--depends CL-NNN,...] [--owner NAME] [--range CL-NNN..CL-NNN]',
     summary: 'List, pick and update the issues in .clutch/issues, and render .clutch/TRACKER.md.',
     run: issuesCommand,
+  },
+  tickets: {
+    usage: ticketsUsage,
+    summary:
+      'Add, route, claim and update tickets in the store that every worktree of the project shares. Each command prints JSON.',
+    run: ticketsCommand,
   },
   friction: {
     usage:
