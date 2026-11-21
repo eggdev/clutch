@@ -4,7 +4,7 @@ import path from 'node:path';
 import { configBase } from '@/config';
 
 /** Whether this machine has one native setting. `unknown` means doctor cannot tell. */
-export type MachineState = 'present' | 'missing' | 'unknown';
+type MachineState = 'present' | 'missing' | 'unknown';
 
 export type NativeMachine = {
   buildMachine: Exclude<MachineState, 'unknown'>;
