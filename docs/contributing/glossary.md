@@ -124,7 +124,7 @@ These terms come from the
 | Decision record    | A short page in `decisions/` that states one project decision, its reason and when to revisit it.                                                   | ADR (in prose), design doc               |
 | One-way door       | A change that a later change cannot undo, such as a stored shape. See [two-way doors](../principles/two-way-doors.md).                              | irreversible change                      |
 | Kickoff slot       | An HTML comment that kickoff replaces with a fact about one project.                                                                                | placeholder, TODO                        |
-| Device host        | The one adapter that drives a simulator, an emulator or a native build. `DEVICE_HOST` names it. See [native builds](./setup/native.md#device-host). | device runner                            |
+| Device host        | The one adapter that drives a simulator, an emulator or a native build. Its one host is `pool`. See [native builds](./setup/native.md#device-host). | device runner                            |
 | Native fingerprint | A hash of each input that goes into a native binary. `native:build` builds only when it changes.                                                    | build hash                               |
 
 ## Words with one meaning only

@@ -13,7 +13,7 @@ How to run, check and ship the project. Open only the page you need.
 - [TypeScript](./typescript.md): one config for each environment, and committed
   generated types
 - [Nx](./nx.md): how to run tasks, project names and the generators
-- [Native builds and devices](./native.md): the device host, the device lock,
+- [Native builds and devices](./native.md): the device pool, the device host
   and `native:build`, which builds only when the native fingerprint changed
 - [Checks](./checks.md): `validate`, each check, CI
 - [Agent tools](./agent-tools.md): the MCP servers that coding agents use, and
