@@ -142,26 +142,15 @@ test('--install puts the last build on the booted device with no build, and refu
   expect(builds).toEqual([]);
 });
 
-test('--fresh builds on a CI runner with no fingerprint record, and is refused anywhere else', async () => {
+test('an unknown flag, such as the removed --fresh, prints the usage line', async () => {
   const { builds, host } = fakeHost();
-  const fresh = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
+  const result = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
     host,
-    env: { GITHUB_ACTIONS: 'true', CI: '1' },
     tool: tool(print('a')),
   });
-  expect(fresh.exitCode).toBe(0);
-  expect(builds).toEqual(['mobile ios']);
-  expect(fresh.record).toBeNull();
-  // An agent sets CI on its own machine, so CI alone names no runner.
-  const refused = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
-    host,
-    env: { CI: '1' },
-    tool: tool(print('a')),
-  });
-  expect(refused.exitCode).toBe(1);
-  expect(refused.log).toContain('for a CI runner');
-  expect(refused.log).toContain('mise exec -- bun run native:build --platform <platform>');
-  expect(builds).toEqual(['mobile ios']);
+  expect(result.exitCode).toBe(1);
+  expect(result.log).toContain('Usage: mise exec -- bun run native:build');
+  expect(builds).toEqual([]);
 });
 
 test('the none host refuses a build, and names the kickoff setup', async () => {

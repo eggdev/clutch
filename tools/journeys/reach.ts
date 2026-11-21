@@ -7,9 +7,9 @@ import { declaresAppId } from '@tools/native/build';
 
 /**
  * The reach rule: the platforms that a change reaches, so the journeys of
- * each one must pass on it. This is the one place that states it. CI reads it
- * to start the native jobs, and the merge judge (CL-441) reads it to know
- * which platforms a PR must pass on.
+ * each one must pass on it. This is the one place that states it. The
+ * `reach` job of CI writes it as outputs, and the merge judge (CL-441) reads
+ * it to know which platforms a PR must pass on.
  *
  * - Every change reaches web. The web journeys run on every PR.
  * - A change reaches native when it touches a native app, a native journey

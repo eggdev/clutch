@@ -105,28 +105,32 @@ export type BuildOptions = {
 };
 
 const usage =
-  'Usage: mise exec -- bun run native:build [app] --platform <ios|android> [--record | --install | --fresh]';
+  'Usage: mise exec -- bun run native:build [app] --platform <ios|android> [--record | --install]';
 
 type Target = {
   app: string;
   platforms: Array<Platform>;
   record: boolean;
   install: boolean;
-  fresh: boolean;
 };
 
 /** The app and platforms that the arguments name, or a refusal to log. */
 function targetOf(root: string, args: Array<string>): Target | string {
-  const { values, positionals } = parseArgs({
-    args,
-    allowPositionals: true,
-    options: {
-      platform: { type: 'string' },
-      record: { type: 'boolean', default: false },
-      install: { type: 'boolean', default: false },
-      fresh: { type: 'boolean', default: false },
-    },
-  });
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args,
+      allowPositionals: true,
+      options: {
+        platform: { type: 'string' },
+        record: { type: 'boolean', default: false },
+        install: { type: 'boolean', default: false },
+      },
+    });
+  } catch (error) {
+    return `${(error as Error).message} ${usage}`;
+  }
+  const { values, positionals } = parsed;
   const apps = nativeApps(root);
   const app = positionals[0] ?? (apps.length === 1 ? apps[0] : undefined);
   if (!app || !apps.includes(app)) {
@@ -141,30 +145,7 @@ function targetOf(root: string, args: Array<string>): Target | string {
     platforms: chosen,
     record: values.record,
     install: values.install,
-    fresh: values.fresh,
   };
-}
-
-/**
- * `--fresh` builds without the fingerprint comparison and writes no record. A
- * CI runner has no earlier build, so the comparison has nothing to compare with.
- */
-async function buildFresh(
-  target: Target,
-  appRoot: string,
-  builder: DeviceHost,
-  lock: string,
-  log: (line: string) => void,
-): Promise<number> {
-  const [platform] = target.platforms;
-  const result = await withLock(lock, () => builder.build(appRoot, platform));
-  log(result.output);
-  if (result.exitCode !== 0) {
-    log(`The ${platform} build failed.`);
-    return result.exitCode;
-  }
-  log(`Built the ${platform} app. No fingerprint record is written.`);
-  return 0;
 }
 
 type Run = {
@@ -265,21 +246,9 @@ export async function nativeBuild(options: BuildOptions): Promise<number> {
     return 1;
   }
   const env = options.env ?? process.env;
-  // GitHub sets GITHUB_ACTIONS on its runners. CI does not name a runner: the
-  // workflow sets it to 1, and an agent sets it on its own machine too.
-  if (target.fresh && env.GITHUB_ACTIONS !== 'true') {
-    log(
-      `--fresh is for a CI runner, where GITHUB_ACTIONS is \`true\`. On this machine, run \`mise exec -- bun run native:build --platform <platform>\`.`,
-    );
-    return 1;
-  }
   const appRoot = path.join(options.root, 'apps', target.app);
   const recordFile = path.join(appRoot, recordName);
   try {
-    if (target.fresh) {
-      const builder = options.host ?? deviceHost(env);
-      return await buildFresh(target, appRoot, builder, options.lock ?? lockFile(), log);
-    }
     const run: Run = {
       target,
       appRoot,
