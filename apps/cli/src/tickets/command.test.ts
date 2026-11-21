@@ -69,8 +69,12 @@ test('when 20 processes claim one phase at once, 1 exits 0 and 19 exit 1', async
   expect(winners).toHaveLength(1);
   expect(claims.filter((claim) => claim.code === 1)).toHaveLength(19);
   const { json } = await tickets(repo.root, 'events', '--ticket', 'SH-1000');
-  expect(json.events.map((event: { type: string }) => event.type)).toEqual(['Ticket', 'Phase']);
-  expect(winners[0].json.ticket.phases[0].claimedBy).toBe(json.events[1].actor);
+  expect(json.events.map((event: { type: string }) => event.type)).toEqual([
+    'Ticket',
+    'Phase',
+    'Phase',
+  ]);
+  expect(winners[0].json.ticket.phases[0].claimedBy).toBe(json.events[2].actor);
 }, 60_000);
 
 test('route exits 1 and names each missing requirement, then exits 0 once they are set', async () => {

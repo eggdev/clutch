@@ -1,0 +1,20 @@
+# How `clutch tickets dispatch` starts each phase of a ticket. See .clutch/README.md#phases.
+# A project owns this file after the first sync. A ready phase with no entry stays ready.
+schemaVersion: 1
+limits:
+  threads: 6 # work threads that run at once on this machine
+  device: 2 # phases that need a device, at once
+work_thread:
+  provider: claudeAgent
+  model: claude-opus-5-5
+phases:
+  - id: build
+    thread: work # work: the one work thread of the ticket. own: a thread of its own.
+    skills: [deliver]
+    prompt: 'Build the ticket in this worktree.'
+    check: 'mise exec -- bun run validate'
+    needs: []
+    advance: agent # agent | owner
+    statuses:
+      blocked:
+        prompt: 'Write the question for the owner in the ask-the-owner form, then stop.'

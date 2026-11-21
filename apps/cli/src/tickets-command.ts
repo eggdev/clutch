@@ -18,6 +18,9 @@ import {
   setPhase,
 } from '@/tickets/change';
 import type { Edit } from '@/tickets/change';
+import { checkDone, dispatch, sendStatusPrompt } from '@/tickets/dispatch';
+import type { Driver } from '@/tickets/dispatch';
+import { missingSkills, phaseFilePath, readPhaseFile } from '@/tickets/phases';
 import { openStore, phaseNames, phaseStatuses } from '@/tickets/store';
 import type { Event, TicketStore } from '@/tickets/store';
 
@@ -31,9 +34,11 @@ export const ticketsUsage = [
   'clutch tickets hold <id>',
   'clutch tickets release <id>',
   'clutch tickets claim <id> <phase> --as NAME [--thread THREAD]',
-  'clutch tickets phase <id> <phase> <status> [--reason TEXT]',
+  'clutch tickets phase <id> <phase> <status> [--reason TEXT] [--approved-by owner --quote TEXT]',
   'clutch tickets link <id> --kind KIND <value>',
   'clutch tickets events [--ticket ID] [--since NUMBER]',
+  'clutch tickets dispatch',
+  'clutch tickets phases [--check]',
 ].join('\n');
 
 const options = {
@@ -56,6 +61,9 @@ const options = {
   thread: { type: 'string' },
   ticket: { type: 'string' },
   since: { type: 'string' },
+  'approved-by': { type: 'string' },
+  quote: { type: 'string' },
+  check: { type: 'boolean' },
 } as const;
 
 type Values = ReturnType<typeof parseArgs<{ options: typeof options }>>['values'];
@@ -95,7 +103,41 @@ async function prefixOf(cwd: string) {
   return loaded.config.tickets.prefix;
 }
 
+/** The checkout that holds `cwd`. Its `clutch.yaml` and phase file apply. */
+async function rootOf(cwd: string) {
+  const top = await git(cwd, 'rev-parse', '--show-toplevel');
+  return top.ok ? top.out : cwd;
+}
+
+/** The driver of the project, or null when the checkout has no phase file. */
+async function driverOf(store: TicketStore, cwd: string, values: Values): Promise<Driver | null> {
+  const root = await rootOf(cwd);
+  const file = await readPhaseFile(root);
+  if (!file) {
+    return null;
+  }
+  const loaded = await loadClutchConfig(root);
+  return {
+    store,
+    file,
+    actor: actorOf(values),
+    project: loaded.kind === 'loaded' ? loaded.config.project : path.basename(root),
+    // The store is `<git-common-dir>/clutch/tickets.sqlite`, in the main checkout.
+    projectDir: path.dirname(path.dirname(path.dirname(store.file))),
+  };
+}
+
+async function dispatched(store: TicketStore, cwd: string, values: Values) {
+  const driver = await driverOf(store, cwd, values);
+  return driver ? await dispatch(driver) : [];
+}
+
+/** The commands that run no dispatch after them. `dispatch` itself writes only through the driver. */
 const reads: Record<string, [number, Handler]> = {
+  dispatch: [
+    0,
+    async (store, _args, values, cwd) => ({ dispatch: await dispatched(store, cwd, values) }),
+  ],
   list: [
     0,
     (store, _args, values) => {
@@ -132,11 +174,29 @@ const reads: Record<string, [number, Handler]> = {
       return { events: store.events({ ticket: values.ticket, since }) };
     },
   ],
+  phases: [
+    0,
+    async (_store, _args, values, cwd) => {
+      const root = await rootOf(cwd);
+      const file = await readPhaseFile(root);
+      if (!values.check) {
+        return { file: phaseFilePath(root), phases: file };
+      }
+      if (!file) {
+        throw new Error(`${phaseFilePath(root)} does not exist.`);
+      }
+      const missing = missingSkills(file, root);
+      if (missing.length > 0) {
+        throw new Error(missing.map((skill) => `The skill ${skill} is not installed.`).join('\n'));
+      }
+      return { status: 'ok', file: phaseFilePath(root) };
+    },
+  ],
 };
 
 /**
- * The commands that change the store. Each one writes at most one event, and
- * `run` prints what it returns.
+ * The commands that change the store. Each one writes an event for each record
+ * that it changes. `run` dispatches after each one and prints what it returns.
  */
 const writes: Record<string, [number, Handler]> = {
   add: [
@@ -208,9 +268,16 @@ const writes: Record<string, [number, Handler]> = {
   ],
   phase: [
     3,
-    (store, [id, phase, status], values) => {
-      const change = { phase, status, reason: values.reason ?? null };
-      return written(store, id, setPhase(store, actorOf(values), id, change));
+    async (store, [id, phase, status], values, cwd) => {
+      const driver = await driverOf(store, cwd, values);
+      let reason = values.reason ?? null;
+      if (driver && status === 'done') {
+        const approval = { approvedBy: values['approved-by'], quote: values.quote };
+        reason = (await checkDone(driver, { id, phase, cwd, ...approval })) ?? reason;
+      }
+      const event = setPhase(store, actorOf(values), id, { phase, status, reason });
+      const prompt = driver && event ? await sendStatusPrompt(driver, id, phase, status) : null;
+      return { ...written(store, id, event), statusPrompt: prompt };
     },
   ],
   link: [
@@ -230,7 +297,17 @@ async function run(args: Array<string>, cwd: string) {
     throw new Error(`Usage:\n${ticketsUsage}`);
   }
   using store = await openStore(cwd);
-  return await command[1](store, rest, values, path.resolve(cwd));
+  const result = await command[1](store, rest, values, path.resolve(cwd));
+  if (!(action in writes)) {
+    return result;
+  }
+  // The write is saved, so a driver error goes in the output and the command still exits 0.
+  const after = await dispatched(store, cwd, values).catch((error: Error) => ({
+    status: 'error',
+    message: error.message,
+  }));
+  const { ticket } = result as { ticket: { id: string } };
+  return { ...result, ticket: shown(store, ticket.id), dispatch: after };
 }
 
 /** `clutch tickets`: the ticket store that every worktree of the project shares. */

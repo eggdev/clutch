@@ -231,6 +231,25 @@ export function claimPhase(
   }) as Event;
 }
 
+/** Saves the thread of a phase that `actor` claimed, once its thread has started. */
+export function setThread(
+  store: TicketStore,
+  actor: string,
+  id: string,
+  change: { phase: string; thread: string },
+) {
+  return store.write(actor, () => {
+    const before = store.phase(id, change.phase);
+    if (before.status !== 'in_progress' || before.claimedBy !== actor) {
+      throw new Error(`${id} ${change.phase} is not in progress with a claim by ${actor}.`);
+    }
+    store.db
+      .query('UPDATE phases SET thread = ? WHERE ticket = ? AND phase = ?')
+      .run(change.thread, id, before.phase);
+    return phaseChange(store, before);
+  });
+}
+
 /**
  * Sets the status of a phase. `done` makes the next phase ready. `ready` drops
  * the claim and sets every later phase to `not_ready`, so the work runs again

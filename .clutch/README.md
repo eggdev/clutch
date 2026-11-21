@@ -89,7 +89,7 @@ A ticket has one phase row for each phase on its route: `triage`, `planning`, `d
 - `done` makes the next phase `ready`. A phase that goes back to `ready` sets each later phase to `not_ready`.
 - `claim` sets `in_progress` and the claim in one transaction. Only a `ready` phase can be claimed, so a second claim exits 1.
 
-Each change writes one event in the same transaction, in the shape of a Linear webhook: `deliveryId`, `createdAt`, `actor`, `type` (`Ticket` or `Phase`), `action` (`create` or `update`), `data` (the record after the change) and `updatedFrom` (the old value of each changed field). A command that changes nothing writes no event. The actor is `--as`, or the user of the machine.
+Each record that a command changes gets one event in the same transaction, in the shape of a Linear webhook: `deliveryId`, `createdAt`, `actor`, `type` (`Ticket` or `Phase`), `action` (`create` or `update`), `data` (the record after the change) and `updatedFrom` (the old value of each changed field). The record that the command names comes first. Then each phase row that changed with it gets its own event, such as the next phase that becomes `ready` after `done`. A new phase row gets a `create` event. A record that does not change gets no event. The actor is `--as`, or the user of the machine.
 
 Every command prints JSON with `schemaVersion: 1`. An error prints `status: error` and a `message`, and exits 1.
 
@@ -99,8 +99,25 @@ Every command prints JSON with `schemaVersion: 1`. An error prints `status: erro
 - `clutch tickets route <id> --phases <phase,...> --reason <text>`
 - `clutch tickets hold <id>`, `release <id>`
 - `clutch tickets claim <id> <phase> --as <name> [--thread <thread>]`
-- `clutch tickets phase <id> <phase> <status> [--reason <text>]`
+- `clutch tickets phase <id> <phase> <status> [--reason <text>] [--approved-by owner --quote <text>]`
 - `clutch tickets link <id> --kind prototype|pull_request|branch|worktree|evidence <value>`
 - `clutch tickets events [--ticket <id>] [--since <event number>]`
+- `clutch tickets dispatch`, `phases [--check]`
 
 `ready` lists each `ready` phase of a ticket that is not held and whose dependencies are done. A ticket is done when each of its phases is `done`.
+
+### Phases
+
+`.clutch/phases.yaml` tells the driver how to start each phase. Clutch ships a default, and the project owns its copy after the first sync. The file has `limits`, `work_thread` and one entry for each phase in `phases`. `tickets phases --check` exits 1 on an unknown key, an unknown phase, or a skill with no `SKILL.md` in `.agents/skills/`, `~/.claude/skills/` or `~/.agents/skills/`.
+
+- `thread: own` starts a new thread with the `provider` and `model` of the entry.
+- `thread: work` uses the one work thread of the ticket. The first work phase starts it in a new worktree from `origin/main`, on the branch `clutch/<id>-<title>`, with the model of `work_thread`. Each later work phase sends its prompt to that thread.
+- `prompt` and `skills` make the prompt. The prompt also tells the agent to read the ticket and to end with `clutch tickets phase <id> <phase> done`.
+- `statuses` holds a prompt for a status. When `tickets phase` sets that status, the driver sends the prompt to the thread of the phase.
+- `check` is a command. `done` runs it in the worktree of the ticket, and exits 1 with no change when it fails.
+- `advance: owner` means that `done` needs `--approved-by owner --quote <the owner's words>`. The quote goes in the reason of the phase, so it is in the event.
+- `needs: [device]` counts the phase against `limits.device`. A running work phase counts against `limits.threads`.
+
+`tickets dispatch` runs after each command that writes, and by hand. It finds each `ready` phase that `tickets ready` lists, and claims it, then starts its thread with `t3` and saves the thread id on the phase. The claim stops a second start, so several dispatches can run at once. A phase that would pass a limit stays `ready`. A phase with no entry in the phase file stays `ready`. When `t3` fails, the phase goes back to `ready` with the error as its reason, and the next dispatch tries again. A checkout with no phase file starts nothing.
+
+Each start, skip and failure writes one JSON line to `~/.local/state/clutch/<project>/dispatch.jsonl`, or under `$XDG_STATE_HOME` when it is set.

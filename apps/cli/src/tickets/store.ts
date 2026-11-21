@@ -229,34 +229,64 @@ export class TicketStore implements Disposable {
     this.db.close();
   }
 
+  /** Every phase row of every ticket, keyed by `<ticket> <phase>`. */
+  private phaseRows() {
+    return new Map(
+      this.db
+        .query<PhaseRow, []>('SELECT * FROM phases ORDER BY rowid')
+        .all()
+        .map((row) => [`${row.ticket} ${row.phase}`, toPhase(row)]),
+    );
+  }
+
+  private insertEvent(actor: string, { type, action, data, updatedFrom }: Change) {
+    const row = this.db
+      .query<EventRow, Array<string>>(
+        `INSERT INTO events (ticket, delivery_id, created_at, actor, type, action, data, updated_from)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      )
+      .get(
+        data.id,
+        randomUUID(),
+        new Date().toISOString(),
+        actor,
+        type,
+        action,
+        JSON.stringify(data),
+        JSON.stringify(updatedFrom),
+      );
+    return toEvent(row as EventRow);
+  }
+
   /**
-   * Runs `change` and writes its event in one immediate transaction, so a
-   * change and its event commit together or not at all. An update that
-   * changes no field writes no event and returns null.
+   * Runs `change` and writes its events in one immediate transaction, so a
+   * change and its events commit together or not at all. The record that
+   * `change` returns gets the first event. Each other phase row that the
+   * change adds or changes, such as the next phase that becomes `ready`, gets
+   * its own event after it. A record that changes no field gets no event.
+   * Returns the event of the record that `change` returns, or null.
    */
   write(actor: string, change: () => Change): Event | null {
     return this.db
       .transaction(() => {
-        const { type, action, data, updatedFrom } = change();
-        if (action === 'update' && Object.keys(updatedFrom).length === 0) {
-          return null;
-        }
-        const row = this.db
-          .query<EventRow, Array<string>>(
-            `INSERT INTO events (ticket, delivery_id, created_at, actor, type, action, data, updated_from)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-          )
-          .get(
-            data.id,
-            randomUUID(),
-            new Date().toISOString(),
-            actor,
-            type,
-            action,
-            JSON.stringify(data),
-            JSON.stringify(updatedFrom),
+        const before = this.phaseRows();
+        const main = change();
+        const changes = [main];
+        for (const [key, data] of this.phaseRows()) {
+          const old = before.get(key);
+          if (main.type === 'Phase' && key === `${data.id} ${(main.data as Phase).phase}`) {
+            continue;
+          }
+          changes.push(
+            old
+              ? { type: 'Phase', action: 'update', data, updatedFrom: changedFrom(old, data) }
+              : { type: 'Phase', action: 'create', data, updatedFrom: {} },
           );
-        return toEvent(row as EventRow);
+        }
+        const events = changes
+          .filter((one) => one.action === 'create' || Object.keys(one.updatedFrom).length > 0)
+          .map((one) => ({ one, event: this.insertEvent(actor, one) }));
+        return events[0]?.one === main ? events[0].event : null;
       })
       .immediate();
   }
