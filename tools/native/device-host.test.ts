@@ -81,3 +81,10 @@ test('installedOn reads what recordInstalled wrote, and nothing for another devi
   expect(installedOn(root, host)).toEqual({ fingerprint: 'a1b2' });
   expect(installedOn(root, other)).toBeNull();
 });
+
+test('the output of a device call leaves out the address of the pool machine', () => {
+  const hint =
+    "Replayed 2 steps in 1.0s This session's daemon was kept alive because its script left the session active; pass --daemon-base-url https://pool.example:8446/v1/agent-device --session tok_1 on your next command to reach it.";
+  const { host } = fakePool(`${hint}\nnext line`);
+  expect(runFlow(host, 'a.yaml').output).toBe('Replayed 2 steps in 1.0s\nnext line');
+});

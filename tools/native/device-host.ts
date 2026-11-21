@@ -45,6 +45,12 @@ export function agentDeviceOf(
   return command;
 }
 
+/**
+ * The sentence that `agent-device` adds to its output after a flow. It holds
+ * the address of the pool machine and the session, which belong in no log.
+ */
+const daemonHint = / ?This session's daemon was kept alive[^\n]*/gu;
+
 /** The `pool` host. `run` is the spawn, a test gives a fake. */
 export function poolHost(
   options: {
@@ -62,7 +68,10 @@ export function poolHost(
   return {
     name: 'pool',
     // The variable is read on each call, so the refusal comes at the first device call.
-    device: (args) => run(agentDeviceOf(options.env, options.exists), args),
+    device: (args) => {
+      const result = run(agentDeviceOf(options.env, options.exists), args);
+      return { exitCode: result.exitCode, output: result.output.replaceAll(daemonHint, '') };
+    },
     id: () => agentDeviceOf(options.env, options.exists),
   };
 }

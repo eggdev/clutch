@@ -75,7 +75,8 @@ export type Runner = {
   ) => Promise<{ code: number; lastLine: string; stderr: string }>;
 };
 
-const spawnRunner: Runner = {
+/** The runner that starts real processes. */
+export const spawnRunner: Runner = {
   capture: async (argv, options = {}) => {
     const child = Bun.spawn([...argv], {
       cwd: options.cwd,
@@ -125,7 +126,13 @@ function cachedApp(root: string, fingerprint: string): string | null {
 }
 
 /** A command on the build machine. A login shell has Homebrew and mise, as a terminal there has them. */
-const remote = (to: string, cmd: string) => ['ssh', '-o', 'BatchMode=yes', to, `zsh -lc '${cmd}'`];
+export const remote = (to: string, cmd: string) => [
+  'ssh',
+  '-o',
+  'BatchMode=yes',
+  to,
+  `zsh -lc '${cmd}'`,
+];
 
 /** Builds the head commit on the build machine. The build machine gets a snapshot from Git, so the build has only committed changes. */
 async function makeBuild(request: BuildRequest, runner: Runner, ssh: string, folder: string) {
