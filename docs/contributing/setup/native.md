@@ -74,6 +74,10 @@ To run a Maestro flow on the opened device:
 AGENT_DEVICE=<path> mise exec -- bun tools/native/device-host.ts flow features/<feature>/journeys/<id>.maestro.yaml
 ```
 
+This command sends the whole file to the device. The device pool refuses a
+script step in it. The journey runner cuts a flow into parts. See
+[native journeys](#native-journeys).
+
 ## The build machine
 
 An iOS build needs Xcode, so a Mac makes it. This machine reaches that Mac
@@ -170,6 +174,51 @@ first fingerprint, with no build.
 
 A review flags a change to `native-fingerprint.json` that has no native change
 with it.
+
+## Native journeys
+
+One command runs each native journey on the opened device:
+
+```sh
+AGENT_DEVICE=<path> mise exec -- bun run journey --native ios
+```
+
+Do these steps in this order:
+
+1. Open a device of the [device pool](#the-device-pool).
+2. Start the dev servers: `mise exec -- bun run dev`.
+3. Install the build of the sources:
+   `AGENT_DEVICE=<path> mise exec -- bun run native:build --platform ios --install`.
+4. Run the journeys with the command above.
+
+The runner stops before the first flow when the device has no build of the
+sources, or when a dev server is down. Each message names the fix. See
+[native journeys](../end-to-end-testing.md#native-journeys) for how a flow runs
+and where its evidence goes.
+
+### The dev server link
+
+A pool device runs on the build machine. It cannot reach the dev servers of
+this machine by a `localhost` name. A simulator shares the network of its Mac,
+and the Mac resolves each `*.localhost` name to itself. So the runner forwards
+the port of the dev proxy from the build machine to this machine. Each dev
+server then answers on the build machine at its own URL.
+[`tools/native/dev-link.ts`](../../../tools/native/dev-link.ts) makes the link:
+
+1. It reads the port from the dev server URLs. All of them carry one port.
+2. It probes each dev server from the build machine, with `curl` over ssh.
+   When each one answers, it does nothing more.
+3. Otherwise it starts the forward:
+   `ssh -f -N -o ExitOnForwardFailure=yes -R <port>:127.0.0.1:<port> <build machine>`.
+4. It probes again. When a dev server still does not answer, it stops and
+   names the dev server.
+
+The forward runs in the background and stays up for the next run. One machine
+at a time can hold the port on the build machine. When another machine holds
+it, the forward fails, and the message says so.
+
+Hot reload does not reach the device. Each journey launches the app, and the
+launch loads the JavaScript of the dev server.
 
 ## Commands that agents do not run
 

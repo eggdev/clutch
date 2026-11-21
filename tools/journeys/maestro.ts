@@ -171,9 +171,8 @@ function serverHoldsCommands(
 }
 
 /**
- * The call of an agent tool. Maestro runs the script on the machine that
- * drives the device, so the call reaches the API from outside the app, as an
- * agent does. A later `see` on the device then proves that the write came
+ * The call of an agent tool. The native runner runs the script on its own
+ * machine, so the call reaches the API from outside the app, as an agent does. A later `see` on the device then proves that the write came
  * through the server. The check fails the flow when the tool refuses.
  */
 function toolCommands(
