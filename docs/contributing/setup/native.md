@@ -92,26 +92,37 @@ The setting is the file `~/.config/clutch/build-machine.json`:
 `ssh` is the name that `ssh` uses for the Mac. `root` is the folder on the Mac
 that holds the builds. The setting belongs to the machine, so one file serves
 all projects on it. The repository holds no machine name. With no file, the
-build stops before any ssh call and names the file and its two fields.
+build stops before any ssh call and names the file and its two fields. Each
+value holds only letters, digits, `.`, `_`, `/`, `@` and `-`, and does not
+start with `-`. `clutch doctor` uses the same rule.
+
+Each remote command runs in a login shell, and the build reads its output. So
+the login files of the build machine must print nothing. Each ssh call stops
+when it cannot connect in 15 seconds, or when the link goes quiet for 90
+seconds.
 
 The build is of the head commit, never of a working tree. `git archive` sends
-the commit to the build machine. A native change that no commit holds stops
-the command, and the message gives both fingerprints. Commit the change, then
-run the command again.
+the commit to the build machine, with the fingerprint of this checkout. A
+native change that no commit holds stops the build before the prebuild, and
+the message gives both fingerprints. Commit the change, then run the command
+again.
 
 [`tools/native/ios-simulator-build.sh`](../../../tools/native/ios-simulator-build.sh)
 makes the build on the build machine. It does these steps:
 
-1. It takes the build lock. When another build of the project runs, it stops.
+1. It takes the build lock. When another build of the project runs, it stops
+   with exit 75.
 2. It unpacks the commit into `work/<revision>/`.
 3. It runs `bun install --frozen-lockfile`.
 4. It makes the native fingerprint, before the prebuild writes `ios/`.
-5. When `artifacts/<fingerprint>/` exists, it has nothing to build.
-6. Otherwise it runs `prebuild:native`. Then `xcodebuild` builds the app for
+5. When the fingerprint is not the one of the checkout, it stops with exit 76.
+   It prints the fingerprint of the commit as its last line.
+6. When `artifacts/<fingerprint>/` exists, it has nothing to build.
+7. Otherwise it runs `prebuild:native`. Then `xcodebuild` builds the app for
    the simulator, signed to run locally, with no team and no profile.
-7. It moves the app to `artifacts/<fingerprint>/`. The folder appears only
+8. It moves the app to `artifacts/<fingerprint>/`. The folder appears only
    when the app in it is whole.
-8. It removes `work/<revision>/` and the lock.
+9. It removes `work/<revision>/` and the lock.
 
 The last line of its output is the fingerprint. The script writes only under
 `<root>/<project>/`. `<project>` is the `name` in the root `package.json`,
@@ -206,16 +217,19 @@ server then answers on the build machine at its own URL.
 [`tools/native/dev-link.ts`](../../../tools/native/dev-link.ts) makes the link:
 
 1. It reads the port from the dev server URLs. All of them carry one port.
-2. It probes each dev server from the build machine, with `curl` over ssh.
-   When each one answers, it does nothing more.
-3. Otherwise it starts the forward:
+2. It looks for the forward on this machine, with `pgrep -f`.
+3. When no forward runs, it starts one:
    `ssh -f -N -o ExitOnForwardFailure=yes -R <port>:127.0.0.1:<port> <build machine>`.
-4. It probes again. When a dev server still does not answer, it stops and
-   names the dev server.
+   When the forward fails, it stops and names the port.
+4. It probes each dev server from the build machine, with `curl` over ssh.
+   When a dev server does not answer, it stops and names the dev server.
 
-The forward runs in the background and stays up for the next run. One machine
-at a time can hold the port on the build machine. When another machine holds
-it, the forward fails, and the message says so.
+The probe comes after the forward, so an answer of another server on that
+port never counts. The forward runs in the background and stays up for the
+next run. One listener at a time can hold the port on the build machine. When
+the dev servers of the build machine or the forward of another machine hold
+it, the forward fails, and the message says so. A dev server URL that holds a
+quote, `$`, a backtick or `\` stops the probe.
 
 Hot reload does not reach the device. Each journey launches the app, and the
 launch loads the JavaScript of the dev server.

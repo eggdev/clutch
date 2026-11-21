@@ -112,7 +112,7 @@ test('both tools get a deny that names the fix for each kind', () => {
     expect(fixFor('bunx vite').permissionDecision).toBe('deny');
     expect(fixFor('bunx vite').permissionDecisionReason).toContain('mise exec -- bun run dev');
     expect(fixFor('eas build').permissionDecisionReason).toContain(
-      'mise exec -- bun run native:build',
+      'It makes a build only when no build of the native fingerprint exists.',
     );
     expect(fixFor('xcrun simctl boot x').permissionDecisionReason).toContain('`device_open`');
     expect(fixFor('xcrun simctl boot x').permissionDecisionReason).toContain('#the-device-pool');
@@ -124,7 +124,9 @@ test('a Simulator tool build is denied, and a control call that names a device i
   expect(
     answer({ tool_name: simulatorTools.build, tool_input: { action: 'build', scheme: 'App' } })
       .permissionDecisionReason,
-  ).toContain('mise exec -- bun run native:build');
+  ).toContain(
+    'Run `mise exec -- bun run native:build` instead. It makes a build only when no build of the native fingerprint exists.',
+  );
   expect(
     answer({ tool_name: simulatorTools.build, tool_input: { action: 'build_status' } }),
   ).toBeNull();
@@ -132,7 +134,7 @@ test('a Simulator tool build is denied, and a control call that names a device i
     expect(
       answer({ tool_name: simulatorTools.control, tool_input: { action: 'attach', ...pick } })
         .permissionDecisionReason,
-    ).toContain("T3 Code's `device_open`");
+    ).toContain("Open a device of the shared pool with T3 Code's `device_open` instead. See");
   }
   for (const action of ['attach', 'launch', 'screenshot', 'tap']) {
     expect(answer({ tool_name: simulatorTools.control, tool_input: { action } })).toBeNull();

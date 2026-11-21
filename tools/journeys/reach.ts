@@ -97,6 +97,29 @@ async function changesOf(root: string, base: string, head: string): Promise<Arra
 }
 
 /**
+ * The lines that say what a change reaches. No CI job runs a native journey
+ * yet, so a native reach names the platforms that a later job would run.
+ */
+export function summaryOf(reach: Reach, outputs: Outputs, hasApp: boolean): Array<string> {
+  const lines = ['Web: reached. Every PR runs the web journeys.'];
+  if (!reach.native) {
+    return [
+      ...lines,
+      'Native: not reached. No changed file is native code or shared runtime code.',
+    ];
+  }
+  if (!hasApp) {
+    return [...lines, 'Native: reached, but the repository has no native app, so nothing runs.'];
+  }
+  const platforms = [outputs.ios && 'iOS', outputs.android && 'Android'].filter(Boolean);
+  return [
+    ...lines,
+    `Native: reached, because ${reach.why.slice(0, 5).join('; ')}.`,
+    `Native platforms reached: ${platforms.join(' and ') || 'none, because the native app declares no app ID'}. No CI job runs a native journey yet: CL-596 adds one. Run the native journeys from a session on a device of the pool.`,
+  ];
+}
+
+/**
  * `bun tools/journeys/reach.ts --base <ref> --head <ref>`, or `--main` for a
  * push to the default branch. It prints the reach, and writes `native=true`
  * to `GITHUB_OUTPUT` when the change reaches native and a native app exists.
@@ -124,18 +147,7 @@ async function main(args: Array<string>, root = process.cwd()) {
     return 2;
   }
   const outputs = outputsOf(root, reach);
-  const hasApp = nativeApps(root).length > 0;
-  console.log(`Web: reached. Every PR runs the web journeys.`);
-  if (!reach.native) {
-    console.log('Native: not reached. No changed file is native code or shared runtime code.');
-  } else if (hasApp) {
-    console.log(`Native: reached, because ${reach.why.slice(0, 5).join('; ')}.`);
-    console.log(
-      `Native lanes: iOS ${outputs.ios ? 'runs' : 'does not run'}, Android ${outputs.android ? 'runs' : 'does not run'}. A lane runs when a native app declares its app ID.`,
-    );
-  } else {
-    console.log('Native: reached, but the repository has no native app, so nothing runs.');
-  }
+  console.log(summaryOf(reach, outputs, nativeApps(root).length > 0).join('\n'));
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
       process.env.GITHUB_OUTPUT,

@@ -14,8 +14,8 @@ type Kind = 'server' | 'device' | 'build';
  *   runs. `mise exec -- bun run dev` uses a running server again.
  * - A device: an agent opens a device of the shared pool with T3 Code's
  *   `device_open`. It never creates, clones, boots or erases one.
- * - A native build: `mise exec -- bun run native:build` builds only when the
- *   native fingerprint changed.
+ * - A native build: `mise exec -- bun run native:build` makes a build only
+ *   when no build of the native fingerprint exists.
  */
 const direct: ReadonlyArray<[kind: Kind, label: string, pattern: RegExp]> = [
   ['server', 'a Vite dev server', /^vite(?:\s+(?:dev|serve|preview)\b|\s+--|\s*$)/u],
@@ -87,7 +87,7 @@ const fixes: Record<Kind, string> = {
   device:
     "An agent never creates, clones, boots or erases a simulator or emulator. Open a device of the shared pool with T3 Code's `device_open` instead, and close it with `device_close` at the end. See docs/contributing/setup/native.md#the-device-pool.",
   build:
-    'Run `mise exec -- bun run native:build` instead. It builds only when the native fingerprint changed, and refuses a JavaScript-only change. See docs/contributing/setup/native.md.',
+    'Run `mise exec -- bun run native:build` instead. It makes a build only when no build of the native fingerprint exists. See docs/contributing/setup/native.md.',
 };
 
 const deny = (reason: string): Outcome => ({

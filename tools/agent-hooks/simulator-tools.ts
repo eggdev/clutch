@@ -23,13 +23,13 @@ export const simulatorTools = {
 export function simulatorToolRefusal(payload: Payload): string | null {
   const input = payload.tool_input ?? {};
   if (payload.tool_name === simulatorTools.build && input.action === 'build') {
-    return 'This tool makes a native iOS build. Run `mise exec -- bun run native:build` instead. It builds only when the native fingerprint changed, and refuses a JavaScript-only change. See docs/contributing/setup/native.md.';
+    return 'This tool makes a native iOS build. Run `mise exec -- bun run native:build` instead. It makes a build only when no build of the native fingerprint exists. See docs/contributing/setup/native.md.';
   }
   if (
     payload.tool_name === simulatorTools.control &&
     (input.device !== undefined || input.udid !== undefined)
   ) {
-    return "This call picks a simulator by name or UDID, and can start a second one. Open a device of the shared pool with T3 Code's `device_open` instead, or call the tool again without `device` and `udid`. See docs/contributing/setup/native.md#the-device-pool.";
+    return "This call picks a simulator by name or UDID, and can start a second one. Open a device of the shared pool with T3 Code's `device_open` instead. See docs/contributing/setup/native.md#the-device-pool.";
   }
   return null;
 }
