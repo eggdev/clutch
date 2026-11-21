@@ -8,14 +8,16 @@ import { apply, writeLog } from '@tools/github/babysit-apply';
 import type { Round } from '@tools/github/babysit-log';
 import { decisionsNow, ownerAsk, ownerEvidence, ownerLeft } from '@tools/github/babysit-owner';
 import { readPr } from '@tools/github/babysit-read';
-import { must } from '@tools/github/github';
+import { defaultBranch, must, prWithBase, prWithHead } from '@tools/github/github';
+import { stackAbove, stackChain } from '@tools/github/stack';
 import type { Run } from '@tools/github/stack';
 import { ownerLogin } from '@tools/github/status';
 
 /**
  * `bun run pr babysit <number>`: one babysitter round in the session that
- * built the PR. Without `--answers`, it plans the round, prints the plan and
- * keeps it in the git directory. With `--answers`, it replies, resolves,
+ * built the PR. Without `--answers`, it plans the round of each PR of the
+ * stack that holds the PR, from the bottom up, prints each plan and keeps it
+ * in the git directory. With `--answers`, it replies, resolves,
  * reruns flaky checks, writes the disposition and the `## Babysit log`, and
  * says when to ask the owner in this session's thread. See
  * .agents/skills/babysit-pr/SKILL.md.
@@ -128,7 +130,35 @@ async function babysitApply(
   return 0;
 }
 
-/** `pr babysit`: the apply step with `--answers` or `--stuck`, else the plan. */
+/**
+ * Each open PR of the stack that holds PR `number`, from the bottom up. A PR
+ * with no stack is a stack of one. When a PR below has no open PR, the stack
+ * starts at `number`.
+ */
+async function stackOf(run: Run, number: string) {
+  const view = ['gh', 'pr', 'view', number, '--json', 'headRefName,baseRefName'];
+  const pr = JSON.parse(await must(run, view)) as { headRefName: string; baseRefName: string };
+  const trunk = await defaultBranch(run);
+  const below = await stackChain(pr.baseRefName, trunk, (head) => prWithHead(run, head)).catch(
+    () => [],
+  );
+  const above = await stackAbove(pr.headRefName, (head) => prWithBase(run, head));
+  return [...below, Number(number), ...above];
+}
+
+/** Plans the round of each PR of the stack, so a red check on a PR below the top starts a round too. */
+async function babysitStack(run: Run, number: string, now: string) {
+  const stack = await stackOf(run, number);
+  for (const each of stack) {
+    if (stack.length > 1) {
+      console.log(`## #${each}`);
+    }
+    await babysitPlan(run, String(each), now);
+  }
+  return 0;
+}
+
+/** `pr babysit`: the apply step for one PR with `--answers` or `--stuck`, else the plan of its stack. */
 export function babysit(
   run: Run,
   number: string,
@@ -136,5 +166,5 @@ export function babysit(
 ) {
   return input.answers || input.stuck
     ? babysitApply(run, number, input)
-    : babysitPlan(run, number, input.now);
+    : babysitStack(run, number, input.now);
 }

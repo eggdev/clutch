@@ -1,5 +1,11 @@
 import type { Run } from '@tools/github/stack';
 
+/**
+ * A command of the Clutch CLI, through `tools/clutch.ts`. In Clutch that runs
+ * the CLI source. In a project it runs the release binary that mise installs.
+ */
+export const clutch = (...args: Array<string>) => ['bun', 'tools/clutch.ts', ...args];
+
 /** Runs a command and returns its trimmed output, or throws with its error. */
 export async function must(run: Run, command: Array<string>, options?: { inherit?: boolean }) {
   const result = await run(command, options);

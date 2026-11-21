@@ -127,6 +127,8 @@ test('issueId reads the title, then the branch', () => {
   expect(issueId('feat(cli): x (CL-426)', 'other')).toBe('CL-426');
   expect(issueId('chore: x', 'clutch/cl-103b-workflow-lint')).toBe('CL-103b');
   expect(issueId('chore: x', 'clutch/flake-friction')).toBeUndefined();
+  // A ticket has no issue file, so its id is no issue id.
+  expect(issueId('fix: x (CL-1000)', 'clutch/cl-1000-fix')).toBeUndefined();
 });
 
 const scorer: Scorer = {

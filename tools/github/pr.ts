@@ -30,6 +30,7 @@ import {
 import type { Run } from '@tools/github/stack';
 import { prStatus, renderStatus, waitForChecks } from '@tools/github/status';
 import type { PrStatus } from '@tools/github/status';
+import { linkPullRequest, stampTicket } from '@tools/github/ticket';
 import { recordBody, recordVerification } from '@tools/github/verification-record';
 import type { OpenOptions } from '@tools/github/verification-record';
 import { conventionalProblem } from '@tools/hooks/commit-msg';
@@ -49,7 +50,7 @@ export const usage = [
   '       bun run pr failures <number>',
   '       bun run pr findings <number> [--check]',
   '       bun run pr babysit <number> [--answers FILE [--pushed SHA] [--sync merge] | --stuck TEXT]',
-  '       bun run pr sync <number | branch | CL-id>',
+  '       bun run pr sync <number | branch | issue or ticket id>',
   '       bun run pr ready <CL-id> <number>',
   '       bun run pr merge <number> [--owner] [--timeout 30m]',
   '       bun run pr revert <number> [--timeout 15m]',
@@ -217,6 +218,7 @@ async function open(run: Run, options: OpenOptions, write: Write, clock: Clock) 
     );
   }
   await recordVerification(run, root, { base, bodyFile, reason: options.unverified, gate: true });
+  const ticket = await stampTicket(run, branch, path.resolve(root, bodyFile));
   await ensureChangeset(run, write, base, branch, title);
   // The PR's link is known only once the PR exists, so a first open marks the issue done without it.
   const existing = await prWithHead(run, branch);
@@ -248,6 +250,7 @@ async function open(run: Run, options: OpenOptions, write: Write, clock: Clock) 
   if (!opened) {
     throw new Error(`GitHub has no open PR for ${branch} after the create.`);
   }
+  await linkPullRequest(run, ticket, opened.url);
   if (base === trunk) {
     if (opened.isDraft) {
       await must(run, ['gh', 'pr', 'ready', String(opened.number)]);

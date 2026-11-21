@@ -49,6 +49,12 @@ mise exec -- bun run pr open --title "<sentence>" --body-file <file>
 - `bun run pr ready <id> <number>` is optional. It adds the PR link to the
   issue, once the PR exists. It makes no commit when the issue already says
   `done` with that link.
+- A ticket branch, such as `clutch/cl-1000-fix-the-total`, has no issue file.
+  A ticket id has 4 or more digits, and an issue id has 3. On a ticket
+  branch, `open` commits no file in `.clutch/issues`. It adds the acceptance
+  criteria of the ticket to the body, unless the body has that section, and
+  it links the PR to the ticket with `clutch tickets link`. See
+  [tickets](https://github.com/eggdev/clutch/blob/main/.clutch/README.md#tickets).
 
 ### Verification record
 
@@ -177,14 +183,16 @@ PR, and each change to its checks or reviews starts the next round. Elsewhere,
 | `bun run pr wait <number> [--timeout 30m]` | After a push. It waits until no check is pending and GitHub shows the commit that the checkout has, then prints the status. It exits 0 when the PR is ready, 1 when it is not, and 2 at the timeout. |
 | `bun run pr failures <number>`          | When a check failed. It prints the failed step of each job, and the output of each failed Nx task, without ANSI codes. A job with no log, such as one that never started, gets its check run's annotations instead. |
 | `bun run pr findings <number> [--check]` | After the checks finish, and after each new review. It lists every agent review finding from every head, and which ones the `## Review disposition` comment answers. See [answer each finding](#answer-each-finding). |
-| `bun run pr babysit <number>`           | At the start of each babysit round. It prints the round's plan: each open thread, each unanswered comment, each failed check, and the sync that the branch needs. It keeps the plan in the git directory. |
+| `bun run pr babysit <number>`           | At the start of each babysit round. It prints the round's plan for each PR of the stack, from the bottom up: each open thread, each unanswered comment, each failed check, and the sync that the branch needs. It keeps each plan in the git directory. |
 | `bun run pr babysit <number> --answers <file> [--pushed <sha>] [--sync merge]` | After you decide, fix, validate and push. It replies in each thread, resolves the answered ones, reruns each flaky check once, writes the disposition and the `## Babysit log`, and says when to ask the owner in the session's thread. `--stuck "<why>"` logs a round that a cap or a conflict stopped. |
-| `bun run pr sync <number, branch or id>` | When GitHub reports the PR as conflicting. It rebases on the PR's base, takes the base's copy of `.clutch/TRACKER.md` if an older branch still committed it, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits, even when another clone rewrote the base. On a PR in the middle of a stack, it keeps the PRs above it linked. After a rebase that you finished by hand, it rebases as usual. |
+| `bun run pr sync <number, branch or id>` | When GitHub reports the PR as conflicting. The id is an issue id, such as `CL-117`, or a ticket id, such as `CL-1000`. It rebases on the PR's base, takes the base's copy of `.clutch/TRACKER.md` if an older branch still committed it, runs `validate` and pushes with a lease. It stops on any other conflict. For a stacked PR whose base was rewritten or merged, it replays only the PR's own commits, even when another clone rewrote the base. On a PR in the middle of a stack, it keeps the PRs above it linked. After a rebase that you finished by hand, it rebases as usual. |
 | `bun run pr ready <id> <number>`        | Optional, once the PR exists. It adds the PR link to the issue's `done` record, commits only the issue file as `chore(tracker): mark <id> done`, and pushes. It makes no commit when the issue already says `done` with that link. The release regenerates `.clutch/TRACKER.md` on `main`. |
 
 Each command reads the repository from the `origin` remote. `sync` takes an
 issue id, such as `CL-117`, and finds the branch with the prefix that
-`pr.branchPrefix` in `clutch.yaml` names. The default is `clutch/cl-`. `sync`
+`pr.branchPrefix` in `clutch.yaml` names. The default is `clutch/cl-`. For a
+ticket id, such as `CL-1000`, it finds the branch that starts with
+`clutch/cl-1000-`. `sync`
 and `ready` change the tracker through `tools/clutch.ts`, so they run the
 release binary in a project.
 

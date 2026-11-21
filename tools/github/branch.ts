@@ -2,16 +2,11 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { must, prWithHead } from '@tools/github/github';
+import { clutch, must, prWithHead } from '@tools/github/github';
 import type { Run } from '@tools/github/stack';
+import { ticketPattern } from '@tools/github/ticket';
 
 const tracker = '.clutch/TRACKER.md';
-
-/**
- * The tracker commands, through `tools/clutch.ts`. In Clutch that runs the
- * CLI source. In a project it runs the release binary that mise installs.
- */
-const clutch = (...args: Array<string>) => ['bun', 'tools/clutch.ts', ...args];
 
 /** The prefix of an agent's branch: `pr.branchPrefix` in clutch.yaml, or `clutch/cl-`. */
 async function branchPrefix(root: string) {
@@ -41,14 +36,20 @@ async function view(run: Run, number: string): Promise<Pr> {
   return { ...pr, head: pr.headRefName, base: pr.baseRefName };
 }
 
-/** The PR that `target` names: a number, a branch, or an issue id such as CL-117. */
+/**
+ * The PR that `target` names: a number, a branch, an issue id such as CL-117,
+ * or a ticket id such as CL-1000. A ticket branch is `clutch/<id>-<title>`.
+ */
 async function resolve(run: Run, root: string, target: string) {
   if (/^\d+$/u.test(target)) {
     return view(run, target);
   }
   let branch = target;
-  if (/^CL-\d{3}[a-z]?$/iu.test(target)) {
-    const prefix = `${await branchPrefix(root)}${target.slice(3).toLowerCase()}-`;
+  const issue = /^CL-\d{3}[a-z]?$/iu.test(target);
+  if (issue || ticketPattern.test(target)) {
+    const prefix = issue
+      ? `${await branchPrefix(root)}${target.slice(3).toLowerCase()}-`
+      : `clutch/${target.toLowerCase()}-`;
     const out = await must(run, ['gh', 'pr', 'list', '--state', 'open', '--json', 'headRefName']);
     const heads = (JSON.parse(out || '[]') as Array<{ headRefName: string }>)
       .map((pr) => pr.headRefName)
@@ -211,7 +212,8 @@ async function trackedIssues(run: Run): Promise<Array<Tracked>> {
 
 /**
  * The issue that a branch works on, by the branch prefix: `clutch/cl-123-x` is
- * CL-123. Undefined when the name carries no id.
+ * CL-123. An issue number has 3 digits, so a ticket branch such as
+ * `clutch/cl-1000-x` names no issue. Undefined when the name carries no id.
  */
 function issueOf(branch: string, prefix: string) {
   const escaped = prefix.replaceAll(/[$()*+.?[\\\]^{|}]/gu, '\\$&');
@@ -246,7 +248,8 @@ async function commitDone(run: Run, issue: Tracked, url?: string) {
 /**
  * `pr open` marks the branch's issue done in the PR head before it pushes. A
  * merge can come as soon as the checks pass, so the merged default branch then
- * says `done` too. A branch without an issue id is left alone.
+ * says `done` too. A branch without an issue id, such as the branch of a
+ * ticket, is left alone: it commits no issue file.
  */
 export async function markBranchDone(run: Run, root: string, branch: string, url?: string) {
   const id = issueOf(branch, await branchPrefix(root));
