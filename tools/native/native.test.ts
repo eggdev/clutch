@@ -4,8 +4,7 @@ import path from 'node:path';
 
 import { nativeBuild, recordName } from '@tools/native/build';
 import type { Fingerprint, FingerprintTool } from '@tools/native/build';
-import { DeviceHostError, deviceHost, withDevice, withLock } from '@tools/native/device-host';
-import type { DeviceHost, Platform } from '@tools/native/device-host';
+import { installedOn, poolHost } from '@tools/native/device-host';
 import { inRepo } from '@tools/testing/in-repo';
 
 const mobile = { 'apps/mobile/package.json': JSON.stringify({ dependencies: { expo: '55.0.0' } }) };
@@ -24,22 +23,25 @@ const now = <T>(value: T): Promise<T> => Promise.resolve(value);
 const tool = (fingerprint: Fingerprint) => (): Promise<FingerprintTool> =>
   now({ create: () => now(fingerprint) });
 
-/** A host that records each build, and answers with `exitCode`. */
-function fakeHost(exitCode = 0, booted = true) {
-  const builds: Array<string> = [];
-  const host: DeviceHost = {
-    name: 'fake',
-    bootedDevice: (platform: Platform) =>
-      Promise.resolve(booted ? { platform, id: 'booted-1', name: 'iPhone' } : null),
-    install: () => Promise.resolve(),
-    checkFlow: () => Promise.resolve({ exitCode: 0, output: 'OK' }),
-    runFlow: () => Promise.resolve({ exitCode: 0, output: 'flow passed' }),
-    build: (appRoot, platform) => {
-      builds.push(`${path.basename(appRoot)} ${platform}`);
-      return Promise.resolve({ exitCode, output: 'build output' });
+const bound = '/tmp/t3/devices/lease-1/agent-device';
+const opened = { AGENT_DEVICE: bound };
+
+/** A pool host on a fake bound command, and a fake build. Each keeps its calls in `calls`. */
+function fakes(env: NodeJS.ProcessEnv = opened) {
+  const calls: Array<string> = [];
+  const host = poolHost({
+    env,
+    exists: (file) => file === bound,
+    run: (_, args) => {
+      calls.push(args.join(' '));
+      return { exitCode: 0, output: '' };
     },
+  });
+  const build = (request: { root: string; app: string; fingerprint: string }) => {
+    calls.push(`build ${request.app} ${request.fingerprint}`);
+    return now(path.join(request.root, 'tmp/native', request.fingerprint, 'App.app'));
   };
-  return { builds, host };
+  return { build, calls, host };
 }
 
 /** Runs `native:build` in a temporary repository and returns its exit code, log and record. */
@@ -49,13 +51,13 @@ function runBuild(files: Record<string, string>, args: Array<string>, options = 
     const exitCode = await nativeBuild({
       root,
       args,
-      lock: path.join(root, '.lock'),
       log: (line) => lines.push(line),
       ...options,
     });
     const file = path.join(root, 'apps/mobile', recordName);
     const record = existsSync(file) ? JSON.parse(readFileSync(file, 'utf-8')) : null;
-    return { exitCode, log: lines.join('\n'), record };
+    const host = poolHost({ env: opened, exists: () => true });
+    return { exitCode, log: lines.join('\n'), record, installed: installedOn(root, host) };
   });
 }
 
@@ -65,150 +67,91 @@ test('a repository with no native app has nothing to build, and exits 0', async 
     exitCode: 0,
     log: 'No native app in this repository. Nothing to build.',
     record: null,
+    installed: null,
   });
 });
 
-test('an unchanged fingerprint refuses the build as a JS-only change', async () => {
-  const { builds, host } = fakeHost();
-  const result = await runBuild({ ...mobile, ...recorded(print('a')) }, ['--platform', 'ios'], {
+test('--install with no device refuses before the build', async () => {
+  const { build, calls, host } = fakes({});
+  const result = await runBuild(mobile, ['--platform', 'ios', '--install'], {
     host,
+    build,
     tool: tool(print('a')),
   });
   expect(result.exitCode).toBe(1);
-  expect(result.log).toContain('JS-only change');
-  expect(result.log).toContain('not a native build');
-  expect(builds).toEqual([]);
+  expect(result.log).toContain('`AGENT_DEVICE` is not set');
+  expect(calls).toEqual([]);
 });
 
-test('a changed fingerprint builds through the host, and records the new fingerprint', async () => {
-  const { builds, host } = fakeHost();
+test('a changed fingerprint finds the build, and writes the new record', async () => {
+  const { build, calls, host } = fakes();
   const result = await runBuild({ ...mobile, ...recorded(print('a')) }, ['--platform', 'ios'], {
     host,
+    build,
     tool: tool(print('b', 'app.json')),
   });
   expect(result.exitCode).toBe(0);
-  expect(builds).toEqual(['mobile ios']);
+  expect(calls).toEqual(['build mobile b']);
   expect(result.log).toContain('app.json');
   expect(result.log).toContain(`Commit apps/mobile/${recordName}`);
+  expect(result.log).toContain('The ios build of fingerprint b is at tmp/native/b/App.app.');
   expect(result.record.ios.hash).toBe('b');
+  expect(result.installed).toBeNull();
 });
 
-test('a failed build keeps the last built fingerprint', async () => {
-  const { host } = fakeHost(65);
+test('an unchanged fingerprint writes no record, and still gives the app', async () => {
+  const { build, calls, host } = fakes();
   const result = await runBuild({ ...mobile, ...recorded(print('a')) }, ['--platform', 'ios'], {
     host,
-    tool: tool(print('b')),
+    build,
+    tool: tool(print('a', 'app.json')),
   });
-  expect(result.exitCode).toBe(65);
-  expect(result.record.ios.hash).toBe('a');
+  expect(result.exitCode).toBe(0);
+  expect(calls).toEqual(['build mobile a']);
+  expect(result.log).not.toContain('Commit');
+  expect(result.log).toContain('tmp/native/a/App.app');
+  expect(result.record.ios.sources[0].id).toBe('ios/Podfile');
 });
 
-test('no recorded fingerprint asks for the first record, and --record writes it with no build', async () => {
-  const { builds, host } = fakeHost();
-  const missing = await runBuild(mobile, ['--platform', 'ios'], { host, tool: tool(print('a')) });
-  expect(missing.exitCode).toBe(1);
-  expect(missing.log).toContain('native:build mobile --record');
-  const first = await runBuild(mobile, ['--record'], { host, tool: tool(print('a')) });
+test('--install puts the built app on the device, and records it for the device', async () => {
+  const { build, calls, host } = fakes();
+  const result = await runBuild(mobile, ['--platform', 'ios', '--install'], {
+    host,
+    build,
+    tool: tool(print('c')),
+  });
+  expect(result.exitCode).toBe(0);
+  expect(calls[0]).toBe('build mobile c');
+  expect(calls[1]).toEndWith('/tmp/native/c/App.app');
+  expect(calls[1]).toStartWith('install ');
+  expect(result.record.ios.hash).toBe('c');
+  expect(result.installed).toEqual({ fingerprint: 'c' });
+  expect(result.log).toContain('Installed the build of fingerprint c on the opened device.');
+});
+
+test('--record writes the fingerprints with no build', async () => {
+  const { build, calls } = fakes();
+  const first = await runBuild(mobile, ['--record'], { build, tool: tool(print('a')) });
   expect(first.exitCode).toBe(0);
   expect([first.record.ios.hash, first.record.android.hash]).toEqual(['a', 'a']);
-  expect(builds).toEqual([]);
+  expect(calls).toEqual([]);
 });
 
-test('--install puts the last build on the booted device with no build, and refuses when there is none', async () => {
-  const product =
-    'apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/Mobile.app/Info.plist';
-  const { builds, host } = fakeHost();
-  const options = { host, tool: tool(print('a')) };
-  const installed = await runBuild(
-    { ...mobile, [product]: '' },
-    ['--platform', 'ios', '--install'],
-    options,
-  );
-  expect(installed.exitCode).toBe(0);
-  expect(installed.log).toContain('Installed the ios build of mobile on iPhone.');
-  const none = await runBuild(mobile, ['--platform', 'ios', '--install'], options);
-  expect(none.exitCode).toBe(1);
-  expect(none.log).toContain('has no ios build to install');
-  const unbooted = await runBuild(
-    { ...mobile, [product]: '' },
-    ['--platform', 'ios', '--install'],
-    {
-      host: fakeHost(0, false).host,
-      tool: tool(print('a')),
-    },
-  );
-  expect(unbooted.exitCode).toBe(1);
-  expect(unbooted.log).toContain('Ask the owner to boot one');
-  expect(builds).toEqual([]);
-});
-
-test('--fresh builds on a CI runner with no fingerprint record, and is refused anywhere else', async () => {
-  const { builds, host } = fakeHost();
-  const fresh = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
-    host,
-    env: { GITHUB_ACTIONS: 'true', CI: '1' },
+test('an unknown flag, such as the removed --fresh, prints the usage line', async () => {
+  const { build, calls } = fakes();
+  const result = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
+    build,
     tool: tool(print('a')),
-  });
-  expect(fresh.exitCode).toBe(0);
-  expect(builds).toEqual(['mobile ios']);
-  expect(fresh.record).toBeNull();
-  // An agent sets CI on its own machine, so CI alone names no runner.
-  const refused = await runBuild(mobile, ['--platform', 'ios', '--fresh'], {
-    host,
-    env: { CI: '1' },
-    tool: tool(print('a')),
-  });
-  expect(refused.exitCode).toBe(1);
-  expect(refused.log).toContain('for a CI runner');
-  expect(refused.log).toContain('mise exec -- bun run native:build --platform <platform>');
-  expect(builds).toEqual(['mobile ios']);
-});
-
-test('the none host refuses a build, and names the kickoff setup', async () => {
-  const result = await runBuild({ ...mobile, ...recorded(print('a')) }, ['--platform', 'ios'], {
-    host: deviceHost({}),
-    tool: tool(print('b')),
   });
   expect(result.exitCode).toBe(1);
-  expect(result.log).toContain('No device host is set up');
-  expect(result.record.ios.hash).toBe('a');
+  expect(result.log).toContain('Usage: mise exec -- bun run native:build');
+  expect(calls).toEqual([]);
 });
 
-test('a missing platform or an unknown host is refused with the fix', async () => {
+test('a missing platform is refused with the fix', async () => {
   const result = await runBuild({ ...mobile, ...recorded(print('a')) }, [], {
     tool: tool(print('b')),
   });
   expect(result.exitCode).toBe(1);
   expect(result.log).toContain('--platform ios');
-  expect(() => deviceHost({ DEVICE_HOST: 'mac' })).toThrow('Use one of: none');
-});
-
-test('one session at a time holds the device lock, and a lock of an ended process is taken over', async () => {
-  await inRepo({}, async (root) => {
-    const file = path.join(root, 'device.lock');
-    const inner = await withLock(file, async () => {
-      const refused = await withLock(file, () => now('second')).catch(
-        (error: Error) => error.message,
-      );
-      return refused;
-    });
-    expect(inner).toContain(`PID ${process.pid}`);
-    expect(existsSync(file)).toBe(false);
-    await Bun.write(file, JSON.stringify({ pid: 2_147_483_646, cwd: '/x', since: 'then' }));
-    expect(await withLock(file, () => now('taken over'))).toBe('taken over');
-  });
-});
-
-test('device work runs on the booted device, and no booted device is refused', async () => {
-  await inRepo({}, async (root) => {
-    const file = path.join(root, 'device.lock');
-    const booted = fakeHost();
-    expect(await withDevice(booted.host, 'ios', (device) => now(device.id), file)).toBe('booted-1');
-    const none = fakeHost(0, false);
-    const refusal = await withDevice(none.host, 'ios', () => now('ran'), file).catch(
-      (error: unknown) => error,
-    );
-    expect(refusal).toBeInstanceOf(DeviceHostError);
-    expect(String(refusal)).toContain('never creates, clones, boots or erases');
-  });
 });

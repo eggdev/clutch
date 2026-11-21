@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { outputsOf, reachOf } from '@tools/journeys/reach';
+import { outputsOf, reachOf, summaryOf } from '@tools/journeys/reach';
 import { inRepo } from '@tools/testing/in-repo';
 
 const files = {
@@ -107,4 +107,22 @@ test('the ios and android outputs need native reach, and an app ID that the nati
       android: false,
     });
   });
+});
+
+test('the summary names the native platforms that a change reaches, and says that no CI job runs them yet', () => {
+  const reach = { web: true, native: true, why: ['apps/mobile changed'] };
+  expect(summaryOf(reach, { native: true, ios: true, android: false }, true)).toEqual([
+    'Web: reached. Every PR runs the web journeys.',
+    'Native: reached, because apps/mobile changed.',
+    'Native platforms reached: iOS. No CI job runs a native journey yet: CL-596 adds one. Run the native journeys from a session on a device of the pool.',
+  ]);
+  expect(summaryOf(reach, { native: true, ios: false, android: false }, true).at(-1)).toStartWith(
+    'Native platforms reached: none, because the native app declares no app ID.',
+  );
+  expect(
+    summaryOf({ ...reach, native: false }, { native: false, ios: false, android: false }, true),
+  ).toEqual([
+    'Web: reached. Every PR runs the web journeys.',
+    'Native: not reached. No changed file is native code or shared runtime code.',
+  ]);
 });
