@@ -4,8 +4,9 @@ import path from 'node:path';
 
 type Config = { agent?: string };
 
-function configBase(env: Record<string, string | undefined>) {
-  return env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+/** The XDG config folder: `XDG_CONFIG_HOME`, or `.config` in the home folder. */
+export function configBase(env: Record<string, string | undefined>, home = os.homedir()) {
+  return env.XDG_CONFIG_HOME || path.join(home, '.config');
 }
 
 /** The user's settings for this CLI, in the XDG config folder. */

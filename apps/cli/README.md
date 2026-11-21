@@ -787,6 +787,10 @@ mise exec -- bun run clutch doctor --phase P1
   `codeql`, and prints `?`.
 - With `--remote`, the last lines compare each file in `.github/rulesets/`
   with GitHub, as `clutch ruleset` does.
+- In a repository with a native app, the last two lines describe this machine.
+  One says whether `~/.config/clutch/build-machine.json` names a build machine.
+  The other says whether T3 Code names a device pool. These lines are advice:
+  they never change the exit code, and `--json` puts them in `machine`.
 - `--category` and `--phase` narrow the report.
 - `--remote` reads GitHub settings for the `remote:` rules: branch rules and
   protection, secret scanning, push protection, the merge queue, auto-merge,

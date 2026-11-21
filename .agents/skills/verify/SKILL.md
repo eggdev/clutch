@@ -68,7 +68,19 @@ reconciles persisted command ownership; uncertain cleanup fails closed.
 python3 tools/verification/verify.py --config .agents/skills/verify/verification.json stop
 ```
 
-No real native flow, broker/T3 driver lease, cloud archive or gardening schedule
-is implemented. The fallback refuses native-labelled flows because a per-checkout
-lock cannot enforce the required host-wide lease. Logs here are local-only;
-remote evidence sharing is not verified. Report these as prerequisites, not passes.
+A native flow runs on a pool device. Open the device with T3 Code's device
+tools, as in [the device pool](../../../docs/contributing/setup/native.md#the-device-pool).
+Then run these commands with the path that `device_open` returns:
+
+```sh
+AGENT_DEVICE=<path> mise exec -- bun run native:build --platform ios --install
+AGENT_DEVICE=<path> mise exec -- bun run journey --native ios
+```
+
+Close the device with `device_close` and `shutdown: true` at the end, also
+after a failure. A session with no T3 Code device tools cannot run a native
+flow. Report the flow as not verified.
+
+No cloud archive or gardening schedule is implemented. Logs here are
+local-only, and remote evidence sharing is not verified. Report these as
+prerequisites, not passes.

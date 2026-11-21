@@ -226,18 +226,18 @@ The `guard-dev-servers` hook refuses each command below and names the fix. It
 reads each command of a shell line after its runner, such as `npx`, `bunx`,
 `pnpm dlx`, `yarn` or `mise exec --`.
 
-| Command                                                      | Does                      | Fix                                 |
-| ------------------------------------------------------------ | ------------------------- | ----------------------------------- |
-| `xcrun simctl create`, `clone`, `boot` or `erase`            | Makes or starts a device  | Reuse the booted device             |
-| `open -a Simulator`                                          | Starts a simulator        | Reuse the booted device             |
-| `emulator -avd`, `emulator @<name>`, `adb emu`, `avdmanager` | Starts or makes a device  | Reuse the booted device             |
-| `eas simulator`                                              | Starts a cloud simulator  | Reuse the booted device             |
-| `eas build`, `eas build:dev`, `eas build:run`                | Makes a native build      | `mise exec -- bun run native:build` |
-| `expo run:ios`, `expo run:android`, `expo prebuild`          | Makes a native build      | `mise exec -- bun run native:build` |
-| `one run:ios`, `one run:android`, `one prebuild`             | Makes a native build      | `mise exec -- bun run native:build` |
-| `react-native run-ios` and the other run and build commands  | Makes a native build      | `mise exec -- bun run native:build` |
-| `xcodebuild`, except `-list` and the other read flags        | Makes a native build      | `mise exec -- bun run native:build` |
-| `gradlew` with an `assemble`, `bundle` or `install` task     | Makes or installs a build | `mise exec -- bun run native:build` |
+| Command                                                      | Does                      | Fix                                    |
+| ------------------------------------------------------------ | ------------------------- | -------------------------------------- |
+| `xcrun simctl create`, `clone`, `boot` or `erase`            | Makes or starts a device  | Open a [pool device](#the-device-pool) |
+| `open -a Simulator`                                          | Starts a simulator        | Open a [pool device](#the-device-pool) |
+| `emulator -avd`, `emulator @<name>`, `adb emu`, `avdmanager` | Starts or makes a device  | Open a [pool device](#the-device-pool) |
+| `eas simulator`                                              | Starts a cloud simulator  | Open a [pool device](#the-device-pool) |
+| `eas build`, `eas build:dev`, `eas build:run`                | Makes a native build      | `mise exec -- bun run native:build`    |
+| `expo run:ios`, `expo run:android`, `expo prebuild`          | Makes a native build      | `mise exec -- bun run native:build`    |
+| `one run:ios`, `one run:android`, `one prebuild`             | Makes a native build      | `mise exec -- bun run native:build`    |
+| `react-native run-ios` and the other run and build commands  | Makes a native build      | `mise exec -- bun run native:build`    |
+| `xcodebuild`, except `-list` and the other read flags        | Makes a native build      | `mise exec -- bun run native:build`    |
+| `gradlew` with an `assemble`, `bundle` or `install` task     | Makes or installs a build | `mise exec -- bun run native:build`    |
 
 Commands that only read stay allowed. Examples are `xcrun simctl list`,
 `xcodebuild -list`, `eas build:list` and `eas update`.
@@ -248,7 +248,8 @@ them to the same hook:
 - A `build` call of `mcp__Claude_Code_iOS_Simulator__build` is refused. Use
   `mise exec -- bun run native:build`. A `build_status` call stays allowed.
 - A call of `mcp__Claude_Code_iOS_Simulator__control` with `device` or `udid`
-  is refused. Without them, the tool reuses the attached or booted simulator.
+  is refused. Open a [pool device](#the-device-pool) with `device_open`
+  instead.
 
 `check-agent-hooks` fails when the hook matcher misses one of these tools.
 Codex has no such tools.

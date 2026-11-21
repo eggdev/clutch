@@ -114,7 +114,8 @@ test('both tools get a deny that names the fix for each kind', () => {
     expect(fixFor('eas build').permissionDecisionReason).toContain(
       'mise exec -- bun run native:build',
     );
-    expect(fixFor('xcrun simctl boot x').permissionDecisionReason).toContain('booted simulator');
+    expect(fixFor('xcrun simctl boot x').permissionDecisionReason).toContain('`device_open`');
+    expect(fixFor('xcrun simctl boot x').permissionDecisionReason).toContain('#the-device-pool');
     expect(fixFor('mise exec -- bun run dev')).toBeNull();
   }
 });
@@ -131,7 +132,7 @@ test('a Simulator tool build is denied, and a control call that names a device i
     expect(
       answer({ tool_name: simulatorTools.control, tool_input: { action: 'attach', ...pick } })
         .permissionDecisionReason,
-    ).toContain('without `device` and `udid`');
+    ).toContain("T3 Code's `device_open`");
   }
   for (const action of ['attach', 'launch', 'screenshot', 'tap']) {
     expect(answer({ tool_name: simulatorTools.control, tool_input: { action } })).toBeNull();
