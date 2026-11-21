@@ -40,7 +40,7 @@ test('a flow is cut at each script and screenshot step, and the device steps bet
 });
 
 const nestedRefusal =
-  'Step 1 holds a script or screenshot step inside another step, or runs the flow of another file.';
+  'Step 1 holds a script, check or screenshot step inside another step, or runs the flow of another file.';
 
 test('a script step inside another step is refused, because the device pool would get it', () => {
   const nested = [
@@ -54,6 +54,50 @@ test('a script step inside another step is refused, because the device pool woul
     '',
   ].join('\n');
   expect(() => flowOf(nested)).toThrow(nestedRefusal);
+});
+
+test('a top-level assertTrue is a part of this machine, in both forms, and a nested one is refused', () => {
+  const checks = [
+    'appId: x',
+    '---',
+    "- tapOn: 'a'",
+    `- assertTrue: \${output.ok}`,
+    '- assertTrue:',
+    `    condition: \${output.n === 2}`,
+    '    label: Two notes',
+    '',
+  ].join('\n');
+  expect(flowOf(checks).parts).toEqual([
+    { kind: 'device', first: 1, commands: [{ tapOn: 'a' }] },
+    { kind: 'assertTrue', step: 2, condition: `\${output.ok}` },
+    { kind: 'assertTrue', step: 3, condition: `\${output.n === 2}`, label: 'Two notes' },
+  ]);
+  const nested = `appId: x\n---\n- repeat:\n    commands:\n      - assertTrue: \${output.ok}\n`;
+  expect(() => flowOf(nested)).toThrow(nestedRefusal);
+  expect(() => flowOf('appId: x\n---\n- assertTrue:\n    label: no condition\n')).toThrow(
+    'Step 1 is a assertTrue step in a form that the runner does not read.',
+  );
+});
+
+test('a check is false for an empty, false, 0, null or undefined value, and true for any other', () => {
+  const values = ['', false, 0, null, undefined, 'false', 1, true, 'no', '[object Object]'];
+  const host = scriptHost({}, { values });
+  const truth = values.map((_, index) => host.assert(`\${values[${index}]}`, 1));
+  expect(truth).toEqual([false, false, false, false, false, false, true, true, true, true]);
+  expect(host.assert('  0 ', 2)).toBe(false);
+});
+
+test('a step with a `${` that the pattern does not read is refused', () => {
+  const host = scriptHost({});
+  const expression = `\${(function () { if (output.ok) { return true } return false })()}`;
+  for (const run of [
+    () => host.resolved({ assertVisible: expression }, 4),
+    () => host.assert(expression, 4),
+  ]) {
+    expect(run).toThrow(
+      `Step 4 holds a \`\${...}\` that the runner cannot read. Move the expression to an \`evalScript\` step that writes \`output\`, and read \`\${output.<name>}\`.`,
+    );
+  }
 });
 
 test('a script file, a flow of another file and a flow hook are refused', () => {
@@ -134,22 +178,15 @@ function fakePost(ok: boolean, reply: string) {
   return { calls, post };
 }
 
-test('a tool step posts with http.post, and its check resolves to true, or false when the post fails', () => {
+test('a tool step posts with http.post, and its check is true, or false when the post fails', () => {
   const tool = `\${output.tool3 = http.post("${url}", {headers: {"content-type": "application/json"}, body: ${JSON.stringify(body)}})}`;
-  const check = {
-    assertTrue: {
-      condition: `\${output.tool3.ok && JSON.parse(output.tool3.body).result !== undefined}`,
-      label: 'The agent tool answers with no refusal',
-    },
-  };
+  const check = `\${output.tool3.ok && JSON.parse(output.tool3.body).result !== undefined}`;
   for (const ok of [true, false]) {
     const fake = fakePost(ok, JSON.stringify({ result: { content: [] } }));
     const host = scriptHost({}, {}, fake.post);
     host.evalScript(tool, 3);
     expect(fake.calls).toEqual([[url, { headers: { 'content-type': 'application/json' }, body }]]);
-    expect(host.resolved(check, 4)).toEqual({
-      assertTrue: { condition: String(ok), label: 'The agent tool answers with no refusal' },
-    });
+    expect(host.assert(check, 4)).toBe(ok);
   }
 });
 
@@ -161,9 +198,7 @@ test('a server check asks with http.post until the values match, and json reads 
   const host = scriptHost({}, {}, fake.post);
   host.evalScript(held, 5);
   expect(fake.calls).toHaveLength(1);
-  expect(host.resolved({ assertTrue: `\${output.held5 === ${want}}` }, 6)).toEqual({
-    assertTrue: 'true',
-  });
+  expect(host.assert(`\${output.held5 === ${want}}`, 6)).toBe(true);
   host.evalScript(
     `\${output.first = json(http.post("u").body).result.structuredContent.items[0].n}`,
     7,

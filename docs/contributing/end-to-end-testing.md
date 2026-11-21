@@ -284,21 +284,26 @@ and links the dev servers to the build machine. See
 
 The `agent-device` daemon is on the pool machine. It refuses each script step of
 a flow that it gets over the network, and a screenshot that it takes stays
-there. So the runner cuts each flow into parts at each top-level `evalScript`
-and `takeScreenshot` step, and runs the parts in order:
+there. So the runner cuts each flow into parts at each top-level `evalScript`,
+`assertTrue` and `takeScreenshot` step, and runs the parts in order:
 
 - Each stretch of device steps goes to the device as one flow file, with
   `agent-device replay --maestro`.
 - Each `evalScript` step runs on this machine. The script gets `http.post`,
   `json`, `output` and the `device` object.
+- Each `assertTrue` step checks its condition on this machine. The condition
+  is false when its value is empty, `false`, `0`, `null` or `undefined`. A
+  false condition fails the journey with the label of the step.
 - Each `takeScreenshot` step saves the screen on this machine, with
   `agent-device screenshot`.
 
-The first part that fails stops the journey. A script or screenshot step inside
-another step, a `runFlow` of another file and a `runScript` step are refused
-before the device gets a step. A value such as `${output.held36}` in a device
-step gets its value on this machine, before the device gets the step. The cut is
-`flowOf` in `tools/journeys/flow-parts.ts`.
+The first part that fails stops the journey. The runner refuses a script,
+check or screenshot step inside another step. It also refuses a `runFlow` of
+another file and a `runScript` step. Each refusal comes before the device gets
+a step. A value such as `${output.held36}` in a device step gets its value on
+this machine, before the device gets the step. A `${...}` that the runner
+cannot read, such as one with nested braces, fails the step before the device
+gets it. The cut is `flowOf` in `tools/journeys/flow-parts.ts`.
 
 Each journey writes its evidence to `test-results/journeys/native/<id>/`. The
 runner removes the folder at the start of the journey.
@@ -323,7 +328,8 @@ device.
 
 A `tool` step calls `/mcp` on the API as the organization of the run. The runner
 makes that call and the call of `serverHolds` on this machine, not on the
-device. So the write comes from outside the app. The `see` after it proves that
+device. The check of each one runs on this machine too, so the device gets no
+`assertTrue` step. So the write comes from outside the app. The `see` after it proves that
 the write reached the device through the server. A refusal of the tool fails the
 journey. `tools/journeys/native.test.ts` runs the runner on a fake device host.
 

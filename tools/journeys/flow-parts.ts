@@ -6,14 +6,20 @@ import { parseAllDocuments, stringify } from 'yaml';
  * A native journey runs on a device of the shared pool through `agent-device`,
  * whose daemon is on the pool machine. That daemon refuses each script step of
  * a flow that it gets over the network, and a screenshot that it takes stays
- * on the pool machine. So the runner keeps those steps on this machine: it
- * sends each stretch of device steps as one flow, and runs the steps between
- * two stretches itself. See docs/contributing/end-to-end-testing.md#native-journeys.
+ * on the pool machine. So the runner keeps those steps and each check on this
+ * machine: it sends each stretch of device steps as one flow, and runs the
+ * steps between two stretches itself. See docs/contributing/end-to-end-testing.md#native-journeys.
  */
 type FlowPart =
   | { readonly kind: 'device'; readonly first: number; readonly commands: ReadonlyArray<unknown> }
   | { readonly kind: 'evalScript'; readonly step: number; readonly script: string }
-  | { readonly kind: 'takeScreenshot'; readonly step: number; readonly name: string };
+  | { readonly kind: 'takeScreenshot'; readonly step: number; readonly name: string }
+  | {
+      readonly kind: 'assertTrue';
+      readonly step: number;
+      readonly condition: string;
+      readonly label?: string;
+    };
 
 /** A flow, cut into its parts in order. */
 export type Flow = {
@@ -26,7 +32,7 @@ export type Flow = {
 };
 
 /** The steps that run on this machine. */
-const localSteps = ['evalScript', 'takeScreenshot'] as const;
+const localSteps = ['evalScript', 'takeScreenshot', 'assertTrue'] as const;
 type LocalStep = (typeof localSteps)[number];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -38,9 +44,9 @@ function localStepOf(command: unknown): LocalStep | null {
 }
 
 /**
- * Whether a device step holds a step that the runner cannot reach: a script or
- * screenshot step below the top level, or a `runFlow` of another file, whose
- * steps the runner does not read.
+ * Whether a device step holds a step that the runner cannot reach: a script,
+ * check or screenshot step below the top level, or a `runFlow` of another
+ * file, whose steps the runner does not read.
  */
 function holdsLocalStep(value: unknown): boolean {
   if (Array.isArray(value)) {
@@ -65,6 +71,12 @@ function localPart(name: LocalStep, command: Record<string, unknown>, step: numb
   if (name === 'evalScript' && typeof value === 'string') {
     return { kind: 'evalScript', step, script: value };
   }
+  if (name === 'assertTrue') {
+    const { condition, label } = isRecord(value) ? value : { condition: value, label: undefined };
+    if (typeof condition === 'string' && (label === undefined || typeof label === 'string')) {
+      return { kind: 'assertTrue', step, condition, ...(label === undefined ? {} : { label }) };
+    }
+  }
   if (name === 'takeScreenshot') {
     const shot = isRecord(value) ? value.path : value;
     if (typeof shot === 'string' && /^[\w.-]+$/u.test(shot)) {
@@ -72,7 +84,7 @@ function localPart(name: LocalStep, command: Record<string, unknown>, step: numb
     }
   }
   throw new Error(
-    `Step ${step} is a ${name} step in a form that the runner does not read. Write \`evalScript: \${...}\` or \`takeScreenshot: <name>\`.`,
+    `Step ${step} is a ${name} step in a form that the runner does not read. Write \`evalScript: \${...}\`, \`assertTrue: \${...}\` or \`takeScreenshot: <name>\`.`,
   );
 }
 
@@ -116,7 +128,7 @@ export function flowOf(source: string): Flow {
     }
     if (holdsLocalStep(command)) {
       throw new Error(
-        `Step ${step} holds a script or screenshot step inside another step, or runs the flow of another file. The device pool refuses a script, and the runner reads only the top-level steps of one file. Move the step to the top level of the flow.`,
+        `Step ${step} holds a script, check or screenshot step inside another step, or runs the flow of another file. The device pool refuses a script, and the runner reads only the top-level steps of one file. Move the step to the top level of the flow.`,
       );
     }
     if (stretch === null) {
@@ -201,17 +213,27 @@ export function scriptHost(
   const run = (code: string, filename: string) =>
     vm.runInContext(code, context, { filename, timeout: scriptMs }) as unknown;
 
-  /** The text with each `${expression}` replaced by its value. */
-  const text = (value: string, where: string) =>
-    value.replaceAll(placeholder, (_, expression: string) => {
+  /**
+   * The text with each `${expression}` replaced by its value. A `${` that the
+   * pattern does not match, such as an expression with nested braces, is
+   * refused, so no step gets the expression as plain text.
+   */
+  const text = (value: string, where: string, empty: 'refuse' | 'keep' = 'refuse') => {
+    if (value.replaceAll(placeholder, '').includes('${')) {
+      throw new Error(
+        `${where} holds a \`\${...}\` that the runner cannot read. Move the expression to an \`evalScript\` step that writes \`output\`, and read \`\${output.<name>}\`.`,
+      );
+    }
+    return value.replaceAll(placeholder, (_, expression: string) => {
       const result = run(`(${expression}\n)`, where);
-      if (result === undefined || result === null) {
+      if (empty === 'refuse' && (result === undefined || result === null)) {
         throw new Error(
           `${where} reads \${${expression}}, which has no value. Set it in the env of the flow or in a script step before, or pass it to the run.`,
         );
       }
       return String(result);
     });
+  };
 
   /** A step with each `${expression}` in it replaced, so the device gets plain values. */
   const resolved = (value: unknown, step: number): unknown => {
@@ -238,6 +260,14 @@ export function scriptHost(
           context[name] = text(value, `The env value ${name}`);
         }
       }
+    },
+    /**
+     * Runs an `assertTrue` step: whether its condition holds. The resolved text
+     * `''`, `false`, `0`, `null` or `undefined` is false, and any other is true.
+     */
+    assert(condition: string, step: number): boolean {
+      const value = text(condition, `Step ${step}`, 'keep').trim();
+      return !['', 'false', '0', 'null', 'undefined'].includes(value);
     },
     /** Runs an `evalScript` step: one `${expression}`, for what it writes to `output`. */
     evalScript(script: string, step: number) {

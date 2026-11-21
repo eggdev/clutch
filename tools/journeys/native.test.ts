@@ -93,7 +93,9 @@ function run(files: Record<string, string>, setup: Setup = {}) {
     const saved = new Map(
       written.map((file) => [file, readFileSync(path.join(root, file), 'utf-8')]),
     );
-    const read = (file: string) => saved.get(file) ?? null;
+    const read = Object.assign((file: string) => saved.get(file) ?? null, {
+      files: () => saved.keys(),
+    });
     const measures = read('test-results/journeys/measures/sign-up.android.json');
     return { exitCode, calls, lines, links, read, measures: measures && JSON.parse(measures) };
   });
@@ -126,16 +128,47 @@ test('a flow with a script step and a screenshot runs its parts in order, and wr
   expect(result.calls).toEqual([
     replay('001'),
     ['wait', 'label="Title" value="Milk"', '500'],
-    replay('003'),
     screenshot('middle'),
     replay('005'),
     screenshot('final-screen'),
   ]);
-  // The device gets the value of the script, not the script.
-  expect(parse(result.read(`${evidence}/parts/003.maestro.yaml`)?.split('---\n')[1] ?? '')).toEqual(
-    [{ assertTrue: 'true' }],
+  expect(result.read(`${evidence}/output.txt`)).toContain('Step 2 passed.\nStep 3 passed.');
+  // The check runs here, so no part file holds it.
+  expect(parse(result.read(`${evidence}/parts/005.maestro.yaml`)?.split('---\n')[1] ?? '')).toEqual(
+    [{ tapOn: 'Done' }],
   );
-  expect(result.read(`${evidence}/output.txt`)).toContain('Step 2 passed.');
+});
+
+test('a check that is false fails the journey here, and the device gets no assertTrue step', async () => {
+  const steps = [
+    '- launchApp',
+    `- evalScript: \${output.tool2 = {ok:false}}`,
+    '- assertTrue:',
+    `    condition: \${output.tool2.ok}`,
+    '    label: The agent tool answers with no refusal',
+    '- tapOn: Done',
+    '',
+  ].join('\n');
+  const result = await run(maestro(steps));
+  expect(result.exitCode).toBe(1);
+  expect(result.calls).toEqual([replay('001'), screenshot('final-screen')]);
+  expect(result.lines).toContain(
+    'Step 3 (assertTrue) failed: The agent tool answers with no refusal',
+  );
+  const parts = [...result.read.files()].filter((file) => file.includes('/parts/'));
+  expect(parts.map((file) => result.read(file))).not.toContainEqual(
+    expect.stringContaining('assertTrue'),
+  );
+});
+
+test('a device step with a `${` that the runner cannot read fails before the device gets it', async () => {
+  const steps = `- launchApp\n- inputText: \${(function () { if (output.ok) { return 'a' } return 'b' })()}\n`;
+  const result = await run(maestro(steps));
+  expect(result.exitCode).toBe(1);
+  expect(result.calls).toEqual([screenshot('final-screen')]);
+  expect(result.lines).toContain(
+    `Step 2 holds a \`\${...}\` that the runner cannot read. Move the expression to an \`evalScript\` step that writes \`output\`, and read \`\${output.<name>}\`.`,
+  );
 });
 
 test('a device part that fails stops the journey, runs no retry, and still saves the final screen', async () => {
@@ -170,7 +203,7 @@ test('a script step inside another step is refused before the device gets a step
   const result = await run(maestro(steps));
   expect([result.exitCode, result.calls]).toEqual([1, []]);
   expect(result.lines[0]).toStartWith(
-    `::error title=Flow cannot run in parts::${flowFile}: Step 1 holds a script or screenshot step inside another step`,
+    `::error title=Flow cannot run in parts::${flowFile}: Step 1 holds a script, check or screenshot step inside another step`,
   );
 });
 

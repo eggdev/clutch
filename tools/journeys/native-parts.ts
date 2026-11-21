@@ -7,8 +7,9 @@ import { DeviceHostError, runFlow } from '@tools/native/device-host';
 import type { DeviceHost, Result } from '@tools/native/device-host';
 
 // The native runner runs a flow in parts on a device of the pool. The device pool refuses a
-// script step, and a screenshot that it takes stays on the pool machine, so the script steps
-// and the screenshots run on this machine. See docs/contributing/end-to-end-testing.md#native-journeys.
+// script step, and a screenshot that it takes stays on the pool machine, so the script steps,
+// the checks and the screenshots run on this machine.
+// See docs/contributing/end-to-end-testing.md#native-journeys.
 
 /**
  * The `device` object of a script step: the native commands of `agent-device`
@@ -59,7 +60,7 @@ function finalScreen(host: DeviceHost, folder: string, log: (line: string) => vo
 /**
  * Runs the parts of one flow in order, and stops at the first that fails. Each
  * stretch of device steps goes to the device as a flow file in `parts/`. A
- * script step runs here, and a screenshot comes here. The output of each part
+ * script step and a check run here, and a screenshot comes here. The output of each part
  * goes to `output.txt`, and `final-screen.png` shows the screen at the end.
  * Returns whether each part passed.
  */
@@ -99,6 +100,13 @@ export function runParts(
         result = result.exitCode === 0 ? runFlow(host, file) : result;
       } else if (part.kind === 'evalScript') {
         result = local(part.step, () => scripts.evalScript(part.script, part.step));
+      } else if (part.kind === 'assertTrue') {
+        const { step, condition, label } = part;
+        result = local(step, () => {
+          if (!scripts.assert(condition, step)) {
+            throw new Error(`Step ${step} (assertTrue) failed: ${label ?? condition}`);
+          }
+        });
       } else {
         result = host.device(['screenshot', path.join(folder, `${part.name}.png`)]);
       }
