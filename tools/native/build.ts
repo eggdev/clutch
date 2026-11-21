@@ -3,14 +3,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { nativeApps } from '@tools/apps';
-import {
-  DeviceHostError,
-  builtApp,
-  deviceHost,
-  lockFile,
-  withDevice,
-  withLock,
-} from '@tools/native/device-host';
+import { DeviceHostError, deviceHost } from '@tools/native/device-host';
 import type { DeviceHost, Platform } from '@tools/native/device-host';
 
 /**
@@ -99,19 +92,16 @@ export type BuildOptions = {
   readonly args: Array<string>;
   readonly host?: DeviceHost;
   readonly tool?: (appRoot: string) => Promise<FingerprintTool>;
-  readonly lock?: string;
   readonly log?: (line: string) => void;
   readonly env?: NodeJS.ProcessEnv;
 };
 
-const usage =
-  'Usage: mise exec -- bun run native:build [app] --platform <ios|android> [--record | --install]';
+const usage = 'Usage: mise exec -- bun run native:build [app] --platform <ios|android> [--record]';
 
 type Target = {
   app: string;
   platforms: Array<Platform>;
   record: boolean;
-  install: boolean;
 };
 
 /** The app and platforms that the arguments name, or a refusal to log. */
@@ -124,7 +114,6 @@ function targetOf(root: string, args: Array<string>): Target | string {
       options: {
         platform: { type: 'string' },
         record: { type: 'boolean', default: false },
-        install: { type: 'boolean', default: false },
       },
     });
   } catch (error) {
@@ -144,7 +133,6 @@ function targetOf(root: string, args: Array<string>): Target | string {
     app,
     platforms: chosen,
     record: values.record,
-    install: values.install,
   };
 }
 
@@ -170,7 +158,7 @@ async function record(run: Run): Promise<number> {
   return 0;
 }
 
-async function buildChanged(run: Run, host: () => DeviceHost, lock: string): Promise<number> {
+async function buildChanged(run: Run, host: () => DeviceHost): Promise<number> {
   const { log, relative } = run;
   const [platform] = run.target.platforms;
   const before = run.recorded[platform];
@@ -183,7 +171,7 @@ async function buildChanged(run: Run, host: () => DeviceHost, lock: string): Pro
   const after = await run.tool.create(run.appRoot, platform);
   if (after.hash === before.hash) {
     log(
-      `JS-only change: the ${platform} native fingerprint matches ${relative}. Ship it with an update, not a native build. A dev build on the booted device loads the new JavaScript from the dev server.`,
+      `JS-only change: the ${platform} native fingerprint matches ${relative}. Ship it with an update, not a native build. A dev build on the device loads the new JavaScript from the dev server.`,
     );
     return 1;
   }
@@ -191,8 +179,7 @@ async function buildChanged(run: Run, host: () => DeviceHost, lock: string): Pro
   for (const source of changedSources(before, after).slice(0, 20)) {
     log(`  ${source}`);
   }
-  const builder = host();
-  const result = await withLock(lock, () => builder.build(run.appRoot, platform));
+  const result = await host().build(run.appRoot, platform);
   log(result.output);
   if (result.exitCode !== 0) {
     log(`The ${platform} build failed, so ${relative} keeps the last built fingerprint.`);
@@ -200,33 +187,6 @@ async function buildChanged(run: Run, host: () => DeviceHost, lock: string): Pro
   }
   run.save({ ...run.recorded, [platform]: after });
   log(`Built. Commit ${relative} with the native change that caused the build.`);
-  return 0;
-}
-
-/**
- * `--install` puts the last build on the booted device, with no build. A build
- * needs no device, so it can finish before the owner boots one.
- */
-async function installLast(run: Run, host: () => DeviceHost, lock: string): Promise<number> {
-  const [platform] = run.target.platforms;
-  const app = builtApp(run.appRoot, platform);
-  if (!app) {
-    run.log(
-      `${run.target.app} has no ${platform} build to install. Build it: \`mise exec -- bun run native:build ${run.target.app} --platform ${platform}\`.`,
-    );
-    return 1;
-  }
-  const installer = host();
-  const name = await withDevice(
-    installer,
-    platform,
-    async (device) => {
-      await installer.install(device, app);
-      return device.name;
-    },
-    lock,
-  );
-  run.log(`Installed the ${platform} build of ${run.target.app} on ${name}.`);
   return 0;
 }
 
@@ -259,13 +219,10 @@ export async function nativeBuild(options: BuildOptions): Promise<number> {
       log,
     };
     const host = () => options.host ?? deviceHost(env);
-    const lock = options.lock ?? lockFile();
     if (target.record) {
       return await record(run);
     }
-    return target.install
-      ? await installLast(run, host, lock)
-      : await buildChanged(run, host, lock);
+    return await buildChanged(run, host);
   } catch (error) {
     if (!(error instanceof DeviceHostError)) {
       throw error;
