@@ -17,19 +17,19 @@ export const simulatorTools = {
  *   goes through `bun run native:build`, which checks the fingerprint.
  *   `build_status` only reads.
  * - `control` with a `device` or `udid` picks a simulator by name, and can
- *   start a second one. Without them, the tool reuses the attached or booted
- *   simulator.
+ *   start a second one. An agent opens a pool device with T3 Code's
+ *   `device_open` instead.
  */
 export function simulatorToolRefusal(payload: Payload): string | null {
   const input = payload.tool_input ?? {};
   if (payload.tool_name === simulatorTools.build && input.action === 'build') {
-    return 'This tool makes a native iOS build. Run `mise exec -- bun run native:build` instead. It builds only when the native fingerprint changed, and refuses a JavaScript-only change. See docs/contributing/setup/native.md.';
+    return 'This tool makes a native iOS build. Run `mise exec -- bun run native:build` instead. It makes a build only when no build of the native fingerprint exists. See docs/contributing/setup/native.md.';
   }
   if (
     payload.tool_name === simulatorTools.control &&
     (input.device !== undefined || input.udid !== undefined)
   ) {
-    return 'This call picks a simulator by name or UDID, and can start a second one. Call the tool again without `device` and `udid`. It then reuses the attached or booted simulator. When none is booted, ask the owner to boot one. See docs/contributing/setup/native.md.';
+    return "This call picks a simulator by name or UDID, and can start a second one. Open a device of the shared pool with T3 Code's `device_open` instead. See docs/contributing/setup/native.md#the-device-pool.";
   }
   return null;
 }

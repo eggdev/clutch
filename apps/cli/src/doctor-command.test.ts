@@ -53,8 +53,10 @@ test('--json reports every registry capability with its detected and declared st
     'summary',
     'sast',
     'rulesets',
+    'machine',
   ]);
   expect(report).toMatchObject({ schemaVersion: 1, root: repo.root, templateRelease: 'v0.2.0' });
+  expect(report.machine).toBeNull();
   const all = await capabilities();
   expect(report.results).toHaveLength(all.length);
   const row = (id: string) => report.results.find((item: { id: string }) => item.id === id);
