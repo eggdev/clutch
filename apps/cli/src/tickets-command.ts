@@ -135,6 +135,23 @@ async function dispatched(store: TicketStore, cwd: string, values: Values) {
   return driver ? await dispatch(driver) : [];
 }
 
+/** `tickets phases [--check]`: reads only the phase file, so it opens no store. */
+async function phasesCommand(values: Values, cwd: string) {
+  const root = await rootOf(cwd);
+  const file = await readPhaseFile(root);
+  if (!values.check) {
+    return { file: phaseFilePath(root), phases: file };
+  }
+  if (!file) {
+    throw new Error(`${phaseFilePath(root)} does not exist.`);
+  }
+  const missing = missingSkills(file, root);
+  if (missing.length > 0) {
+    throw new Error(missing.map((skill) => `The skill ${skill} is not installed.`).join('\n'));
+  }
+  return { status: 'ok', file: phaseFilePath(root) };
+}
+
 /** The commands that run no dispatch after them. `dispatch` itself writes only through the driver. */
 const reads: Record<string, [number, Handler]> = {
   dispatch: [
@@ -176,24 +193,6 @@ const reads: Record<string, [number, Handler]> = {
         throw new Error(`--since must be an event number. Got ${values.since}.`);
       }
       return { events: store.events({ ticket: values.ticket, since }) };
-    },
-  ],
-  phases: [
-    0,
-    async (_store, _args, values, cwd) => {
-      const root = await rootOf(cwd);
-      const file = await readPhaseFile(root);
-      if (!values.check) {
-        return { file: phaseFilePath(root), phases: file };
-      }
-      if (!file) {
-        throw new Error(`${phaseFilePath(root)} does not exist.`);
-      }
-      const missing = missingSkills(file, root);
-      if (missing.length > 0) {
-        throw new Error(missing.map((skill) => `The skill ${skill} is not installed.`).join('\n'));
-      }
-      return { status: 'ok', file: phaseFilePath(root) };
     },
   ],
 };
@@ -300,6 +299,9 @@ const writes: Record<string, [number, Handler]> = {
 async function run(args: Array<string>, cwd: string) {
   const { values, positionals } = parseArgs({ args, allowPositionals: true, options });
   const [action = '', ...rest] = positionals;
+  if (action === 'phases' && rest.length === 0) {
+    return phasesCommand(values, cwd);
+  }
   const command = reads[action] ?? writes[action];
   if (!command || command[0] !== rest.length) {
     throw new Error(`Usage:\n${ticketsUsage}`);
