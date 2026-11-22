@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -159,6 +160,15 @@ test('a ready phase with no entry stays ready, and phases --check names a skill 
     code: 1,
     json: { message: 'The skill nowhere is not installed.' },
   });
+});
+
+test('phases and phases --check create no ticket store', async () => {
+  await using shop = await project(phaseFile('{ threads: 6, device: 2 }', triageOwn));
+  expect(await shop.tickets(['phases', '--check'])).toMatchObject({ code: 0 });
+  expect(await shop.tickets(['phases'])).toMatchObject({ code: 0 });
+  expect(existsSync(path.join(shop.root, '.git', 'clutch', 'tickets.sqlite'))).toBe(false);
+  expect(await shop.tickets(['list'])).toMatchObject({ code: 0 });
+  expect(existsSync(path.join(shop.root, '.git', 'clutch', 'tickets.sqlite'))).toBe(true);
 });
 
 test('phases --check exits 1 on an unknown key or phase, and 0 on a valid file', async () => {
