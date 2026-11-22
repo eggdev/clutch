@@ -74,8 +74,8 @@ on those pages; this list only points at them.
 
 **Build or run a native app**
 
-1. [Native builds and devices](./setup/native.md): reuse the booted device,
-   and build only through `native:build`.
+1. [Native builds and devices](./setup/native.md): open a device of the shared
+   pool, and build only through `native:build`.
 
 ## Setup and workflow
 

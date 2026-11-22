@@ -4,7 +4,7 @@ End-to-end tests drive the real app through its user-facing entry point:
 browser, native app or CLI. A journey is one end-to-end test. See
 [journeys](./setup/verification.md#journeys) for the files, the runner and the
 check. The locator guidance below applies to browser journeys. Native journeys
-use Maestro.
+use the Maestro flow format.
 
 ## What to test
 
@@ -165,9 +165,8 @@ run that failed a measured budget also has `budgetFailure`, with its kind and
 its message.
 
 The measures read the top document only. A click or a layout shift inside an
-iframe, such as a payment or captcha frame, is not counted. A native try has only its result and its time. CI keeps the files as the
-`journey-measures-web`, `journey-measures-ios` and `journey-measures-android`
-artifacts.
+iframe, such as a payment or captcha frame, is not counted. A native try has only its result and its time. CI keeps the web files as the
+`journey-measures-web` artifact.
 
 ## Agent and pool
 
@@ -226,10 +225,19 @@ the answer can come.
 Chromium: it moves the clock past a timer of one minute.
 
 The native run writes the flow to `test-results/journeys/native/<id>.maestro.yaml`
-and runs it on the booted device. It records each outcome with the taps and
-submits before it. A core journey whose outcome goes over the click budget fails,
+and runs it on the opened device in parts. See [native journeys](#native-journeys).
+It records each outcome with the taps and submits before it. A core journey whose outcome goes over the click budget fails,
 with the rule of the web run in `@repo/journeys/types/budget`. The app ID comes
 from `expo.ios.bundleIdentifier` or `expo.android.package` in the app's `app.json`.
+
+A `tap`, `fill`, `see` or `gone` on a `fieldWith` target compiles to a script
+step that calls the `device` object, such as
+`evalScript: ${device.wait("label=\"Note title\" value=\"Milk\"", 10000)}`.
+A `text` selector of a flow matches the label of a field, never its value. So
+no flow step finds a field by its value. The native commands of `agent-device`
+read `label="…" value="…"`. `device.wait`, `device.gone`, `device.fill` and
+`device.press` call `agent-device wait`, `wait absent`, `fill` and `press`. A
+`submit` stays `pressKey: Enter`.
 
 The native flow does not prove what it leaves out. It runs the first device
 only. It does not run axe or check the object pool. Read the
@@ -242,32 +250,70 @@ into `webOnly`, waits for the owner. See [proof gates code](../principles/proof-
 
 ## Native journeys
 
-Each native journey runs with Maestro on the booted device of the device host:
+Each native journey runs on the device that the caller opened from the
+[device pool](./setup/native.md#the-device-pool), through `agent-device`. The
+Maestro command line tool is not needed. A leased device has no app, so install
+the build first. [Native journeys](./setup/native.md#native-journeys) gives the
+order:
 
 ```sh
-mise exec -- bun run journey --native ios
+AGENT_DEVICE=<path> mise exec -- bun run native:build --platform ios --install
+AGENT_DEVICE=<path> mise exec -- bun run journey --native ios
 ```
 
-CI runs it on an iPhone 16 simulator on a `macos-15` runner, with Xcode 26.3.
-The default Xcode of that runner has an older Swift than the native modules of
-Expo 57 need. The Android job boots a Pixel 7 emulator with API 35, on an
-`ubuntu` runner with KVM. That job runs only for a repository with an Android
-app, and it fails until the project fills its build line. Each job has a limit
-of 25 minutes. The iOS job sets `DEVICE_HOST=local`, which finds the simulator
-that the job booted. The Android job sets `DEVICE_HOST=ci`, which finds the
-emulator that the job booted. A native run with no native journey fails.
+No CI job runs a native journey for now. An agent runs one from its session,
+on a device of the shared pool. CL-596 adds a native check to local CI. A
+native run with no native journey fails.
 
 A journey in data form compiles to a Maestro flow. The first launch of a flow
 clears the state of the app. Each launch passes two launch arguments.
 `devOrganization` gives the run an organization of its own. The app sends it on
 the sync socket, on iOS only. See `apps/app/lib/server.native.ts`.
-`RCT_jsLocation` tells a debug build where its dev server is.
+`RCT_jsLocation` tells a debug build where its dev server is. The flow writes
+each name with a leading `-`, such as `-devOrganization`. `agent-device` passes
+each name to the app as it is, and iOS reads an argument as `-name value`.
 
-The runner drives the build that is on the device, so the sources must be the
-ones of that build. It compares the native fingerprint of the app with the one
-in `native-fingerprint.json`. When they differ, or no build is on record, it
-runs no flow and names the build command. `tools/journeys/native.test.ts`
-holds that rule.
+The runner drives the build that is on the device, so the device must have the
+build of the sources. `native:build --install` records the fingerprint of the
+build that it installs on the opened device. The runner compares that record
+with the native fingerprint of the app now. When the device has no record, or a
+record of another fingerprint, the runner runs no flow and names the install
+command. The runner then checks that each dev server answers on this machine,
+and links the dev servers to the build machine. See
+[the dev server link](./setup/native.md#the-dev-server-link).
+
+The `agent-device` daemon is on the pool machine. It refuses each script step of
+a flow that it gets over the network, and a screenshot that it takes stays
+there. So the runner cuts each flow into parts at each top-level `evalScript`,
+`assertTrue` and `takeScreenshot` step, and runs the parts in order:
+
+- Each stretch of device steps goes to the device as one flow file, with
+  `agent-device replay --maestro`.
+- Each `evalScript` step runs on this machine. The script gets `http.post`,
+  `json`, `output` and the `device` object.
+- Each `assertTrue` step checks its condition on this machine. The condition
+  is false when its value is empty, `false`, `0`, `null` or `undefined`. A
+  false condition fails the journey with the label of the step.
+- Each `takeScreenshot` step saves the screen on this machine, with
+  `agent-device screenshot`.
+
+The first part that fails stops the journey. The runner refuses a script,
+check or screenshot step inside another step. It also refuses a `runFlow` of
+another file and a `runScript` step. Each refusal comes before the device gets
+a step. A value such as `${output.held36}` in a device step gets its value on
+this machine, before the device gets the step. A `${...}` that the runner
+cannot read, such as one with nested braces, fails the step before the device
+gets it. The cut is `flowOf` in `tools/journeys/flow-parts.ts`.
+
+Each journey writes its evidence to `test-results/journeys/native/<id>/`. The
+runner removes the folder at the start of the journey.
+
+| File               | What it holds                                                     |
+| ------------------ | ----------------------------------------------------------------- |
+| `output.txt`       | The output of each part, in order.                                |
+| `parts/`           | The flow file of each stretch of device steps, by its first step. |
+| `<name>.png`       | The screenshot of each `takeScreenshot` step.                     |
+| `final-screen.png` | The screen after the last part, or after the part that failed.    |
 
 A step with no native form carries `webOnly(step, reason)`. The compiler
 refuses a web-only step with no reason, and a flow with no `see`, `gone` or
@@ -280,31 +326,24 @@ it asks again for a short time. On a device, a `see` after a `fill` matches the
 text that the flow typed. So `serverHolds` is the proof that the write left the
 device.
 
-A `tool` step calls `/mcp` on the API from the machine that drives the device, as
-the organization of the run. Maestro runs that call, so the write comes from
-outside the app. The `see` after it proves that the write reached the device
-through the server. A refusal of the tool fails the flow.
-
-The runner compiles each journey first. Maestro then reads each flow with
-`maestro check-syntax`, before a device is needed. A flow that Maestro cannot
-read fails the run, also when no device is booted.
-`tools/journeys/native.test.ts` holds that rule.
-
-Maestro runs on Java. On a Mac whose only JDK is the one of Homebrew, the device
-host names that JDK as `JAVA_HOME`. With no Java, the run stops with one
-sentence that names the fix. `tools/native/maestro.test.ts` holds both cases.
+A `tool` step calls `/mcp` on the API as the organization of the run. The runner
+makes that call and the call of `serverHolds` on this machine, not on the
+device. The check of each one runs on this machine too, so the device gets no
+`assertTrue` step. So the write comes from outside the app. The `see` after it proves that
+the write reached the device through the server. A refusal of the tool fails the
+journey. `tools/journeys/native.test.ts` runs the runner on a fake device host.
 
 An `offline` step is left out of an iOS flow. The run prints one sentence that
 says so, because a simulator shares the network of its host. The app loads
 plain HTTP only from `localhost` and its subdomains, as set in
 `apps/app/app.json`.
 
-A known limit: a native lane records only the result and the time of each try.
+A known limit: a native run records only the result and the time of each try.
 It does not measure a layout shift, clicks or axe. The device host also does
 not record outcomes yet. So the budgets on this page hold on web only.
 
-The native jobs run on a PR that reaches native, and on each push to `main`.
-`tools/journeys/reach.ts` is the one place that states the reach rule:
+`tools/journeys/reach.ts` is the one place that states the reach rule. It
+names the platforms that a change reaches:
 
 - Every change reaches web.
 - A change reaches native when it touches a native app, a native journey,
@@ -314,23 +353,9 @@ The native jobs run on a PR that reaches native, and on each push to `main`.
 - A sensitive path alone reaches web only. A sensitive path is a file with the
   tier `one-way-door` in `.clutch/risk.yaml`.
 
-A repository with no native app runs no native job. CI starts a platform's
-lane only when a native app declares that platform's app ID. The ID is
-`expo.ios.bundleIdentifier` for iOS, or `expo.android.package` for Android,
-in app.json.
-The template declares iOS only. The `native-ios` job builds the app with
-`native:build --fresh`.
-
-The iOS lane also needs the repository variable `CLUTCH_IOS_LANE` set to `on`.
-Without it, CI skips the `native-ios` job, and a skipped job holds no merge.
-The template leaves the variable unset. The first native build does not fit
-the 25 minutes of the job on a GitHub runner (CL-469). Until the lane can pass,
-run the iOS journeys through a [device host](./setup/native.md#device-host).
-
-A project that ships Android adds its package, then
-fills the build line of `native-android` in `.github/workflows/ci.yml`. Until it
-does, that line fails.
-
-<!-- kickoff: The build step of the native-ios and native-android jobs: how CI builds the app for the simulator and the emulator, and installs it. -->
+A platform counts only when a native app declares that platform's app ID. The
+ID is `expo.ios.bundleIdentifier` for iOS, or `expo.android.package` for
+Android, in app.json. The template declares iOS only. A project that ships
+Android adds its package.
 
 <!-- kickoff: The end-to-end runner for each selected platform, the command to run the suite and one file, the health route, and the infrastructure failures that CI may retry. -->
