@@ -32,7 +32,7 @@ import type { Platform } from '@tools/native/device-host';
  * Each journey writes its measures file.
  * With no web journey, `--all` passes and says so: a warning annotation and a
  * line in the step summary. `--native <ios|android>` runs each native journey
- * on the booted device of the device host. `--hunt <count>` is the nightly
+ * on the device that `AGENT_DEVICE` names. `--hunt <count>` is the nightly
  * flake hunt: it runs each web journey `count` times on each device with no
  * retry, and prints the first-run failures of each journey. It passes when
  * the journeys fail, because it only measures. It writes no measures.

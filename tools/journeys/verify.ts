@@ -127,7 +127,7 @@ export function reportOf(
   // A web pass says nothing about a device, so the report names what it did not run.
   for (const app of onDevice) {
     lines.push(
-      `Native: not run. This report holds the web runs only, and apps/${app} also runs on a device. Run \`mise exec -- bun run journey --native ios\` on a booted device.`,
+      `Native: not run. This report holds the web runs only, and apps/${app} also runs on a device. Run \`mise exec -- bun run journey --native ios\` on a device that you opened from the pool, with \`AGENT_DEVICE\` set.`,
     );
   }
   if (failed === 0 && findings === 0 && runnerCode === 0) {
