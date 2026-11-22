@@ -190,6 +190,8 @@ test('names, issue links and the porcelain format', () => {
   expect(() => branchName('cart', 'cl-1')).toThrow('--issue takes an id such as CL-201');
   expect(issueOf('clutch/cl-201b-cart')).toBe('CL-201b');
   expect(issueOf('feature/x')).toBeNull();
+  // A ticket number has 4 digits, so a ticket branch names no issue.
+  expect(issueOf('clutch/cl-1000-fix')).toBeNull();
   expect(
     parsePorcelain(
       'worktree /r\nHEAD abc\nbranch refs/heads/main\n\nworktree /r2\nHEAD def\ndetached\n\nworktree /bare\nbare\n',

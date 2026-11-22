@@ -45,6 +45,8 @@ export type Ticket = {
   route: Array<PhaseName>;
   routeReason: string | null;
   hold: boolean;
+  /** Why the ticket is held, such as the phase that the route needs and Clutch cannot run yet. */
+  holdReason: string | null;
   body: string;
   dependsOn: Array<string>;
   links: Array<{ kind: (typeof linkKinds)[number]; value: string }>;
@@ -67,13 +69,22 @@ export type Change = Pick<Event, 'type' | 'action' | 'data' | 'updatedFrom'>;
 
 type TicketRow = Omit<
   Ticket,
-  'acceptance' | 'major' | 'route' | 'routeReason' | 'hold' | 'dependsOn' | 'links' | 'createdAt'
+  | 'acceptance'
+  | 'major'
+  | 'route'
+  | 'routeReason'
+  | 'hold'
+  | 'holdReason'
+  | 'dependsOn'
+  | 'links'
+  | 'createdAt'
 > & {
   acceptance: string;
   major: number | null;
   route: string;
   route_reason: string | null;
   hold: number;
+  hold_reason: string | null;
   created_at: string;
 };
 
@@ -117,6 +128,7 @@ const schema = `
     route TEXT NOT NULL DEFAULT '[]',
     route_reason TEXT,
     hold INTEGER NOT NULL DEFAULT 0 CHECK(hold IN (0, 1)),
+    hold_reason TEXT,
     body TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
   );
@@ -154,8 +166,11 @@ const schema = `
     updated_from TEXT NOT NULL
   );
   CREATE INDEX events_ticket ON events (ticket, number);
-  PRAGMA user_version=1;
+  PRAGMA user_version=2;
 `;
+
+/** Version 2 adds the reason of a hold. */
+const fromVersion1 = 'ALTER TABLE tickets ADD COLUMN hold_reason TEXT; PRAGMA user_version=2;';
 
 /** The old value of each field that differs between `before` and `after`. */
 export function changedFrom<T extends object>(before: T, after: T) {
@@ -214,7 +229,9 @@ export class TicketStore implements Disposable {
             .get() ?? { user_version: 0 };
           if (version === 0) {
             this.db.exec(schema);
-          } else if (version !== 1) {
+          } else if (version === 1) {
+            this.db.exec(fromVersion1);
+          } else if (version !== 2) {
             throw new Error(`${file} has schema ${version}. Update Clutch to read it.`);
           }
         })
@@ -229,34 +246,64 @@ export class TicketStore implements Disposable {
     this.db.close();
   }
 
+  /** Every phase row of every ticket, keyed by `<ticket> <phase>`. */
+  private phaseRows() {
+    return new Map(
+      this.db
+        .query<PhaseRow, []>('SELECT * FROM phases ORDER BY rowid')
+        .all()
+        .map((row) => [`${row.ticket} ${row.phase}`, toPhase(row)]),
+    );
+  }
+
+  private insertEvent(actor: string, { type, action, data, updatedFrom }: Change) {
+    const row = this.db
+      .query<EventRow, Array<string>>(
+        `INSERT INTO events (ticket, delivery_id, created_at, actor, type, action, data, updated_from)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      )
+      .get(
+        data.id,
+        randomUUID(),
+        new Date().toISOString(),
+        actor,
+        type,
+        action,
+        JSON.stringify(data),
+        JSON.stringify(updatedFrom),
+      );
+    return toEvent(row as EventRow);
+  }
+
   /**
-   * Runs `change` and writes its event in one immediate transaction, so a
-   * change and its event commit together or not at all. An update that
-   * changes no field writes no event and returns null.
+   * Runs `change` and writes its events in one immediate transaction, so a
+   * change and its events commit together or not at all. The record that
+   * `change` returns gets the first event. Each other phase row that the
+   * change adds or changes, such as the next phase that becomes `ready`, gets
+   * its own event after it. A record that changes no field gets no event.
+   * Returns the event of the record that `change` returns, or null.
    */
   write(actor: string, change: () => Change): Event | null {
     return this.db
       .transaction(() => {
-        const { type, action, data, updatedFrom } = change();
-        if (action === 'update' && Object.keys(updatedFrom).length === 0) {
-          return null;
-        }
-        const row = this.db
-          .query<EventRow, Array<string>>(
-            `INSERT INTO events (ticket, delivery_id, created_at, actor, type, action, data, updated_from)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-          )
-          .get(
-            data.id,
-            randomUUID(),
-            new Date().toISOString(),
-            actor,
-            type,
-            action,
-            JSON.stringify(data),
-            JSON.stringify(updatedFrom),
+        const before = this.phaseRows();
+        const main = change();
+        const changes = [main];
+        for (const [key, data] of this.phaseRows()) {
+          const old = before.get(key);
+          if (main.type === 'Phase' && key === `${data.id} ${(main.data as Phase).phase}`) {
+            continue;
+          }
+          changes.push(
+            old
+              ? { type: 'Phase', action: 'update', data, updatedFrom: changedFrom(old, data) }
+              : { type: 'Phase', action: 'create', data, updatedFrom: {} },
           );
-        return toEvent(row as EventRow);
+        }
+        const events = changes
+          .filter((one) => one.action === 'create' || Object.keys(one.updatedFrom).length > 0)
+          .map((one) => ({ one, event: this.insertEvent(actor, one) }));
+        return events[0]?.one === main ? events[0].event : null;
       })
       .immediate();
   }
@@ -273,6 +320,7 @@ export class TicketStore implements Disposable {
       route,
       route_reason,
       hold,
+      hold_reason,
       created_at,
       ...rest
     } = row as TicketRow & { number: number };
@@ -283,6 +331,7 @@ export class TicketStore implements Disposable {
       route: JSON.parse(route) as Array<PhaseName>,
       routeReason: route_reason,
       hold: hold === 1,
+      holdReason: hold_reason,
       dependsOn: this.db
         .query<{ depends_on: string }, [string]>(
           'SELECT depends_on FROM depends_on WHERE ticket = ? ORDER BY depends_on',

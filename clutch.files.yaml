@@ -208,6 +208,10 @@ files:
   # Risk tiers by path. A project tunes the paths to its own layout.
   - path: .clutch/risk.yaml
     rule: seed
+  # How `clutch tickets dispatch` starts each phase. The project tunes its limits and prompts.
+  - path: .clutch/phases.yaml
+    rule: seed
+    add_on_sync: true
   # How a project writes changesets. Clutch's own pending changesets stay here.
   - path: .changeset/README.md
     rule: seed

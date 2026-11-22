@@ -56,8 +56,11 @@ test('ids start at 1000, and a new ticket has one triage phase that a hold keeps
   expect(statuses(store, 'T-1001')).toEqual({ triage: 'not_ready' });
   releaseTicket(store, 'owner', 'T-1001');
   expect(statuses(store, 'T-1001')).toEqual({ triage: 'ready' });
-  holdTicket(store, 'owner', 'T-1001');
+  holdTicket(store, 'owner', 'T-1001', 'The route needs design.');
   expect(statuses(store, 'T-1001')).toEqual({ triage: 'not_ready' });
+  expect(store.ticket('T-1001').holdReason).toBe('The route needs design.');
+  releaseTicket(store, 'owner', 'T-1001');
+  expect(store.ticket('T-1001').holdReason).toBeNull();
 });
 
 test('a route with no planning names each missing requirement, and passes once they are set', async () => {
@@ -142,7 +145,7 @@ test('a claim needs a ready phase, so a second claim fails', async () => {
   expect(() => claimPhase(store, 'second', id, 'build', null)).toThrow('has no build phase');
 });
 
-test('each write adds exactly one event in the webhook shape, and a write that changes nothing adds none', async () => {
+test('each changed record gets one event in the webhook shape, and a write that changes nothing adds none', async () => {
   await using store = await tempStore();
   const id = add(store);
   setPhase(store, 'owner', id, {
@@ -163,7 +166,7 @@ test('each write adds exactly one event in the webhook shape, and a write that c
   expect(releaseTicket(store, 'owner', id)).toBeNull();
 
   const events = store.events();
-  expect(events).toHaveLength(3);
+  expect(events).toHaveLength(4);
   for (const event of events) {
     expect(Object.keys(event).toSorted()).toEqual([
       'action',
@@ -183,6 +186,11 @@ test('each write adds exactly one event in the webhook shape, and a write that c
   });
   expect(events[1]).toMatchObject({
     type: 'Phase',
+    action: 'create',
+    data: { id, phase: 'triage', status: 'ready' },
+  });
+  expect(events[2]).toMatchObject({
+    type: 'Phase',
     action: 'update',
     data: {
       id,
@@ -192,11 +200,28 @@ test('each write adds exactly one event in the webhook shape, and a write that c
     },
     updatedFrom: { status: 'ready', blockedReason: null },
   });
-  expect(events[2]).toMatchObject({
+  expect(events[3]).toMatchObject({
     type: 'Ticket',
     updatedFrom: { links: [] },
   });
-  expect(store.events({ ticket: id, since: 2 }).map((event) => event.number)).toEqual([3]);
+  expect(store.events({ ticket: id, since: 3 }).map((event) => event.number)).toEqual([4]);
+});
+
+test('done writes one event for the phase and one for the next phase that becomes ready', async () => {
+  await using store = await tempStore();
+  const id = add(store);
+  editTicket(store, 'owner', id, complete);
+  routeTicket(store, 'owner', id, { phases: ['build', 'review'], reason: 'x' });
+  const since = store.events().length;
+  const done = setPhase(store, 'owner', id, { phase: 'triage', status: 'done', reason: null });
+  expect(done).toMatchObject({ data: { phase: 'triage' }, updatedFrom: { status: 'ready' } });
+  expect(store.events({ since }).map((event) => [event.data, event.updatedFrom])).toMatchObject([
+    [{ phase: 'triage', status: 'done' }, { status: 'ready' }],
+    [{ phase: 'build', status: 'ready' }, { status: 'not_ready' }],
+  ]);
+  const held = store.events().length;
+  holdTicket(store, 'owner', id, null);
+  expect(store.events({ since: held }).map((event) => event.type)).toEqual(['Ticket', 'Phase']);
 });
 
 test('edit never changes the description, and ready skips held tickets and open dependencies', async () => {

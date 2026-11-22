@@ -10,7 +10,11 @@ schedule babysits for it. In T3, register the PR and watch it: each change to
 its checks or reviews wakes the session for the next round. Elsewhere, run
 `bun run pr wait <number>` between rounds.
 
-`bun run pr babysit <number>` plans each round. It reports these triggers:
+`bun run pr babysit <number>` plans each round. On a stack, it plans a round
+for each PR of the stack, from the bottom up, so a red check on a PR below
+the top starts a round too. Give it any PR of the stack. Each plan names its
+PR, and the apply step takes one PR: run `--answers` or `--stuck` for each PR
+whose plan has a round. It reports these triggers:
 
 | Trigger          | When                                                                  |
 | ---------------- | --------------------------------------------------------------------- |
@@ -35,7 +39,9 @@ merge.
 Run every command through `mise exec --`.
 
 1. **Plan.** `bun run pr babysit <n>` prints the work and keeps the plan in
-   the git directory. When it says no round runs, wait for the next change.
+   the git directory, for each PR of the stack. Do the steps below for each
+   PR whose plan has a round. When it says no round runs, wait for the next
+   change.
 2. **Read each red check.** `bun run pr failures <n>` prints the failed step
    of each job and the output of each failed Nx task.
 3. **Sync by merge.** On `conflict` or `behind`, merge the base into the
