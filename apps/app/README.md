@@ -8,15 +8,16 @@ feature's screen renders here, and each route is a file under `app/`.
 
 - `mise exec -- bun run dev` starts the app in a browser at
   `http://app.<project>.localhost:1355`.
-- `mise exec -- bun run native:build --platform ios` builds the native app for
-  the iOS simulator. The build needs no booted simulator.
-- `mise exec -- bun run native:build --platform ios --install` installs the last
-  build on the booted simulator. A debug build loads its JavaScript from the
-  dev server, so run `dev` first.
-- `mise exec -- bun run journey --native ios` runs the native journeys on the
-  booted simulator.
+- `AGENT_DEVICE=<path> mise exec -- bun run native:build --platform ios --install`
+  finds the build of the native fingerprint, makes it on the build machine
+  when none exists, and installs it on the opened device. A debug build loads
+  its JavaScript from the dev server, so run `dev` first.
+- `AGENT_DEVICE=<path> mise exec -- bun run journey --native ios` runs the
+  native journeys on the opened device.
 
-An iOS run needs a simulator that the owner booted. No command boots one.
+An agent first opens a device of the
+[device pool](../../docs/contributing/setup/native.md#the-device-pool) with
+T3 Code's `device_open`. `<path>` is the command that `device_open` returns.
 
 ## Where things live
 

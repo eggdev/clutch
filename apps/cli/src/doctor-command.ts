@@ -1,3 +1,4 @@
+import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -8,6 +9,7 @@ import { baselineFile, nextBaseline, readBaseline, writeBaseline } from '@/docto
 import { coreJourneyFindings } from '@/doctor/core-journeys';
 import { detect } from '@/doctor/detect';
 import { gate } from '@/doctor/gate';
+import { nativeMachine, renderNativeMachine } from '@/doctor/native-machine';
 import { originRepo, remoteProber, runGh } from '@/doctor/remote';
 import { buildReport, renderReport } from '@/doctor/report';
 import { renderSast, sastPath } from '@/doctor/sast';
@@ -167,6 +169,9 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
     }
     return result.code;
   }
+  // Advice about this machine only: no exit code, capability or baseline reads it.
+  const place = { env: process.env, home: os.homedir() };
+  const machine = await nativeMachine(root, place);
   if (values.json) {
     console.log(
       JSON.stringify({
@@ -177,6 +182,7 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
         ...report,
         sast,
         rulesets,
+        machine,
       }),
     );
   } else {
@@ -187,6 +193,9 @@ async function run(args: Array<string>, cwd: string): Promise<number> {
       console.log(`Rulesets: unknown (${rulesets})`);
     } else if (rulesets) {
       console.log(renderRulesets(rulesets));
+    }
+    if (machine) {
+      console.log(renderNativeMachine(machine, place));
     }
   }
   return 0;
